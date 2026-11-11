@@ -157,6 +157,9 @@ export function feedBagPrice(tier: FeedTier, unlocks: Unlocks): number {
   return ECONOMY.feed.tiers[tier].bagPrice * (1 - discount);
 }
 
+/** Whole grams one hen eats per day (integer, so feed stock never drifts). */
+export const feedGramsPerHenDay = (): number => Math.round(ECONOMY.feed.kgPerHenPerDay * 1000);
+
 export function feedCostPerHenDay(tier: FeedTier, unlocks: Unlocks): number {
   return (feedBagPrice(tier, unlocks) / ECONOMY.feed.bagKg) * ECONOMY.feed.kgPerHenPerDay;
 }
