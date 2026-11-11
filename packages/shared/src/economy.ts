@@ -65,8 +65,17 @@ export const ECONOMY = {
     maxLoss: 0.9,
   },
   market: {
-    /** Daily supply at which the price multiplier is exactly 1. */
+    /**
+     * Fixed reference for the economy sheet: the daily supply at which the multiplier is exactly 1
+     * when the reference is not scaled (marketMultiplier's default).
+     */
     referenceSupply: 600,
+    /**
+     * Live demand per active farm. The live market's reference supply is this times the number of
+     * active farms (player farms plus open agents), so a typical day sits near 1.00x whether two
+     * players or twenty share Yolk Street. Tuned with the 30-day simulation (apps/server/test/sim.test.ts).
+     */
+    demandPerActiveFarm: 15,
     exponent: 0.8,
     minMultiplier: 0.4,
     maxMultiplier: 2.5,
@@ -140,7 +149,7 @@ export const ECONOMY = {
       startCash: 900,
       /** Bulk price as a share of the live price. */
       priceShare: 0.72,
-      bulkQty: { min: 15, max: 50 },
+      bulkQty: { min: 8, max: 50 },
       /** The wholesaler resells everything it buys into the street market the next day. */
       resellShare: 1.0,
     },
@@ -203,11 +212,19 @@ const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.m
 export const toMilli = (coins: number): number => Math.round(coins * 1000);
 export const fromMilli = (milli: number): number => milli / 1000;
 
-/** clamp((referenceSupply / supply) ^ exponent, min, max). No supply means the top of the range. */
-export function marketMultiplier(totalDailySupply: number): number {
+/** The live market's reference supply: demand per active farm times the active farms (at least one). */
+export function marketReference(activeFarms: number): number {
+  return Math.max(1, Math.floor(activeFarms)) * ECONOMY.market.demandPerActiveFarm;
+}
+
+/**
+ * clamp((reference / supply) ^ exponent, min, max). No supply means the top of the range. The
+ * reference defaults to the fixed sheet value; the live market passes marketReference(activeFarms).
+ */
+export function marketMultiplier(totalDailySupply: number, reference: number = ECONOMY.market.referenceSupply): number {
   const m = ECONOMY.market;
   if (totalDailySupply <= 0) return m.maxMultiplier;
-  return clamp(Math.pow(m.referenceSupply / totalDailySupply, m.exponent), m.minMultiplier, m.maxMultiplier);
+  return clamp(Math.pow(reference / totalDailySupply, m.exponent), m.minMultiplier, m.maxMultiplier);
 }
 
 export const isCrash = (multiplier: number): boolean => multiplier <= ECONOMY.market.crashAt;
