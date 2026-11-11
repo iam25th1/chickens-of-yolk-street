@@ -209,7 +209,8 @@ impl Contract {
                 .map(|(k, v)| format!("{k}: {v}"))
                 .collect::<Vec<_>>()
                 .join(", ");
-            self.hens.internal_mint(
+            // the contract pays storage from its own balance: no deposit asked of the caller
+            self.hens.internal_mint_with_refund(
                 h.token_id.clone(),
                 h.owner_id.clone(),
                 Some(TokenMetadata {
@@ -226,6 +227,7 @@ impl Contract {
                     reference: None,
                     reference_hash: None,
                 }),
+                None,
             );
         }
 
