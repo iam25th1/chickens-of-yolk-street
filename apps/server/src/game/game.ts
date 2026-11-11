@@ -768,14 +768,15 @@ export class Game {
         await expireCards(ctx);
         await expireOrders(ctx);
         // 3. the cast acts
-        const candidates: Candidate[] = [];
+        const acted: { agentId: string; result: DecisionResult }[] = [];
         for (const { agentId, result } of decisions) {
           const [row] = await q.query(`SELECT ${AGENT_COLUMNS} FROM agents WHERE id = $1 AND status = 'open'`, [agentId]);
           if (!row) continue;
           const agent = toAgent(row);
           await turnOverStock(ctx, agent);
           if (result.brain !== 'skipped') {
-            candidates.push(...(await applyDecision(ctx, agent, result.decision, this.applyFarmAction)));
+            await applyDecision(ctx, agent, result.decision, this.applyFarmAction, 'close');
+            acted.push({ agentId, result });
             agent.lastBrain = result.brain;
             await chargeForThinking(ctx, agent);
           }
@@ -805,6 +806,12 @@ export class Game {
         await q.query('DELETE FROM lay_events WHERE day < $1', [newDay - 1]);
         await this.refreshShop(ctx);
         if (this.withCast) await ensureCast(ctx, this.createFarmFn);
+        // orders, fills and offers price against the new day's market
+        const candidates: Candidate[] = [];
+        for (const { agentId, result } of acted) {
+          const [row] = await q.query(`SELECT ${AGENT_COLUMNS} FROM agents WHERE id = $1 AND status = 'open'`, [agentId]);
+          if (row) candidates.push(...(await applyDecision(ctx, toAgent(row), result.decision, this.applyFarmAction, 'open')));
+        }
         // other players' open sell orders reach each player as a trade card
         const trades: { farmId: string; orderId: string }[] = [];
         const sells = await q.query(`SELECT o.id, o.farm_id FROM orders o JOIN farms f ON f.id = o.farm_id WHERE o.status = 'open' AND o.kind = 'limit' AND o.side = 'sell' AND f.owner_kind = 'player'`);

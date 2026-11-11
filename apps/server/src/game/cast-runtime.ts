@@ -183,8 +183,12 @@ export async function turnOverStock(ctx: Ctx, agent: AgentRow): Promise<void> {
   await setAgentStock(ctx, agent.id, agent.stock);
 }
 
-/** Applies one decision, bounded; returns the offers that become player cards. */
-export async function applyDecision(ctx: Ctx, agent: AgentRow, d: Decision, applyFarmAction: ApplyFarmAction): Promise<Candidate[]> {
+/**
+ * Applies one decision, bounded. 'close' runs before the market closes (farm actions and restock,
+ * whose sales count in today's supply); 'open' runs once tomorrow's price is set (orders, fills and
+ * offers, priced against it). Returns the offers that become player cards.
+ */
+export async function applyDecision(ctx: Ctx, agent: AgentRow, d: Decision, applyFarmAction: ApplyFarmAction, phase: 'close' | 'open'): Promise<Candidate[]> {
   const m = await liveMultiplier(ctx);
   const tryIt = async (what: string, fn: () => Promise<unknown>): Promise<void> => {
     try {
@@ -195,11 +199,18 @@ export async function applyDecision(ctx: Ctx, agent: AgentRow, d: Decision, appl
     }
   };
 
-  if (agent.role === 'rival' && agent.farmId) {
-    for (const a of d.farmActions) {
+  if (phase === 'close') {
+    if (agent.role === 'rival' && agent.farmId) {
+      for (const a of d.farmActions) {
       const [row] = await ctx.q.query(`SELECT ${FARM_COLUMNS} FROM farms WHERE id = $1`, [agent.farmId]);
       if (row) await tryIt(a.t, () => applyFarmAction(ctx, toFarm(row), a));
+      }
     }
+    if (agent.role === 'supplier') await restock(ctx, agent, d);
+    return [];
+  }
+
+  if (agent.role === 'rival' && agent.farmId) {
     for (const s of d.sellOrders) {
       const [row] = await ctx.q.query(`SELECT ${FARM_COLUMNS} FROM farms WHERE id = $1`, [agent.farmId]);
       if (!row) break;
@@ -207,21 +218,6 @@ export async function applyDecision(ctx: Ctx, agent: AgentRow, d: Decision, appl
       const qty = Math.min(s.qty, farm.crate[s.grade]);
       if (qty > 0) await tryIt('sell order', () => placeSellOrder(ctx, farm, s.grade, qty, Math.max(0.3, Math.min(2.5, s.priceShare)) * eggPrice(s.grade, m, [])));
     }
-  }
-
-  if (agent.role === 'supplier') {
-    const stock = { ...agent.stock };
-    for (const t of ['cheap', 'standard', 'premium'] as const) {
-      const bags = d.restock[t];
-      if (bags <= 0) continue;
-      const cost = bags * toMilli(ECONOMY.feed.tiers[t].bagPrice * ECONOMY.suppliers.wholesaleShare);
-      if (cost > (await agentCash(ctx, agent))) continue;
-      await moveAgentCash(ctx, agent, -cost, 'restock', t);
-      stock[t] = (stock[t] ?? 0) + bags;
-    }
-    stock.markup = Math.max(0.8, Math.min(1.6, d.markup));
-    agent.stock = stock;
-    await setAgentStock(ctx, agent.id, stock);
   }
 
   if (agent.role === 'buyer') {
@@ -241,6 +237,21 @@ export async function applyDecision(ctx: Ctx, agent: AgentRow, d: Decision, appl
   // offers only to existing player farms
   const players = new Set((await ctx.q.query<{ id: string }>(`SELECT id FROM farms WHERE owner_kind = 'player' AND bust_day IS NULL`)).map((r) => r.id));
   return d.offers.filter((o) => players.has(o.farmId)).map((offer) => ({ agent, offer }));
+}
+
+async function restock(ctx: Ctx, agent: AgentRow, d: Decision): Promise<void> {
+  const stock = { ...agent.stock };
+    for (const t of ['cheap', 'standard', 'premium'] as const) {
+      const bags = d.restock[t];
+      if (bags <= 0) continue;
+      const cost = bags * toMilli(ECONOMY.feed.tiers[t].bagPrice * ECONOMY.suppliers.wholesaleShare);
+      if (cost > (await agentCash(ctx, agent))) continue;
+      await moveAgentCash(ctx, agent, -cost, 'restock', t);
+      stock[t] = (stock[t] ?? 0) + bags;
+    }
+    stock.markup = Math.max(0.8, Math.min(1.6, d.markup));
+    agent.stock = stock;
+    await setAgentStock(ctx, agent.id, stock);
 }
 
 /** Thinking costs coins; an agent below zero is bust. */
