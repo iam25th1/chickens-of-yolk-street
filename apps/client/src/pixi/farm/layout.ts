@@ -9,6 +9,8 @@ export interface Point {
 
 export const FARM_W = 508;
 export const TRAY_W = 132;
+/** In portrait the top bar wraps to two rows and the tray sits under the farm. */
+export const PORTRAIT_FARM_TOP = 40;
 
 export const FIELD = { left: 0, top: 24, right: FARM_W, bottom: 344 };
 

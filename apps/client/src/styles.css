@@ -473,6 +473,48 @@ input[type='range'].slider::-moz-range-thumb {
     inset 3px 0 0 var(--terracotta);
 }
 
+.desk {
+  position: absolute;
+  left: 6px;
+  top: 186px;
+  width: 122px;
+  height: 130px;
+  overflow-y: auto;
+}
+
+/* Portrait: the top bar wraps, the tray becomes a panel under the farm. */
+.portrait .topbar {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 24px;
+  padding: 3px 4px;
+  row-gap: 3px;
+  justify-content: space-between;
+}
+
+.portrait .topbar .spacer {
+  display: none;
+}
+
+.portrait .tray {
+  left: 0;
+  right: 0;
+  width: auto;
+  top: var(--farm-bottom);
+  box-shadow:
+    inset 0 2px 0 var(--ink),
+    inset 0 3px 0 var(--terracotta);
+}
+
+.portrait .desk {
+  left: 136px;
+  top: 8px;
+  right: 6px;
+  width: auto;
+  height: auto;
+  bottom: 6px;
+}
+
 .card {
   position: absolute;
   left: 2px;

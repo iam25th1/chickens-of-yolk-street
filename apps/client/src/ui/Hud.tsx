@@ -145,7 +145,7 @@ export function TopBar({ farm, onShop, onSettings, onMarket, onLedger }: { farm:
       <Stat icon="feed" title="Days of feed in the trough">
         <span className={days < 2 ? 'down' : ''}>{days.toFixed(1)}D</span>
       </Stat>
-      <div style={{ flex: 1 }} />
+      <div className="spacer" style={{ flex: 1 }} />
       <DayClock />
       {button('market', 'Market board', onMarket)}
       {button('ledger', 'Ledger', onLedger)}

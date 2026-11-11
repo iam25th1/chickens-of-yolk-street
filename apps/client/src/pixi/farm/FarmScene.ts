@@ -11,7 +11,7 @@ import { FrameSprite } from '../FrameSprite';
 import { Fx } from '../Fx';
 import type { Scene } from '../host';
 import { HenActor } from './HenActor';
-import { FARM_W, PLOTS, PROPS, SPOTS, TRAY_W, TROUGH_SPOTS, YARD, randomIn, type Point } from './layout';
+import { FARM_W, PORTRAIT_FARM_TOP, PLOTS, PROPS, SPOTS, TRAY_W, TROUGH_SPOTS, YARD, randomIn, type Point } from './layout';
 
 const MAX_VISIBLE_HENS = 40;
 const TILE = 16;
@@ -121,7 +121,7 @@ export class FarmScene implements Scene {
     const portrait = h > w;
     const free = portrait ? w : w - TRAY_W;
     const x = Math.round((free - FARM_W) / 2);
-    const y = portrait ? Math.max(0, Math.round((Math.min(h, 520) - 360) / 2)) : 0;
+    const y = portrait ? PORTRAIT_FARM_TOP : 0;
     this.view = { w, h, x, y };
     this.world.position.set(x, y);
     this.ground?.destroy(true);

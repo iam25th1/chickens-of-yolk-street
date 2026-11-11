@@ -2,6 +2,7 @@
 // has its own logical size (app/viewport.ts), scaled to the window, with HUD pieces pinned to its edges.
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useStore } from '../state/store';
+import { PORTRAIT_FARM_TOP } from '../pixi/farm/layout';
 import { viewport, watchViewport, type Viewport } from './viewport';
 
 export function useViewport(): Viewport {
@@ -42,6 +43,8 @@ export function Stage({
           ['--ui-w' as string]: `${v.uiW}px`,
           ['--ui-h' as string]: `${v.uiH}px`,
           ['--fit' as string]: String(Math.min(1, v.uiW / 640, v.uiH / 360)),
+          // where the farm's fence line ends, in UI pixels (the tray starts there in portrait)
+          ['--farm-bottom' as string]: `${Math.round(((PORTRAIT_FARM_TOP + 344) * v.zoom) / v.uiZoom)}px`,
         }}
       >
         {children}
