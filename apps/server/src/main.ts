@@ -81,7 +81,9 @@ const tick = setInterval(() => {
   game.tick().catch((err: unknown) => log(`[day] tick failed: ${err instanceof Error ? err.stack : String(err)}`));
 }, 1000);
 
-server.listen(config.port, () => log(`[http] listening on http://localhost:${config.port} (day ${game.getClock().day})`));
+const listening = (): void => log(`[http] listening on http://${config.host ?? 'localhost'}:${config.port} (day ${game.getClock().day})`);
+if (config.host) server.listen(config.port, config.host, listening);
+else server.listen(config.port, listening);
 
 const shutdown = (): void => {
   clearInterval(tick);

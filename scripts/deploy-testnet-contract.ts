@@ -78,8 +78,8 @@ if (values.create) {
   } else {
     const parent = new Account(signerId, provider, signer);
     const publicKey = KeyPair.fromString(privateKey as KeyPairString).getPublicKey().toString();
-    await parent.createSubAccount({ accountOrPrefix: target, publicKey, nearToTransfer: nearToYocto(Number(values.fund)) });
-    console.log(`created ${target} (testnet) with the signer's public key, funded with ${values.fund} NEAR`);
+    const created = await parent.createSubAccount({ accountOrPrefix: target, publicKey, nearToTransfer: nearToYocto(Number(values.fund)) });
+    console.log(`created ${target} (testnet) with the signer's public key, funded with ${values.fund} NEAR: tx ${created.transaction_outcome.id}`);
   }
 }
 

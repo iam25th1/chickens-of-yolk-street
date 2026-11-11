@@ -6,6 +6,8 @@ import { ECONOMY } from '@coys/shared';
 export interface ServerConfig {
   production: boolean;
   port: number;
+  /** HOST, or null to listen on every interface. */
+  host: string | null;
   databaseUrl: string;
   sessionSecret: string;
   sessionSecretEphemeral: boolean;
@@ -55,6 +57,7 @@ export function readConfig(env: NodeJS.ProcessEnv, repoRoot: string): ServerConf
   return {
     production,
     port: Number(env.PORT || 8787),
+    host: env.HOST || null,
     databaseUrl,
     sessionSecret: env.SESSION_SECRET || randomBytes(32).toString('hex'),
     sessionSecretEphemeral: !env.SESSION_SECRET,
@@ -71,6 +74,7 @@ export function readConfig(env: NodeJS.ProcessEnv, repoRoot: string): ServerConf
 export const ENV_NAMES = [
   'NODE_ENV',
   'PORT',
+  'HOST',
   'DATABASE_URL',
   'ALLOW_PGLITE_IN_PRODUCTION',
   'GAME_SEASON',

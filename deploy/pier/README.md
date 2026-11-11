@@ -11,13 +11,13 @@ the WebSocket on one port) plus a Postgres database. On Pier it is served at
 |---|---|
 | Repository | `iam25th1/chickens-of-yolk-street` (private: give Pier read access) |
 | Branch | `main` |
-| Node | 24.22.3 (LTS); the repo needs 22.22.2 or newer |
+| Node | 24.22.3 (LTS); the repo needs 22.22.2 or newer. Pier runs its own Node, so pin this one by path: the start command names the 24.22.3 `node` binary and each build step runs under `/usr/bin/env PATH=<24.22.3 bin>:...` |
 | Working directory | the repository root |
-| Build, step 1 | `npm ci --ignore-scripts` |
+| Build, step 1 | `npm ci --ignore-scripts --include=dev` (Pier runs build steps with `NODE_ENV=production`, which would leave out the build tools) |
 | Build, step 2 | `npm run build` |
 | Start | `node apps/server/dist/main.js` (straight to Node, so stop signals reach it and it closes cleanly) |
-| Port | `8787` (set `PORT=8787`; the server listens on every interface) |
-| Health check | `GET http://127.0.0.1:8787/healthz`, healthy on HTTP 200 with `"ok": true` |
+| Port | `8787` by default. On the Pier Mac 8787 is already held by another user's forward, so the service runs on `7570`; Pier passes `PORT` and `HOST=127.0.0.1`, and the server listens on `HOST` when it is set (every interface otherwise) |
+| Health check | `GET http://127.0.0.1:<port>/healthz`, healthy on HTTP 200 with `"ok": true` |
 | Restart | always; the clock and the day close live in this one process, so run exactly one instance |
 
 The server applies database migrations on every boot. They are safe to run again and take an
@@ -49,7 +49,8 @@ Set these on the service. Values marked secret never go in the repo, a chat or a
 | Variable | Value | Notes |
 |---|---|---|
 | `NODE_ENV` | `production` | turns on the production checks below |
-| `PORT` | `8787` | |
+| `PORT` | `8787` (`7570` on the Pier Mac) | Pier sets it from the service port |
+| `HOST` | `127.0.0.1` | Pier sets it; listen on loopback only, behind the tunnel |
 | `DATABASE_URL` | `postgres://...` | required in production; PGlite is refused |
 | `GAME_SEASON` | `s1` | required in production |
 | `SESSION_SECRET` | secret: a long random string | required in production |
@@ -71,13 +72,19 @@ anything missing.
 
 ## Cloudflare tunnel
 
-In the **25th.dev** Cloudflare account, add a public hostname to the tunnel that runs on the Mac:
+The game has a Cloudflare tunnel of its own, `yolkstreet`, in the **25th.dev** account, registered in Pier as a
+tunnel record whose cert path is that account's cert. Pier writes its ingress (`yolkstreet.25th.dev` only),
+creates the DNS record with that cert, and routes the hostname through its proxy to the service port. A tunnel of
+its own means adding the game never restarts the connector of a tunnel that carries other sites.
 
 | Field | Value |
 |---|---|
-| Subdomain | `yolkstreet` |
-| Domain | `25th.dev` |
-| Service | `HTTP` `localhost:8787` |
+| Hostname | `yolkstreet.25th.dev` |
+| Tunnel | `yolkstreet` (25th.dev account) |
+| Service | HTTP, through the Pier proxy to the service port on `127.0.0.1` |
+
+Rate limits key on the visitor's address. Behind the tunnel every request reaches the server from loopback,
+so the server takes `CF-Connecting-IP` from loopback requests only (Pier's proxy passes it through).
 
 WebSockets need no extra setting: the game connects to `wss://yolkstreet.25th.dev/ws` on the same
 host, and Cloudflare tunnels carry WebSocket upgrades.
@@ -99,6 +106,11 @@ npx tsx scripts/db-backup.ts --out backups
 
 This writes `backups/coys-<UTC time>.dump`. Run it daily and before every deploy. The password is
 passed to `pg_dump` as an environment variable, never on the command line.
+
+On the Pier Mac a launchd agent runs it every day at 03:20 local time, with the database URL from a
+`0600` file outside the repo, into a backups folder outside the repo, and keeps 30 days. On 11 November
+2026 the first run was restored into a scratch database: all 19 tables came back with the same row counts
+as the live database, and the scratch database was dropped.
 
 ## Moving to Render in an outage
 

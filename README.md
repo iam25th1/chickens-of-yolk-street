@@ -47,12 +47,39 @@ NEAR tools used: **Privy social login** (email, with a silent NEAR wallet), **NE
 
 Check it yourself with view calls on `coys-game.testnet`: `day_record({"season": "delivery-proof", "day": 2})` (shows `egg_transfers: 2`), `last_settled_day({"season": "legacy"})` (3), `nft_total_supply()`; the `mt_transfer` events are in the day 2 transaction's receipts. NEAR AI Cloud answered 402 (no credits on the account yet) in these runs, so every agent used its rule policy and each fallback was logged: the path the tests also cover.
 
+**Live deploy.** https://yolkstreet.25th.dev runs season `s1` on Pier, settling to its own production contract
+account `play.coys-game.testnet` ([deploy/pier](deploy/pier/README.md), [deploy/testnet.md](deploy/testnet.md)).
+Checked on 11 November 2026 at about 20:06 UTC:
+
+```json
+{"ok":true,"version":"0.1.0","commit":"a2d54b574f2f","season":"s1","day":2,"db":{"kind":"postgres","ok":true,"ms":0},"settlement":"near-testnet","uptimeS":108}
+```
+
+| When | What | Transaction |
+|---|---|---|
+| 11 Nov | `play.coys-game.testnet` created by `coys-game.testnet` with the same public key, funded with 5.33 NEAR | [9bejUg6V...](https://testnet.nearblocks.io/txns/9bejUg6VLDakSHe7MZj6ecQatNrSv9ifS5rBajpztiKY) |
+| 11 Nov | Game contract (wasm sha256 `fc7645dc...`) deployed and initialised on it, owner `play.coys-game.testnet` | [5ZdpvZgA...](https://testnet.nearblocks.io/txns/5ZdpvZgA4U4idi6DorRN8AfH5kMcHk2CzyGnwp9gy2Gd) |
+| 11 Nov | Agent wallet `upstart1.play.coys-game.testnet`, 0.05 NEAR | [DBsnzZUE...](https://testnet.nearblocks.io/txns/DBsnzZUETH8aLTt5Sk7aFY42bcMZ6UCNGaZMqi2q8BqW) |
+| 11 Nov | Agent wallet `oldmoney1.play.coys-game.testnet`, 0.05 NEAR | [6zrX27tX...](https://testnet.nearblocks.io/txns/6zrX27tXnVYGCNnribskBo9EJGWDeQXBMSsNsCuXgbVs) |
+| 11 Nov | Agent wallet `squeezer1.play.coys-game.testnet`, 0.05 NEAR | [2pCBa4nx...](https://testnet.nearblocks.io/txns/2pCBa4nxkasgRLiZnT66gcRXLL3FZuuh6KRjzKTtiBUt) |
+| 11 Nov | Agent wallet `loyalist1.play.coys-game.testnet`, 0.05 NEAR | [J5XmcTQb...](https://testnet.nearblocks.io/txns/J5XmcTQb5TbGhr6kjzBgq7N9QbSEVDcKuMbepxrvkrJB) |
+| 11 Nov | Agent wallet `bakery1.play.coys-game.testnet`, 0.05 NEAR | [6XoSGUAn...](https://testnet.nearblocks.io/txns/6XoSGUAnp98xLnTB7vg1LyS6vmS5bk99h274iTg4Jf4A) |
+| 11 Nov | Agent wallet `trader1.play.coys-game.testnet`, 0.05 NEAR | [FfCVpyMj...](https://testnet.nearblocks.io/txns/FfCVpyMjNcZScYkGu75JYy6oVBSn3LWVtSWqxTgaaM4a) |
+| 11 Nov | Agent wallet `wholesaler1.play.coys-game.testnet`, 0.05 NEAR | [4xqGJnhA...](https://testnet.nearblocks.io/txns/4xqGJnhAcTpRHM2wEZU2H9PZLvKd5k2LDcnzGMpt3jRf) |
+| 11 Nov | Season `s1` day 1 settled on the production contract (`last_settled_day({"season": "s1"})` is 1) | [Fz56pALi...](https://testnet.nearblocks.io/txns/Fz56pALiRXbLvt9ZK6R6ZwRg1uhzdeJ2XRyxcipHdaS6) |
+
+Also checked live: the title page, `/build/index-BL-i4f2Y.js` and `/assets/sprites/12-crate.png` answer 200, a
+WebSocket on `wss://yolkstreet.25th.dev/ws` upgrades (101) and answers a ping, and `/api/market` serves the market
+state. Waiting on a top-up: after the contract's storage and the seven wallets, `play.coys-game.testnet` holds about
+1.5 NEAR available, under the 2 NEAR reserve, so hen mints wait and the server links the seven wallets to their
+agents only once the balance is back above 2.05 NEAR (12 NEAR recommended). Eggs settle meanwhile.
+
 ## Try it
 
 Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what to do and what you should see. Commands are the same in PowerShell and a POSIX shell unless shown otherwise.
 
 1. **Install.** Run `npm ci --ignore-scripts`. You see the lockfile install with no package install scripts (`.npmrc` also sets `ignore-scripts=true`).
-2. **Test.** Run `npm test`. On a fresh clone you see **82 tests pass and 3 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it), and the asset re-pack check needs a coys-assets checkout beside the repo. Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, and two real WebSocket clients in one market.
+2. **Test.** Run `npm test`. On a fresh clone you see **85 tests pass and 3 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it), and the asset re-pack check needs a coys-assets checkout beside the repo. Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, and two real WebSocket clients in one market.
 3. **Play.** Run `npm run dev` and open http://localhost:5173. You see an egg fill up over the loading plate, then the title: the logo stamps in and the price ticker scrolls.
 4. **Sign in.** Press **PLAY**. With `PRIVY_APP_ID` set you sign in with email; without it a red **LOCAL DEV LOGIN** label asks for a name. You see your farm: 10 hens, a starter coop, **50.00** coins, **DAY001**.
 5. **Take the tour.** On a first visit your hen talks you through three cards: **COLLECT**, **SELL**, **DECISION CARDS**. You see each card swing in while she talks; **SKIP** closes it, and it does not come back on that browser.
@@ -308,6 +335,7 @@ All optional for local play. Copy `.env.example` to `.env` at the repo root. Pro
 |---|---|---|
 | `NODE_ENV` | server | local play rules (PGlite allowed, demo days allowed) |
 | `PORT`, `DATABASE_URL`, `SESSION_SECRET` | server | 8787; PGlite at `.data/coys`; a random secret per boot |
+| `HOST` | server | listens on every interface |
 | `GAME_SEASON` | server | a fresh database makes its own `dev-...` season; an existing one keeps its own |
 | `DEMO_DAY_SECONDS`, `DEMO_MODE` | server | 180-second days; `DEMO_MODE=1` lets a production server use demo days |
 | `ALLOW_PGLITE_IN_PRODUCTION` | server | production refuses PGlite (set only to check a build) |
@@ -362,7 +390,9 @@ docs/submission      drafts: demo shot list, post drafts, form fields
 
 On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass. CI is green: the TypeScript job (with PostgreSQL 16: the Postgres tests, the production build booting against Postgres with `/healthz` checked, and a backup restored into a second database) and the contracts job (unit tests, `cargo near build`, sandbox tests). The economy sheet tests hit their values exactly; the five-seed simulation meets the economy acceptance; a malformed model answer falls back to rules; a new season settles day 1 after an old season ended at day 3; non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
 
-**Not verifiable headlessly:** the live Pier deploy and its tunnel, a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
+The live Pier deploy and its tunnel were checked end to end on 11 November 2026 (receipts under [How NEAR fits in](#how-near-fits-in)).
+
+**Not verifiable headlessly:** a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
 
