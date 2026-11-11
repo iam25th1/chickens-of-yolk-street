@@ -14,14 +14,15 @@ import { TitleScreen } from '../screens/TitleScreen';
 import { settings } from '../state/settings';
 import { SettingsPanel } from '../ui/Panels';
 import { ServicesContext, type Services } from './services';
-import { Stage, useStageScale } from './Stage';
+import { Stage, useViewport } from './Stage';
 
 type Screen = 'boot' | 'title' | 'login' | 'loadingFarm' | 'farm';
 
 const FONTS = ['16px "Pixelify Sans"', '8px Silkscreen', 'bold 8px Silkscreen'];
 
 export function App() {
-  const scale = useStageScale();
+  const vp = useViewport();
+  const scale = vp.zoom;
   const [services, setServices] = useState<Services | null>(null);
   const [screen, setScreen] = useState<Screen>('boot');
   const [progress, setProgress] = useState(0);
@@ -69,7 +70,7 @@ export function App() {
     const img = new Image();
     img.onload = () => {
       const c = document.createElement('canvas');
-      const size = Math.min(128, 16 * scale);
+      const size = Math.min(128, Math.round(16 * scale));
       c.width = size;
       c.height = size;
       const ctx = c.getContext('2d');
@@ -134,27 +135,37 @@ export function App() {
   }, []);
 
   return (
-    <Stage scale={scale} onMount={onMount} cursor={cursor} onPointerDown={unlockAudio}>
+    <Stage onMount={onMount} cursor={cursor} onPointerDown={unlockAudio}>
       {services && (
         <ServicesContext.Provider value={services}>
           <div ref={screenEl} className="layer">
-            {screen === 'boot' && <LoadingScreen progress={progress} label="WAKING THE HENS" />}
-            {screen === 'title' && <TitleScreen audioReady={audioReady} onPlay={play} onSettings={() => setSettingsOpen(true)} />}
-            {screen === 'login' && config && (
-              <LoginScreen privyAppId={config.privyAppId} devLogin={config.devLogin} onSignedIn={onSignedIn} onBack={() => setScreen('title')} />
+            {screen !== 'farm' && (
+              <div className="stage640">
+                {screen === 'boot' && <LoadingScreen progress={progress} label="WAKING THE HENS" />}
+                {screen === 'title' && <TitleScreen audioReady={audioReady} onPlay={play} onSettings={() => setSettingsOpen(true)} />}
+                {screen === 'login' && config && (
+                  <LoginScreen privyAppId={config.privyAppId} devLogin={config.devLogin} onSignedIn={onSignedIn} onBack={() => setScreen('title')} />
+                )}
+                {screen === 'loadingFarm' && <LoadingScreen progress={progress} label="LOADING THE FARM" />}
+              </div>
             )}
-            {screen === 'loadingFarm' && <LoadingScreen progress={progress} label="LOADING THE FARM" />}
             {screen === 'farm' && signedIn && (
               <FarmScreen session={signedIn.session} accountId={signedIn.accountId} onSignedOut={signOut} onSettings={() => setSettingsOpen(true)} />
             )}
           </div>
-          {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+          {settingsOpen && (
+            <div className="stage640" style={{ zIndex: 60 }}>
+              <SettingsPanel onClose={() => setSettingsOpen(false)} />
+            </div>
+          )}
         </ServicesContext.Provider>
       )}
       {fatal && (
-        <div className="panel" role="alert" style={{ left: 160, top: 140, width: 320 }}>
-          <h2 className="panel-title">THE FARM DID NOT OPEN</h2>
-          <span>{fatal.toUpperCase()}</span>
+        <div className="stage640" style={{ zIndex: 70 }}>
+          <div className="panel" role="alert" style={{ left: 160, top: 140, width: 320 }}>
+            <h2 className="panel-title">THE FARM DID NOT OPEN</h2>
+            <span>{fatal.toUpperCase()}</span>
+          </div>
         </div>
       )}
     </Stage>

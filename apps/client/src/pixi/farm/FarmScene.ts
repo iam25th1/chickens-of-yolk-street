@@ -9,9 +9,9 @@ import { juice } from '../../motion/juice';
 import { dayElapsed, isNight, type ClientEvent } from '../../state/game';
 import { FrameSprite } from '../FrameSprite';
 import { Fx } from '../Fx';
-import { GAME_H, GAME_W, type Scene } from '../host';
+import type { Scene } from '../host';
 import { HenActor } from './HenActor';
-import { PLOTS, PROPS, SPOTS, TROUGH_SPOTS, YARD, randomIn, type Point } from './layout';
+import { FARM_W, PLOTS, PROPS, SPOTS, TRAY_W, TROUGH_SPOTS, YARD, randomIn, type Point } from './layout';
 
 const MAX_VISIBLE_HENS = 40;
 const TILE = 16;
@@ -57,18 +57,19 @@ export class FarmScene implements Scene {
   private ambience: { day: LoopHandle | null; night: LoopHandle | null; snore: LoopHandle | null } = { day: null, night: null, snore: null };
   private machineLoops = new Map<string, LoopHandle>();
   private roostIndex = 0;
+  private ground: Sprite | null = null;
+  private readonly extras: FrameSprite[] = [];
+  private view = { w: 640, h: 360, x: 0, y: 0 };
 
   constructor(
     private readonly assets: AssetStore,
     private readonly audio: AudioEngine,
-    renderer: Renderer,
+    private readonly renderer: Renderer,
     private readonly hooks: FarmHooks,
   ) {
     this.fx = new Fx(assets);
-    this.world.addChild(this.bakeGround(renderer));
     this.ysort.sortableChildren = true;
     this.world.addChild(this.ysort, this.fx.layer);
-    this.night.rect(0, 0, GAME_W, GAME_H).fill({ color: 0x1b2a4a, alpha: 0.42 });
     this.night.alpha = 0;
     this.root.addChild(this.world, this.night);
 
@@ -112,23 +113,62 @@ export class FarmScene implements Scene {
     s.destroy();
   }
 
-  /** Grass, straw yard, dirt path and fence, drawn once into a texture. */
-  private bakeGround(renderer: Renderer): Sprite {
+  /**
+   * The window shows a w x h world. The farm (FARM_W wide) is centred in the part the tray leaves
+   * free; grass, the fence and a few props run on to the window's edges, so there is no border.
+   */
+  resize(w: number, h: number): void {
+    const portrait = h > w;
+    const free = portrait ? w : w - TRAY_W;
+    const x = Math.round((free - FARM_W) / 2);
+    const y = portrait ? Math.max(0, Math.round((Math.min(h, 520) - 360) / 2)) : 0;
+    this.view = { w, h, x, y };
+    this.world.position.set(x, y);
+    this.ground?.destroy(true);
+    this.ground = this.bakeGround(-x, -y, w, h);
+    this.world.addChildAt(this.ground, 0);
+    this.night.clear().rect(0, 0, w, h).fill({ color: 0x3b4f7a, alpha: 0.24 });
+    for (const s of this.extras.splice(0)) this.unplace(s);
+    // props on the grass beyond the farm, the same every time for the same window
+    const rows = ['hay-bale', 'flowers', 'flowers', 'puddle'] as const;
+    let n = 0;
+    for (let px = -x + 24; px < w - x; px += 56) {
+      if (px > -16 && px < FARM_W + 16) continue;
+      const row = rows[n % rows.length] ?? 'flowers';
+      const py = 70 + ((n * 97) % 240);
+      this.extras.push(this.place(new FrameSprite(this.assets, ['24-farm-props'], row).desync(), { x: px, y: py }));
+      n++;
+    }
+  }
+
+  /** A farm point in stage coordinates (for effects drawn in the UI layer). */
+  toStage(p: Point): Point {
+    return { x: p.x + this.view.x, y: p.y + this.view.y };
+  }
+
+  /** Grass, straw yard, dirt path and fence, drawn once per window size into a texture. */
+  private bakeGround(x0: number, y0: number, w: number, h: number): Sprite {
     const g = new Container();
     const tile = (cx: number, cy: number, x: number, y: number) => {
       const t = new Sprite(this.assets.region('23-farm-tileset', cx * 128, cy * 128, 128, 128));
-      t.position.set(x, y);
+      t.position.set(x - x0, y - y0);
       g.addChild(t);
     };
-    for (let y = 0; y < GAME_H; y += TILE) for (let x = 0; x < GAME_W; x += TILE) tile(Math.floor(Math.random() * 4), 0, x, y);
+    const left = Math.floor(x0 / TILE) * TILE;
+    const top = Math.floor(y0 / TILE) * TILE;
+    // grass varies by position, not by chance, so a resize does not reshuffle the field
+    for (let y = top; y < y0 + h; y += TILE) for (let x = left; x < x0 + w; x += TILE) tile(Math.abs((x * 7 + y * 13) / TILE) % 4, 0, x, y);
     for (let y = YARD.top - 8; y < YARD.bottom + 8; y += TILE)
-      for (let x = YARD.left - 8; x < YARD.right + 8; x += TILE) tile(Math.floor(Math.random() * 2), 3, x, y); // straw columns 2 and 3 carry an egg and a quill
-    for (let y = 248; y < GAME_H; y += TILE) for (const x of [424, 440]) tile(0, 2, x, y);
-    for (let x = 0; x < 424; x += TILE) tile(x % 64 === 0 ? 1 : 0, 6, x, 326);
-    const rt = RenderTexture.create({ width: GAME_W, height: GAME_H, scaleMode: 'nearest' });
-    renderer.render({ container: g, target: rt });
+      for (let x = YARD.left - 8; x < YARD.right + 8; x += TILE) tile(Math.abs((x * 3 + y * 5) / TILE) % 2, 3, x, y); // straw columns 2 and 3 carry an egg and a quill
+    for (let y = 248; y < y0 + h; y += TILE) for (const x of [424, 440]) tile(0, 2, x, y);
+    for (let x = left; x < 424; x += TILE) tile(x % 64 === 0 ? 1 : 0, 6, x, 326);
+    for (let x = 456; x < x0 + w; x += TILE) tile(x % 64 === 0 ? 1 : 0, 6, x, 326);
+    const rt = RenderTexture.create({ width: Math.ceil(w), height: Math.ceil(h), scaleMode: 'nearest' });
+    this.renderer.render({ container: g, target: rt });
     g.destroy({ children: true });
-    return new Sprite(rt);
+    const s = new Sprite(rt);
+    s.position.set(x0, y0);
+    return s;
   }
 
   // ---- state ----------------------------------------------------------------------------------
@@ -312,7 +352,7 @@ export class FarmScene implements Scene {
       case 'sold': {
         this.fx.burst('cash-burst', SPOTS.crate.x, SPOTS.crate.y - 16);
         this.crate.play('egg-drop', { loop: false, restart: true, onDone: () => this.crate.play(this.crateRow()) });
-        this.hooks.coins({ x: SPOTS.crate.x, y: SPOTS.crate.y - 20 }, Math.min(12, 3 + Math.round(e.totalMilli / 4000)));
+        this.hooks.coins(this.toStage({ x: SPOTS.crate.x, y: SPOTS.crate.y - 20 }), Math.min(12, 3 + Math.round(e.totalMilli / 4000)));
         let n = 0;
         for (const a of this.hens.values()) if (n++ < 8 && Math.random() < 0.6) a.cheer();
         break;
@@ -359,7 +399,7 @@ export class FarmScene implements Scene {
       juice.hitstop(90);
       juice.shake(3, 300);
       this.fx.burst('confetti', SPOTS.crate.x, SPOTS.crate.y - 24, { count: 3, spread: 12 });
-      this.hooks.coins({ x: SPOTS.crate.x, y: SPOTS.crate.y - 20 }, 6);
+      this.hooks.coins(this.toStage({ x: SPOTS.crate.x, y: SPOTS.crate.y - 20 }), 6);
       this.audio.play('14-coins-large');
       setTimeout(() => this.crate.play(this.crateRow()), 1400);
     }, onGround.length * 40 + 420);

@@ -1,30 +1,20 @@
-// The 640x360 stage, scaled by the largest whole number that fits the window. The canvas and the
-// UI layer share one coordinate space, so a UI element at (x, y) sits over world pixel (x, y).
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { GAME_H, GAME_W } from '../pixi/host';
+// The stage fills the window. The canvas draws the world (see pixi/host.ts); the UI layer above it
+// has its own logical size (app/viewport.ts), scaled to the window, with HUD pieces pinned to its edges.
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { useStore } from '../state/store';
+import { viewport, watchViewport, type Viewport } from './viewport';
 
-function fitScale(): number {
-  return Math.max(1, Math.floor(Math.min(window.innerWidth / GAME_W, window.innerHeight / GAME_H)));
-}
-
-export function useStageScale(): number {
-  const [scale, setScale] = useState(fitScale);
-  useEffect(() => {
-    const onResize = () => setScale(fitScale());
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-  return scale;
+export function useViewport(): Viewport {
+  useEffect(() => watchViewport(), []);
+  return useStore(viewport, (v) => v);
 }
 
 export function Stage({
-  scale,
   onMount,
   cursor,
   onPointerDown,
   children,
 }: {
-  scale: number;
   onMount: (el: HTMLDivElement) => void;
   cursor: string | null;
   onPointerDown: () => void;
@@ -32,6 +22,7 @@ export function Stage({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const mounted = useRef(false);
+  const v = useViewport();
 
   useLayoutEffect(() => {
     if (ref.current && !mounted.current) {
@@ -40,22 +31,19 @@ export function Stage({
     }
   }, [onMount]);
 
-  const w = GAME_W * scale;
-  const h = GAME_H * scale;
   return (
-    <div
-      ref={ref}
-      className="viewport"
-      onPointerDown={onPointerDown}
-      style={{
-        width: w,
-        height: h,
-        left: Math.max(0, Math.floor((window.innerWidth - w) / 2)),
-        top: Math.max(0, Math.floor((window.innerHeight - h) / 2)),
-        cursor: cursor ?? 'default',
-      }}
-    >
-      <div className="ui" style={{ transform: `scale(${scale})` }}>
+    <div ref={ref} className={`viewport ${v.portrait ? 'portrait' : 'landscape'}`} onPointerDown={onPointerDown} style={{ cursor: cursor ?? 'default' }}>
+      <div
+        className="ui"
+        style={{
+          width: v.uiW,
+          height: v.uiH,
+          transform: `scale(${v.uiZoom})`,
+          ['--ui-w' as string]: `${v.uiW}px`,
+          ['--ui-h' as string]: `${v.uiH}px`,
+          ['--fit' as string]: String(Math.min(1, v.uiW / 640, v.uiH / 360)),
+        }}
+      >
         {children}
       </div>
     </div>

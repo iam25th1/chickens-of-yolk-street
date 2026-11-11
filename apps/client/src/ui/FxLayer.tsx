@@ -105,13 +105,15 @@ export function FxLayer() {
 
   return (
     <div ref={layer} className="layer" style={{ zIndex: 25 }}>
-      {stamps.map((s) => (
-        <Stamp key={s.id} row={s.row} coins={s.coins} onDone={() => setStamps((all) => all.filter((x) => x.id !== s.id))} />
-      ))}
-      {bust && <BustBanner key={bust.id} name={bust.name} sign={bust.sign} />}
-      {toasts.map((t, i) => (
-        <Toast key={t.id} text={t.text} tone={t.tone} index={i} />
-      ))}
+      <div className="stage640">
+        {stamps.map((s) => (
+          <Stamp key={s.id} row={s.row} coins={s.coins} onDone={() => setStamps((all) => all.filter((x) => x.id !== s.id))} />
+        ))}
+        {bust && <BustBanner key={bust.id} name={bust.name} sign={bust.sign} />}
+        {toasts.map((t, i) => (
+          <Toast key={t.id} text={t.text} tone={t.tone} index={i} />
+        ))}
+      </div>
     </div>
   );
 }

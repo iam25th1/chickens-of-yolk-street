@@ -174,7 +174,8 @@ export function CardOverlay({
 
   return (
     <div ref={root} className="layer" style={{ zIndex: 40 }}>
-      <div style={{ position: 'absolute', left: 0, top: 24, width: 508, height: 320, background: 'rgba(42, 22, 12, 0.55)' }} />
+      <div className="dim" />
+      <div className="stage640">
       <div ref={portraitEl} className="panel" style={{ left: 40, top: 92, width: 240, height: 128, zIndex: 41 }}>
         <div className="row" style={{ alignItems: 'flex-start', gap: 8 }}>
           {look ? <Portrait sheet={look.portrait} row={portraitRow} loop={talking || portraitRow === 'idle'} /> : <div style={{ width: 64, height: 64 }} />}
@@ -237,6 +238,7 @@ export function CardOverlay({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

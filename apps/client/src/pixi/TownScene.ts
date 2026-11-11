@@ -1,31 +1,27 @@
 // The market board backdrop: the town square plate, bunting across the top and a milling crowd.
-import { Container, Sprite } from 'pixi.js';
+import { Container } from 'pixi.js';
 import type { AssetStore } from '../assets/store';
 import type { AudioEngine, LoopHandle } from '../audio/audio';
 import { FrameSprite } from './FrameSprite';
-import { GAME_W, type Scene } from './host';
+import type { Scene } from './host';
+import { Plate, PLATE_W } from './plate';
 
 export class TownScene implements Scene {
   readonly root = new Container();
   private readonly sprites: FrameSprite[] = [];
   private readonly crowd: { s: FrameSprite; dir: number; min: number; max: number }[] = [];
   private murmur: LoopHandle | null;
+  private readonly plate: Plate;
 
   constructor(
     assets: AssetStore,
     audio: AudioEngine,
   ) {
-    const frame = assets.frames('27-town-square-plate', 'plate')[0];
-    if (frame) {
-      const bg = new Sprite(frame.texture);
-      bg.anchor.set(0);
-      bg.scale.set(assets.scale('27-town-square-plate'));
-      this.root.addChild(bg);
-    }
-    for (let x = 32; x < GAME_W; x += 64) {
+    this.plate = new Plate(assets, '27-town-square-plate', this.root);
+    for (let x = 32; x < PLATE_W; x += 64) {
       const s = new FrameSprite(assets, ['27-town-square-anim'], 'bunting').desync();
       s.position.set(x, 32);
-      this.root.addChild(s);
+      this.plate.content.addChild(s);
       this.sprites.push(s);
     }
     const rows: [string, number, number][] = [
@@ -38,11 +34,15 @@ export class TownScene implements Scene {
     for (const [row, x, y] of rows) {
       const s = new FrameSprite(assets, ['27-town-square-anim'], row).desync();
       s.position.set(x, y);
-      this.root.addChild(s);
+      this.plate.content.addChild(s);
       if (row === 'milling') this.crowd.push({ s, dir: Math.random() < 0.5 ? -1 : 1, min: x - 40, max: x + 40 });
       else this.sprites.push(s);
     }
     this.murmur = audio.loop('34-market', { volume: 0.4, fadeMs: 900 });
+  }
+
+  resize(w: number, h: number): void {
+    this.plate.resize(w, h);
   }
 
   update(dtMs: number): void {

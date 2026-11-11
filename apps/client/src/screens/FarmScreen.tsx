@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isCrash, type CardView } from '@coys/shared';
 import { useServices } from '../app/services';
+import { worldToUi } from '../app/viewport';
 import { GameSocket, type Action } from '../net/socket';
 import { FarmScene } from '../pixi/farm/FarmScene';
 import { TownScene } from '../pixi/TownScene';
@@ -74,7 +75,7 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
     if (!farm || scene.current) return;
     const s = new FarmScene(assets, audio, pixi.app.renderer, {
       collect: (eggId) => send({ t: 'collect', eggId }),
-      coins: (from, count) => uiFx.emit({ kind: 'coins', from, count }),
+      coins: (from, count) => uiFx.emit({ kind: 'coins', from: worldToUi(from), count }),
     });
     scene.current = s;
     s.sync(farm);
@@ -198,8 +199,8 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
 
   if (!farm || !market) {
     return (
-      <div className="layer">
-        <div className="toast" style={{ position: 'absolute', left: 254, top: 170 }}>
+      <div className="stage640">
+        <div className="toast" style={{ position: 'absolute', left: 320, top: 170, transform: 'translateX(-50%)' }}>
           {status === 'offline' ? 'RECONNECTING TO THE MARKET' : 'WALKING TO THE FARM'}
         </div>
       </div>
@@ -216,7 +217,9 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
         onLedger={() => setPanel('ledger')}
       />
       {view === 'market' ? (
-        <MarketBoard farm={farm} market={market} send={send} onBack={() => setView('farm')} />
+        <div className="stage640">
+          <MarketBoard farm={farm} market={market} send={send} onBack={() => setView('farm')} />
+        </div>
       ) : (
         <div className="tray">
           <SellCard farm={farm} market={market} send={send} />
@@ -226,12 +229,18 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
       )}
       <Ticker extra={[farm.name.toUpperCase()]} />
       {status === 'offline' && (
-        <div className="toast" style={{ position: 'absolute', left: 190, top: 300 }}>
-          RECONNECTING TO THE MARKET
+        <div className="stage640">
+          <div className="toast" style={{ position: 'absolute', left: 320, top: 300, transform: 'translateX(-50%)' }}>
+            RECONNECTING TO THE MARKET
+          </div>
         </div>
       )}
-      {panel === 'shop' && <ShopPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
-      {panel === 'ledger' && <LedgerPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
+      {panel && (
+        <div className="stage640" style={{ zIndex: 20 }}>
+          {panel === 'shop' && <ShopPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
+          {panel === 'ledger' && <LedgerPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
+        </div>
+      )}
       {tour && view === 'farm' && <Onboarding onDone={() => setTour(false)} />}
       {overlay && view === 'farm' && !tour && (
         <CardOverlay key={overlay.card.id} card={overlay.card} result={overlay.result} haggleMood={overlay.mood} send={send} onClose={showNext} />

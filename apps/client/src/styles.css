@@ -1,5 +1,6 @@
-/* Chickens of Yolk Street: pixel UI. The game is laid out in a 640x360 space and scaled by a whole
-   number, so every border, gap and font size here is in game pixels. No gradients, no purple. */
+/* Chickens of Yolk Street: pixel UI. Sizes are in game pixels: the UI layer is scaled to the window
+   (app/viewport.ts). The HUD is pinned to the window's edges; screens drawn for 640x360 sit centred.
+   No gradients, no purple. */
 
 @font-face {
   font-family: 'Pixelify Sans';
@@ -70,9 +71,11 @@ body {
 /* ---- stage ------------------------------------------------------------------------------------ */
 
 .viewport {
-  position: absolute;
+  position: fixed;
+  inset: 0;
   overflow: hidden;
   background: var(--ink);
+  touch-action: manipulation;
 }
 
 .viewport canvas {
@@ -88,8 +91,6 @@ body {
   position: absolute;
   left: 0;
   top: 0;
-  width: 640px;
-  height: 360px;
   transform-origin: 0 0;
   font-size: 8px;
   line-height: 8px;
@@ -109,6 +110,41 @@ body {
 
 .layer > * {
   pointer-events: auto;
+}
+
+/* A layer inside a layer is a container, not a surface: it must never take the world's clicks. */
+.layer > .layer,
+.ui > .layer {
+  pointer-events: none;
+}
+
+/* Screens drawn for 640x360 (title, login, cards, panels) sit centred, shrunk to fit if needed. */
+.stage640 {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 640px;
+  height: 360px;
+  transform: translate(-50%, -50%) scale(var(--fit, 1));
+  pointer-events: none;
+}
+
+.stage640 > * {
+  pointer-events: auto;
+}
+
+/* The world dims behind a card or the tour (not the HUD). */
+.dim {
+  position: absolute;
+  left: 0;
+  top: 24px;
+  right: 132px;
+  bottom: 16px;
+  background: rgba(42, 22, 12, 0.6);
+}
+
+.portrait .dim {
+  right: 0;
 }
 
 .sprite {
@@ -354,7 +390,7 @@ input[type='range'].slider::-moz-range-thumb {
   position: absolute;
   left: 0;
   top: 0;
-  width: 640px;
+  right: 0;
   height: 24px;
   display: flex;
   align-items: center;
@@ -389,7 +425,7 @@ input[type='range'].slider::-moz-range-thumb {
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 640px;
+  right: 0;
   height: 16px;
   overflow: hidden;
   background: var(--ink);
@@ -430,7 +466,7 @@ input[type='range'].slider::-moz-range-thumb {
   right: 0;
   top: 24px;
   width: 132px;
-  height: 320px;
+  bottom: 16px;
   background: var(--terracotta-deep);
   box-shadow:
     inset 2px 0 0 var(--ink),

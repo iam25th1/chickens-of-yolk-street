@@ -179,6 +179,37 @@ export class AssetStore {
     return url;
   }
 
+  /** Average colour of each edge of a sprite's first frame, for filling the window around a plate. */
+  edgeColours(id: string): { left: number; right: number; top: number; bottom: number } {
+    const img = this.images.get(this.sprite(id).group);
+    const f = this.frameRects(id, this.rows(id)[0] ?? '')[0];
+    const fallback = { left: 0x2a160c, right: 0x2a160c, top: 0x2a160c, bottom: 0x2a160c };
+    if (!img || !f) return fallback;
+    const canvas = document.createElement('canvas');
+    canvas.width = f.w;
+    canvas.height = f.h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return fallback;
+    ctx.drawImage(img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+    const d = ctx.getImageData(0, 0, f.w, f.h).data;
+    const avg = (pts: [number, number][]) => {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      for (const [x, y] of pts) {
+        const o = (y * f.w + x) * 4;
+        r += d[o] ?? 0;
+        g += d[o + 1] ?? 0;
+        b += d[o + 2] ?? 0;
+      }
+      const n = Math.max(1, pts.length);
+      return (Math.round(r / n) << 16) | (Math.round(g / n) << 8) | Math.round(b / n);
+    };
+    const col = (x: number) => Array.from({ length: f.h }, (_, y) => [x, y] as [number, number]);
+    const row = (y: number) => Array.from({ length: f.w }, (_, x) => [x, y] as [number, number]);
+    return { left: avg(col(0)), right: avg(col(f.w - 1)), top: avg(row(0)), bottom: avg(row(f.h - 1)) };
+  }
+
   private readonly portraits = new Map<string, string>();
 
   /** A hen's stacked trait layers (first idle frame) as a data URL, at a whole-number zoom. */

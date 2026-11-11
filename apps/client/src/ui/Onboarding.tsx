@@ -117,7 +117,8 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   if (!ready || !step) return null;
   return (
     <div ref={root} className="layer" style={{ zIndex: 45 }} role="dialog" aria-label="How to play">
-      <div style={{ position: 'absolute', left: 0, top: 24, width: 508, height: 320, background: 'rgba(42, 22, 12, 0.6)' }} />
+      <div className="dim" />
+      <div className="stage640">
       <div ref={portraitEl} className="panel" style={{ left: 40, top: 92, width: 240, height: 128, zIndex: 46 }}>
         <div className="row" style={{ alignItems: 'flex-start', gap: 8 }}>
           <Portrait sheet={NARRATOR} row={talking ? 'talk' : 'idle'} loop />
@@ -156,6 +157,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         >
           SKIP
         </button>
+      </div>
       </div>
     </div>
   );

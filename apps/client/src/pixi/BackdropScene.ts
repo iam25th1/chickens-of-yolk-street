@@ -1,8 +1,9 @@
 // Loading and title backdrops: a 640x360 plate with drifting clouds and little hens.
-import { Container, Sprite } from 'pixi.js';
+import { Container } from 'pixi.js';
 import type { AssetStore } from '../assets/store';
 import { FrameSprite } from './FrameSprite';
-import { GAME_W, type Scene } from './host';
+import type { Scene } from './host';
+import { Plate, PLATE_W } from './plate';
 
 interface Drifter {
   s: FrameSprite;
@@ -16,6 +17,7 @@ export class BackdropScene implements Scene {
   private readonly drifters: Drifter[] = [];
   private readonly sprites: FrameSprite[] = [];
   private logo: FrameSprite | null = null;
+  private readonly plate: Plate;
 
   constructor(
     private readonly assets: AssetStore,
@@ -23,13 +25,8 @@ export class BackdropScene implements Scene {
   ) {
     const plate = kind === 'loading' ? '25-loading-plate' : '26-title-plate';
     const anim = kind === 'loading' ? '25-loading-anim' : '26-title-anim';
-    const frame = assets.frames(plate, 'plate')[0];
-    if (frame) {
-      const bg = new Sprite(frame.texture);
-      bg.anchor.set(0);
-      bg.scale.set(assets.scale(plate));
-      this.root.addChild(bg);
-    }
+    this.plate = new Plate(assets, plate, this.root);
+    const at = this.plate.content;
 
     const cloudRow = kind === 'loading' ? 'big-cloud' : 'clouds';
     const clouds: [string, number, number, number][] = [
@@ -41,8 +38,8 @@ export class BackdropScene implements Scene {
     for (const [row, x, y, speed] of clouds) {
       const s = new FrameSprite(assets, [anim], row).desync();
       s.position.set(x, y + 16);
-      this.root.addChild(s);
-      this.drifters.push({ s, speed, min: -80, max: GAME_W + 80 });
+      at.addChild(s);
+      this.drifters.push({ s, speed, min: -80, max: PLATE_W + 80 });
     }
 
     if (kind === 'loading') {
@@ -55,15 +52,15 @@ export class BackdropScene implements Scene {
         const s = new FrameSprite(assets, [anim], row).desync();
         s.position.set(x, y);
         s.face(dir);
-        this.root.addChild(s);
+        at.addChild(s);
         this.sprites.push(s);
       }
     } else {
       for (let i = 0; i < 5; i++) {
         const s = new FrameSprite(assets, [anim], 'hen-march').desync();
         s.position.set(-40 - i * 34, 336);
-        this.root.addChild(s);
-        this.drifters.push({ s, speed: 0.022, min: -200, max: GAME_W + 40 });
+        at.addChild(s);
+        this.drifters.push({ s, speed: 0.022, min: -200, max: PLATE_W + 40 });
       }
     }
   }
@@ -71,15 +68,24 @@ export class BackdropScene implements Scene {
   /** Title logo: stamps in, then idles with its shine. */
   showLogo(onImpact: () => void): FrameSprite {
     const logo = new FrameSprite(this.assets, ['28-logo'], 'stamp-in');
-    logo.position.set(GAME_W / 2, 92);
+    logo.position.set(PLATE_W / 2, 92);
     logo.play('stamp-in', {
       loop: false,
       onDone: () => logo.play('idle', { loop: true }),
     });
-    this.root.addChild(logo);
+    this.plate.content.addChild(logo);
     this.logo = logo;
     onImpact();
     return logo;
+  }
+
+  /** Clouds and marching hens cross the whole window, not only the plate. */
+  resize(w: number, h: number): void {
+    const o = this.plate.resize(w, h);
+    for (const d of this.drifters) {
+      d.min = Math.min(d.min, -o.x - 200);
+      d.max = Math.max(PLATE_W + 40, w - o.x + 80);
+    }
   }
 
   update(dtMs: number): void {
