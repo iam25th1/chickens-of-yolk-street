@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/main.ts",
     "build": "node build.mjs",
-    "typecheck": "tsc -p tsconfig.json",
-    "deploy-contract": "tsx src/chain/deploy-game-contract.ts"
+    "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@coys/shared": "0.1.0",

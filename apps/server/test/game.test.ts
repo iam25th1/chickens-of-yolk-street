@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ECONOMY, feedGramsPerHenDay, marketMultiplier, toMilli, type FarmState } from '@coys/shared';
+import { ECONOMY, feedGramsPerHenDay, marketMultiplier, marketReference, toMilli, type FarmState } from '@coys/shared';
 import { makeGame, type TestGame } from './helpers';
 
 let t: TestGame | null = null;
@@ -92,7 +92,8 @@ describe('actions are priced by the server', () => {
     await nextDay(t);
     const after = await t.game.getMarketState();
     expect(after.history.at(-1)).toEqual({ day: 2, supply: count, multiplier: market.multiplier });
-    expect(after.multiplier).toBeCloseTo(marketMultiplier(count), 10);
+    // a quiet market: one player farm and no agents, so demand is one farm's worth
+    expect(after.multiplier).toBeCloseTo(marketMultiplier(count, marketReference(1)), 10);
     expect(await t.game.ledgerTotal(farmId)).toBe(farm.cashMilli);
   });
 });

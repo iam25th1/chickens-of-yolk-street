@@ -1,7 +1,10 @@
 // End to end over HTTP and WebSocket: the server rejects forged prices and balances, needs a
 // session, rate-limits, and applies a retried request only once.
-import type { AddressInfo } from 'node:net';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join, sep } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import { ECONOMY, toMilli, type ServerMessage } from '@coys/shared';
@@ -24,6 +27,7 @@ beforeAll(async () => {
     clientDist: null,
     settlementMode: 'noop',
     dbKind: t.db.kind,
+    pingDb: () => t.db.query('SELECT 1'),
     log: () => undefined,
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -97,6 +101,40 @@ async function cashNow(c: Client): Promise<number> {
   const farm = await c.next((m) => m.t === 'farm');
   return farm.t === 'farm' ? farm.farm.cashMilli : NaN;
 }
+
+describe('the health check', () => {
+  it('/healthz reports the version, the season and the database', async () => {
+    const res = await fetch(`http://${base}/healthz`);
+    expect(res.status).toBe(200);
+    const h = (await res.json()) as Record<string, unknown>;
+    expect(h).toMatchObject({ ok: true, version: 'dev', season: t.game.season, db: { kind: 'pglite', ok: true }, settlement: 'noop' });
+    expect(typeof h.day).toBe('number');
+  });
+
+  it('serves the built client from its folder however the path is spelled, and nothing outside it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'coys-dist-'));
+    writeFileSync(join(dir, 'index.html'), '<div id="root"></div>');
+    const s = createGameServer({
+      game: t.game,
+      sessions: createSessionSigner('test-secret'),
+      privy: null,
+      privyAppId: null,
+      devLogin: true,
+      clientDist: dir.split(sep).join('/'),
+      settlementMode: 'noop',
+      dbKind: t.db.kind,
+      log: () => undefined,
+    });
+    await new Promise<void>((resolve) => s.listen(0, '127.0.0.1', resolve));
+    const at = `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
+    expect(await (await fetch(`${at}/`)).text()).toContain('id="root"');
+    expect(await (await fetch(`${at}/some/route`)).text()).toContain('id="root"');
+    expect((await fetch(`${at}/..%2f..%2fpackage.json`)).status).not.toBe(500);
+    expect(await (await fetch(`${at}/..%2f..%2fpackage.json`)).text()).not.toContain('"workspaces"');
+    await new Promise<void>((resolve) => s.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
 
 describe('the server is authoritative', () => {
   it('rejects a sell that carries a client price', async () => {

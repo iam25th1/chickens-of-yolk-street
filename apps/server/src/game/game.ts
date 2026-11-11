@@ -1,6 +1,7 @@
 // The authoritative game. Every price, balance and outcome is computed here from ECONOMY and the
 // database; clients only ask for actions. Mutations run one at a time (serial) inside database
 // transactions, and messages go out only after a transaction commits.
+import { randomBytes } from 'node:crypto';
 import {
   BODY_COLOURS,
   ECONOMY,
@@ -18,6 +19,7 @@ import {
   henLayingRate,
   isCrash,
   marketMultiplier,
+  marketReference,
   nextCoopKind,
   toMilli,
   type ActionMessage,
@@ -51,6 +53,7 @@ import {
   buildContext,
   chargeForThinking,
   ensureCast,
+  loyalistCreditQuote,
   openAgents,
   supplierQuote,
   turnOverStock,
@@ -70,7 +73,7 @@ import {
   type Farm,
   type Outbound,
 } from './ctx';
-import { cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
+import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
 
 export { ActionError } from './ctx';
@@ -97,6 +100,15 @@ export interface GameOptions {
   log?: (line: string) => void;
   /** Open the seven agents (default true; some tests run a quiet market). */
   cast?: boolean;
+  /** In-game day length in ms (default ECONOMY.day.lengthMs; DEMO_DAY_SECONDS shortens it). */
+  dayLengthMs?: number;
+  /** GAME_SEASON. A fresh database takes it (or makes a dev season); an existing one must match. */
+  season?: string | null;
+}
+
+/** A season id for a fresh database started without GAME_SEASON: unique, so it never collides on chain. */
+export function devSeason(now: number): string {
+  return `dev-${new Date(now).toISOString().slice(0, 10).replace(/-/g, '')}-${randomBytes(3).toString('hex')}`;
 }
 
 export class Game {
@@ -107,6 +119,10 @@ export class Game {
   private readonly rng: Rng;
   private readonly log: (line: string) => void;
   private readonly withCast: boolean;
+  private readonly wantSeason: string | null;
+  private readonly dayMs: number;
+  /** The database's season, known after init(). */
+  season = '';
   private readonly listeners = new Set<(out: Outbound) => void>();
   private queue: Promise<unknown> = Promise.resolve();
   private clock = { day: 1, dayStartedAt: 0 };
@@ -122,6 +138,8 @@ export class Game {
     this.log = opts.log ?? ((line) => console.log(line));
     this.brain = { ...opts.brain, log: this.log };
     this.withCast = opts.cast ?? true;
+    this.wantSeason = opts.season ?? null;
+    this.dayMs = opts.dayLengthMs ?? ECONOMY.day.lengthMs;
   }
 
   // ---- plumbing -------------------------------------------------------------------------------
@@ -143,7 +161,19 @@ export class Game {
 
   private makeCtx(q: Queryable): Ctx {
     const now = this.now();
-    return { q, day: this.clock.day, now, elapsed: now - this.clock.dayStartedAt, rng: this.rng, log: this.log, out: [], touched: new Set(), marketChanged: false };
+    return {
+      q,
+      season: this.season,
+      day: this.clock.day,
+      dayMs: this.dayMs,
+      now,
+      elapsed: now - this.clock.dayStartedAt,
+      rng: this.rng,
+      log: this.log,
+      out: [],
+      touched: new Set(),
+      marketChanged: false,
+    };
   }
 
   /** Runs fn in one transaction, then sends its queued messages and fresh farm and market state. */
@@ -167,7 +197,7 @@ export class Game {
   }
 
   getClock(): ClockState {
-    return { day: this.clock.day, dayStartedAt: this.clock.dayStartedAt, dayLengthMs: ECONOMY.day.lengthMs, serverNow: this.now() };
+    return { day: this.clock.day, dayStartedAt: this.clock.dayStartedAt, dayLengthMs: this.dayMs, serverNow: this.now() };
   }
 
   // ---- lifecycle ------------------------------------------------------------------------------
@@ -177,12 +207,20 @@ export class Game {
     if (applied.length) this.log(`[db] applied migrations ${applied.join(', ')} (${this.db.kind})`);
     const rows = await this.db.query('SELECT day, day_started_at FROM game_clock WHERE id = 1');
     if (!rows.length) {
+      const season = this.wantSeason ?? devSeason(this.now());
       await this.db.tx(async (q) => {
-        await q.query('INSERT INTO game_clock (id, day, day_started_at) VALUES (1, 1, $1)', [this.now()]);
-        await q.query('INSERT INTO market_days (day, multiplier) VALUES (1, $1)', [ECONOMY.market.openingMultiplier]);
+        await q.query('INSERT INTO game_clock (id, day, day_started_at, season) VALUES (1, 1, $1, $2)', [this.now(), season]);
+        await q.query('INSERT INTO market_days (season, day, multiplier) VALUES ($1, 1, $2)', [season, ECONOMY.market.openingMultiplier]);
       });
     }
-    const [clock] = await this.db.query('SELECT day, day_started_at FROM game_clock WHERE id = 1');
+    const [clock] = await this.db.query('SELECT day, day_started_at, season FROM game_clock WHERE id = 1');
+    const stored = String(clock?.season);
+    if (this.wantSeason !== null && this.wantSeason !== stored) {
+      throw new Error(
+        `this database holds season ${stored} but GAME_SEASON is ${this.wantSeason}. A new season needs a fresh DATABASE_URL; to carry on, set GAME_SEASON=${stored}.`,
+      );
+    }
+    this.season = stored;
     this.clock = { day: num(clock?.day), dayStartedAt: num(clock?.day_started_at) };
     await this.serial(() =>
       this.inTx(async (ctx) => {
@@ -195,7 +233,7 @@ export class Game {
 
   /** Called every second: cards arrive through the day; the day closes when its time is up. */
   async tick(): Promise<void> {
-    if (this.now() >= this.clock.dayStartedAt + ECONOMY.day.lengthMs) {
+    if (this.now() >= this.clock.dayStartedAt + this.dayMs) {
       await this.tickIfDue();
       return;
     }
@@ -203,7 +241,7 @@ export class Game {
   }
 
   async tickIfDue(): Promise<boolean> {
-    if (this.ticking || this.now() < this.clock.dayStartedAt + ECONOMY.day.lengthMs) return false;
+    if (this.ticking || this.now() < this.clock.dayStartedAt + this.dayMs) return false;
     this.ticking = true;
     try {
       await this.endDay();
@@ -400,6 +438,7 @@ export class Game {
     const history = (await this.db.query('SELECT day, supply, multiplier FROM market_days WHERE closed_at IS NOT NULL ORDER BY day DESC LIMIT 30'))
       .map((r): MarketDay => ({ day: num(r.day), supply: num(r.supply), multiplier: num(r.multiplier) }))
       .reverse();
+    const reference = marketReference(await activeFarms(this.db));
     const counts = await this.db.query(`SELECT owner_kind, (bust_day IS NOT NULL) AS bust, count(*) AS n FROM farms GROUP BY owner_kind, (bust_day IS NOT NULL)`);
     const farms = { players: 0, agents: 0, bust: 0 };
     for (const c of counts) {
@@ -434,10 +473,12 @@ export class Game {
         via: t.via as MarketState['trades'][number]['via'],
       }));
     return {
+      season: this.season,
       day,
       multiplier,
       pricesMilli: Object.fromEntries(EGG_GRADES.map((g) => [g, toMilli(eggPrice(g, multiplier, []))])) as Record<EggGrade, number>,
       supplyToday: num(today?.supply ?? 0),
+      reference,
       crash: isCrash(multiplier),
       history,
       farms,
@@ -594,6 +635,11 @@ export class Game {
         }
         return;
       }
+      case 'buyFeedOnCredit': {
+        const quote = await loyalistCreditQuote(ctx, farm, action.tier, action.bags);
+        await buyBagsFrom(ctx, farm, quote.agent, action.tier, action.bags, quote.unitMilli, true);
+        return;
+      }
       case 'setFeedTier':
         await ctx.q.query('UPDATE farms SET feed_tier = $2 WHERE id = $1', [farm.id, action.tier]);
         return;
@@ -698,7 +744,7 @@ export class Game {
       ids.push(String(h.id));
       progress.push(p);
       for (let i = 0; i < n; i++) {
-        const atMs = Math.floor((start + this.rng() * (end - start)) * ECONOMY.day.lengthMs);
+        const atMs = Math.floor((start + this.rng() * (end - start)) * this.dayMs);
         eggs.push([newId(), farmId, String(h.id), day, atMs, gradeForRoll(gradeTier, this.rng()), this.rng() < breakage]);
       }
     }
@@ -787,17 +833,18 @@ export class Game {
           await q.query('UPDATE agents SET last_decided_day = $2, last_brain = $3 WHERE id = $1', [agent.id, day, result.brain]);
           await bustIfBroke(ctx, agent);
         }
-        // 4. the market closes on the day's total supply
+        // 4. the market closes on the day's total supply, against demand from every active farm
         const [md] = await q.query('SELECT multiplier, supply FROM market_days WHERE day = $1', [day]);
         const supply = num(md?.supply ?? 0);
-        const nextMultiplier = marketMultiplier(supply);
-        await q.query('UPDATE market_days SET closed_at = $2, next_multiplier = $3 WHERE day = $1', [day, ctx.now, nextMultiplier]);
+        const reference = marketReference(await activeFarms(q));
+        const nextMultiplier = marketMultiplier(supply, reference);
+        await q.query('UPDATE market_days SET closed_at = $2, next_multiplier = $3, reference = $4 WHERE day = $1', [day, ctx.now, nextMultiplier, reference]);
         // 5. the next day opens
         const newDay = day + 1;
-        let start = this.clock.dayStartedAt + ECONOMY.day.lengthMs;
-        if (ctx.now - start > ECONOMY.day.lengthMs) start = ctx.now; // after downtime, start fresh instead of replaying days
+        let start = this.clock.dayStartedAt + this.dayMs;
+        if (ctx.now - start > this.dayMs) start = ctx.now; // after downtime, start fresh instead of replaying days
         await q.query('UPDATE game_clock SET day = $1, day_started_at = $2 WHERE id = 1', [newDay, start]);
-        await q.query('INSERT INTO market_days (day, multiplier) VALUES ($1, $2)', [newDay, nextMultiplier]);
+        await q.query('INSERT INTO market_days (season, day, multiplier) VALUES ($1, $2, $3)', [ctx.season, newDay, nextMultiplier]);
         this.clock = { day: newDay, dayStartedAt: start };
         ctx.day = newDay;
         ctx.elapsed = ctx.now - start;
@@ -822,7 +869,7 @@ export class Game {
         await createCards(ctx, candidates, trades);
         await arriveCards(ctx);
         ctx.marketChanged = true;
-        return { day, supply, nextMultiplier, collected, laid, plans, tally };
+        return { day, supply, reference, nextMultiplier, collected, laid, plans, tally };
       });
       const ctx = ctxOut as unknown as Ctx;
       const players = await this.db.query<{ id: string; player_id: string }>(`SELECT id, player_id FROM farms WHERE owner_kind = 'player'`);
@@ -844,12 +891,13 @@ export class Game {
       }
       await this.flush(ctx);
       this.emit(null, { t: 'clock', clock: this.getClock() });
-      this.log(`[day] ${outcome.day} closed: supply ${outcome.supply}, next multiplier ${outcome.nextMultiplier.toFixed(3)}; day ${this.clock.day} begins`);
+      this.log(`[day] ${outcome.day} closed: supply ${outcome.supply} of ${outcome.reference} demand, next multiplier ${outcome.nextMultiplier.toFixed(3)}; day ${this.clock.day} begins`);
       return outcome.day;
     });
 
-    const result = await this.chain.settleDay(this.db, closedDay);
-    await this.db.query('UPDATE market_days SET settlement_status = $2, settlement_tx = $3, settlement_error = $4 WHERE day = $1', [
+    const result = await this.chain.settleDay(this.db, this.season, closedDay);
+    await this.db.query('UPDATE market_days SET settlement_status = $3, settlement_tx = $4, settlement_error = $5 WHERE season = $1 AND day = $2', [
+      this.season,
       closedDay,
       result.status,
       result.txHash,

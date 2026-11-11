@@ -19,7 +19,7 @@ function Board({ title, x, y, w, h, children }: { title: string; x: number; y: n
   }, [x]);
   return (
     <div ref={el} className="panel" style={{ left: x, top: y, width: w, height: h, padding: 6 }}>
-      <div className="panel-title" style={{ fontSize: 8, lineHeight: '8px', marginBottom: 4 }}>
+      <div className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', marginBottom: 4 }}>
         {title}
       </div>
       {children}
@@ -57,7 +57,9 @@ export function MarketBoard({ farm, market, send, onBack }: { farm: FarmState; m
         ))}
         <div className="row spread">
           <span>MARKET X{market.multiplier.toFixed(2)}</span>
-          <span>SOLD TODAY {market.supplyToday}</span>
+          <span>
+            SOLD {market.supplyToday} OF {market.reference}
+          </span>
         </div>
       </Board>
 

@@ -1,0 +1,53 @@
+# Render Blueprint: the fallback host for Chickens of Yolk Street (Pier is the main one, see
+# deploy/pier/README.md). One web service (built client, HTTP API and WebSocket on one port) and
+# one Postgres database. Secrets are entered in the Render dashboard (sync: false), never here.
+# Details: deploy/render/README.md
+
+services:
+  - type: web
+    name: yolk-street
+    runtime: node
+    plan: 0.5c-512mb
+    region: frankfurt
+    branch: main
+    # one instance only: the game clock and the day close live in this process
+    numInstances: 1
+    buildCommand: npm ci --ignore-scripts && npm run build
+    startCommand: node apps/server/dist/main.js
+    healthCheckPath: /healthz
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: 24.22.3
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: yolk-street-db
+          property: connectionString
+      - key: GAME_SEASON
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: PRIVY_APP_ID
+        sync: false
+      - key: PRIVY_VERIFICATION_KEY
+        sync: false
+      - key: NEAR_TESTNET_ACCOUNT_ID
+        sync: false
+      - key: NEAR_TESTNET_PRIVATE_KEY
+        sync: false
+      - key: NEARAI_API_KEY
+        sync: false
+      - key: NEARAI_DAILY_SPEND_CAP_USD
+        value: '2'
+
+databases:
+  - name: yolk-street-db
+    databaseName: coys
+    user: coys
+    plan: 0.1c-256mb
+    region: frankfurt
+    postgresMajorVersion: '18'
+    # private network only; allow your IP for a restore, then remove it
+    ipAllowList: []

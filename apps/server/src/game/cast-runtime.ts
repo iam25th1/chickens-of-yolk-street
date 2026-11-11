@@ -10,6 +10,7 @@ import {
   feedGramsPerHenDay,
   isCrash,
   loyalistBagPrice,
+  marketReference,
   squeezerBagPrice,
   toMilli,
   type AgentKind,
@@ -38,7 +39,7 @@ import {
   type Ctx,
   type Farm,
 } from './ctx';
-import { executeFill, liveMultiplier, loadOrderById, openSells, placeBuyOrder, placeSellOrder, recordTrade } from './market';
+import { activeFarms, executeFill, liveMultiplier, loadOrderById, openSells, placeBuyOrder, placeSellOrder, recordTrade } from './market';
 
 export type CreateFarm = (
   ctx: Ctx,
@@ -120,6 +121,7 @@ export async function buildContext(ctx: Ctx, agent: AgentRow, history: MarketDay
         feedGrams: f.feed,
         feedTier: f.feedTier,
         unlocks: (await ctx.q.query<{ unlock_id: UnlockId }>('SELECT unlock_id FROM unlocks WHERE farm_id = $1', [f.id])).map((u) => u.unlock_id),
+        owes: num((await ctx.q.query(`SELECT COALESCE(SUM(due_milli - paid_milli), 0) AS s FROM debts WHERE farm_id = $1 AND status = 'open'`, [f.id]))[0]?.s) / 1000,
       };
       continue;
     }
@@ -155,7 +157,15 @@ export async function buildContext(ctx: Ctx, agent: AgentRow, history: MarketDay
   return {
     day: ctx.day,
     agent: { id: agent.id, kind: agent.kind as AgentKind, role: agent.role, name: agent.name, cash, stock, struggling: cash < ECONOMY.agents.struggleCash },
-    market: { multiplier: m, prices, supplyYesterday: history.at(-1)?.supply ?? 0, history: history.slice(-7), crash: isCrash(m), auctionHens },
+    market: {
+      multiplier: m,
+      prices,
+      reference: marketReference(await activeFarms(ctx.q)),
+      supplyYesterday: history.at(-1)?.supply ?? 0,
+      history: history.slice(-7),
+      crash: isCrash(m),
+      auctionHens,
+    },
     own,
     farms: briefs,
   };
@@ -276,6 +286,19 @@ export async function bustIfBroke(ctx: Ctx, agent: AgentRow): Promise<boolean> {
   ctx.log(`[agents] ${agent.name} is bust on day ${ctx.day}${hens ? `; ${hens} hens go to auction` : ''}`);
   ctx.marketChanged = true;
   return true;
+}
+
+/** The Loyalist's quote for feed on credit, within its credit limit for that farm. */
+export async function loyalistCreditQuote(ctx: Ctx, farm: Farm, tier: FeedTier, bags: number): Promise<{ agent: AgentRow; unitMilli: number }> {
+  const [agent] = await loadAgents(ctx, `status = 'open' AND kind = 'loyalist'`);
+  if (!agent || (agent.stock[tier] ?? 0) < bags) throw new ActionError('insufficient_stock', `no open Loyalist with ${bags} ${tier} bags`);
+  const unitMilli = toMilli(loyalistBagPrice(tier, (await loadMemory(ctx.q, agent.id, farm.id)).deals) * (agent.stock.markup ?? 1));
+  const [owed] = await ctx.q.query(`SELECT COALESCE(SUM(due_milli - paid_milli), 0) AS s FROM debts WHERE farm_id = $1 AND agent_id = $2 AND status = 'open'`, [
+    farm.id,
+    agent.id,
+  ]);
+  if (num(owed?.s) + unitMilli * bags > toMilli(ECONOMY.suppliers.loyalist.creditLimit)) throw new ActionError('invalid_action', 'over the Loyalist credit limit');
+  return { agent, unitMilli };
 }
 
 /** The farm's chosen supplier quotes a bag (the Squeezer prices desperation in; the Loyalist rewards loyalty). */

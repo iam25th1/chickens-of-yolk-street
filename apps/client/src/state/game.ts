@@ -34,8 +34,8 @@ export function dayElapsed(): number {
   return c ? Math.max(0, serverNow() - c.dayStartedAt) : 0;
 }
 
-/** 0 at dawn, 1 at the next dawn. */
-export const dayFraction = (): number => Math.min(1, dayElapsed() / ECONOMY.day.lengthMs);
+/** 0 at dawn, 1 at the next dawn (the server sets the day length; demo recordings shorten it). */
+export const dayFraction = (): number => Math.min(1, dayElapsed() / (game.get().clock?.dayLengthMs ?? ECONOMY.day.lengthMs));
 
 export const isNight = (): boolean => dayFraction() >= ECONOMY.day.nightStart;
 

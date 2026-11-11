@@ -278,21 +278,69 @@ CREATE TABLE chain_balances (
 ALTER TABLE market_days ADD COLUMN settlement_error text;
 `,
   },
+  {
+    id: 3,
+    name: 'market demand scales with active farms',
+    sql: `
+-- the reference supply each day closed against: demand per active farm times active farms
+ALTER TABLE market_days ADD COLUMN reference integer;
+`,
+  },
+  {
+    id: 4,
+    name: 'seasons',
+    sql: `
+-- One database holds one season (GAME_SEASON); settlement is keyed by (season, day) on chain and
+-- here. Databases from before seasons carry on as the season 'legacy', matching the contract's
+-- migrate, which files version 1 days under that name.
+ALTER TABLE game_clock ADD COLUMN season text;
+UPDATE game_clock SET season = 'legacy';
+ALTER TABLE market_days ADD COLUMN season text NOT NULL DEFAULT 'legacy';
+ALTER TABLE market_days DROP CONSTRAINT market_days_pkey;
+ALTER TABLE market_days ADD PRIMARY KEY (season, day);
+ALTER TABLE ledger ADD COLUMN season text NOT NULL DEFAULT 'legacy';
+`,
+  },
 ];
 
+/** Key for the Postgres advisory lock that serialises migrations across server instances. */
+const MIGRATION_LOCK = 727_274_001;
+
+const record = (m: { id: number; name: string }): string =>
+  `INSERT INTO schema_migrations (id, name, applied_at) VALUES (${m.id}, '${m.name.replace(/'/g, "''")}', ${Date.now()})`;
+
+/**
+ * Applies pending migrations on boot; safe to run again and again. On Postgres everything runs in
+ * one transaction under an advisory lock, so two instances booting at once cannot race and a
+ * failed migration leaves nothing half applied. PGlite is one process, one migration at a time.
+ */
 export async function migrate(db: Db): Promise<number[]> {
-  await db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+  const table = `CREATE TABLE IF NOT EXISTS schema_migrations (
     id integer PRIMARY KEY,
     name text NOT NULL,
     applied_at bigint NOT NULL
-  )`);
-  const done = new Set((await db.query<{ id: number }>('SELECT id FROM schema_migrations')).map((r) => Number(r.id)));
+  )`;
   const applied: number[] = [];
+  if (db.kind === 'postgres') {
+    await db.tx(async (q) => {
+      await q.query(`SELECT pg_advisory_xact_lock(${MIGRATION_LOCK})`);
+      await q.query(table);
+      const done = new Set((await q.query<{ id: number }>('SELECT id FROM schema_migrations')).map((r) => Number(r.id)));
+      for (const m of MIGRATIONS) {
+        if (done.has(m.id)) continue;
+        // no parameters: the simple protocol runs every statement of the migration
+        await q.query(m.sql);
+        await q.query(record(m));
+        applied.push(m.id);
+      }
+    });
+    return applied;
+  }
+  await db.exec(table);
+  const done = new Set((await db.query<{ id: number }>('SELECT id FROM schema_migrations')).map((r) => Number(r.id)));
   for (const m of MIGRATIONS) {
     if (done.has(m.id)) continue;
-    await db.exec(
-      `BEGIN;\n${m.sql}\nINSERT INTO schema_migrations (id, name, applied_at) VALUES (${m.id}, '${m.name.replace(/'/g, "''")}', ${Date.now()});\nCOMMIT;`,
-    );
+    await db.exec(`BEGIN;\n${m.sql}\n${record(m)};\nCOMMIT;`);
     applied.push(m.id);
   }
   return applied;

@@ -20,7 +20,8 @@ export interface ChainWriter {
   readonly mode: 'noop' | 'near-testnet';
   /** Explorer base for transaction receipts, or null. */
   readonly explorer: string | null;
-  settleDay(db: Db, day: number): Promise<SettleResult>;
+  /** Settles one closed day of a season. */
+  settleDay(db: Db, season: string, day: number): Promise<SettleResult>;
 }
 
 export interface TestnetConfig {
@@ -59,10 +60,10 @@ export class NoopChain implements ChainWriter {
     private readonly log: (line: string) => void,
   ) {}
 
-  async settleDay(db: Db, day: number): Promise<SettleResult> {
-    const built = await buildDayBatch(db, day, { henMintCap: 0, renderer: null });
+  async settleDay(db: Db, season: string, day: number): Promise<SettleResult> {
+    const built = await buildDayBatch(db, season, day, { henMintCap: 0, renderer: null });
     this.log(
-      `[chain] !!! NO-OP for day ${day}: ${this.reason}. Batch built (${built.batch.farms.length} farms, ` +
+      `[chain] !!! NO-OP for season ${season} day ${day}: ${this.reason}. Batch built (${built.batch.farms.length} farms, ` +
         `digest ${built.batch.digest.slice(0, 12)}) and recorded in market_days only, not on NEAR testnet.`,
     );
     return { status: 'noop', txHash: null };
@@ -93,7 +94,7 @@ export class TestnetChain implements ChainWriter {
       this.checked = true;
     }
     const contract = await new Account(this.cfg.contractId, this.provider).getState();
-    if (contract.codeHash === '11111111111111111111111111111111') return 'the game contract is not deployed yet (npm run deploy-contract -w @coys/server)';
+    if (contract.codeHash === '11111111111111111111111111111111') return 'the game contract is not deployed yet (see deploy/testnet.md)';
     return null;
   }
 
@@ -131,16 +132,16 @@ export class TestnetChain implements ChainWriter {
     }
   }
 
-  async settleDay(db: Db, day: number): Promise<SettleResult> {
+  async settleDay(db: Db, season: string, day: number): Promise<SettleResult> {
     try {
       const blocked = await this.preflight();
       if (blocked) {
-        this.log(`[chain] !!! NO-OP for day ${day}: ${blocked}`);
+        this.log(`[chain] !!! NO-OP for season ${season} day ${day}: ${blocked}`);
         return { status: 'noop', txHash: null, error: blocked };
       }
       await this.ensureAgentAccounts(db);
       const lowBalance = (await this.balanceNear()) < this.cfg.minBalanceNear;
-      const built = await buildDayBatch(db, day, { henMintCap: lowBalance ? 0 : this.cfg.henMintCap, renderer: this.renderer });
+      const built = await buildDayBatch(db, season, day, { henMintCap: lowBalance ? 0 : this.cfg.henMintCap, renderer: this.renderer });
       if (lowBalance) this.log('[chain] game account balance is low; hen mints wait for a top-up');
       const outcome = await this.account.callFunctionRaw({
         contractId: this.cfg.contractId,
@@ -152,12 +153,12 @@ export class TestnetChain implements ChainWriter {
       const txHash = outcome.transaction_outcome.id;
       await commitBatch(db, built);
       this.log(
-        `[chain] day ${day} settled on NEAR testnet: ${txHash} (${built.batch.eggs.length} egg moves, ${built.batch.hen_mints.length} hens minted, ${built.batch.hen_moves.length} moved)`,
+        `[chain] season ${season} day ${day} settled on NEAR testnet: ${txHash} (${built.batch.eggs.length} egg moves, ${built.batch.hen_mints.length} hens minted, ${built.batch.hen_moves.length} moved)`,
       );
       return { status: 'sent', txHash };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
-      this.log(`[chain] day ${day} FAILED on NEAR testnet: ${error.slice(0, 300)}`);
+      this.log(`[chain] season ${season} day ${day} FAILED on NEAR testnet: ${error.slice(0, 300)}`);
       return { status: 'failed', txHash: null, error: error.slice(0, 500) };
     }
   }

@@ -19,7 +19,11 @@ export type Outbound = { playerId: string | null; msg: ServerMessage };
 /** One transaction's view of the game. Messages are queued and sent only after commit. */
 export interface Ctx {
   q: Queryable;
+  /** The database's season: stored with every ledger row and every settled day. */
+  season: string;
   day: number;
+  /** Length of an in-game day in milliseconds (ECONOMY.day.lengthMs unless a demo shortens it). */
+  dayMs: number;
   now: number;
   /** Milliseconds into the current day. */
   elapsed: number;
@@ -80,8 +84,9 @@ export async function loadFarm(q: Queryable, farmId: string): Promise<Farm> {
 export async function moveCash(ctx: Ctx, farmId: string, kind: string, amountMilli: number, ref: string): Promise<void> {
   if (amountMilli === 0) return;
   await ctx.q.query('UPDATE farms SET cash_milli = cash_milli + $2 WHERE id = $1', [farmId, amountMilli]);
-  await ctx.q.query('INSERT INTO ledger (farm_id, day, kind, amount_milli, ref, created_at) VALUES ($1, $2, $3, $4, $5, $6)', [
+  await ctx.q.query('INSERT INTO ledger (farm_id, season, day, kind, amount_milli, ref, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
     farmId,
+    ctx.season,
     ctx.day,
     kind,
     amountMilli,

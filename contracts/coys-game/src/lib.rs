@@ -3,10 +3,13 @@
 //! - Hens are NEP-171 NFTs (near-contract-standards), one token per hen; metadata holds the traits
 //!   and a small rendered portrait.
 //! - Eggs are NEP-245 multi-tokens (near-sdk-contract-tools), one token id per grade.
-//! - `settle_day` is the only way the game writes: once per in-game day it mints, moves and burns
-//!   egg tokens, mints and moves hens, and records the day's summary and a digest of every farm's
-//!   net result. Only the owner (the game account) may call it; holders still use the standard
-//!   `nft_*` and `mt_*` methods for their own tokens.
+//! - `settle_day` is the only way the game writes: once per in-game day of a season it mints, moves
+//!   and burns egg tokens, mints and moves hens, and records the day's summary and a digest of every
+//!   farm's net result. Only the owner (the game account) may call it; holders still use the
+//!   standard `nft_*` and `mt_*` methods for their own tokens.
+//! - Days are keyed by (season, day). A new season (a fresh game database) starts again at day 1;
+//!   within a season every day lands once and in order. Version 1 settled days without seasons;
+//!   `migrate` keeps those as the season `legacy`.
 
 use std::collections::HashMap;
 
@@ -28,6 +31,9 @@ use near_sdk_contract_tools::{Nep245, Owner};
 /// Egg token ids, one per grade.
 pub const EGG_GRADES: [&str; 4] = ["egg-white", "egg-cream", "egg-brown", "egg-golden"];
 
+/// The season that version 1's days (settled before seasons existed) belong to after `migrate`.
+pub const LEGACY_SEASON: &str = "legacy";
+
 #[derive(BorshSerialize, BorshStorageKey)]
 #[borsh(crate = "near_sdk::borsh")]
 enum StorageKey {
@@ -37,11 +43,26 @@ enum StorageKey {
     HenApprovals,
     HenContractMetadata,
     Days,
+    SeasonDays,
+    SeasonLastDay,
 }
 
 #[derive(PanicOnDefault, Nep245, Owner)]
 #[near(contract_state)]
 pub struct Contract {
+    hens: NonFungibleToken,
+    hen_metadata: LazyOption<NFTContractMetadata>,
+    /// Version 1 days, readable as the legacy season.
+    legacy_days: LookupMap<u32, DayRecord>,
+    /// Settled days, keyed "season:day".
+    days: LookupMap<String, DayRecord>,
+    /// Last settled day of each season.
+    last_days: LookupMap<String, u32>,
+}
+
+/// Version 1 state, read once by `migrate`. Field order matches the version 1 struct.
+#[near(serializers = [borsh])]
+struct ContractV1 {
     hens: NonFungibleToken,
     hen_metadata: LazyOption<NFTContractMetadata>,
     days: LookupMap<u32, DayRecord>,
@@ -114,6 +135,8 @@ pub struct HenMove {
 #[near(serializers = [json])]
 #[derive(Clone, Debug)]
 pub struct DayBatch {
+    /// Season id: 1 to 32 characters of a-z, 0-9 and '-'.
+    pub season: String,
     pub day: u32,
     pub supply: u32,
     pub multiplier_milli: u32,
@@ -126,6 +149,14 @@ pub struct DayBatch {
 
 fn grade_ok(grade: &str) -> bool {
     EGG_GRADES.contains(&grade)
+}
+
+fn season_ok(season: &str) -> bool {
+    !season.is_empty() && season.len() <= 32 && season.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+}
+
+fn day_key(season: &str, day: u32) -> String {
+    format!("{season}:{day}")
 }
 
 #[near]
@@ -152,8 +183,9 @@ impl Contract {
                     reference_hash: None,
                 }),
             ),
-            days: LookupMap::new(StorageKey::Days),
-            last_day: 0,
+            legacy_days: LookupMap::new(StorageKey::Days),
+            days: LookupMap::new(StorageKey::SeasonDays),
+            last_days: LookupMap::new(StorageKey::SeasonLastDay),
         };
         Owner::init(&mut contract, &owner_id);
         for grade in EGG_GRADES {
@@ -162,10 +194,29 @@ impl Contract {
         contract
     }
 
-    /// The day close. Owner only; days must arrive in order and each lands once.
+    /// Upgrades version 1 state (days without seasons) in place after the new code is deployed.
+    /// Hens, egg balances and the owner are untouched; version 1's days become the legacy season.
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate() -> Self {
+        let old: ContractV1 = env::state_read().unwrap_or_else(|| env::panic_str("no version 1 state to migrate"));
+        let mut last_days = LookupMap::new(StorageKey::SeasonLastDay);
+        last_days.insert(LEGACY_SEASON.to_string(), old.last_day);
+        Self {
+            hens: old.hens,
+            hen_metadata: old.hen_metadata,
+            legacy_days: old.days,
+            days: LookupMap::new(StorageKey::SeasonDays),
+            last_days,
+        }
+    }
+
+    /// The day close. Owner only; within a season days arrive in order and each lands once.
     pub fn settle_day(&mut self, batch: DayBatch) -> DayRecord {
         Self::require_owner();
-        require!(batch.day > self.last_day, "day already settled");
+        require!(season_ok(&batch.season), "season must be 1 to 32 characters of a-z, 0-9 and -");
+        let last = self.last_days.get(&batch.season).copied().unwrap_or(0);
+        require!(batch.day > last, "day already settled");
 
         let mut minted: u128 = 0;
         let mut burned: u128 = 0;
@@ -254,27 +305,33 @@ impl Contract {
             hens_minted: u32::try_from(batch.hen_mints.len()).unwrap_or(u32::MAX),
             hens_moved: u32::try_from(batch.hen_moves.len()).unwrap_or(u32::MAX),
         };
-        self.days.insert(batch.day, record.clone());
-        self.last_day = batch.day;
+        self.days.insert(day_key(&batch.season, batch.day), record.clone());
+        self.last_days.insert(batch.season.clone(), batch.day);
         env::log_str(&format!(
             "EVENT_JSON:{}",
             near_sdk::serde_json::json!({
                 "standard": "coys",
-                "version": "1.0.0",
+                "version": "2.0.0",
                 "event": "day_settled",
-                "data": [{ "day": record.day, "supply": record.supply, "multiplier_milli": record.multiplier_milli,
-                           "digest": record.digest, "farms": batch.farms.len() }],
+                "data": [{ "season": batch.season, "day": record.day, "supply": record.supply,
+                           "multiplier_milli": record.multiplier_milli, "digest": record.digest, "farms": batch.farms.len() }],
             })
         ));
         record
     }
 
-    pub fn day_record(&self, day: u32) -> Option<DayRecord> {
-        self.days.get(&day).cloned()
+    pub fn day_record(&self, season: String, day: u32) -> Option<DayRecord> {
+        self.days.get(&day_key(&season, day)).cloned().or_else(|| {
+            if season == LEGACY_SEASON {
+                self.legacy_days.get(&day).cloned()
+            } else {
+                None
+            }
+        })
     }
 
-    pub fn last_settled_day(&self) -> u32 {
-        self.last_day
+    pub fn last_settled_day(&self, season: String) -> u32 {
+        self.last_days.get(&season).copied().unwrap_or(0)
     }
 
     pub fn egg_grades(&self) -> Vec<String> {
@@ -373,7 +430,12 @@ mod tests {
     }
 
     fn batch(day: u32) -> DayBatch {
+        batch_in("s1", day)
+    }
+
+    fn batch_in(season: &str, day: u32) -> DayBatch {
         DayBatch {
+            season: season.to_string(),
             day,
             supply: 12,
             multiplier_milli: 1000,
@@ -405,8 +467,84 @@ mod tests {
         assert_eq!(c.balance_of("egg-brown", &accounts(2)), 4);
         assert_eq!(c.nft_token("hen-1".into()).map(|t| t.owner_id), Some(accounts(3)));
         assert_eq!(c.nft_supply_for_owner(accounts(1)), U128(1));
-        assert_eq!(c.last_settled_day(), 1);
-        assert_eq!(c.day_record(1), Some(record));
+        assert_eq!(c.last_settled_day("s1".into()), 1);
+        assert_eq!(c.day_record("s1".into(), 1), Some(record));
+        assert_eq!(c.day_record("s2".into(), 1), None);
+    }
+
+    #[test]
+    fn a_new_season_starts_again_at_day_one() {
+        ctx(accounts(0));
+        let mut c = Contract::new(accounts(0));
+        for day in 1..=3 {
+            c.settle_day(batch_in("s1", day));
+        }
+        let first = c.settle_day(batch_in("s2", 1));
+        assert_eq!(first.day, 1);
+        assert_eq!(c.last_settled_day("s1".into()), 3);
+        assert_eq!(c.last_settled_day("s2".into()), 1);
+        assert!(c.day_record("s1".into(), 3).is_some());
+        assert!(c.day_record("s2".into(), 1).is_some());
+    }
+
+    #[test]
+    #[should_panic(expected = "day already settled")]
+    fn an_old_season_cannot_repeat_a_day() {
+        ctx(accounts(0));
+        let mut c = Contract::new(accounts(0));
+        for day in 1..=3 {
+            c.settle_day(batch_in("s1", day));
+        }
+        c.settle_day(batch_in("s2", 1));
+        c.settle_day(batch_in("s1", 3));
+    }
+
+    #[test]
+    #[should_panic(expected = "season must be")]
+    fn season_ids_are_checked() {
+        ctx(accounts(0));
+        let mut c = Contract::new(accounts(0));
+        c.settle_day(batch_in("Season One!", 1));
+    }
+
+    #[test]
+    fn migrate_keeps_version_1_days_as_the_legacy_season() {
+        ctx(accounts(0));
+        let mut days = LookupMap::new(StorageKey::Days);
+        let record = DayRecord {
+            day: 3,
+            supply: 93,
+            multiplier_milli: 2500,
+            digest: "d".repeat(64),
+            farms: 3,
+            eggs_minted: U128(26),
+            eggs_burned: U128(16),
+            egg_transfers: 0,
+            hens_minted: 12,
+            hens_moved: 0,
+        };
+        days.insert(3, record.clone());
+        days.flush();
+        let v1 = ContractV1 {
+            hens: NonFungibleToken::new(
+                StorageKey::HenOwners,
+                accounts(0),
+                Some(StorageKey::HenMetadata),
+                Some(StorageKey::HenEnumeration),
+                Some(StorageKey::HenApprovals),
+            ),
+            hen_metadata: LazyOption::new(StorageKey::HenContractMetadata, None),
+            days,
+            last_day: 3,
+        };
+        env::state_write(&v1);
+        let mut c = Contract::migrate();
+        Owner::init(&mut c, &accounts(0));
+        assert_eq!(c.last_settled_day(LEGACY_SEASON.into()), 3);
+        assert_eq!(c.day_record(LEGACY_SEASON.into(), 3), Some(record));
+        // the legacy season carries on from day 4, and a new season starts at day 1
+        assert_eq!(c.settle_day(batch_in(LEGACY_SEASON, 4)).day, 4);
+        assert_eq!(c.settle_day(batch_in("s2", 1)).day, 1);
     }
 
     #[test]

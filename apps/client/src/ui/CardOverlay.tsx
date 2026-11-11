@@ -11,7 +11,7 @@ import type { Action } from '../net/socket';
 import { CARD_ART, CARD_TITLE, CARD_UNIT, CHOICE_LABEL, LOOK } from './cast';
 import { SheetSprite } from './SheetSprite';
 
-function Portrait({ sheet, row, loop, onDone }: { sheet: string; row: string; loop: boolean; onDone?: () => void }) {
+export function Portrait({ sheet, row, loop, onDone }: { sheet: string; row: string; loop: boolean; onDone?: () => void }) {
   const { assets } = useServices();
   const [i, setI] = useState(0);
   const json = assets.sheet(sheet);
@@ -180,7 +180,7 @@ export function CardOverlay({
         <div className="row" style={{ alignItems: 'flex-start', gap: 8 }}>
           {look ? <Portrait sheet={look.portrait} row={portraitRow} loop={talking || portraitRow === 'idle'} /> : <div style={{ width: 64, height: 64 }} />}
           <div className="col" style={{ gap: 4, width: 150 }}>
-            <span className="panel-title" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
+            <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
               {card.from.toUpperCase()}
             </span>
             <span style={{ minHeight: 56, lineHeight: '10px' }}>{typed.toUpperCase()}</span>

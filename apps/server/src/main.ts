@@ -2,10 +2,12 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ECONOMY } from '@coys/shared';
 import { NEARAI_DEFAULT_CHEAP_MODEL, NearAiClient } from './ai/nearai';
 import { InferenceBudget } from './agents/brain';
 import { createPrivyVerifier } from './auth/privy';
 import { createSessionSigner } from './auth/session';
+import { BUILD } from './build-info';
 import { createChainWriter } from './chain/chain';
 import { HenRenderer } from './chain/hen-image';
 import { openDb } from './db/db';
@@ -20,11 +22,15 @@ if (existsSync(envFile)) process.loadEnvFile(envFile);
 const log = (line: string): void => console.log(`${new Date().toISOString()} ${line}`);
 const config = readConfig(process.env, repoRoot);
 log(`[env] ${describeEnv(process.env)}`);
+log(`[build] ${BUILD.version}${BUILD.commit ? ` (${BUILD.commit})` : ''}${config.production ? ', production' : ''}`);
 if (config.sessionSecretEphemeral) log('[auth] SESSION_SECRET unset: using a random secret, sessions end on restart');
-if (!config.privyAppId) log('[auth] PRIVY_APP_ID unset: running with the LOCAL DEV LOGIN only');
+if (!config.privyAppId) log(`[auth] PRIVY_APP_ID unset: running with the LOCAL DEV LOGIN only${config.production ? ' (!!! on a production server anyone can make a player)' : ''}`);
+if (config.dayLengthMs !== ECONOMY.day.lengthMs) log(`[day] DEMO_DAY_SECONDS: an in-game day lasts ${config.dayLengthMs / 1000} s (normally ${ECONOMY.day.lengthMs / 1000} s)`);
+if (config.demoDayIgnored) log('[day] DEMO_DAY_SECONDS is ignored in production unless DEMO_MODE=1');
 
 const db = await openDb(config.databaseUrl);
 log(`[db] ${db.kind}${config.databaseUrl === 'memory://' ? ' in memory' : db.kind === 'pglite' ? ` at ${config.databaseUrl.slice('pglite://'.length)}` : ''}`);
+if (config.production && db.kind === 'pglite') log('[db] !!! PGlite in production (ALLOW_PGLITE_IN_PRODUCTION=1): for checking a build only, not for players');
 
 const renderer = new HenRenderer(join(repoRoot, 'apps/client/public/assets'));
 const chain = createChainWriter(process.env, renderer, log);
@@ -45,6 +51,8 @@ const game = new Game({
   db,
   chain,
   log,
+  season: config.season,
+  dayLengthMs: config.dayLengthMs,
   brain: {
     client: nearAi,
     budget: new InferenceBudget(db, capUsd),
@@ -54,6 +62,7 @@ const game = new Game({
   },
 });
 await game.init();
+log(`[season] ${game.season}${config.season ? '' : ' (GAME_SEASON unset: kept from the database, or made for a fresh one)'}`);
 
 const server = createGameServer({
   game,
@@ -64,6 +73,7 @@ const server = createGameServer({
   clientDist: config.clientDist,
   settlementMode: chain.mode,
   dbKind: db.kind,
+  pingDb: () => db.query('SELECT 1'),
   log,
 });
 

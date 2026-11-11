@@ -12,6 +12,7 @@ import {
   henPaybackDays,
   isCrash,
   marketMultiplier,
+  marketReference,
   saleValue,
   simulateReinvest,
   toMilli,
@@ -26,8 +27,9 @@ describe('economy sheet values', () => {
     expect(henPaybackDays({ tier: 'standard', multiplier: 1 })).toBeCloseTo(17.3, 1);
   });
 
-  it('market multiplier at 1300 daily supply is 0.54', () => {
+  it('market multiplier at 1300 daily supply is 0.54 (fixed sheet reference of 600)', () => {
     expect(marketMultiplier(1300)).toBeCloseTo(0.54, 2);
+    expect(marketMultiplier(1300, ECONOMY.market.referenceSupply)).toBeCloseTo(0.54, 2);
   });
 
   it('a 10-hen farm reinvesting with a 20-coin reserve fills a 30-hen coop on day 16', () => {
@@ -56,6 +58,15 @@ describe('formulas', () => {
     expect(marketMultiplier(100_000)).toBe(0.4);
     expect(isCrash(0.8)).toBe(true);
     expect(isCrash(0.81)).toBe(false);
+  });
+
+  it('the live reference scales with active farms', () => {
+    const per = ECONOMY.market.demandPerActiveFarm;
+    expect(marketReference(9)).toBe(9 * per);
+    expect(marketReference(0)).toBe(per);
+    expect(marketMultiplier(9 * per, marketReference(9))).toBe(1);
+    // twice the farms absorb twice the eggs at the same price
+    expect(marketMultiplier(400, marketReference(18))).toBeCloseTo(marketMultiplier(200, marketReference(9)), 10);
   });
 
   it('crowding loses 15% per 10% over capacity, capped at 90%', () => {

@@ -15,7 +15,7 @@ import {
   type TradeView,
   type UnlockId,
 } from '@coys/shared';
-import { num } from '../db/db';
+import { num, type Queryable } from '../db/db';
 import { ActionError, eggTotal, loadFarm, moveAgentCash, moveCash, newId, setAgentStock, toAgent, AGENT_COLUMNS, type AgentRow, type Ctx, type Farm } from './ctx';
 
 const BIG_TRADE_MILLI = 25_000;
@@ -23,6 +23,14 @@ const BIG_TRADE_MILLI = 25_000;
 export async function liveMultiplier(ctx: Ctx): Promise<number> {
   const [md] = await ctx.q.query('SELECT multiplier FROM market_days WHERE day = $1', [ctx.day]);
   return num(md?.multiplier ?? ECONOMY.market.openingMultiplier);
+}
+
+/** Player farms still farming plus open agents: the market's demand scales with them. */
+export async function activeFarms(q: Queryable): Promise<number> {
+  const [r] = await q.query(
+    `SELECT (SELECT count(*) FROM agents WHERE status = 'open') + (SELECT count(*) FROM farms WHERE owner_kind = 'player' AND bust_day IS NULL) AS n`,
+  );
+  return num(r?.n);
 }
 
 export interface TradeInput {
