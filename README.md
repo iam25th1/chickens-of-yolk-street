@@ -32,7 +32,7 @@ Chickens of Yolk Street puts a **real, shared economy** in a toy you can play wi
 Node 22.22.2 or newer. Each step says what to do and what you should see.
 
 1. **Install.** Run `npm ci --ignore-scripts`. You see the lockfile install, and no package install scripts run (`.npmrc` also sets `ignore-scripts=true`).
-2. **Test.** Run `npm test`. You see **47 tests pass**, including the economy sheet: margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply, and a 30-hen coop **full on day 16**.
+2. **Test.** Run `npm test`. You see **47 tests**: 46 pass and one (re-packing from the asset repo) skips unless `coys-assets` is cloned beside this repo. They include the economy sheet: margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply, and a 30-hen coop **full on day 16**.
 3. **Play.** Run `npm run dev` and open http://localhost:5173. You see an egg fill up over the loading plate, then the title: the logo stamps in and the price ticker scrolls.
 4. **Sign in.** Press **PLAY**. With no `PRIVY_APP_ID` you see a red **LOCAL DEV LOGIN** label. Type a name and press **START FARMING**. You see your farm: 10 hens, a starter coop, **50.00** coins, **DAY001** on the split-flap clock.
 5. **Collect.** Watch a hen puff up and lay. Click the egg: it pops into the crate with a sparkle and a tiny freeze. The egg counter goes up by one.
