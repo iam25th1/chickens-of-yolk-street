@@ -8,7 +8,7 @@ import { ECONOMY, emptyEggStock, type FarmState } from '@coys/shared';
 import { NearAiClient } from '../src/ai/nearai';
 import type { AgentContext } from '../src/agents/decision';
 import { ruleDecision } from '../src/agents/rules';
-import { makeGame, type TestGame } from './helpers';
+import { RecordingChain, makeGame, type TestGame } from './helpers';
 
 const eggs = (f: FarmState) => f.crate.white + f.crate.cream + f.crate.brown + f.crate.golden;
 const SEEDS = [1, 2, 3, 4, 5];
@@ -65,6 +65,8 @@ interface SeedReport {
   contracts: { signed: number; delivered: number; missed: number };
   inference: { decisions: number; modelCalls: number; fallbacks: number; skipped: number; spendUsd: number; capUsd: number };
   wholesalerResold: number;
+  /** Contract eggs that moved as tokens from a player wallet to the Bakery wallet, and the first receipt. */
+  onChainDeliveries: { transfers: number; eggs: number; firstReceipt: string | null };
   cash: Record<string, string>;
 }
 
@@ -81,8 +83,10 @@ async function runSeed(seed: number): Promise<{ report: SeedReport; t: TestGame;
     }) as typeof fetch,
   });
   const capUsd = 0.25;
-  const t = await makeGame({ cast: true, client, capUsd, seed });
+  const chain = new RecordingChain('game.testnet');
+  const t = await makeGame({ cast: true, client, capUsd, seed, chain, season: `sim-${seed}` });
   const players = [await t.game.ensurePlayer('dev', 'sim-player-01', 'Ada'), await t.game.ensurePlayer('dev', 'sim-player-02', 'Bo')];
+  for (const [i, p] of players.entries()) await t.game.act(p.playerId, { t: 'linkWallet', rid: `w${i}`, accountId: ['ada.testnet', 'bo.testnet'][i] ?? 'x.testnet' });
   const cash: Record<string, string[]> = {};
   for (let day = 1; day <= 30; day++) {
     await playDay(t, players, day);
@@ -119,6 +123,11 @@ async function runSeed(seed: number): Promise<{ report: SeedReport; t: TestGame;
       spendUsd: usage.reduce((s, u) => s + Number(u.spend_micro_usd), 0) / 1e6,
       capUsd,
     },
+    onChainDeliveries: (() => {
+      const moves = chain.batches.flatMap((b) => b.eggs.filter((m) => m.kind === 'Transfer' && /^bakery\d+\.game\.testnet$/.test(m.to ?? '') && /^(ada|bo)\.testnet$/.test(m.from ?? '')).map((m) => ({ ...m, day: b.day, season: b.season })));
+      const first = moves[0];
+      return { transfers: moves.length, eggs: moves.reduce((n, m) => n + Number(m.amount), 0), firstReceipt: first ? `recorded-${first.season}-${first.day}` : null };
+    })(),
     wholesalerResold: Number((await t.db.query(`SELECT COALESCE(SUM(qty), 0) AS n FROM trades WHERE via = 'resale'`))[0]?.n),
     cash: Object.fromEntries(Object.entries(cash).map(([k, v]) => [k, v.join(' ')])),
   };
@@ -147,11 +156,13 @@ describe('30-day market simulation', () => {
       expect(report.inference.spendUsd).toBeLessThanOrEqual(report.inference.capUsd);
       expect(report.inference.fallbacks).toBeGreaterThan(0);
       expect(report.contracts.delivered + report.contracts.missed).toBeGreaterThan(0);
+      // Bakery contract eggs reach the Bakery's wallet as tokens in the day's settlement batch
+      expect(report.onChainDeliveries.transfers).toBeGreaterThan(0);
       for (const p of players) expect(await t.game.ledgerTotal(p.farmId)).toBe((await t.game.getFarmState(p.farmId)).cashMilli);
       await t.db.close();
     }
     console.log(
-      `SIM ACCEPTANCE ${reports.map((r) => `seed ${r.seed}: median x${r.medianMultiplier.toFixed(2)}, min x${r.minMultiplier.toFixed(2)}, ${r.glutDays} glut days, rival busts: ${r.rivalBusts.join(', ') || 'none'}`).join(' | ')}`,
+      `SIM ACCEPTANCE ${reports.map((r) => `seed ${r.seed}: median x${r.medianMultiplier.toFixed(2)}, min x${r.minMultiplier.toFixed(2)}, ${r.glutDays} glut days, rival busts: ${r.rivalBusts.join(', ') || 'none'}, ${r.onChainDeliveries.eggs} contract eggs to the Bakery wallet on chain`).join(' | ')}`,
     );
     for (const r of reports) {
       expect(r.medianMultiplier).toBeGreaterThanOrEqual(0.8);
