@@ -1,0 +1,234 @@
+{
+  "frames": {
+    "flutter/0": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 704
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 120
+    },
+    "flutter/1": {
+      "frame": {
+        "x": 512,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 704
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 120
+    },
+    "flutter/2": {
+      "frame": {
+        "x": 1024,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 704
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 120
+    },
+    "flutter/3": {
+      "frame": {
+        "x": 1536,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 704
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 500
+    },
+    "shine/0": {
+      "frame": {
+        "x": 0,
+        "y": 704,
+        "w": 512,
+        "h": 704
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 704
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 100
+    },
+    "shine/1": {
+      "frame": {
+        "x": 512,
+        "y": 704,
+        "w": 512,
+        "h": 704
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 704
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 100
+    },
+    "shine/2": {
+      "frame": {
+        "x": 1024,
+        "y": 704,
+        "w": 512,
+        "h": 704
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 704
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 100
+    },
+    "shine/3": {
+      "frame": {
+        "x": 1536,
+        "y": 704,
+        "w": 512,
+        "h": 704
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 704
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 704
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 600
+    }
+  },
+  "animations": {
+    "flutter": [
+      "flutter/0",
+      "flutter/1",
+      "flutter/2",
+      "flutter/3"
+    ],
+    "shine": [
+      "shine/0",
+      "shine/1",
+      "shine/2",
+      "shine/3"
+    ]
+  },
+  "meta": {
+    "app": "chickens-of-yolk-street/scripts/pack-assets.ts",
+    "version": "1",
+    "image": "29-card-undercut.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 1408
+    },
+    "scale": "1",
+    "source": {
+      "path": "art/29-card-undercut/29-card-undercut.png",
+      "sha256": "9f16768418bf4fa329fc2333033fd332db5cd330f7ec6f93805ba324f52dad3b"
+    },
+    "grid": 4
+  }
+}

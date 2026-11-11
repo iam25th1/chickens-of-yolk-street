@@ -1,0 +1,26 @@
+{
+  "name": "@coys/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/main.ts",
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "deploy-settlement-log": "tsx src/chain/deploy-settlement-log.ts"
+  },
+  "dependencies": {
+    "@coys/shared": "0.1.0",
+    "@electric-sql/pglite": "0.5.16",
+    "jose": "6.2.17",
+    "near-api-js": "7.5.3",
+    "pg": "8.23.1",
+    "ws": "8.22.2",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1",
+    "@types/ws": "8.18.2",
+    "esbuild": "0.28.2"
+  }
+}

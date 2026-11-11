@@ -1,0 +1,180 @@
+{
+  "frames": {
+    "turnaround/0": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 688
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 540
+    },
+    "turnaround/1": {
+      "frame": {
+        "x": 512,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 688
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 180
+    },
+    "turnaround/2": {
+      "frame": {
+        "x": 1024,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 688
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 360
+    },
+    "turnaround/3": {
+      "frame": {
+        "x": 1536,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 688
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 540
+    },
+    "turnaround/4": {
+      "frame": {
+        "x": 1024,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 688
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 360
+    },
+    "turnaround/5": {
+      "frame": {
+        "x": 512,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 512,
+        "h": 688
+      },
+      "sourceSize": {
+        "w": 512,
+        "h": 688
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 180
+    }
+  },
+  "animations": {
+    "turnaround": [
+      "turnaround/0",
+      "turnaround/1",
+      "turnaround/2",
+      "turnaround/3",
+      "turnaround/4",
+      "turnaround/5"
+    ]
+  },
+  "meta": {
+    "app": "chickens-of-yolk-street/scripts/pack-assets.ts",
+    "version": "1",
+    "image": "01-hen-base.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2048,
+      "h": 688
+    },
+    "scale": "1",
+    "source": {
+      "path": "art/01-hen-base/01-hen-base.png",
+      "sha256": "5b58747a6d00046c383040720d44c70440da853ac1f9a081da90561f018b22f9"
+    },
+    "grid": 1
+  }
+}

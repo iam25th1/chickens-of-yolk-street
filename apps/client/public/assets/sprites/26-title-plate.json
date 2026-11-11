@@ -1,0 +1,50 @@
+{
+  "frames": {
+    "plate/0": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720
+      },
+      "sourceSize": {
+        "w": 1280,
+        "h": 720
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 0
+    }
+  },
+  "animations": {
+    "plate": [
+      "plate/0"
+    ]
+  },
+  "meta": {
+    "app": "chickens-of-yolk-street/scripts/pack-assets.ts",
+    "version": "1",
+    "image": "26-title-plate.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1280,
+      "h": 720
+    },
+    "scale": "1",
+    "source": {
+      "path": "art/26-title-plate/26-title-plate.png",
+      "sha256": "91aa1172786f5399b10580452ee432fc27053b19b62e5ec6496ef2adfe51c42a"
+    },
+    "grid": 2
+  }
+}

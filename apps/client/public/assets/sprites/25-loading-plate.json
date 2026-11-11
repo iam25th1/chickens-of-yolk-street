@@ -1,0 +1,50 @@
+{
+  "frames": {
+    "plate/0": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720
+      },
+      "sourceSize": {
+        "w": 1280,
+        "h": 720
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 0
+    }
+  },
+  "animations": {
+    "plate": [
+      "plate/0"
+    ]
+  },
+  "meta": {
+    "app": "chickens-of-yolk-street/scripts/pack-assets.ts",
+    "version": "1",
+    "image": "25-loading-plate.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1280,
+      "h": 720
+    },
+    "scale": "1",
+    "source": {
+      "path": "art/25-loading-plate/25-loading-plate.png",
+      "sha256": "0ffa6e8e509f49d49fa053befcdae2a0cd829154688e95ec7ba8f5428bbe6cc2"
+    },
+    "grid": 2
+  }
+}

@@ -1,0 +1,340 @@
+{
+  "frames": {
+    "idle/0": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 180
+    },
+    "idle/1": {
+      "frame": {
+        "x": 256,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 180
+    },
+    "idle/2": {
+      "frame": {
+        "x": 512,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 180
+    },
+    "idle/3": {
+      "frame": {
+        "x": 768,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 180
+    },
+    "refilling/0": {
+      "frame": {
+        "x": 0,
+        "y": 384,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 100
+    },
+    "refilling/1": {
+      "frame": {
+        "x": 256,
+        "y": 384,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 100
+    },
+    "refilling/2": {
+      "frame": {
+        "x": 512,
+        "y": 384,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 100
+    },
+    "refilling/3": {
+      "frame": {
+        "x": 768,
+        "y": 384,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 100
+    },
+    "empty-alarm/0": {
+      "frame": {
+        "x": 0,
+        "y": 768,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 80
+    },
+    "empty-alarm/1": {
+      "frame": {
+        "x": 256,
+        "y": 768,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 80
+    },
+    "empty-alarm/2": {
+      "frame": {
+        "x": 512,
+        "y": 768,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 80
+    },
+    "empty-alarm/3": {
+      "frame": {
+        "x": 768,
+        "y": 768,
+        "w": 256,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 256,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 256,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "duration": 80
+    }
+  },
+  "animations": {
+    "idle": [
+      "idle/0",
+      "idle/1",
+      "idle/2",
+      "idle/3"
+    ],
+    "refilling": [
+      "refilling/0",
+      "refilling/1",
+      "refilling/2",
+      "refilling/3"
+    ],
+    "empty-alarm": [
+      "empty-alarm/0",
+      "empty-alarm/1",
+      "empty-alarm/2",
+      "empty-alarm/3"
+    ]
+  },
+  "meta": {
+    "app": "chickens-of-yolk-street/scripts/pack-assets.ts",
+    "version": "1",
+    "image": "21-feed-hopper.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1024,
+      "h": 1152
+    },
+    "scale": "1",
+    "source": {
+      "path": "art/21-feed-hopper/21-feed-hopper.png",
+      "sha256": "56c3d405e4d3cfaade25461ebc141863609ac67cc152c7a0287faef4bff381b4"
+    },
+    "grid": 1
+  }
+}

@@ -1,0 +1,316 @@
+{
+  "frames": {
+    "button-hover/0": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 384,
+        "h": 128
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 180
+    },
+    "button-hover/1": {
+      "frame": {
+        "x": 384,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 384,
+        "h": 128
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 180
+    },
+    "button-hover/2": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 384,
+        "h": 128
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 180
+    },
+    "button-hover/3": {
+      "frame": {
+        "x": 768,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 384,
+        "h": 128
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 180
+    },
+    "button-press/0": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 384,
+        "h": 128
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 300
+    },
+    "button-press/1": {
+      "frame": {
+        "x": 1152,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 384,
+        "h": 128
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 300
+    },
+    "panel/0": {
+      "frame": {
+        "x": 0,
+        "y": 128,
+        "w": 384,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 384,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 1500
+    },
+    "icon-button/0": {
+      "frame": {
+        "x": 0,
+        "y": 512,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      },
+      "anchor": {
+        "x": 1.5,
+        "y": 0.5
+      },
+      "duration": 400
+    },
+    "icon-button/1": {
+      "frame": {
+        "x": 128,
+        "y": 512,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 400
+    },
+    "icon-button/2": {
+      "frame": {
+        "x": 256,
+        "y": 512,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      },
+      "anchor": {
+        "x": -0.5,
+        "y": 0.5
+      },
+      "duration": 400
+    },
+    "icon-button/3": {
+      "frame": {
+        "x": 384,
+        "y": 512,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      },
+      "anchor": {
+        "x": 1.5,
+        "y": 0.5
+      },
+      "duration": 400
+    }
+  },
+  "animations": {
+    "button-hover": [
+      "button-hover/0",
+      "button-hover/1",
+      "button-hover/2",
+      "button-hover/3"
+    ],
+    "button-press": [
+      "button-press/0",
+      "button-press/1"
+    ],
+    "panel": [
+      "panel/0"
+    ],
+    "icon-button": [
+      "icon-button/0",
+      "icon-button/1",
+      "icon-button/2",
+      "icon-button/3"
+    ]
+  },
+  "meta": {
+    "app": "chickens-of-yolk-street/scripts/pack-assets.ts",
+    "version": "1",
+    "image": "31-ui-pieces.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1536,
+      "h": 640
+    },
+    "scale": "1",
+    "source": {
+      "path": "art/31-ui-pieces/31-ui-pieces.png",
+      "sha256": "481911956e9ce0cfc0cf8ea19ce3ad4876733fd5eee6dab4904540b0a47cf117"
+    },
+    "grid": 8
+  }
+}

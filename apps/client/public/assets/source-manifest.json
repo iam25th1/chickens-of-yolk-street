@@ -1,0 +1,5023 @@
+{
+  "generatedAt": "2026-10-23T17:06:36.761Z",
+  "source": {
+    "world": "@25th/game-11",
+    "worldId": "b85da6b6-a277-4f1a-99c4-fb1877da20bc",
+    "appId": "9f30b210-6e30-4559-8794-40bcd757f140",
+    "cdn": "https://www.spawn.co",
+    "sourceCommit": "81acc4b7ca2659c85e5e2c29f7eac7a3c76ce58a"
+  },
+  "counts": {
+    "easels": 65,
+    "artFolders": 67,
+    "easelSheets": 65,
+    "traitLayers": 10,
+    "soundNumbers": 45,
+    "soundEntries": 59,
+    "audioTakes": 124,
+    "unmappedEasels": 0,
+    "unmappedUploads": 37,
+    "totalBytes": 99639937,
+    "loopOggs": 12
+  },
+  "known_issues": [
+    {
+      "id": "asset-19-pick",
+      "doc_tracker": "19",
+      "status": "pick pending",
+      "folders": [
+        "art/19-egg-grader",
+        "art/19b-egg-sorter"
+      ],
+      "issue": "The egg grader and the egg sorter are drawn as the same machine and both claim tracker 19.",
+      "action": "Grader is canonical for now. Sorter is kept as 19b-egg-sorter until 25TH picks one. Neither is dropped."
+    },
+    {
+      "id": "feed-sack-fractional-cell",
+      "doc_tracker": "13",
+      "status": "fixed",
+      "folders": [
+        "art/13-sack-cheap",
+        "art/13-sack-standard",
+        "art/13-sack-premium"
+      ],
+      "issue": "The sheets used a 256 x 341.333 cell, so frame edges fell between pixels.",
+      "action": "Fixed: Spawn commit 62432a9 rebuilt them on whole-pixel 256 x 384 cells (1024 x 1152 sheets, same rows and timings). The new sheets are in art/13-sack-*; the old ones are kept as unmapped/art/13-sack-*-fractional-cell.png."
+    },
+    {
+      "id": "audio-mp3-only",
+      "doc_tracker": null,
+      "status": "gapless OGGs built headlessly, ear check pending",
+      "folders": [
+        "audio/05-snore",
+        "audio/16-ticker",
+        "audio/25-conveyor",
+        "audio/26-sorter",
+        "audio/27-cart",
+        "audio/34-market",
+        "audio/38-night",
+        "audio/39-day",
+        "audio/41-title",
+        "audio/42-farm-day",
+        "audio/43-market-tension",
+        "audio/44-jingle"
+      ],
+      "issue": "Spawn holds MP3 only, with no WAV or OGG masters. MP3 pads the start and end of each file, so looping sounds will gap at the loop point.",
+      "action": "Each looping sound now has a gapless <take>-loop.ogg (OGG Vorbis quality 6) built here from its MP3: gapless decode, silence trim, zero-crossing snap, and a crossfade of 10 ms or less where the seam still jumped. sound.json \"loop\" gives the loop points. An ear check is pending; listen to audio/05-snore first (its OGG seam step is 1.4 times the natural step nearby, about -40 dBFS). Masters from the original source would still beat a re-encode of an MP3."
+    },
+    {
+      "id": "particles-timing",
+      "doc_tracker": "35",
+      "status": "source of truth decided",
+      "folders": [
+        "art/35-particles"
+      ],
+      "issue": "Spawn's timings.md lists a 600 ms hold on the last frame. easels.json plays 60 ms frames, then removes the particle.",
+      "action": "easels.json is the source of truth and anim.json follows it. The 600 ms hold in timings.md is outdated."
+    }
+  ],
+  "audio_gaps": [
+    {
+      "doc_sound": 2,
+      "doc_name": "lay strain and plop",
+      "type": "variant missing",
+      "expected": 2,
+      "found": "1 take",
+      "folders": [
+        "audio/02-lay"
+      ],
+      "gap": "1 of 2 variants has no take"
+    },
+    {
+      "doc_sound": 3,
+      "doc_name": "happy flap and squawk",
+      "type": "variant missing",
+      "expected": 2,
+      "found": "1 take",
+      "folders": [
+        "audio/03-flap"
+      ],
+      "gap": "1 of 2 variants has no take"
+    },
+    {
+      "doc_sound": 4,
+      "doc_name": "sad warble",
+      "type": "variant missing",
+      "expected": 2,
+      "found": "1 take",
+      "folders": [
+        "audio/04-sad"
+      ],
+      "gap": "1 of 2 variants has no take"
+    },
+    {
+      "doc_sound": 9,
+      "doc_name": "egg crack",
+      "type": "variant missing",
+      "expected": 2,
+      "found": "1 take",
+      "folders": [
+        "audio/09-crack"
+      ],
+      "gap": "1 of 2 variants has no take"
+    },
+    {
+      "doc_sound": 10,
+      "doc_name": "egg splat",
+      "type": "variant missing",
+      "expected": 2,
+      "found": "1 take",
+      "folders": [
+        "audio/10-splat"
+      ],
+      "gap": "1 of 2 variants has no take"
+    },
+    {
+      "doc_sound": 18,
+      "doc_name": "stamp slams",
+      "type": "variant missing",
+      "expected": 4,
+      "found": "4 presses, 3 unique takes (press 3 replays take a at pitch 0.88; Spawn upload names skip 18-c)",
+      "folders": [
+        "audio/18-stamp"
+      ],
+      "gap": "1 of 4 stamps (accepted, declined, counter, sold) has no take of its own"
+    },
+    {
+      "doc_sound": 30,
+      "doc_name": "clerk stamping",
+      "type": "variant missing",
+      "expected": 3,
+      "found": "3 presses, 2 unique takes (press 2 replays take a at pitch 1.15; Spawn upload names skip 30-b)",
+      "folders": [
+        "audio/30-stamp-thump"
+      ],
+      "gap": "1 of 3 variants has no take of its own"
+    },
+    {
+      "doc_sound": 13,
+      "doc_name": "grade tray click",
+      "type": "name differs",
+      "folders": [
+        "audio/13-tray"
+      ],
+      "found": "board label \"sorter click\"",
+      "gap": "number matches; the label names the sorter, the doc the grader tray. Not renamed."
+    },
+    {
+      "doc_sound": 26,
+      "doc_name": "grader rattle",
+      "type": "name differs",
+      "folders": [
+        "audio/26-sorter"
+      ],
+      "found": "board label \"sorter loop\"",
+      "gap": "number matches; the folder names the sorter, the doc the grader (asset 19 canonical). Not renamed."
+    }
+  ],
+  "art": [
+    {
+      "tracker": "01-hen-base",
+      "number": "01",
+      "doc_tracker": "01",
+      "role": "canonical",
+      "name": "hen-base",
+      "label": "base hen · 4 views",
+      "sourceEasel": "01",
+      "folder": "art/01-hen-base",
+      "files": [
+        {
+          "path": "art/01-hen-base/01-hen-base.png",
+          "sha256": "5b58747a6d00046c383040720d44c70440da853ac1f9a081da90561f018b22f9",
+          "bytes": 1292376,
+          "source": "/cdn/value.5b58747a6d00046c383040720d44c70440da853ac1f9a081da90561f018b22f9.png",
+          "width": 2048,
+          "height": 688,
+          "role": "sheet"
+        },
+        {
+          "path": "art/01-hen-base/anim.json",
+          "sha256": "e549e47d5fe2c729008de5ac6bdebdebcb05910b07d0ecf97da9b03e4ecc74f1",
+          "bytes": 1912,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "01-hen-anims",
+      "number": "01",
+      "doc_tracker": "01",
+      "role": "canonical",
+      "name": "hen-anims",
+      "label": "hen animations",
+      "sourceEasel": "02",
+      "folder": "art/01-hen-anims",
+      "files": [
+        {
+          "path": "art/01-hen-anims/01-hen-anims.png",
+          "sha256": "56bea5544529f1500676d86b283f35c1e5860140503782540b491960427a5d70",
+          "bytes": 2064364,
+          "source": "/cdn/value.56bea5544529f1500676d86b283f35c1e5860140503782540b491960427a5d70.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "sheet"
+        },
+        {
+          "path": "art/01-hen-anims/anim.json",
+          "sha256": "74c44cf2967cef330f10d8a3b4b668d05246f960e7bf0f18fb1f1e095609898b",
+          "bytes": 7349,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "03-chick",
+      "number": "03",
+      "doc_tracker": "03",
+      "role": "canonical",
+      "name": "chick",
+      "label": "baby chick",
+      "sourceEasel": "03",
+      "folder": "art/03-chick",
+      "files": [
+        {
+          "path": "art/03-chick/03-chick.png",
+          "sha256": "f763180d863d3910ad27135a6c9b54a6cfb0adcb0e90414e55ce7eedd004a8de",
+          "bytes": 1227841,
+          "source": "/cdn/value.f763180d863d3910ad27135a6c9b54a6cfb0adcb0e90414e55ce7eedd004a8de.png",
+          "width": 1024,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/03-chick/anim.json",
+          "sha256": "6af3a8f35100952464dba5b6c4e77f16197832a03258cf4eaf1dc161ed6c3b02",
+          "bytes": 4080,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "x-hen-portrait",
+      "number": "x",
+      "doc_tracker": null,
+      "role": "extra",
+      "name": "hen-portrait",
+      "label": "hen portrait",
+      "sourceEasel": "04",
+      "folder": "art/x-hen-portrait",
+      "files": [
+        {
+          "path": "art/x-hen-portrait/x-hen-portrait.png",
+          "sha256": "e7a91e12111ab6e6aed213a15baad7f5114abd96fbbcde417291577e853581f4",
+          "bytes": 2027825,
+          "source": "/cdn/value.e7a91e12111ab6e6aed213a15baad7f5114abd96fbbcde417291577e853581f4.png",
+          "width": 1024,
+          "height": 1536,
+          "role": "sheet"
+        },
+        {
+          "path": "art/x-hen-portrait/anim.json",
+          "sha256": "f06909294c7dcfa869c05dd24ec9636f3e38d08090b152148723eb022961253e",
+          "bytes": 5599,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "04-upstart",
+      "number": "04",
+      "doc_tracker": "04",
+      "role": "canonical",
+      "name": "upstart",
+      "label": "the upstart",
+      "sourceEasel": "05",
+      "folder": "art/04-upstart",
+      "files": [
+        {
+          "path": "art/04-upstart/04-upstart.png",
+          "sha256": "47b9ce7c6e8086ded19dd857c36bda4d9f2f87ed8c80cc44a6a113440d2282a8",
+          "bytes": 2162111,
+          "source": "/cdn/value.47b9ce7c6e8086ded19dd857c36bda4d9f2f87ed8c80cc44a6a113440d2282a8.png",
+          "width": 1024,
+          "height": 1280,
+          "role": "sheet"
+        },
+        {
+          "path": "art/04-upstart/anim.json",
+          "sha256": "7cdb50b1f1b1844135748e990deab69b56015a101e6cdc16900c13509a01e148",
+          "bytes": 4868,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "05-old-money",
+      "number": "05",
+      "doc_tracker": "05",
+      "role": "canonical",
+      "name": "old-money",
+      "label": "old money",
+      "sourceEasel": "06",
+      "folder": "art/05-old-money",
+      "files": [
+        {
+          "path": "art/05-old-money/05-old-money.png",
+          "sha256": "48c18bbc9b30e8fb9ad7d20c077dffd55b8a9c91fda99a85b1da4cee6cd26d6c",
+          "bytes": 2026980,
+          "source": "/cdn/value.48c18bbc9b30e8fb9ad7d20c077dffd55b8a9c91fda99a85b1da4cee6cd26d6c.png",
+          "width": 1024,
+          "height": 1280,
+          "role": "sheet"
+        },
+        {
+          "path": "art/05-old-money/anim.json",
+          "sha256": "288c7cbeeb0735b415cc0dc2262bdd960b7a48d1916b02acd4616aa9d7ee5658",
+          "bytes": 4877,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "06-squeezer",
+      "number": "06",
+      "doc_tracker": "06",
+      "role": "canonical",
+      "name": "squeezer",
+      "label": "the squeezer",
+      "sourceEasel": "07",
+      "folder": "art/06-squeezer",
+      "files": [
+        {
+          "path": "art/06-squeezer/06-squeezer.png",
+          "sha256": "72a159cfa2b4909074632d423c3c9f75bb99c9939fad99e431611587cf043d9b",
+          "bytes": 1841530,
+          "source": "/cdn/value.72a159cfa2b4909074632d423c3c9f75bb99c9939fad99e431611587cf043d9b.png",
+          "width": 1024,
+          "height": 1280,
+          "role": "sheet"
+        },
+        {
+          "path": "art/06-squeezer/anim.json",
+          "sha256": "c24453393f0e959e799d819ca4a85c1eb60c47c615c41fab7788c543d26a811f",
+          "bytes": 5012,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "07-loyalist",
+      "number": "07",
+      "doc_tracker": "07",
+      "role": "canonical",
+      "name": "loyalist",
+      "label": "the loyalist",
+      "sourceEasel": "08",
+      "folder": "art/07-loyalist",
+      "files": [
+        {
+          "path": "art/07-loyalist/07-loyalist.png",
+          "sha256": "56be80de5f8f53e5a40bda5cbaa8a13e3dc671bca440b854e9ada28d10fb04df",
+          "bytes": 1990721,
+          "source": "/cdn/value.56be80de5f8f53e5a40bda5cbaa8a13e3dc671bca440b854e9ada28d10fb04df.png",
+          "width": 1024,
+          "height": 1280,
+          "role": "sheet"
+        },
+        {
+          "path": "art/07-loyalist/anim.json",
+          "sha256": "9b6296fb488aa5c3f0a3984d0a3d87a8f1231df90bbe41a76516aa3eaf6ed659",
+          "bytes": 5079,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "08-bakery-buyer",
+      "number": "08",
+      "doc_tracker": "08",
+      "role": "canonical",
+      "name": "bakery-buyer",
+      "label": "bakery buyer",
+      "sourceEasel": "09",
+      "folder": "art/08-bakery-buyer",
+      "files": [
+        {
+          "path": "art/08-bakery-buyer/08-bakery-buyer.png",
+          "sha256": "b29dbdd753baaf1d1568ddde4641b4dc7abfae9baf4c972cd35d06a4707b1f04",
+          "bytes": 1598653,
+          "source": "/cdn/value.b29dbdd753baaf1d1568ddde4641b4dc7abfae9baf4c972cd35d06a4707b1f04.png",
+          "width": 1024,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/08-bakery-buyer/anim.json",
+          "sha256": "d538e6eb060e2f88c7ffd168e18afb7d13468cbd89ffbb19b08a382899b92ce3",
+          "bytes": 3850,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "09-market-trader",
+      "number": "09",
+      "doc_tracker": "09",
+      "role": "canonical",
+      "name": "market-trader",
+      "label": "market trader",
+      "sourceEasel": "10",
+      "folder": "art/09-market-trader",
+      "files": [
+        {
+          "path": "art/09-market-trader/09-market-trader.png",
+          "sha256": "88d2541484db2992d7bef7ffc69dc14051dc8bd772e4ec2052a14151d438c1e3",
+          "bytes": 1652820,
+          "source": "/cdn/value.88d2541484db2992d7bef7ffc69dc14051dc8bd772e4ec2052a14151d438c1e3.png",
+          "width": 1024,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/09-market-trader/anim.json",
+          "sha256": "ac9396a3ee5b355a0904198cad31248e3201aaae12d42f1d96a9979e7cc71a98",
+          "bytes": 4000,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "10-wholesaler",
+      "number": "10",
+      "doc_tracker": "10",
+      "role": "canonical",
+      "name": "wholesaler",
+      "label": "wholesaler",
+      "sourceEasel": "11",
+      "folder": "art/10-wholesaler",
+      "files": [
+        {
+          "path": "art/10-wholesaler/10-wholesaler.png",
+          "sha256": "9fc2180a918b3c976bddebad013816c494b0eb165f52552a2f38db74702f3107",
+          "bytes": 1619574,
+          "source": "/cdn/value.9fc2180a918b3c976bddebad013816c494b0eb165f52552a2f38db74702f3107.png",
+          "width": 1024,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/10-wholesaler/anim.json",
+          "sha256": "f5ec68aef38648fb32058a1586adda376390b87c0534a64c990eed8d464d6e5b",
+          "bytes": 3975,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "11-egg-cream",
+      "number": "11",
+      "doc_tracker": "11",
+      "role": "canonical",
+      "name": "egg-cream",
+      "label": "cream egg",
+      "sourceEasel": "12",
+      "folder": "art/11-egg-cream",
+      "files": [
+        {
+          "path": "art/11-egg-cream/11-egg-cream.png",
+          "sha256": "fc62e854a835ea74e76306a3418a9ed1c37d9b16c3bcf24c31ff6f36ea739e7c",
+          "bytes": 1195932,
+          "source": "/cdn/value.fc62e854a835ea74e76306a3418a9ed1c37d9b16c3bcf24c31ff6f36ea739e7c.png",
+          "width": 1024,
+          "height": 1280,
+          "role": "sheet"
+        },
+        {
+          "path": "art/11-egg-cream/anim.json",
+          "sha256": "bce8d7eff67e70e9eddc3a0b9aaa50ec8248e665b554d9102204b4d3e878a07b",
+          "bytes": 4937,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "11-egg-white",
+      "number": "11",
+      "doc_tracker": "11",
+      "role": "canonical",
+      "name": "egg-white",
+      "label": "white egg",
+      "sourceEasel": "13",
+      "folder": "art/11-egg-white",
+      "files": [
+        {
+          "path": "art/11-egg-white/11-egg-white.png",
+          "sha256": "8f543c1539ae41d7b22c650f76f73ca6496049d280b3910ef786b6928cead019",
+          "bytes": 928620,
+          "source": "/cdn/value.8f543c1539ae41d7b22c650f76f73ca6496049d280b3910ef786b6928cead019.png",
+          "width": 1024,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/11-egg-white/anim.json",
+          "sha256": "fd4957a5c25776965eefbe96fd159b8c128c64c319dceeca6ef0478a71094f85",
+          "bytes": 4033,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "11-egg-brown",
+      "number": "11",
+      "doc_tracker": "11",
+      "role": "canonical",
+      "name": "egg-brown",
+      "label": "jumbo brown egg",
+      "sourceEasel": "14",
+      "folder": "art/11-egg-brown",
+      "files": [
+        {
+          "path": "art/11-egg-brown/11-egg-brown.png",
+          "sha256": "e27f03700902f75b4fe7aeea713a0051344d89cdcb961a7208455167d99900ac",
+          "bytes": 698153,
+          "source": "/cdn/value.e27f03700902f75b4fe7aeea713a0051344d89cdcb961a7208455167d99900ac.png",
+          "width": 1024,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/11-egg-brown/anim.json",
+          "sha256": "734e2f3587c74be72e21b8f7e4391ed82c0f60fabdfa049ea8a06420368e048e",
+          "bytes": 4039,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "11-egg-golden",
+      "number": "11",
+      "doc_tracker": "11",
+      "role": "canonical",
+      "name": "egg-golden",
+      "label": "golden egg",
+      "sourceEasel": "15",
+      "folder": "art/11-egg-golden",
+      "files": [
+        {
+          "path": "art/11-egg-golden/11-egg-golden.png",
+          "sha256": "bb1b85f1bf19c391b25134323354e192821281141f114e1eafda38249f6b91c2",
+          "bytes": 1187163,
+          "source": "/cdn/value.bb1b85f1bf19c391b25134323354e192821281141f114e1eafda38249f6b91c2.png",
+          "width": 1024,
+          "height": 1280,
+          "role": "sheet"
+        },
+        {
+          "path": "art/11-egg-golden/anim.json",
+          "sha256": "ca975a0f583cf6e31dde50e2e3d2d7f2de0439472363803174884f2b874c35e4",
+          "bytes": 4948,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "12-crate",
+      "number": "12",
+      "doc_tracker": "12",
+      "role": "canonical",
+      "name": "crate",
+      "label": "egg crate",
+      "sourceEasel": "16",
+      "folder": "art/12-crate",
+      "files": [
+        {
+          "path": "art/12-crate/12-crate.png",
+          "sha256": "6a58331f882a0bc95a4aebd0fce61b9ffa6eecb200ed8d671bd10de4d7328f61",
+          "bytes": 1973981,
+          "source": "/cdn/value.6a58331f882a0bc95a4aebd0fce61b9ffa6eecb200ed8d671bd10de4d7328f61.png",
+          "width": 1024,
+          "height": 1536,
+          "role": "sheet"
+        },
+        {
+          "path": "art/12-crate/anim.json",
+          "sha256": "5173fa45b9d0337cee3942cffc179bb238cdbeaa61955eca1b0dc953941e4faa",
+          "bytes": 5641,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "13-sack-cheap",
+      "number": "13",
+      "doc_tracker": "13",
+      "role": "canonical",
+      "name": "sack-cheap",
+      "label": "cheap feed sack",
+      "sourceEasel": "17",
+      "sourceCommit": "ade37db287a00749214d18b5f94b79fdad3f015b",
+      "folder": "art/13-sack-cheap",
+      "files": [
+        {
+          "path": "art/13-sack-cheap/13-sack-cheap.png",
+          "sha256": "75bb2ba9b09b0dbf9f35ad5ba6c02271a3af11a8e176c13f00620938abff34c5",
+          "bytes": 726535,
+          "source": "/cdn/value.75bb2ba9b09b0dbf9f35ad5ba6c02271a3af11a8e176c13f00620938abff34c5.png",
+          "width": 1024,
+          "height": 1152,
+          "role": "sheet"
+        },
+        {
+          "path": "art/13-sack-cheap/anim.json",
+          "sha256": "b5ce14a522873f48632d1952d73f4ba00ee5de948b541f8b8e298dc344fe22f5",
+          "bytes": 3210,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "13-sack-standard",
+      "number": "13",
+      "doc_tracker": "13",
+      "role": "canonical",
+      "name": "sack-standard",
+      "label": "standard feed sack",
+      "sourceEasel": "18",
+      "sourceCommit": "ade37db287a00749214d18b5f94b79fdad3f015b",
+      "folder": "art/13-sack-standard",
+      "files": [
+        {
+          "path": "art/13-sack-standard/13-sack-standard.png",
+          "sha256": "7e89dcf89612011c1ec8c11789df1f36dd3120ff3c481cbf58b6ee4cdd051a83",
+          "bytes": 733702,
+          "source": "/cdn/value.7e89dcf89612011c1ec8c11789df1f36dd3120ff3c481cbf58b6ee4cdd051a83.png",
+          "width": 1024,
+          "height": 1152,
+          "role": "sheet"
+        },
+        {
+          "path": "art/13-sack-standard/anim.json",
+          "sha256": "a423e5f73c3905e09ea6897017691f75a5013a3139dffc3c88404385df39c43f",
+          "bytes": 3222,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "13-sack-premium",
+      "number": "13",
+      "doc_tracker": "13",
+      "role": "canonical",
+      "name": "sack-premium",
+      "label": "premium feed sack",
+      "sourceEasel": "19",
+      "sourceCommit": "ade37db287a00749214d18b5f94b79fdad3f015b",
+      "folder": "art/13-sack-premium",
+      "files": [
+        {
+          "path": "art/13-sack-premium/13-sack-premium.png",
+          "sha256": "3ec9c60b410adc3ff2e4b62e405ef91df9c59f8df785b82434d4b134391c7840",
+          "bytes": 788800,
+          "source": "/cdn/value.3ec9c60b410adc3ff2e4b62e405ef91df9c59f8df785b82434d4b134391c7840.png",
+          "width": 1024,
+          "height": 1152,
+          "role": "sheet"
+        },
+        {
+          "path": "art/13-sack-premium/anim.json",
+          "sha256": "5bd30c5b139fe3c5a7727f82a62d49d0c0fe0f19f647d30b82364e318a44c84d",
+          "bytes": 3218,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "14-trough",
+      "number": "14",
+      "doc_tracker": "14",
+      "role": "canonical",
+      "name": "trough",
+      "label": "feeder trough",
+      "sourceEasel": "20",
+      "folder": "art/14-trough",
+      "files": [
+        {
+          "path": "art/14-trough/14-trough.png",
+          "sha256": "5ee99062dbe89abae4f7bdc3fd248bdc87d7deab989bb0bddb55193db7a04fca",
+          "bytes": 1496343,
+          "source": "/cdn/value.5ee99062dbe89abae4f7bdc3fd248bdc87d7deab989bb0bddb55193db7a04fca.png",
+          "width": 1536,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/14-trough/anim.json",
+          "sha256": "a5475549c8aad1b54d3b524e4b03d14646598866b357483197794aa0c5e63628",
+          "bytes": 3978,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "15-coop-red",
+      "number": "15",
+      "doc_tracker": "15",
+      "role": "canonical",
+      "name": "coop-red",
+      "label": "chicken coop",
+      "sourceEasel": "21",
+      "folder": "art/15-coop-red",
+      "files": [
+        {
+          "path": "art/15-coop-red/15-coop-red.png",
+          "sha256": "b9ee3423030b7605c4adb5851ac51b2ea55db7ed7d46d4d1faa3b35f6549c82e",
+          "bytes": 2339701,
+          "source": "/cdn/value.b9ee3423030b7605c4adb5851ac51b2ea55db7ed7d46d4d1faa3b35f6549c82e.png",
+          "width": 1536,
+          "height": 1152,
+          "role": "sheet"
+        },
+        {
+          "path": "art/15-coop-red/anim.json",
+          "sha256": "e72cab4b71c2d877a22ce62a1f8c0eca3d7385c6dbfa51167f7f8a7a996191ba",
+          "bytes": 3141,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "15-coop-starter",
+      "number": "15",
+      "doc_tracker": "15",
+      "role": "canonical",
+      "name": "coop-starter",
+      "label": "starter coop",
+      "sourceEasel": "22",
+      "folder": "art/15-coop-starter",
+      "files": [
+        {
+          "path": "art/15-coop-starter/15-coop-starter.png",
+          "sha256": "d93b6bb1997edea9c482222e4aa9be312ed93fd7e2e2bd1ef157a07f389d77ab",
+          "bytes": 2155004,
+          "source": "/cdn/value.d93b6bb1997edea9c482222e4aa9be312ed93fd7e2e2bd1ef157a07f389d77ab.png",
+          "width": 1536,
+          "height": 1152,
+          "role": "sheet"
+        },
+        {
+          "path": "art/15-coop-starter/anim.json",
+          "sha256": "531153dc1ea62a386901a48fb541dfb297cf4f1c090b90478de8513ac900035b",
+          "bytes": 3153,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "15-coop-deluxe",
+      "number": "15",
+      "doc_tracker": "15",
+      "role": "canonical",
+      "name": "coop-deluxe",
+      "label": "deluxe coop",
+      "sourceEasel": "23",
+      "folder": "art/15-coop-deluxe",
+      "files": [
+        {
+          "path": "art/15-coop-deluxe/15-coop-deluxe.png",
+          "sha256": "97da04b9badea324ac20866bc4e7ee774a6210e03a6bc5f94adc6f67a5c0eead",
+          "bytes": 2388023,
+          "source": "/cdn/value.97da04b9badea324ac20866bc4e7ee774a6210e03a6bc5f94adc6f67a5c0eead.png",
+          "width": 1536,
+          "height": 1152,
+          "role": "sheet"
+        },
+        {
+          "path": "art/15-coop-deluxe/anim.json",
+          "sha256": "825d03427798350c45de524258fdfdb73f9f6cc611447ad20aaddba64101636c",
+          "bytes": 3149,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "16-farmhouse",
+      "number": "16",
+      "doc_tracker": "16",
+      "role": "canonical",
+      "name": "farmhouse",
+      "label": "farmhouse",
+      "sourceEasel": "24",
+      "folder": "art/16-farmhouse",
+      "files": [
+        {
+          "path": "art/16-farmhouse/16-farmhouse.png",
+          "sha256": "b0f4ee3116c432cf710936a540a2c19e23bff9d66f34f3b5a66734a46ebf3243",
+          "bytes": 1679491,
+          "source": "/cdn/value.b0f4ee3116c432cf710936a540a2c19e23bff9d66f34f3b5a66734a46ebf3243.png",
+          "width": 1536,
+          "height": 768,
+          "role": "sheet"
+        },
+        {
+          "path": "art/16-farmhouse/anim.json",
+          "sha256": "b26d94b679bb5ff253e86458acdf318de772a72ff7541717df00b21becf101be",
+          "bytes": 2169,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "17-sign-farm",
+      "number": "17",
+      "doc_tracker": "17",
+      "role": "canonical",
+      "name": "sign-farm",
+      "label": "farm sign",
+      "sourceEasel": "25",
+      "folder": "art/17-sign-farm",
+      "files": [
+        {
+          "path": "art/17-sign-farm/17-sign-farm.png",
+          "sha256": "def1c6438706b1070d9a295a40003cc659c7c8155281f4f8428369e7e229791f",
+          "bytes": 892813,
+          "source": "/cdn/value.def1c6438706b1070d9a295a40003cc659c7c8155281f4f8428369e7e229791f.png",
+          "width": 1536,
+          "height": 512,
+          "role": "sheet"
+        },
+        {
+          "path": "art/17-sign-farm/anim.json",
+          "sha256": "75e3272dedafa277e3639aa7c060c33f65406446be7e737ace6ef9608b73e58c",
+          "bytes": 2497,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "17-sign-upstart",
+      "number": "17",
+      "doc_tracker": "17",
+      "role": "canonical",
+      "name": "sign-upstart",
+      "label": "upstart sign",
+      "sourceEasel": "26",
+      "folder": "art/17-sign-upstart",
+      "files": [
+        {
+          "path": "art/17-sign-upstart/17-sign-upstart.png",
+          "sha256": "9a4396a8f82b9ab0202c89f6f12032e8ed85cdc54933d8f98dddc7173f335e80",
+          "bytes": 970877,
+          "source": "/cdn/value.9a4396a8f82b9ab0202c89f6f12032e8ed85cdc54933d8f98dddc7173f335e80.png",
+          "width": 1536,
+          "height": 512,
+          "role": "sheet"
+        },
+        {
+          "path": "art/17-sign-upstart/anim.json",
+          "sha256": "0ded9c84d9f1603dec5a46e86631b9e3cddef855f93a9de8e9c535e2e200c95f",
+          "bytes": 2509,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "17-sign-old-money",
+      "number": "17",
+      "doc_tracker": "17",
+      "role": "canonical",
+      "name": "sign-old-money",
+      "label": "old money sign",
+      "sourceEasel": "27",
+      "folder": "art/17-sign-old-money",
+      "files": [
+        {
+          "path": "art/17-sign-old-money/17-sign-old-money.png",
+          "sha256": "97441e595a9069db646faa47b70e7d19a71e6ba9589667bafbc3a68af8fa6b04",
+          "bytes": 1089569,
+          "source": "/cdn/value.97441e595a9069db646faa47b70e7d19a71e6ba9589667bafbc3a68af8fa6b04.png",
+          "width": 1536,
+          "height": 512,
+          "role": "sheet"
+        },
+        {
+          "path": "art/17-sign-old-money/anim.json",
+          "sha256": "414ac6af320cb616ec88c689034261eaa8a9c4849f47b5577afe20bd03f067bd",
+          "bytes": 2518,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "18-conveyor",
+      "number": "18",
+      "doc_tracker": "18",
+      "role": "canonical",
+      "name": "conveyor",
+      "label": "egg conveyor",
+      "sourceEasel": "28",
+      "folder": "art/18-conveyor",
+      "files": [
+        {
+          "path": "art/18-conveyor/18-conveyor.png",
+          "sha256": "8224e6f6859572b74c2304c2185e6d182e0bd8b737d0af3c1e7aa1dd6a0139ec",
+          "bytes": 6183,
+          "source": "/cdn/value.8224e6f6859572b74c2304c2185e6d182e0bd8b737d0af3c1e7aa1dd6a0139ec.png",
+          "width": 512,
+          "height": 640,
+          "role": "sheet"
+        },
+        {
+          "path": "art/18-conveyor/anim.json",
+          "sha256": "574ead24b04b236e037163c19e7598a1a6625d4709e7f6af88abd07756487d5f",
+          "bytes": 4679,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "19b-egg-sorter",
+      "number": "19b",
+      "doc_tracker": "19",
+      "role": "alternate",
+      "name": "egg-sorter",
+      "label": "egg sorter",
+      "sourceEasel": "29",
+      "folder": "art/19b-egg-sorter",
+      "files": [
+        {
+          "path": "art/19b-egg-sorter/19b-egg-sorter.png",
+          "sha256": "b9a36440a022137c4ca265dbece349d95c056b22c145702d18ab51fb56f8966f",
+          "bytes": 1770200,
+          "source": "/cdn/value.b9a36440a022137c4ca265dbece349d95c056b22c145702d18ab51fb56f8966f.png",
+          "width": 1024,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/19b-egg-sorter/anim.json",
+          "sha256": "6d962221ee3f9d90bdbafbbcdfe7838823b8c437e8cfca2e4ff7c75a9c86288b",
+          "bytes": 4040,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "19-egg-grader",
+      "number": "19",
+      "doc_tracker": "19",
+      "role": "canonical",
+      "name": "egg-grader",
+      "label": "egg grader",
+      "sourceEasel": "30",
+      "folder": "art/19-egg-grader",
+      "files": [
+        {
+          "path": "art/19-egg-grader/19-egg-grader.png",
+          "sha256": "24044ff3fb83c635f6f02bb6d8f44e635eeb92a0c45d045d5d65568836781d5f",
+          "bytes": 1284393,
+          "source": "/cdn/value.24044ff3fb83c635f6f02bb6d8f44e635eeb92a0c45d045d5d65568836781d5f.png",
+          "width": 1024,
+          "height": 768,
+          "role": "sheet"
+        },
+        {
+          "path": "art/19-egg-grader/anim.json",
+          "sha256": "598d283ec7a3ee943268675c26e8a0056a912ec4754bcbb35da26da147c6ea78",
+          "bytes": 3076,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "20-delivery-cart",
+      "number": "20",
+      "doc_tracker": "20",
+      "role": "canonical",
+      "name": "delivery-cart",
+      "label": "delivery cart",
+      "sourceEasel": "31",
+      "folder": "art/20-delivery-cart",
+      "files": [
+        {
+          "path": "art/20-delivery-cart/20-delivery-cart.png",
+          "sha256": "a7eb8752f17ea671df554145ce4a22bca7be04c32bc89ccb3ab8cf88bb069620",
+          "bytes": 1190411,
+          "source": "/cdn/value.a7eb8752f17ea671df554145ce4a22bca7be04c32bc89ccb3ab8cf88bb069620.png",
+          "width": 1024,
+          "height": 768,
+          "role": "sheet"
+        },
+        {
+          "path": "art/20-delivery-cart/anim.json",
+          "sha256": "6c824344a36c1bd1a31f4d00f58ceacba33d44aa295230367062a515828a2c44",
+          "bytes": 3153,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "21-feed-hopper",
+      "number": "21",
+      "doc_tracker": "21",
+      "role": "canonical",
+      "name": "feed-hopper",
+      "label": "feed hopper",
+      "sourceEasel": "32",
+      "folder": "art/21-feed-hopper",
+      "files": [
+        {
+          "path": "art/21-feed-hopper/21-feed-hopper.png",
+          "sha256": "56c3d405e4d3cfaade25461ebc141863609ac67cc152c7a0287faef4bff381b4",
+          "bytes": 1602166,
+          "source": "/cdn/value.56c3d405e4d3cfaade25461ebc141863609ac67cc152c7a0287faef4bff381b4.png",
+          "width": 1024,
+          "height": 1152,
+          "role": "sheet"
+        },
+        {
+          "path": "art/21-feed-hopper/anim.json",
+          "sha256": "df6f9dfd90622b0fb475582751c17a510384253bc37ec16d049cf819f258e2dd",
+          "bytes": 3013,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "22-sales-clerk",
+      "number": "22",
+      "doc_tracker": "22",
+      "role": "canonical",
+      "name": "sales-clerk",
+      "label": "sales clerk",
+      "sourceEasel": "33",
+      "folder": "art/22-sales-clerk",
+      "files": [
+        {
+          "path": "art/22-sales-clerk/22-sales-clerk.png",
+          "sha256": "1afb453389f1fbcfce96f1024a52d659414160db059b5425d547ece9d3ced0a0",
+          "bytes": 1087698,
+          "source": "/cdn/value.1afb453389f1fbcfce96f1024a52d659414160db059b5425d547ece9d3ced0a0.png",
+          "width": 1024,
+          "height": 768,
+          "role": "sheet"
+        },
+        {
+          "path": "art/22-sales-clerk/anim.json",
+          "sha256": "f793995a177b2a81a85085aa5476e72c60cc208467e38bc563fff029e2451b6b",
+          "bytes": 3080,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "23-farm-tileset",
+      "number": "23",
+      "doc_tracker": "23",
+      "role": "canonical",
+      "name": "farm-tileset",
+      "label": "farm tileset",
+      "sourceEasel": "34",
+      "folder": "art/23-farm-tileset",
+      "files": [
+        {
+          "path": "art/23-farm-tileset/23-farm-tileset.png",
+          "sha256": "ae9f9a65134e83db6218588ebaf5cea61662bbe2128f2e29d41df20cc7e8bfa4",
+          "bytes": 12884,
+          "source": "/cdn/value.ae9f9a65134e83db6218588ebaf5cea61662bbe2128f2e29d41df20cc7e8bfa4.png",
+          "width": 512,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/23-farm-tileset/anim.json",
+          "sha256": "1a329984c6d21feb8e5dd7cf83a23fac02b2793f1366534aa6cc82287c01a81e",
+          "bytes": 2202,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "24-farm-props",
+      "number": "24",
+      "doc_tracker": "24",
+      "role": "canonical",
+      "name": "farm-props",
+      "label": "farm props",
+      "sourceEasel": "35",
+      "folder": "art/24-farm-props",
+      "files": [
+        {
+          "path": "art/24-farm-props/24-farm-props.png",
+          "sha256": "4cf5de0b8e44fa1361b22e01e4b3431110575ecf3c65ebbf9520b3033809c66f",
+          "bytes": 11772,
+          "source": "/cdn/value.4cf5de0b8e44fa1361b22e01e4b3431110575ecf3c65ebbf9520b3033809c66f.png",
+          "width": 1024,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/24-farm-props/anim.json",
+          "sha256": "25847036624fb42a6b4604284427ff58c109e074bfe187a501f135a70b25ccb0",
+          "bytes": 3984,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "27-town-square-plate",
+      "number": "27",
+      "doc_tracker": "27",
+      "role": "canonical",
+      "name": "town-square-plate",
+      "label": "yolk street plate",
+      "sourceEasel": "36",
+      "folder": "art/27-town-square-plate",
+      "files": [
+        {
+          "path": "art/27-town-square-plate/27-town-square-plate.png",
+          "sha256": "70f2d68c4bcf0eb90c28e2b0cfacf0100be1320118e39c41c1ac8d7214a0f892",
+          "bytes": 18129,
+          "source": "/cdn/value.70f2d68c4bcf0eb90c28e2b0cfacf0100be1320118e39c41c1ac8d7214a0f892.png",
+          "width": 1280,
+          "height": 720,
+          "role": "sheet"
+        },
+        {
+          "path": "art/27-town-square-plate/anim.json",
+          "sha256": "c70cb772e29c8ecd433b5cd81151c54b0577f6e782bbc8d3cd88061159dc97c8",
+          "bytes": 508,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "25-loading-anim",
+      "number": "25",
+      "doc_tracker": "25",
+      "role": "canonical",
+      "name": "loading-anim",
+      "label": "loading sky + hens",
+      "sourceEasel": "37",
+      "folder": "art/25-loading-anim",
+      "files": [
+        {
+          "path": "art/25-loading-anim/25-loading-anim.png",
+          "sha256": "bdf9037c44f824ace0c11511976011b4a33d021240475ed615cb68b8e6c744d8",
+          "bytes": 7443,
+          "source": "/cdn/value.bdf9037c44f824ace0c11511976011b4a33d021240475ed615cb68b8e6c744d8.png",
+          "width": 1024,
+          "height": 512,
+          "role": "sheet"
+        },
+        {
+          "path": "art/25-loading-anim/anim.json",
+          "sha256": "eda75c256c1df0d6c03e5c59501764d80432d19a56aa0585444bcf9d7e8f5b05",
+          "bytes": 3874,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "26-title-anim",
+      "number": "26",
+      "doc_tracker": "26",
+      "role": "canonical",
+      "name": "title-anim",
+      "label": "title clouds + hen line",
+      "sourceEasel": "38",
+      "folder": "art/26-title-anim",
+      "files": [
+        {
+          "path": "art/26-title-anim/26-title-anim.png",
+          "sha256": "6906698de02227a95498642f1bb4b49fb99dd73dce1d7335c6be0f7a33f065f8",
+          "bytes": 7423,
+          "source": "/cdn/value.6906698de02227a95498642f1bb4b49fb99dd73dce1d7335c6be0f7a33f065f8.png",
+          "width": 1024,
+          "height": 512,
+          "role": "sheet"
+        },
+        {
+          "path": "art/26-title-anim/anim.json",
+          "sha256": "aeb7580dede4778501959c54d510f8bbb6b3771a0fd5929ea2f49802c019a159",
+          "bytes": 3648,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "27-town-square-anim",
+      "number": "27",
+      "doc_tracker": "27",
+      "role": "canonical",
+      "name": "town-square-anim",
+      "label": "town square crowd",
+      "sourceEasel": "39",
+      "folder": "art/27-town-square-anim",
+      "files": [
+        {
+          "path": "art/27-town-square-anim/27-town-square-anim.png",
+          "sha256": "c76fdaafb964bf2227d526350e49e8a98c221bf640cc35db755c5ac05cb6b59f",
+          "bytes": 7339,
+          "source": "/cdn/value.c76fdaafb964bf2227d526350e49e8a98c221bf640cc35db755c5ac05cb6b59f.png",
+          "width": 1024,
+          "height": 448,
+          "role": "sheet"
+        },
+        {
+          "path": "art/27-town-square-anim/anim.json",
+          "sha256": "05ab5d975dffe510700bf6a7b2a6afc3fc79fed5fd4dc35f069e8e5535b88bbb",
+          "bytes": 4000,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "28-logo",
+      "number": "28",
+      "doc_tracker": "28",
+      "role": "canonical",
+      "name": "logo",
+      "label": "animated logo",
+      "sourceEasel": "40",
+      "folder": "art/28-logo",
+      "files": [
+        {
+          "path": "art/28-logo/28-logo.png",
+          "sha256": "75e3b357ab8d3ea1bccf2a3f2cb4188e180ca8f841743e3f24166d440394f821",
+          "bytes": 34470,
+          "source": "/cdn/value.75e3b357ab8d3ea1bccf2a3f2cb4188e180ca8f841743e3f24166d440394f821.png",
+          "width": 4096,
+          "height": 768,
+          "role": "sheet"
+        },
+        {
+          "path": "art/28-logo/anim.json",
+          "sha256": "69cb5b3f3880f7d835610533e6523e641e788e8c62be5ac6d7b9ec5f588baccb",
+          "bytes": 2237,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "29-card-bulk-order",
+      "number": "29",
+      "doc_tracker": "29",
+      "role": "canonical",
+      "name": "card-bulk-order",
+      "label": "bulk order",
+      "sourceEasel": "41",
+      "folder": "art/29-card-bulk-order",
+      "files": [
+        {
+          "path": "art/29-card-bulk-order/29-card-bulk-order.png",
+          "sha256": "b253e34cc5f7f2052b82d9ee6fdbb4c56b579fa0244603700496c93de5ecb44c",
+          "bytes": 24088,
+          "source": "/cdn/value.b253e34cc5f7f2052b82d9ee6fdbb4c56b579fa0244603700496c93de5ecb44c.png",
+          "width": 2048,
+          "height": 1408,
+          "role": "sheet"
+        },
+        {
+          "path": "art/29-card-bulk-order/anim.json",
+          "sha256": "37ef6d8cb25da4f21258e0b4b151c647cc1949c3f7449d7bd19b69d5146d7c32",
+          "bytes": 2333,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "29-card-premium-order",
+      "number": "29",
+      "doc_tracker": "29",
+      "role": "canonical",
+      "name": "card-premium-order",
+      "label": "premium order",
+      "sourceEasel": "42",
+      "folder": "art/29-card-premium-order",
+      "files": [
+        {
+          "path": "art/29-card-premium-order/29-card-premium-order.png",
+          "sha256": "69c4f74b886cddb4c9136d199f7e2504a44461250d7abea3c82a058f2b3715da",
+          "bytes": 23739,
+          "source": "/cdn/value.69c4f74b886cddb4c9136d199f7e2504a44461250d7abea3c82a058f2b3715da.png",
+          "width": 2048,
+          "height": 1408,
+          "role": "sheet"
+        },
+        {
+          "path": "art/29-card-premium-order/anim.json",
+          "sha256": "689ceb840e5091918446ea8da2e26d3aac6689362a272f1f0192132654c11d15",
+          "bytes": 2345,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "29-card-standing-contract",
+      "number": "29",
+      "doc_tracker": "29",
+      "role": "canonical",
+      "name": "card-standing-contract",
+      "label": "standing contract",
+      "sourceEasel": "43",
+      "folder": "art/29-card-standing-contract",
+      "files": [
+        {
+          "path": "art/29-card-standing-contract/29-card-standing-contract.png",
+          "sha256": "292595a742dde1251b1f2e85fc7dec08071ed6231381b0dc02a495ed04bc39be",
+          "bytes": 24222,
+          "source": "/cdn/value.292595a742dde1251b1f2e85fc7dec08071ed6231381b0dc02a495ed04bc39be.png",
+          "width": 2048,
+          "height": 1408,
+          "role": "sheet"
+        },
+        {
+          "path": "art/29-card-standing-contract/anim.json",
+          "sha256": "1bb7ae688195ab3cd3de20a768c8679e38c11b636ef0fb2bb43d00b5133b3e43",
+          "bytes": 2361,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "29-card-feed-deal",
+      "number": "29",
+      "doc_tracker": "29",
+      "role": "canonical",
+      "name": "card-feed-deal",
+      "label": "feed deal",
+      "sourceEasel": "44",
+      "folder": "art/29-card-feed-deal",
+      "files": [
+        {
+          "path": "art/29-card-feed-deal/29-card-feed-deal.png",
+          "sha256": "d5e44098355840d85812c305048302bd5fb4aca0503b360fe2616a7bd4236676",
+          "bytes": 23816,
+          "source": "/cdn/value.d5e44098355840d85812c305048302bd5fb4aca0503b360fe2616a7bd4236676.png",
+          "width": 2048,
+          "height": 1408,
+          "role": "sheet"
+        },
+        {
+          "path": "art/29-card-feed-deal/anim.json",
+          "sha256": "e75de6f79734f4b83d3482b4f4030819bba668704a14b9b8d81af94e4c4ec65f",
+          "bytes": 2329,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "29-card-credit-terms",
+      "number": "29",
+      "doc_tracker": "29",
+      "role": "canonical",
+      "name": "card-credit-terms",
+      "label": "credit terms",
+      "sourceEasel": "45",
+      "folder": "art/29-card-credit-terms",
+      "files": [
+        {
+          "path": "art/29-card-credit-terms/29-card-credit-terms.png",
+          "sha256": "3506d59423fd2bd7af595772744156db5dc9f0b0b4e6c461f502fe9c33840722",
+          "bytes": 24109,
+          "source": "/cdn/value.3506d59423fd2bd7af595772744156db5dc9f0b0b4e6c461f502fe9c33840722.png",
+          "width": 2048,
+          "height": 1408,
+          "role": "sheet"
+        },
+        {
+          "path": "art/29-card-credit-terms/anim.json",
+          "sha256": "23d59946929e802249a83e66da3b602a6815301c739c8a3caeb696645f8de308",
+          "bytes": 2341,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "29-card-undercut",
+      "number": "29",
+      "doc_tracker": "29",
+      "role": "canonical",
+      "name": "card-undercut",
+      "label": "undercut",
+      "sourceEasel": "46",
+      "folder": "art/29-card-undercut",
+      "files": [
+        {
+          "path": "art/29-card-undercut/29-card-undercut.png",
+          "sha256": "9f16768418bf4fa329fc2333033fd332db5cd330f7ec6f93805ba324f52dad3b",
+          "bytes": 23984,
+          "source": "/cdn/value.9f16768418bf4fa329fc2333033fd332db5cd330f7ec6f93805ba324f52dad3b.png",
+          "width": 2048,
+          "height": 1408,
+          "role": "sheet"
+        },
+        {
+          "path": "art/29-card-undercut/anim.json",
+          "sha256": "2a3c951f4616ddfddcd3419246a80aad903cbebdc22c42e6f7612720d25daccd",
+          "bytes": 2325,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "29-card-buyout-offer",
+      "number": "29",
+      "doc_tracker": "29",
+      "role": "canonical",
+      "name": "card-buyout-offer",
+      "label": "buyout offer",
+      "sourceEasel": "47",
+      "folder": "art/29-card-buyout-offer",
+      "files": [
+        {
+          "path": "art/29-card-buyout-offer/29-card-buyout-offer.png",
+          "sha256": "4fdda6b4d1b32e37947fb79dd19a897f3be6cc040ed97007625a3943880a17f8",
+          "bytes": 24376,
+          "source": "/cdn/value.4fdda6b4d1b32e37947fb79dd19a897f3be6cc040ed97007625a3943880a17f8.png",
+          "width": 2048,
+          "height": 1408,
+          "role": "sheet"
+        },
+        {
+          "path": "art/29-card-buyout-offer/anim.json",
+          "sha256": "349ef1f9a20a2a7f459a6edfef6c80b839ddd022ac353c09bfa71d55328b6859",
+          "bytes": 2341,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "29-card-glut-warning",
+      "number": "29",
+      "doc_tracker": "29",
+      "role": "canonical",
+      "name": "card-glut-warning",
+      "label": "glut warning",
+      "sourceEasel": "48",
+      "folder": "art/29-card-glut-warning",
+      "files": [
+        {
+          "path": "art/29-card-glut-warning/29-card-glut-warning.png",
+          "sha256": "7c3f08c13b5a8edcef3ae9e21c165b0dde43521e09053a1a1456c15f2d2e4740",
+          "bytes": 24095,
+          "source": "/cdn/value.7c3f08c13b5a8edcef3ae9e21c165b0dde43521e09053a1a1456c15f2d2e4740.png",
+          "width": 2048,
+          "height": 1408,
+          "role": "sheet"
+        },
+        {
+          "path": "art/29-card-glut-warning/anim.json",
+          "sha256": "5843d709c71989aa514bb1a93503260217c4557e54d6bdb267cda61e701e21a1",
+          "bytes": 2341,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "29-card-player-trade",
+      "number": "29",
+      "doc_tracker": "29",
+      "role": "canonical",
+      "name": "card-player-trade",
+      "label": "player trade",
+      "sourceEasel": "49",
+      "folder": "art/29-card-player-trade",
+      "files": [
+        {
+          "path": "art/29-card-player-trade/29-card-player-trade.png",
+          "sha256": "16589eecaca532048675e4a30fddb674f77dfdd4b12b877365d8075b81420d7d",
+          "bytes": 24434,
+          "source": "/cdn/value.16589eecaca532048675e4a30fddb674f77dfdd4b12b877365d8075b81420d7d.png",
+          "width": 2048,
+          "height": 1408,
+          "role": "sheet"
+        },
+        {
+          "path": "art/29-card-player-trade/anim.json",
+          "sha256": "2630cda963da5d68cdfcd6e566786b26d2c21c5bb1458088d58b99471c7a2ceb",
+          "bytes": 2341,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "30-stamps",
+      "number": "30",
+      "doc_tracker": "30",
+      "role": "canonical",
+      "name": "stamps",
+      "label": "rubber stamps",
+      "sourceEasel": "50",
+      "folder": "art/30-stamps",
+      "files": [
+        {
+          "path": "art/30-stamps/30-stamps.png",
+          "sha256": "9bf77f2f08df8f9f6b5a2e80fda569d4d78c5f7a78ef103d1947484039afa2dd",
+          "bytes": 18773,
+          "source": "/cdn/value.9bf77f2f08df8f9f6b5a2e80fda569d4d78c5f7a78ef103d1947484039afa2dd.png",
+          "width": 2048,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/30-stamps/anim.json",
+          "sha256": "00eefe3ef364b77d1e34e3703ef3f940cb807337891b169bba865cd799e94da6",
+          "bytes": 4098,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "31-ui-pieces",
+      "number": "31",
+      "doc_tracker": "31",
+      "role": "canonical",
+      "name": "ui-pieces",
+      "label": "ui pieces",
+      "sourceEasel": "51",
+      "folder": "art/31-ui-pieces",
+      "files": [
+        {
+          "path": "art/31-ui-pieces/31-ui-pieces.png",
+          "sha256": "481911956e9ce0cfc0cf8ea19ce3ad4876733fd5eee6dab4904540b0a47cf117",
+          "bytes": 7654,
+          "source": "/cdn/value.481911956e9ce0cfc0cf8ea19ce3ad4876733fd5eee6dab4904540b0a47cf117.png",
+          "width": 1536,
+          "height": 640,
+          "role": "sheet"
+        },
+        {
+          "path": "art/31-ui-pieces/anim.json",
+          "sha256": "070221924b112b84214082b90164866dd2b6367c6ebc9d21702bc13f2e2b8406",
+          "bytes": 3088,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "32-icons",
+      "number": "32",
+      "doc_tracker": "32",
+      "role": "canonical",
+      "name": "icons",
+      "label": "icons",
+      "sourceEasel": "52",
+      "folder": "art/32-icons",
+      "files": [
+        {
+          "path": "art/32-icons/32-icons.png",
+          "sha256": "c87256a2976f0974cf6b33c41d0c08c588f524e98027a353a723d855111b3659",
+          "bytes": 9921,
+          "source": "/cdn/value.c87256a2976f0974cf6b33c41d0c08c588f524e98027a353a723d855111b3659.png",
+          "width": 512,
+          "height": 1280,
+          "role": "sheet"
+        },
+        {
+          "path": "art/32-icons/anim.json",
+          "sha256": "bfd3d08d52d6e03a98cdd93195da3806c4fc1719be8cb1ef4c573982f4ef688c",
+          "bytes": 9040,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "33-split-flap",
+      "number": "33",
+      "doc_tracker": "33",
+      "role": "canonical",
+      "name": "split-flap",
+      "label": "split flap",
+      "sourceEasel": "53",
+      "folder": "art/33-split-flap",
+      "files": [
+        {
+          "path": "art/33-split-flap/33-split-flap.png",
+          "sha256": "c87247a947a66cdad97a6147b4f59be6ffd9bb79e22ac090455b695c4f14ae54",
+          "bytes": 4435,
+          "source": "/cdn/value.c87247a947a66cdad97a6147b4f59be6ffd9bb79e22ac090455b695c4f14ae54.png",
+          "width": 832,
+          "height": 384,
+          "role": "sheet"
+        },
+        {
+          "path": "art/33-split-flap/anim.json",
+          "sha256": "96bdf079db9340193145eb75e654b34151d1b5ea1fe48a92070567b9bbe8d35e",
+          "bytes": 3114,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "34-cursor",
+      "number": "34",
+      "doc_tracker": "34",
+      "role": "canonical",
+      "name": "cursor",
+      "label": "chicken cursor",
+      "sourceEasel": "54",
+      "folder": "art/34-cursor",
+      "files": [
+        {
+          "path": "art/34-cursor/34-cursor.png",
+          "sha256": "25127b4e742590eac8311b3c7e9fb2088c95c1f474879aad32a4ea8feff1b869",
+          "bytes": 3814,
+          "source": "/cdn/value.25127b4e742590eac8311b3c7e9fb2088c95c1f474879aad32a4ea8feff1b869.png",
+          "width": 512,
+          "height": 384,
+          "role": "sheet"
+        },
+        {
+          "path": "art/34-cursor/anim.json",
+          "sha256": "3d9bba58eba6116f214a9f54605f540379584d3a3ba4ca94ee4c5844611a3074",
+          "bytes": 3130,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "35-particles",
+      "number": "35",
+      "doc_tracker": "35",
+      "role": "canonical",
+      "name": "particles",
+      "label": "particle effects",
+      "sourceEasel": "55",
+      "folder": "art/35-particles",
+      "files": [
+        {
+          "path": "art/35-particles/35-particles.png",
+          "sha256": "22096f53982324b2fd41493754f49d6bac468eca9b5353fbc2167f377c690d19",
+          "bytes": 10611,
+          "source": "/cdn/value.22096f53982324b2fd41493754f49d6bac468eca9b5353fbc2167f377c690d19.png",
+          "width": 768,
+          "height": 1024,
+          "role": "sheet"
+        },
+        {
+          "path": "art/35-particles/anim.json",
+          "sha256": "198510022d40473b6efb06e2c9a66fa14b015912b60c2cbde1b156b805a4349f",
+          "bytes": 9596,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "25-loading-plate",
+      "number": "25",
+      "doc_tracker": "25",
+      "role": "canonical",
+      "name": "loading-plate",
+      "label": "dawn farm plate",
+      "sourceEasel": "56",
+      "folder": "art/25-loading-plate",
+      "files": [
+        {
+          "path": "art/25-loading-plate/25-loading-plate.png",
+          "sha256": "0ffa6e8e509f49d49fa053befcdae2a0cd829154688e95ec7ba8f5428bbe6cc2",
+          "bytes": 85038,
+          "source": "/cdn/value.0ffa6e8e509f49d49fa053befcdae2a0cd829154688e95ec7ba8f5428bbe6cc2.png",
+          "width": 1280,
+          "height": 720,
+          "role": "sheet"
+        },
+        {
+          "path": "art/25-loading-plate/anim.json",
+          "sha256": "d21f4f955de25da8fac825159af0551b744bcc433fcb0016a4b12939a63d270c",
+          "bytes": 494,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "26-title-plate",
+      "number": "26",
+      "doc_tracker": "26",
+      "role": "canonical",
+      "name": "title-plate",
+      "label": "farm vista plate",
+      "sourceEasel": "57",
+      "folder": "art/26-title-plate",
+      "files": [
+        {
+          "path": "art/26-title-plate/26-title-plate.png",
+          "sha256": "91aa1172786f5399b10580452ee432fc27053b19b62e5ec6496ef2adfe51c42a",
+          "bytes": 83188,
+          "source": "/cdn/value.91aa1172786f5399b10580452ee432fc27053b19b62e5ec6496ef2adfe51c42a.png",
+          "width": 1280,
+          "height": 720,
+          "role": "sheet"
+        },
+        {
+          "path": "art/26-title-plate/anim.json",
+          "sha256": "5bcaee07a8c49a3fa3ed21dfbf0ba395db23c61a738612a5421f164f2f6b5888",
+          "bytes": 489,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "02-comb-spiky",
+      "number": "02",
+      "doc_tracker": "02",
+      "role": "trait",
+      "name": "comb-spiky",
+      "label": "punk hen animations",
+      "sourceEasel": "58",
+      "folder": "art/02-comb-spiky",
+      "files": [
+        {
+          "path": "art/02-comb-spiky/02-comb-spiky.png",
+          "sha256": "de145ab92379ffccd2dd5950b6a0a88552188eaf38303174f276f60260356604",
+          "bytes": 1871253,
+          "source": "/cdn/value.de145ab92379ffccd2dd5950b6a0a88552188eaf38303174f276f60260356604.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "sheet"
+        },
+        {
+          "path": "art/02-comb-spiky/02-comb-spiky.layer.png",
+          "sha256": "b1b42230a1dada3d6e8e89e31eadcf1fc5288d0fd6547b9435dbae9c65fd6c3b",
+          "bytes": 154646,
+          "source": "/cdn/value.b1b42230a1dada3d6e8e89e31eadcf1fc5288d0fd6547b9435dbae9c65fd6c3b.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "trait-layer"
+        },
+        {
+          "path": "art/02-comb-spiky/anim.json",
+          "sha256": "a92e069b9160d23d320e1b41863fea2da60541afa0aa648f8394a9c68c17f698",
+          "bytes": 7759,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "02-comb-mohawk",
+      "number": "02",
+      "doc_tracker": "02",
+      "role": "trait",
+      "name": "comb-mohawk",
+      "label": "slicked mohawk hen",
+      "sourceEasel": "59",
+      "folder": "art/02-comb-mohawk",
+      "files": [
+        {
+          "path": "art/02-comb-mohawk/02-comb-mohawk.png",
+          "sha256": "a2eac74e0209a6d6729849148db07c439ff818547d4f2e9992076bc4aaf3c6c2",
+          "bytes": 1886844,
+          "source": "/cdn/value.a2eac74e0209a6d6729849148db07c439ff818547d4f2e9992076bc4aaf3c6c2.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "sheet"
+        },
+        {
+          "path": "art/02-comb-mohawk/02-comb-mohawk.layer.png",
+          "sha256": "10e536b961ab746826bf599297228dc1ec06d054a31fca13ab1f6970e347bf85",
+          "bytes": 152966,
+          "source": "/cdn/value.10e536b961ab746826bf599297228dc1ec06d054a31fca13ab1f6970e347bf85.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "trait-layer"
+        },
+        {
+          "path": "art/02-comb-mohawk/anim.json",
+          "sha256": "1edc91e14c73fe13788f47f89c4690fe165e25f9d197ee72dc1b594d6b3dbe76",
+          "bytes": 7762,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "02-comb-nub",
+      "number": "02",
+      "doc_tracker": "02",
+      "role": "trait",
+      "name": "comb-nub",
+      "label": "02-comb-nub",
+      "sourceEasel": "60",
+      "folder": "art/02-comb-nub",
+      "files": [
+        {
+          "path": "art/02-comb-nub/02-comb-nub.png",
+          "sha256": "591b36147823366ec7ed219d26ea6c70dd1e2f267283e8653cfedf8f263c4386",
+          "bytes": 1139153,
+          "source": "/cdn/value.591b36147823366ec7ed219d26ea6c70dd1e2f267283e8653cfedf8f263c4386.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "sheet"
+        },
+        {
+          "path": "art/02-comb-nub/02-comb-nub.layer.png",
+          "sha256": "d23a5ffd2b03c73512dfe8ea2d0515039f497f055acd108e3c8e981cb491028c",
+          "bytes": 11373,
+          "source": "/cdn/value.d23a5ffd2b03c73512dfe8ea2d0515039f497f055acd108e3c8e981cb491028c.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "trait-layer"
+        },
+        {
+          "path": "art/02-comb-nub/anim.json",
+          "sha256": "a98e1142f9d0358a9b83cedfafb80240d787b43ecd5ece58c646d0b80d229eff",
+          "bytes": 7743,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "02-eyes-sleepy",
+      "number": "02",
+      "doc_tracker": "02",
+      "role": "trait",
+      "name": "eyes-sleepy",
+      "label": "02-eyes-sleepy",
+      "sourceEasel": "61",
+      "folder": "art/02-eyes-sleepy",
+      "files": [
+        {
+          "path": "art/02-eyes-sleepy/02-eyes-sleepy.png",
+          "sha256": "6faf80a6489a0bcf626fea31a37395a8dce2ad408e0bddf5c8b81f4bc9ebb330",
+          "bytes": 1269660,
+          "source": "/cdn/value.6faf80a6489a0bcf626fea31a37395a8dce2ad408e0bddf5c8b81f4bc9ebb330.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "sheet"
+        },
+        {
+          "path": "art/02-eyes-sleepy/02-eyes-sleepy.layer.png",
+          "sha256": "c0d5405dca7f7870f28aaebb15296db07e54d7defafe5844d32cfbdbf4b7de51",
+          "bytes": 16002,
+          "source": "/cdn/value.c0d5405dca7f7870f28aaebb15296db07e54d7defafe5844d32cfbdbf4b7de51.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "trait-layer"
+        },
+        {
+          "path": "art/02-eyes-sleepy/anim.json",
+          "sha256": "793d68ced3e33e388dbd8d4dfbec829386ee2f5685f14147e344ea0f75adb88e",
+          "bytes": 7758,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "02-eyes-wild",
+      "number": "02",
+      "doc_tracker": "02",
+      "role": "trait",
+      "name": "eyes-wild",
+      "label": "02-eyes-wild",
+      "sourceEasel": "62",
+      "folder": "art/02-eyes-wild",
+      "files": [
+        {
+          "path": "art/02-eyes-wild/02-eyes-wild.png",
+          "sha256": "fa679b064540c8f5b18b00fbb07ca47210715d7d541806d78e9839dcea1b9035",
+          "bytes": 1231490,
+          "source": "/cdn/value.fa679b064540c8f5b18b00fbb07ca47210715d7d541806d78e9839dcea1b9035.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "sheet"
+        },
+        {
+          "path": "art/02-eyes-wild/02-eyes-wild.layer.png",
+          "sha256": "a8f8234f69a45f4f97e79409227b9120a6ded10a57453df4417b0b922c5f47a6",
+          "bytes": 19706,
+          "source": "/cdn/value.a8f8234f69a45f4f97e79409227b9120a6ded10a57453df4417b0b922c5f47a6.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "trait-layer"
+        },
+        {
+          "path": "art/02-eyes-wild/anim.json",
+          "sha256": "8dcb640a53cd93aa5b383b0e67d1ff84f60db6509271cb16a71af620400dae97",
+          "bytes": 7748,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "02-acc-tophat",
+      "number": "02",
+      "doc_tracker": "02",
+      "role": "trait",
+      "name": "acc-tophat",
+      "label": "02-acc-tophat",
+      "sourceEasel": "63",
+      "folder": "art/02-acc-tophat",
+      "files": [
+        {
+          "path": "art/02-acc-tophat/02-acc-tophat.png",
+          "sha256": "d5341855acaa9bbc869904700ee2e435162d88aa8e1e636cf3a7ba33a7ca9def",
+          "bytes": 1218481,
+          "source": "/cdn/value.d5341855acaa9bbc869904700ee2e435162d88aa8e1e636cf3a7ba33a7ca9def.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "sheet"
+        },
+        {
+          "path": "art/02-acc-tophat/02-acc-tophat.layer.png",
+          "sha256": "0b30e714be7339d0763ef286f01792ec799d12709bdaae10d20a0d8851982484",
+          "bytes": 12842,
+          "source": "/cdn/value.0b30e714be7339d0763ef286f01792ec799d12709bdaae10d20a0d8851982484.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "trait-layer"
+        },
+        {
+          "path": "art/02-acc-tophat/anim.json",
+          "sha256": "babc48fd3753da525f3b66361a774b9a099bb4bbbcbefdde86e6836340ade97e",
+          "bytes": 7753,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "02-acc-bowtie",
+      "number": "02",
+      "doc_tracker": "02",
+      "role": "trait",
+      "name": "acc-bowtie",
+      "label": "02-acc-bowtie",
+      "sourceEasel": "64",
+      "folder": "art/02-acc-bowtie",
+      "files": [
+        {
+          "path": "art/02-acc-bowtie/02-acc-bowtie.png",
+          "sha256": "125ede3477022520993bd9b5670dac94c6b1a064eb8d3d62e3155de9b9e4f9f0",
+          "bytes": 1272846,
+          "source": "/cdn/value.125ede3477022520993bd9b5670dac94c6b1a064eb8d3d62e3155de9b9e4f9f0.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "sheet"
+        },
+        {
+          "path": "art/02-acc-bowtie/02-acc-bowtie.layer.png",
+          "sha256": "94979a65f587a1591e1102afa2975acb7336a0eb41eba1f7608b3f6a7d059daa",
+          "bytes": 11485,
+          "source": "/cdn/value.94979a65f587a1591e1102afa2975acb7336a0eb41eba1f7608b3f6a7d059daa.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "trait-layer"
+        },
+        {
+          "path": "art/02-acc-bowtie/anim.json",
+          "sha256": "69840bd94462d634b996bd30199e8d4c1d0151929b6a16c8028e8a4086f7b05d",
+          "bytes": 7753,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "02-acc-shades",
+      "number": "02",
+      "doc_tracker": "02",
+      "role": "trait",
+      "name": "acc-shades",
+      "label": "02-acc-shades",
+      "sourceEasel": "65",
+      "folder": "art/02-acc-shades",
+      "files": [
+        {
+          "path": "art/02-acc-shades/02-acc-shades.png",
+          "sha256": "1016ccf39cdd000c409ad0ddf4387e41ba962ed8eccbb785b401701ef56cbdc4",
+          "bytes": 1944675,
+          "source": "/cdn/value.1016ccf39cdd000c409ad0ddf4387e41ba962ed8eccbb785b401701ef56cbdc4.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "sheet"
+        },
+        {
+          "path": "art/02-acc-shades/02-acc-shades.layer.png",
+          "sha256": "a2c25b853cc43c137a0dc30c2b27d003a8c900d2fa27f9e8577161b651fe8981",
+          "bytes": 12614,
+          "source": "/cdn/value.a2c25b853cc43c137a0dc30c2b27d003a8c900d2fa27f9e8577161b651fe8981.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "trait-layer"
+        },
+        {
+          "path": "art/02-acc-shades/anim.json",
+          "sha256": "75d627fe6544ed0b7baffc9875f11d337d683ecb0f2e664989fd0d6ab3259134",
+          "bytes": 7753,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "02-body",
+      "number": "02",
+      "doc_tracker": "02",
+      "role": "trait",
+      "name": "body",
+      "label": "hen body layer (base white hen)",
+      "sourceEasel": null,
+      "folder": "art/02-body",
+      "files": [
+        {
+          "path": "art/02-body/02-body.layer.png",
+          "sha256": "537aa895c34c4c6ffc8d2c2ebc80149a6e958857c4adb20b31e75b6534481304",
+          "bytes": 1139924,
+          "source": "/cdn/value.537aa895c34c4c6ffc8d2c2ebc80149a6e958857c4adb20b31e75b6534481304.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "trait-layer"
+        },
+        {
+          "path": "art/02-body/anim.json",
+          "sha256": "d5fdab4d74b5c4554cf02e0b68949cafb9463ae133c07b088069b367b02a2691",
+          "bytes": 7504,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "02-comb-default",
+      "number": "02",
+      "doc_tracker": "02",
+      "role": "trait",
+      "name": "comb-default",
+      "label": "default comb layer",
+      "sourceEasel": null,
+      "folder": "art/02-comb-default",
+      "files": [
+        {
+          "path": "art/02-comb-default/02-comb-default.layer.png",
+          "sha256": "7fdbd739af664ab1bb4affb85fc4cba4ce9df20700e5ef3a0e63e7f1552721ca",
+          "bytes": 333489,
+          "source": "/cdn/value.7fdbd739af664ab1bb4affb85fc4cba4ce9df20700e5ef3a0e63e7f1552721ca.png",
+          "width": 1024,
+          "height": 1792,
+          "role": "trait-layer"
+        },
+        {
+          "path": "art/02-comb-default/anim.json",
+          "sha256": "7132d70057907d96edcc406569a34a91d780864cb8290febd2ec331168e43e62",
+          "bytes": 7515,
+          "role": "anim"
+        }
+      ]
+    }
+  ],
+  "audio": [
+    {
+      "id": "01-cluck",
+      "number": "01",
+      "doc_tracker": "01",
+      "doc_sound": 1,
+      "role": "canonical",
+      "name": "cluck",
+      "label": "smug cluck",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/01-cluck",
+      "files": [
+        {
+          "path": "audio/01-cluck/01-cluck-a.mp3",
+          "sha256": "390ab822d2d804d64a6596910f7b2412a5969c98c3504a3bd4086ce8bfce13af",
+          "bytes": 2348,
+          "source": "/cdn/value.390ab822d2d804d64a6596910f7b2412a5969c98c3504a3bd4086ce8bfce13af.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "01-a"
+        },
+        {
+          "path": "audio/01-cluck/01-cluck-b.mp3",
+          "sha256": "fba68dc1d5e356bfd88c3d5ded237ac68208c32a2ff8d0ebe2837c6c542fc9bd",
+          "bytes": 1964,
+          "source": "/cdn/value.fba68dc1d5e356bfd88c3d5ded237ac68208c32a2ff8d0ebe2837c6c542fc9bd.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "01-b"
+        },
+        {
+          "path": "audio/01-cluck/01-cluck-c.mp3",
+          "sha256": "3340b4c25a6664652af44816463243b10c68dde56b8f12ed52e48bf22cec5cd4",
+          "bytes": 2732,
+          "source": "/cdn/value.3340b4c25a6664652af44816463243b10c68dde56b8f12ed52e48bf22cec5cd4.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "01-c"
+        },
+        {
+          "path": "audio/01-cluck/01-cluck-d.mp3",
+          "sha256": "9beef765c34e010ec72ce39c1d3c4c4a48a5c734eeaf8ec6aea689e739fb0c95",
+          "bytes": 3500,
+          "source": "/cdn/value.9beef765c34e010ec72ce39c1d3c4c4a48a5c734eeaf8ec6aea689e739fb0c95.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "01-d"
+        },
+        {
+          "path": "audio/01-cluck/sound.json",
+          "sha256": "7b98f028170623ef8b68cae8a5da57ed7d8ebe4cf4992bdda2b53728e465eb28",
+          "bytes": 1766,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "02-lay",
+      "number": "02",
+      "doc_tracker": "02",
+      "doc_sound": 2,
+      "role": "canonical",
+      "name": "lay",
+      "label": "egg laid",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/02-lay",
+      "files": [
+        {
+          "path": "audio/02-lay/02-lay-a.mp3",
+          "sha256": "df8f476d4a4c8b39df8572cded1f386934d172179ce6721a2f9d9cb76bd9d65e",
+          "bytes": 39744,
+          "source": "/cdn/moodboard-pixel-bright/sfx-hen-comic-straining-grunt-then-egg-plop-bouncy-pop.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/02-lay/sound.json",
+          "sha256": "3bb0b5331e6dbc6d5396d57f3446dbf79c441a36e288972b43741196f3b5f31c",
+          "bytes": 579,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "03-flap",
+      "number": "03",
+      "doc_tracker": "03",
+      "doc_sound": 3,
+      "role": "canonical",
+      "name": "flap",
+      "label": "happy flap",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/03-flap",
+      "files": [
+        {
+          "path": "audio/03-flap/03-flap-a.mp3",
+          "sha256": "a5d7106aff7e4695a3d6992ce5fe34041f646102606abafadcf7aa597023022d",
+          "bytes": 18476,
+          "source": "/cdn/value.a5d7106aff7e4695a3d6992ce5fe34041f646102606abafadcf7aa597023022d.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "03-flap"
+        },
+        {
+          "path": "audio/03-flap/sound.json",
+          "sha256": "66d0cf3cc96088c7ac71c1f614ed21089dd1ac30b57c76841c9266494654f855",
+          "bytes": 614,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "04-sad",
+      "number": "04",
+      "doc_tracker": "04",
+      "doc_sound": 4,
+      "role": "canonical",
+      "name": "sad",
+      "label": "sad warble",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/04-sad",
+      "files": [
+        {
+          "path": "audio/04-sad/04-sad-a.mp3",
+          "sha256": "2ac259f5d0bdac2f7f2f2eb7270fc9a2ad6662b8d95c0b4ff78da29ba8937a16",
+          "bytes": 18476,
+          "source": "/cdn/value.2ac259f5d0bdac2f7f2f2eb7270fc9a2ad6662b8d95c0b4ff78da29ba8937a16.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "04-sad"
+        },
+        {
+          "path": "audio/04-sad/sound.json",
+          "sha256": "33cdf86ce24bc6f1ec6889856fac17892d23b7323764b3ffab3c31b962c96fe5",
+          "bytes": 609,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "05-snore",
+      "number": "05",
+      "doc_tracker": "05",
+      "doc_sound": 5,
+      "role": "canonical",
+      "name": "snore",
+      "label": "snore loop",
+      "kind": "loop",
+      "sourceEasel": null,
+      "folder": "audio/05-snore",
+      "files": [
+        {
+          "path": "audio/05-snore/05-snore-a.mp3",
+          "sha256": "d8a7007db3737951db70727c46fa6360d8ae0b8c2cd1d1f75cd88e2eebda3f8c",
+          "bytes": 121536,
+          "source": "/cdn/moodboard-pixel-bright/sfx-tiny-hen-snoring-little-whistle-loop.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/05-snore/05-snore-a-loop.ogg",
+          "sha256": "0c3bf760b3273f9ced13e1d29b9e7a1bac344036371616efd047750a9cf05683",
+          "bytes": 86725,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 48000,
+          "channels": 2,
+          "samples": 238679,
+          "derivedFrom": "audio/05-snore/05-snore-a.mp3"
+        },
+        {
+          "path": "audio/05-snore/sound.json",
+          "sha256": "53e93f77cded75305f17747d07dd4c012e23870be40d41ea1c5c9fa102d4013c",
+          "bytes": 844,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "06-peep",
+      "number": "06",
+      "doc_tracker": "06",
+      "doc_sound": 6,
+      "role": "canonical",
+      "name": "peep",
+      "label": "chick peep",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/06-peep",
+      "files": [
+        {
+          "path": "audio/06-peep/06-peep-a.mp3",
+          "sha256": "c6d5a6c3862edbba9a03bb4b995b54ee7d45bc97862f351171b1310de6a5039e",
+          "bytes": 2732,
+          "source": "/cdn/value.c6d5a6c3862edbba9a03bb4b995b54ee7d45bc97862f351171b1310de6a5039e.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "06-a"
+        },
+        {
+          "path": "audio/06-peep/06-peep-b.mp3",
+          "sha256": "f55d26b4167e556cd5eca5dac9b62d97c3b3b153072233a00ac9da4909350084",
+          "bytes": 2732,
+          "source": "/cdn/value.f55d26b4167e556cd5eca5dac9b62d97c3b3b153072233a00ac9da4909350084.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "06-b"
+        },
+        {
+          "path": "audio/06-peep/06-peep-c.mp3",
+          "sha256": "c7d723b96dfcec544060d2a2124bcce6a46b95080ee2a7fa46b6d7e112085424",
+          "bytes": 8876,
+          "source": "/cdn/value.c7d723b96dfcec544060d2a2124bcce6a46b95080ee2a7fa46b6d7e112085424.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "06-c"
+        },
+        {
+          "path": "audio/06-peep/sound.json",
+          "sha256": "8373665cbfb850fdc153cdfb59e197e8706fc8de1b5c0c42e14f36a82274fb8f",
+          "bytes": 1374,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "07-chorus",
+      "number": "07",
+      "doc_tracker": "07",
+      "doc_sound": 7,
+      "role": "canonical",
+      "name": "chorus",
+      "label": "coop rush",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/07-chorus",
+      "files": [
+        {
+          "path": "audio/07-chorus/07-chorus-a.mp3",
+          "sha256": "46bcd1c773094655751319f0d73e3519288e0d68afa1acce621fe149779145a1",
+          "bytes": 34604,
+          "source": "/cdn/value.46bcd1c773094655751319f0d73e3519288e0d68afa1acce621fe149779145a1.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "07-chorus"
+        },
+        {
+          "path": "audio/07-chorus/sound.json",
+          "sha256": "ad9af9e003fa127bd35d9b6ed6eee070920a04c39c66be57be5cdbef99f64f5a",
+          "bytes": 623,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "08-egg-pop",
+      "number": "08",
+      "doc_tracker": "08",
+      "doc_sound": 8,
+      "role": "canonical",
+      "name": "egg-pop",
+      "label": "egg pickup",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/08-egg-pop",
+      "files": [
+        {
+          "path": "audio/08-egg-pop/08-egg-pop-a.mp3",
+          "sha256": "709cd5282846b1746607e200ab8ed2468dd31df5b2eebd5145812ccbbcbf0985",
+          "bytes": 5804,
+          "source": "/cdn/value.709cd5282846b1746607e200ab8ed2468dd31df5b2eebd5145812ccbbcbf0985.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "08-a"
+        },
+        {
+          "path": "audio/08-egg-pop/08-egg-pop-b.mp3",
+          "sha256": "9c0e3fb0cacd8453f9abd3d3e51a68a47e8d6add6c66d493246aa50239c84e62",
+          "bytes": 5420,
+          "source": "/cdn/value.9c0e3fb0cacd8453f9abd3d3e51a68a47e8d6add6c66d493246aa50239c84e62.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "08-b"
+        },
+        {
+          "path": "audio/08-egg-pop/08-egg-pop-c.mp3",
+          "sha256": "c786e7463f2fdc831b28aa1793b5359e007c9f8eaab3abcc9a30564359ebaa1f",
+          "bytes": 3884,
+          "source": "/cdn/value.c786e7463f2fdc831b28aa1793b5359e007c9f8eaab3abcc9a30564359ebaa1f.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "08-c"
+        },
+        {
+          "path": "audio/08-egg-pop/08-egg-pop-d.mp3",
+          "sha256": "41ce2278b2b58917f169a03f285c0c7b8b56bd952c846c79837d1487a78a70df",
+          "bytes": 5804,
+          "source": "/cdn/value.41ce2278b2b58917f169a03f285c0c7b8b56bd952c846c79837d1487a78a70df.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "08-d"
+        },
+        {
+          "path": "audio/08-egg-pop/sound.json",
+          "sha256": "1c49d1f03d4b49cb12433391cb13ce1aacb01eaeb03f24eec9a788e8a049e304",
+          "bytes": 1786,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "09-crack",
+      "number": "09",
+      "doc_tracker": "09",
+      "doc_sound": 9,
+      "role": "canonical",
+      "name": "crack",
+      "label": "shell crack",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/09-crack",
+      "files": [
+        {
+          "path": "audio/09-crack/09-crack-a.mp3",
+          "sha256": "73d1bcc725082123213978bad740fd746409f29bce87c503795054c982c8188e",
+          "bytes": 8876,
+          "source": "/cdn/value.73d1bcc725082123213978bad740fd746409f29bce87c503795054c982c8188e.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "09-crack"
+        },
+        {
+          "path": "audio/09-crack/sound.json",
+          "sha256": "f6f213cdfa652877a12b97c0c540a900bba5972a854b0572629f67cec1400dfd",
+          "bytes": 619,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "10-splat",
+      "number": "10",
+      "doc_tracker": "10",
+      "doc_sound": 10,
+      "role": "canonical",
+      "name": "splat",
+      "label": "egg splat",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/10-splat",
+      "files": [
+        {
+          "path": "audio/10-splat/10-splat-a.mp3",
+          "sha256": "bc9d994d241f74e86fb25830882d2f58dd2560f003e1359decaf5116bcb7216c",
+          "bytes": 8876,
+          "source": "/cdn/value.bc9d994d241f74e86fb25830882d2f58dd2560f003e1359decaf5116bcb7216c.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "10-splat"
+        },
+        {
+          "path": "audio/10-splat/sound.json",
+          "sha256": "7b36c3ab7093677208c6431ace683f5a393ef14c74d6a9719999ed3e88eccea3",
+          "bytes": 617,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "11-golden",
+      "number": "11",
+      "doc_tracker": "11",
+      "doc_sound": 11,
+      "role": "canonical",
+      "name": "golden",
+      "label": "golden shimmer",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/11-golden",
+      "files": [
+        {
+          "path": "audio/11-golden/11-golden-a.mp3",
+          "sha256": "6cfcfbeab4c0df9690f66c635e866214fd2886e4b0841e1d9fc3089d2be48f5b",
+          "bytes": 18476,
+          "source": "/cdn/value.6cfcfbeab4c0df9690f66c635e866214fd2886e4b0841e1d9fc3089d2be48f5b.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "11-golden"
+        },
+        {
+          "path": "audio/11-golden/sound.json",
+          "sha256": "f4b4267c89fa4ac074b0827aee22e5c8859a8cd243658906f9e617b60e0b7d3a",
+          "bytes": 628,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "12-crate",
+      "number": "12",
+      "doc_tracker": "12",
+      "doc_sound": 12,
+      "role": "canonical",
+      "name": "crate",
+      "label": "crate thunk",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/12-crate",
+      "files": [
+        {
+          "path": "audio/12-crate/12-crate-a.mp3",
+          "sha256": "bbf1c41d655781058cf75a468e489d04ab5bd4490aa8e3743de472018d4ef483",
+          "bytes": 2348,
+          "source": "/cdn/value.bbf1c41d655781058cf75a468e489d04ab5bd4490aa8e3743de472018d4ef483.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "12-a"
+        },
+        {
+          "path": "audio/12-crate/12-crate-b.mp3",
+          "sha256": "e56cc45ffee6eeeaee6a254f14556918ec81141a34907059a177febdfd76178c",
+          "bytes": 4268,
+          "source": "/cdn/value.e56cc45ffee6eeeaee6a254f14556918ec81141a34907059a177febdfd76178c.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "12-b"
+        },
+        {
+          "path": "audio/12-crate/12-crate-c.mp3",
+          "sha256": "f38d1a61348cff05bb79dcc0fd6067f726fa127abf0c755e1ef9ab8537168f8b",
+          "bytes": 2348,
+          "source": "/cdn/value.f38d1a61348cff05bb79dcc0fd6067f726fa127abf0c755e1ef9ab8537168f8b.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "12-c"
+        },
+        {
+          "path": "audio/12-crate/sound.json",
+          "sha256": "1b8398e1ec7d34f57f0f076d905b0095afd9ad9cb5f985bb7eb858114567a117",
+          "bytes": 1383,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "13-tray",
+      "number": "13",
+      "doc_tracker": "13",
+      "doc_sound": 13,
+      "role": "canonical",
+      "name": "tray",
+      "label": "sorter click",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/13-tray",
+      "files": [
+        {
+          "path": "audio/13-tray/13-tray-a.mp3",
+          "sha256": "3cf561285dff4d2de9ec8e63607464a2a7c72873a2c2358b3abc10ae770a566a",
+          "bytes": 4268,
+          "source": "/cdn/value.3cf561285dff4d2de9ec8e63607464a2a7c72873a2c2358b3abc10ae770a566a.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "13-a"
+        },
+        {
+          "path": "audio/13-tray/13-tray-b.mp3",
+          "sha256": "8dc31df40b0cc88cb52b805a8e0b094bcd77bee976e2e3e8fa2773cf2613ebf4",
+          "bytes": 4268,
+          "source": "/cdn/value.8dc31df40b0cc88cb52b805a8e0b094bcd77bee976e2e3e8fa2773cf2613ebf4.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "13-b"
+        },
+        {
+          "path": "audio/13-tray/13-tray-c.mp3",
+          "sha256": "8c81e6be91a40b9c3089a7274ce7d81bf5f699eb5ab0486489f2f815917fb510",
+          "bytes": 1964,
+          "source": "/cdn/value.8c81e6be91a40b9c3089a7274ce7d81bf5f699eb5ab0486489f2f815917fb510.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "13-c"
+        },
+        {
+          "path": "audio/13-tray/sound.json",
+          "sha256": "85fcacd8b2e1099dcff31ac2fdcc93e67305e153931eba9f9276c66c28d81767",
+          "bytes": 1376,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "14-coins-small",
+      "number": "14",
+      "doc_tracker": "14",
+      "doc_sound": 14,
+      "role": "canonical",
+      "name": "coins-small",
+      "label": "coins small",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/14-coins-small",
+      "files": [
+        {
+          "path": "audio/14-coins-small/14-coins-small-a.mp3",
+          "sha256": "fa1df93dfd1c67854fd03619d35c99a360429f0d24333ccd7853a027a0f97f2b",
+          "bytes": 16940,
+          "source": "/cdn/value.fa1df93dfd1c67854fd03619d35c99a360429f0d24333ccd7853a027a0f97f2b.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "14-coins-small"
+        },
+        {
+          "path": "audio/14-coins-small/sound.json",
+          "sha256": "13ab1a83bfb320e94c76de2cff437ea57d8f47046ec7f4b890cf82a77620e60f",
+          "bytes": 650,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "14-coins-large",
+      "number": "14",
+      "doc_tracker": "14",
+      "doc_sound": 14,
+      "role": "canonical",
+      "name": "coins-large",
+      "label": "coins large",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/14-coins-large",
+      "files": [
+        {
+          "path": "audio/14-coins-large/14-coins-large-a.mp3",
+          "sha256": "6eedde134d8e0985028fb4caaf2ad9276cfbf9ca6bf7bd4d20610e088c300466",
+          "bytes": 33068,
+          "source": "/cdn/value.6eedde134d8e0985028fb4caaf2ad9276cfbf9ca6bf7bd4d20610e088c300466.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "14-coins-large"
+        },
+        {
+          "path": "audio/14-coins-large/sound.json",
+          "sha256": "7e3c4bf01afa9f23e72774eb6ba960614a48e0680cb7af8d108b0e9d157b4d1c",
+          "bytes": 650,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "15-kaching",
+      "number": "15",
+      "doc_tracker": "15",
+      "doc_sound": 15,
+      "role": "canonical",
+      "name": "kaching",
+      "label": "ka-ching",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/15-kaching",
+      "files": [
+        {
+          "path": "audio/15-kaching/15-kaching-a.mp3",
+          "sha256": "ddee39a8fef986502fd415be7f488f9e72f6ea4268e293d14bc2534d69d9938b",
+          "bytes": 27648,
+          "source": "/cdn/moodboard-pixel-bright/sfx-cartoon-cash-register-ka-ching-bell.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/15-kaching/sound.json",
+          "sha256": "c4e926fceb1f487c366fa6ca9c073bb71eb4ac9ae0aa7d21d2bd0543fabe90dd",
+          "bytes": 580,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "16-ticker",
+      "number": "16",
+      "doc_tracker": "16",
+      "doc_sound": 16,
+      "role": "canonical",
+      "name": "ticker",
+      "label": "counter tick loop",
+      "kind": "loop",
+      "sourceEasel": null,
+      "folder": "audio/16-ticker",
+      "files": [
+        {
+          "path": "audio/16-ticker/16-ticker-a.mp3",
+          "sha256": "2dba90485d72d2da2997f29df45543292af222c252bbe5ea7294f6df35629061",
+          "bytes": 121536,
+          "source": "/cdn/moodboard-pixel-bright/sfx-fast-rhythmic-rolling-number-counter-ticks-loop.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/16-ticker/16-ticker-a-loop.ogg",
+          "sha256": "cf53d3288eb5b3b3081bce266bfeffa2ea406f743477d71b79dc5af675a60740",
+          "bytes": 156118,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 48000,
+          "channels": 2,
+          "samples": 239991,
+          "derivedFrom": "audio/16-ticker/16-ticker-a.mp3"
+        },
+        {
+          "path": "audio/16-ticker/sound.json",
+          "sha256": "780e0cc58a4639e6a28e9bb84ec330adb375043de6583e44423417459b1a91a4",
+          "bytes": 867,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "17-card",
+      "number": "17",
+      "doc_tracker": "17",
+      "doc_sound": 17,
+      "role": "canonical",
+      "name": "card",
+      "label": "card swoosh",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/17-card",
+      "files": [
+        {
+          "path": "audio/17-card/17-card-a.mp3",
+          "sha256": "0deb77cc44fe01b63aec4804d562f95adbf6e653a99ca31a862126e50b273dd7",
+          "bytes": 4652,
+          "source": "/cdn/value.0deb77cc44fe01b63aec4804d562f95adbf6e653a99ca31a862126e50b273dd7.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "17-a"
+        },
+        {
+          "path": "audio/17-card/17-card-b.mp3",
+          "sha256": "b720100b07f48706251b586fc5eefbfb663ebb34d64ad4f44f4ca2d983f5bd3f",
+          "bytes": 4652,
+          "source": "/cdn/value.b720100b07f48706251b586fc5eefbfb663ebb34d64ad4f44f4ca2d983f5bd3f.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "17-b"
+        },
+        {
+          "path": "audio/17-card/sound.json",
+          "sha256": "8f93dfa4b80875a22c32632d6433eb7805b110c03961a168ce0a6d72f4802ebc",
+          "bytes": 993,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "18-stamp",
+      "number": "18",
+      "doc_tracker": "18",
+      "doc_sound": 18,
+      "role": "canonical",
+      "name": "stamp",
+      "label": "stamp slam",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/18-stamp",
+      "files": [
+        {
+          "path": "audio/18-stamp/18-stamp-a.mp3",
+          "sha256": "254056e3d8fe21fa27e21859591b58924e88205764c82eb6aa2221c84762a654",
+          "bytes": 1964,
+          "source": "/cdn/value.254056e3d8fe21fa27e21859591b58924e88205764c82eb6aa2221c84762a654.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "18-a"
+        },
+        {
+          "path": "audio/18-stamp/18-stamp-b.mp3",
+          "sha256": "17e5ab28df9b75050dfe01104932c30822af7b43db407e2315fae89331e92158",
+          "bytes": 8876,
+          "source": "/cdn/value.17e5ab28df9b75050dfe01104932c30822af7b43db407e2315fae89331e92158.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "18-b"
+        },
+        {
+          "path": "audio/18-stamp/18-stamp-c.mp3",
+          "sha256": "95a99988bc08970daec9f5291e7cf104976d3ec41e3bf6ce19de7be5eac5d522",
+          "bytes": 1964,
+          "source": "/cdn/value.95a99988bc08970daec9f5291e7cf104976d3ec41e3bf6ce19de7be5eac5d522.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "18-d"
+        },
+        {
+          "path": "audio/18-stamp/sound.json",
+          "sha256": "44ee39c45adb17f2a8c28c5a24231b85349d92344577b34d69d5780d877261b3",
+          "bytes": 1465,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "19-haggle-win",
+      "number": "19",
+      "doc_tracker": "19",
+      "doc_sound": 19,
+      "role": "canonical",
+      "name": "haggle-win",
+      "label": "haggle win",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/19-haggle-win",
+      "files": [
+        {
+          "path": "audio/19-haggle-win/19-haggle-win-a.mp3",
+          "sha256": "5278f24c88ac84203f3259194e3341d7a37366ef573f0f8e6dc455638daabc40",
+          "bytes": 18476,
+          "source": "/cdn/value.5278f24c88ac84203f3259194e3341d7a37366ef573f0f8e6dc455638daabc40.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "19-haggle-win"
+        },
+        {
+          "path": "audio/19-haggle-win/sound.json",
+          "sha256": "d6a4b8b561a84d7ac04eabb75353e2f25579abc8954f95e10dc32f52e688fd27",
+          "bytes": 644,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "20-fail",
+      "number": "20",
+      "doc_tracker": "20",
+      "doc_sound": 20,
+      "role": "canonical",
+      "name": "fail",
+      "label": "wah-wah",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/20-fail",
+      "files": [
+        {
+          "path": "audio/20-fail/20-fail-a.mp3",
+          "sha256": "1ffad248fbfcb5b872de86983a572f3a6ec02c5cd95f0c31ab1efe83382c297d",
+          "bytes": 18476,
+          "source": "/cdn/value.1ffad248fbfcb5b872de86983a572f3a6ec02c5cd95f0c31ab1efe83382c297d.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "20-fail"
+        },
+        {
+          "path": "audio/20-fail/sound.json",
+          "sha256": "d0b190b4be09353b0dff8990d2fe638201c123de0d896b378d951a158bc739fe",
+          "bytes": 611,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "21-build",
+      "number": "21",
+      "doc_tracker": "21",
+      "doc_sound": 21,
+      "role": "canonical",
+      "name": "build",
+      "label": "building",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/21-build",
+      "files": [
+        {
+          "path": "audio/21-build/21-build-a.mp3",
+          "sha256": "b99e464ce4ce1f2cd7a99b1be9aca59b3ac224f1b90f7b55ac683a5d6aee030b",
+          "bytes": 21312,
+          "source": "/cdn/moodboard-pixel-bright/sfx-fast-cartoon-hammer-taps-and-wood-creak.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/21-build/sound.json",
+          "sha256": "ba10773c38be5acacf2ca865d4c5370a85abd002362e21b44365defb48bd2985",
+          "bytes": 576,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "22-boing",
+      "number": "22",
+      "doc_tracker": "22",
+      "doc_sound": 22,
+      "role": "canonical",
+      "name": "boing",
+      "label": "boing pop",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/22-boing",
+      "files": [
+        {
+          "path": "audio/22-boing/22-boing-a.mp3",
+          "sha256": "43c0144ee0eebefd0b978d9f176b4e00673cdde76a23e1ef0dae0ed16268b3c8",
+          "bytes": 16940,
+          "source": "/cdn/value.43c0144ee0eebefd0b978d9f176b4e00673cdde76a23e1ef0dae0ed16268b3c8.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "22-boing"
+        },
+        {
+          "path": "audio/22-boing/sound.json",
+          "sha256": "77b06dd4bcc4b8136405501ee26e95ee88365864efb4d825f92e8e5f8c8c596f",
+          "bytes": 618,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "23-sign-creak",
+      "number": "23",
+      "doc_tracker": "23",
+      "doc_sound": 23,
+      "role": "canonical",
+      "name": "sign-creak",
+      "label": "sign creak",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/23-sign-creak",
+      "files": [
+        {
+          "path": "audio/23-sign-creak/23-sign-creak-a.mp3",
+          "sha256": "91bbe2ed644a274a4beadf84dbee0d988e4a784f687524bf3088fb099a4a0e34",
+          "bytes": 22464,
+          "source": "/cdn/moodboard-toon-vibrant/sfx-wooden-sign-creak.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/23-sign-creak/sound.json",
+          "sha256": "a51746cd5aa5eb03d4fe87c7bb79d322d3aa6d8db9178ce0bedea4d9b190cd97",
+          "bytes": 576,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "23-sign-fall",
+      "number": "23",
+      "doc_tracker": "23",
+      "doc_sound": 23,
+      "role": "canonical",
+      "name": "sign-fall",
+      "label": "sign falls",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/23-sign-fall",
+      "files": [
+        {
+          "path": "audio/23-sign-fall/23-sign-fall-a.mp3",
+          "sha256": "312d2b1b9f9dd413cc8d873afd1cf12526e53ff38f4889c44b3b53f9dcc7fac5",
+          "bytes": 28224,
+          "source": "/cdn/moodboard-pixel-bright/sfx-wooden-sign-crack-and-clatter-falling-over.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/23-sign-fall/sound.json",
+          "sha256": "0090feb50ab2fd4694f64723390332d2ffc94d6ad688d54ae69e187aedab1409",
+          "bytes": 597,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "24-machine",
+      "number": "24",
+      "doc_tracker": "24",
+      "doc_sound": 24,
+      "role": "canonical",
+      "name": "machine",
+      "label": "machine start",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/24-machine",
+      "files": [
+        {
+          "path": "audio/24-machine/24-machine-a.mp3",
+          "sha256": "404d48137a0cc1b724bac36c2b9c1f6df08b0e8cdc29378a1742e07c34fb9d5f",
+          "bytes": 26540,
+          "source": "/cdn/value.404d48137a0cc1b724bac36c2b9c1f6df08b0e8cdc29378a1742e07c34fb9d5f.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "24-machine"
+        },
+        {
+          "path": "audio/24-machine/sound.json",
+          "sha256": "6cad312afaee1c8186ba1fda6ff11b2754a6cf4d3b7c7d01a744c98b1b636644",
+          "bytes": 632,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "25-conveyor",
+      "number": "25",
+      "doc_tracker": "25",
+      "doc_sound": 25,
+      "role": "canonical",
+      "name": "conveyor",
+      "label": "conveyor loop",
+      "kind": "loop",
+      "sourceEasel": null,
+      "folder": "audio/25-conveyor",
+      "files": [
+        {
+          "path": "audio/25-conveyor/25-conveyor-a.mp3",
+          "sha256": "77ab3ddf715783df6e850265c3985c254032dde1c10ea71dc9dfe869451596b2",
+          "bytes": 145152,
+          "source": "/cdn/moodboard-pixel-bright/sfx-wooden-conveyor-belt-rumbling-soft-clacks-loop.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/25-conveyor/25-conveyor-a-loop.ogg",
+          "sha256": "4fa16ee72e4a20849ca0b1907d8a884dd5b81a3b395536eb70d54339b691dc76",
+          "bytes": 149221,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 48000,
+          "channels": 2,
+          "samples": 287414,
+          "derivedFrom": "audio/25-conveyor/25-conveyor-a.mp3"
+        },
+        {
+          "path": "audio/25-conveyor/sound.json",
+          "sha256": "bb40c098864bbeb1e230b63211fb9ca0db0881effa478fb2730f9a87f61c8457",
+          "bytes": 875,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "26-sorter",
+      "number": "26",
+      "doc_tracker": "26",
+      "doc_sound": 26,
+      "role": "canonical",
+      "name": "sorter",
+      "label": "sorter loop",
+      "kind": "loop",
+      "sourceEasel": null,
+      "folder": "audio/26-sorter",
+      "files": [
+        {
+          "path": "audio/26-sorter/26-sorter-a.mp3",
+          "sha256": "8c5e157b5259b181ea5f7a584dfe6529bf26da4e5d73cc3dad5c3c51ee345982",
+          "bytes": 121536,
+          "source": "/cdn/moodboard-pixel-bright/sfx-rattly-sorting-machine-clattering-jiggling-loop.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/26-sorter/26-sorter-a-loop.ogg",
+          "sha256": "9204d16e4023b8c4e0f35378a74775d4acb355888ec87c8bf22137b3253dd4bd",
+          "bytes": 132593,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 48000,
+          "channels": 2,
+          "samples": 239992,
+          "derivedFrom": "audio/26-sorter/26-sorter-a.mp3"
+        },
+        {
+          "path": "audio/26-sorter/sound.json",
+          "sha256": "815c2d55d0198c59d13d239c26e6c64c112a696e99508ee06c2323b9d8f4fe31",
+          "bytes": 861,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "27-cart",
+      "number": "27",
+      "doc_tracker": "27",
+      "doc_sound": 27,
+      "role": "canonical",
+      "name": "cart",
+      "label": "cart loop",
+      "kind": "loop",
+      "sourceEasel": null,
+      "folder": "audio/27-cart",
+      "files": [
+        {
+          "path": "audio/27-cart/27-cart-a.mp3",
+          "sha256": "e291815725e411e0590b8a765c1d552ef05854b1b2b78d52b6b29ae8a34033a0",
+          "bytes": 145152,
+          "source": "/cdn/moodboard-pixel-bright/sfx-small-wooden-cart-wheels-rolling-crate-bumps-hen-footsteps-loop.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/27-cart/27-cart-a-loop.ogg",
+          "sha256": "f6d1de930ff8d15165f11fe8469b7b57b855d73b0b843a0ab8ad306497aabacf",
+          "bytes": 143487,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 48000,
+          "channels": 2,
+          "samples": 287959,
+          "derivedFrom": "audio/27-cart/27-cart-a.mp3"
+        },
+        {
+          "path": "audio/27-cart/sound.json",
+          "sha256": "6fad323eedc9e57da79881f206ccc8944fe6c555fdb7ad901e65a6b5daee642a",
+          "bytes": 863,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "28-grain",
+      "number": "28",
+      "doc_tracker": "28",
+      "doc_sound": 28,
+      "role": "canonical",
+      "name": "grain",
+      "label": "grain pour",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/28-grain",
+      "files": [
+        {
+          "path": "audio/28-grain/28-grain-a.mp3",
+          "sha256": "4f0f05af243017b61ee1a58095308f7f5159a9f1fe7e5f65c5813ecdb6e8e9cb",
+          "bytes": 26156,
+          "source": "/cdn/value.4f0f05af243017b61ee1a58095308f7f5159a9f1fe7e5f65c5813ecdb6e8e9cb.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "28-a"
+        },
+        {
+          "path": "audio/28-grain/28-grain-b.mp3",
+          "sha256": "f7598f00068260604973893a48a2b3058ecfee8968c64bbc4cb3519ce50ce031",
+          "bytes": 20012,
+          "source": "/cdn/value.f7598f00068260604973893a48a2b3058ecfee8968c64bbc4cb3519ce50ce031.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "28-b"
+        },
+        {
+          "path": "audio/28-grain/sound.json",
+          "sha256": "f1767cb55aa249db6a9dcc2e8d63d4e5364006fd1a7a99a26c237d596d7cbcc7",
+          "bytes": 1000,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "29-alarm-bell",
+      "number": "29",
+      "doc_tracker": "29",
+      "doc_sound": 29,
+      "role": "canonical",
+      "name": "alarm-bell",
+      "label": "alarm bell",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/29-alarm-bell",
+      "files": [
+        {
+          "path": "audio/29-alarm-bell/29-alarm-bell-a.mp3",
+          "sha256": "c363ffc1d6169cac09679025ddfe0feb8b6a217a87de528c896f87262dd5105a",
+          "bytes": 18476,
+          "source": "/cdn/value.c363ffc1d6169cac09679025ddfe0feb8b6a217a87de528c896f87262dd5105a.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "29-alarm-bell"
+        },
+        {
+          "path": "audio/29-alarm-bell/sound.json",
+          "sha256": "87bd980f206aed57ee1bf79748009e7d5a136d7c3e2caf24d3b6c848820533f5",
+          "bytes": 644,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "30-stamp-thump",
+      "number": "30",
+      "doc_tracker": "30",
+      "doc_sound": 30,
+      "role": "canonical",
+      "name": "stamp-thump",
+      "label": "stamp thumps",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/30-stamp-thump",
+      "files": [
+        {
+          "path": "audio/30-stamp-thump/30-stamp-thump-a.mp3",
+          "sha256": "d561e4b7b71ea56e06a83ef2ccba6171e83d7fa4e6d0d73d11513e752e723bb9",
+          "bytes": 1964,
+          "source": "/cdn/value.d561e4b7b71ea56e06a83ef2ccba6171e83d7fa4e6d0d73d11513e752e723bb9.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "30-a"
+        },
+        {
+          "path": "audio/30-stamp-thump/30-stamp-thump-b.mp3",
+          "sha256": "e7b921c73432827006e08701fcf4229322d02b7cc9e015b77ee656be2a735bb4",
+          "bytes": 2732,
+          "source": "/cdn/value.e7b921c73432827006e08701fcf4229322d02b7cc9e015b77ee656be2a735bb4.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "30-c"
+        },
+        {
+          "path": "audio/30-stamp-thump/sound.json",
+          "sha256": "334af9ab294c36e305ca768e988db232f75007ab5de2b4b59a8c1ef7b2234560",
+          "bytes": 1125,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "31-flap",
+      "number": "31",
+      "doc_tracker": "31",
+      "doc_sound": 31,
+      "role": "canonical",
+      "name": "flap",
+      "label": "split flap",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/31-flap",
+      "files": [
+        {
+          "path": "audio/31-flap/31-flap-a.mp3",
+          "sha256": "ecfae41b4091ce6e4aa87b1515354c3b4fc2ed03750ba77b7e428df9a3d92a85",
+          "bytes": 8876,
+          "source": "/cdn/value.ecfae41b4091ce6e4aa87b1515354c3b4fc2ed03750ba77b7e428df9a3d92a85.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "31-a"
+        },
+        {
+          "path": "audio/31-flap/31-flap-b.mp3",
+          "sha256": "42340ab09aab674ba1e972a02af661e294bd9762a57f7ad5db26fa9d6b0cfad7",
+          "bytes": 8876,
+          "source": "/cdn/value.42340ab09aab674ba1e972a02af661e294bd9762a57f7ad5db26fa9d6b0cfad7.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "31-b"
+        },
+        {
+          "path": "audio/31-flap/31-flap-c.mp3",
+          "sha256": "438aa3e07ed8774de9416e6569b5aff836cdd774d09f94721128c081c9b08f8c",
+          "bytes": 8876,
+          "source": "/cdn/value.438aa3e07ed8774de9416e6569b5aff836cdd774d09f94721128c081c9b08f8c.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "31-c"
+        },
+        {
+          "path": "audio/31-flap/sound.json",
+          "sha256": "a57057f41fcae79705b7720454124370455a428aa69df0604c3365fea5b8bc7a",
+          "bytes": 1374,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "32-collapse",
+      "number": "32",
+      "doc_tracker": "32",
+      "doc_sound": 32,
+      "role": "canonical",
+      "name": "collapse",
+      "label": "business crash",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/32-collapse",
+      "files": [
+        {
+          "path": "audio/32-collapse/32-collapse-a.mp3",
+          "sha256": "f111d3f115ce757fd900fd3c6cff72ff7cb5265842c7370da9f21e9efcf79e89",
+          "bytes": 33408,
+          "source": "/cdn/moodboard-pixel-bright/sfx-big-comic-crash-wood-feathers-crowd-gasp.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/32-collapse/sound.json",
+          "sha256": "fcf950a259e11917963fa61e0e1a51f55781f31754a31be85a91ee1409a32d63",
+          "bytes": 595,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "33-siren",
+      "number": "33",
+      "doc_tracker": "33",
+      "doc_sound": 33,
+      "role": "canonical",
+      "name": "siren",
+      "label": "crash siren",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/33-siren",
+      "files": [
+        {
+          "path": "audio/33-siren/33-siren-a.mp3",
+          "sha256": "64af4e683ddf9f11806da56ed0e7a9742b3586bae23d22027093a3f966a37f01",
+          "bytes": 26540,
+          "source": "/cdn/value.64af4e683ddf9f11806da56ed0e7a9742b3586bae23d22027093a3f966a37f01.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "33-siren"
+        },
+        {
+          "path": "audio/33-siren/sound.json",
+          "sha256": "7481d12620d9607140946e3a99b424be8d17cc75b899e9d8788dc6df3425c256",
+          "bytes": 620,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "34-market",
+      "number": "34",
+      "doc_tracker": "34",
+      "doc_sound": 34,
+      "role": "canonical",
+      "name": "market",
+      "label": "market loop",
+      "kind": "loop",
+      "sourceEasel": null,
+      "folder": "audio/34-market",
+      "files": [
+        {
+          "path": "audio/34-market/34-market-a.mp3",
+          "sha256": "067cec2e7d88fac047aab19a197545fbaf5189c95f38ad9a15bec08f46fe9962",
+          "bytes": 481114,
+          "source": "/cdn/value.067cec2e7d88fac047aab19a197545fbaf5189c95f38ad9a15bec08f46fe9962.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "34-market-30s-loop"
+        },
+        {
+          "path": "audio/34-market/34-market-a-loop.ogg",
+          "sha256": "11233676af29599e169600ffa4e4b32bfc46aa7ddd9506230f6baf5d85f164de",
+          "bytes": 321204,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 44100,
+          "channels": 1,
+          "samples": 1322937,
+          "derivedFrom": "audio/34-market/34-market-a.mp3"
+        },
+        {
+          "path": "audio/34-market/sound.json",
+          "sha256": "c5b037397d953d6eab803cdc4e786d97362efa63305e0970a66fc0bb31290614",
+          "bytes": 905,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "35-hover",
+      "number": "35",
+      "doc_tracker": "35",
+      "doc_sound": 35,
+      "role": "canonical",
+      "name": "hover",
+      "label": "ui hover",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/35-hover",
+      "files": [
+        {
+          "path": "audio/35-hover/35-hover-a.mp3",
+          "sha256": "8cb7d56592c865c054418db55d51fe480dd078bb8cc1c598defc96721cc30172",
+          "bytes": 4268,
+          "source": "/cdn/value.8cb7d56592c865c054418db55d51fe480dd078bb8cc1c598defc96721cc30172.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "35-hover"
+        },
+        {
+          "path": "audio/35-hover/sound.json",
+          "sha256": "034d925d893b1518dff6512b6d922e0a68f7ecc2b74123f5dedc888f687d8fb2",
+          "bytes": 616,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "35-click",
+      "number": "35",
+      "doc_tracker": "35",
+      "doc_sound": 35,
+      "role": "canonical",
+      "name": "click",
+      "label": "ui click",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/35-click",
+      "files": [
+        {
+          "path": "audio/35-click/35-click-a.mp3",
+          "sha256": "4fb2c3a49afcb080696af70a0b8fa95c9b22ff14aed7224c8ffe6b738771b285",
+          "bytes": 4268,
+          "source": "/cdn/value.4fb2c3a49afcb080696af70a0b8fa95c9b22ff14aed7224c8ffe6b738771b285.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "35-click"
+        },
+        {
+          "path": "audio/35-click/sound.json",
+          "sha256": "468ec8e828d1dffe558e0daee7a7b630c7ee6a35f0236b69f36af923814bc702",
+          "bytes": 616,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "35-back",
+      "number": "35",
+      "doc_tracker": "35",
+      "doc_sound": 35,
+      "role": "canonical",
+      "name": "back",
+      "label": "ui back",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/35-back",
+      "files": [
+        {
+          "path": "audio/35-back/35-back-a.mp3",
+          "sha256": "c65561e7008cab5e9a79054c40e29290183d89da7e30ff19dabd021b45a7211c",
+          "bytes": 3884,
+          "source": "/cdn/value.c65561e7008cab5e9a79054c40e29290183d89da7e30ff19dabd021b45a7211c.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "35-back"
+        },
+        {
+          "path": "audio/35-back/sound.json",
+          "sha256": "31446325430c4f638577b58463366679d0097dfcdfd55c96fe76cfcaad1dbc88",
+          "bytes": 610,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "36-grab",
+      "number": "36",
+      "doc_tracker": "36",
+      "doc_sound": 36,
+      "role": "canonical",
+      "name": "grab",
+      "label": "grab pluck",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/36-grab",
+      "files": [
+        {
+          "path": "audio/36-grab/36-grab-a.mp3",
+          "sha256": "a43fc00cef1a15ca209ebe5722fa1fca12a11cd73f68f2536334b4d2d13fe773",
+          "bytes": 4268,
+          "source": "/cdn/value.a43fc00cef1a15ca209ebe5722fa1fca12a11cd73f68f2536334b4d2d13fe773.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "36-grab"
+        },
+        {
+          "path": "audio/36-grab/sound.json",
+          "sha256": "cd04a6fd57122ad6368813172892b2000984daaa40269ddc0ceda76a3637d8af",
+          "bytes": 613,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "36-drop",
+      "number": "36",
+      "doc_tracker": "36",
+      "doc_sound": 36,
+      "role": "canonical",
+      "name": "drop",
+      "label": "drop thump",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/36-drop",
+      "files": [
+        {
+          "path": "audio/36-drop/36-drop-a.mp3",
+          "sha256": "bdb277d68190bc7577474e661cbd836099a60fcdb2d8179187bce23033640d44",
+          "bytes": 4268,
+          "source": "/cdn/value.bdb277d68190bc7577474e661cbd836099a60fcdb2d8179187bce23033640d44.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "36-drop"
+        },
+        {
+          "path": "audio/36-drop/sound.json",
+          "sha256": "ef5750454fc20516e231f0acc009bc4cd55c5107405fea4806228056c55b6b49",
+          "bytes": 613,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "37-crow",
+      "number": "37",
+      "doc_tracker": "37",
+      "doc_sound": 37,
+      "role": "canonical",
+      "name": "crow",
+      "label": "rooster crow",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/37-crow",
+      "files": [
+        {
+          "path": "audio/37-crow/37-crow-a.mp3",
+          "sha256": "0b0eac434ba655dca3bbcaeca6f69ce148bfe7081c9c4dc64b6adb7e00b6df89",
+          "bytes": 26540,
+          "source": "/cdn/value.0b0eac434ba655dca3bbcaeca6f69ce148bfe7081c9c4dc64b6adb7e00b6df89.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "37-a"
+        },
+        {
+          "path": "audio/37-crow/37-crow-b.mp3",
+          "sha256": "925e0b2177041f4451c71f0e9ed012550b830cfa92542c9641e9d64b9c3a7fb4",
+          "bytes": 7724,
+          "source": "/cdn/value.925e0b2177041f4451c71f0e9ed012550b830cfa92542c9641e9d64b9c3a7fb4.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "37-b"
+        },
+        {
+          "path": "audio/37-crow/sound.json",
+          "sha256": "fa70a067f4bcda0af58a3f6e8281085c421164c8d0174ffc135ce89eaa824942",
+          "bytes": 995,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "38-night",
+      "number": "38",
+      "doc_tracker": "38",
+      "doc_sound": 38,
+      "role": "canonical",
+      "name": "night",
+      "label": "night loop",
+      "kind": "loop",
+      "sourceEasel": null,
+      "folder": "audio/38-night",
+      "files": [
+        {
+          "path": "audio/38-night/38-night-a.mp3",
+          "sha256": "edf547eafb96bfd70160e455aa992b79a5b42fdeb0ed9dabfbdffcf2072dd5d4",
+          "bytes": 481114,
+          "source": "/cdn/value.edf547eafb96bfd70160e455aa992b79a5b42fdeb0ed9dabfbdffcf2072dd5d4.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "38-night-30s-loop"
+        },
+        {
+          "path": "audio/38-night/38-night-a-loop.ogg",
+          "sha256": "e4a6a4cace8bde1e3f5ecdac8e5d682026fd24b069c73918110b3a71ec945d78",
+          "bytes": 380049,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 44100,
+          "channels": 1,
+          "samples": 1322531,
+          "derivedFrom": "audio/38-night/38-night-a.mp3"
+        },
+        {
+          "path": "audio/38-night/sound.json",
+          "sha256": "828a74031cd7355a3a591af13c4f9184f825055b74871d78a808f46dfa68454c",
+          "bytes": 898,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "39-day",
+      "number": "39",
+      "doc_tracker": "39",
+      "doc_sound": 39,
+      "role": "canonical",
+      "name": "day",
+      "label": "farm day loop",
+      "kind": "loop",
+      "sourceEasel": null,
+      "folder": "audio/39-day",
+      "files": [
+        {
+          "path": "audio/39-day/39-day-a.mp3",
+          "sha256": "0ea1ce60b2a207b1668c7d386a04aaabd4bcdfd2ca15d074fa05f44cd6f9a826",
+          "bytes": 960931,
+          "source": "/cdn/value.0ea1ce60b2a207b1668c7d386a04aaabd4bcdfd2ca15d074fa05f44cd6f9a826.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "39-farm-day-60s-loop"
+        },
+        {
+          "path": "audio/39-day/39-day-a-loop.ogg",
+          "sha256": "0adf449c7d5c165386efc4b49bd952beeea157c3713662c559ca1ab363d53207",
+          "bytes": 661881,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 44100,
+          "channels": 1,
+          "samples": 2643943,
+          "derivedFrom": "audio/39-day/39-day-a.mp3"
+        },
+        {
+          "path": "audio/39-day/sound.json",
+          "sha256": "e28d0c287d6255654be14bcc3c8b4b97c744045c2205bfd82ce9bad0951bfe48",
+          "bytes": 892,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "40-upstart",
+      "number": "40",
+      "doc_tracker": "40",
+      "doc_sound": 40,
+      "role": "canonical",
+      "name": "upstart",
+      "label": "upstart",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/40-upstart",
+      "files": [
+        {
+          "path": "audio/40-upstart/40-upstart-a.mp3",
+          "sha256": "49ff719c6bb3f6473eea8d187fe70217e600a00ccf94f1ec53444e27aa9d2696",
+          "bytes": 14252,
+          "source": "/cdn/value.49ff719c6bb3f6473eea8d187fe70217e600a00ccf94f1ec53444e27aa9d2696.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-upstart-a"
+        },
+        {
+          "path": "audio/40-upstart/40-upstart-b.mp3",
+          "sha256": "499afa865d696baeeeb101e2d41d93a48be3a3df9d3b3357e4a9dbb95eceb816",
+          "bytes": 11180,
+          "source": "/cdn/value.499afa865d696baeeeb101e2d41d93a48be3a3df9d3b3357e4a9dbb95eceb816.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-upstart-b"
+        },
+        {
+          "path": "audio/40-upstart/40-upstart-c.mp3",
+          "sha256": "7aa6a0d70133040e8827941db86c3a451bb89fd8528e20f03c79485ae28a1c78",
+          "bytes": 15404,
+          "source": "/cdn/value.7aa6a0d70133040e8827941db86c3a451bb89fd8528e20f03c79485ae28a1c78.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-upstart-c"
+        },
+        {
+          "path": "audio/40-upstart/40-upstart-d.mp3",
+          "sha256": "d8c1ff12b698b68aa3ba9c028317bdae93046cae6136080028669db929aff7b6",
+          "bytes": 23852,
+          "source": "/cdn/value.d8c1ff12b698b68aa3ba9c028317bdae93046cae6136080028669db929aff7b6.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-upstart-d"
+        },
+        {
+          "path": "audio/40-upstart/40-upstart-e.mp3",
+          "sha256": "91ead863877fec1638d56f628c458f2d2846cddbb8115bb4107937638d201db7",
+          "bytes": 8492,
+          "source": "/cdn/value.91ead863877fec1638d56f628c458f2d2846cddbb8115bb4107937638d201db7.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-upstart-e"
+        },
+        {
+          "path": "audio/40-upstart/40-upstart-f.mp3",
+          "sha256": "b1d874e85e7f570f00d04606c4b3704d10a9c41a5432b6f43a04270d4871f077",
+          "bytes": 18092,
+          "source": "/cdn/value.b1d874e85e7f570f00d04606c4b3704d10a9c41a5432b6f43a04270d4871f077.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-upstart-f"
+        },
+        {
+          "path": "audio/40-upstart/40-upstart-g.mp3",
+          "sha256": "a4aed3cb71b0f1532a969b2ea2f9e3587b1e9825c45442b6d19abf6792def7de",
+          "bytes": 15020,
+          "source": "/cdn/value.a4aed3cb71b0f1532a969b2ea2f9e3587b1e9825c45442b6d19abf6792def7de.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-upstart-g"
+        },
+        {
+          "path": "audio/40-upstart/sound.json",
+          "sha256": "83da14d36bcf296acf3b846bbf6855f209ac53942ce65285749c1cbc140ac055",
+          "bytes": 3094,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "40-old-money",
+      "number": "40",
+      "doc_tracker": "40",
+      "doc_sound": 40,
+      "role": "canonical",
+      "name": "old-money",
+      "label": "old money",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/40-old-money",
+      "files": [
+        {
+          "path": "audio/40-old-money/40-old-money-a.mp3",
+          "sha256": "3dd1bc6d76056397c330309dc87f00a776ff427bb9d54cfb4359800f3c4d1391",
+          "bytes": 15404,
+          "source": "/cdn/value.3dd1bc6d76056397c330309dc87f00a776ff427bb9d54cfb4359800f3c4d1391.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-old-money-a"
+        },
+        {
+          "path": "audio/40-old-money/40-old-money-b.mp3",
+          "sha256": "a93af4068dc68271ca3254675421d28a73e5ae5d9c9a556e5f49e8a3a07e14f0",
+          "bytes": 21932,
+          "source": "/cdn/value.a93af4068dc68271ca3254675421d28a73e5ae5d9c9a556e5f49e8a3a07e14f0.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-old-money-b"
+        },
+        {
+          "path": "audio/40-old-money/40-old-money-c.mp3",
+          "sha256": "1f1c42547f487476ef6a645225b53a18fc00655778b151b5f010f380c6d31345",
+          "bytes": 9260,
+          "source": "/cdn/value.1f1c42547f487476ef6a645225b53a18fc00655778b151b5f010f380c6d31345.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-old-money-c"
+        },
+        {
+          "path": "audio/40-old-money/40-old-money-d.mp3",
+          "sha256": "00ba115015f3e6de9374980a07bb38205730881eca8e4e6ecd28225315eb22a0",
+          "bytes": 24620,
+          "source": "/cdn/value.00ba115015f3e6de9374980a07bb38205730881eca8e4e6ecd28225315eb22a0.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-old-money-d"
+        },
+        {
+          "path": "audio/40-old-money/40-old-money-e.mp3",
+          "sha256": "9fa902b4310fff63442ae2aaa3e2267299801bc8af1bdfd123e26f4a8b722421",
+          "bytes": 25004,
+          "source": "/cdn/value.9fa902b4310fff63442ae2aaa3e2267299801bc8af1bdfd123e26f4a8b722421.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-old-money-e"
+        },
+        {
+          "path": "audio/40-old-money/40-old-money-f.mp3",
+          "sha256": "1dac217fa13d5d7c2bbfa3d097058ddf0089dc1adf854a709f67f524a6abab7d",
+          "bytes": 11948,
+          "source": "/cdn/value.1dac217fa13d5d7c2bbfa3d097058ddf0089dc1adf854a709f67f524a6abab7d.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-old-money-f"
+        },
+        {
+          "path": "audio/40-old-money/40-old-money-g.mp3",
+          "sha256": "1f4b2ab315369404671bf0ebe81c1a36709d815df93c5c64afedbb0edf59fba8",
+          "bytes": 11948,
+          "source": "/cdn/value.1f4b2ab315369404671bf0ebe81c1a36709d815df93c5c64afedbb0edf59fba8.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-old-money-g"
+        },
+        {
+          "path": "audio/40-old-money/40-old-money-h.mp3",
+          "sha256": "9a0488cdda7853a28420a19c8aa7e89dc5b8d8a8ab34cf58c5d73cf9bd786cf3",
+          "bytes": 19628,
+          "source": "/cdn/value.9a0488cdda7853a28420a19c8aa7e89dc5b8d8a8ab34cf58c5d73cf9bd786cf3.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-old-money-h"
+        },
+        {
+          "path": "audio/40-old-money/sound.json",
+          "sha256": "853a158df8ced982db74bf45e313f9b48a1926dc5ba966f75b307ab3954058d6",
+          "bytes": 3460,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "40-squeezer",
+      "number": "40",
+      "doc_tracker": "40",
+      "doc_sound": 40,
+      "role": "canonical",
+      "name": "squeezer",
+      "label": "squeezer",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/40-squeezer",
+      "files": [
+        {
+          "path": "audio/40-squeezer/40-squeezer-a.mp3",
+          "sha256": "4537c156fe360e79868f63970f783d03fb42a2d2b99df636eb9c25548ad291ba",
+          "bytes": 22700,
+          "source": "/cdn/value.4537c156fe360e79868f63970f783d03fb42a2d2b99df636eb9c25548ad291ba.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-squeezer-a"
+        },
+        {
+          "path": "audio/40-squeezer/40-squeezer-b.mp3",
+          "sha256": "e6eba528bbbe69bec643b9456450fa8672b882a05512eb31356dfb163da43c95",
+          "bytes": 23468,
+          "source": "/cdn/value.e6eba528bbbe69bec643b9456450fa8672b882a05512eb31356dfb163da43c95.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-squeezer-b"
+        },
+        {
+          "path": "audio/40-squeezer/40-squeezer-c.mp3",
+          "sha256": "9e7ad51b0b0aec7c3ff3537b9618edb997dd185b78992f20123325b878f2e1f4",
+          "bytes": 6572,
+          "source": "/cdn/value.9e7ad51b0b0aec7c3ff3537b9618edb997dd185b78992f20123325b878f2e1f4.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-squeezer-d"
+        },
+        {
+          "path": "audio/40-squeezer/40-squeezer-d.mp3",
+          "sha256": "bf455d2ab3e639f78b0533035042e41d90864c0fe4f475206d4e27f1a80a8499",
+          "bytes": 5804,
+          "source": "/cdn/value.bf455d2ab3e639f78b0533035042e41d90864c0fe4f475206d4e27f1a80a8499.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-squeezer-e"
+        },
+        {
+          "path": "audio/40-squeezer/40-squeezer-e.mp3",
+          "sha256": "d432b7c4ad525ac6903061f2a82213f3ae4a0018afca0ed577490a811b291b3a",
+          "bytes": 25004,
+          "source": "/cdn/value.d432b7c4ad525ac6903061f2a82213f3ae4a0018afca0ed577490a811b291b3a.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-squeezer-f"
+        },
+        {
+          "path": "audio/40-squeezer/40-squeezer-f.mp3",
+          "sha256": "136736dc2dda7d0882445564a535b954dc151a7b24a99e11cdbd2842148ddb40",
+          "bytes": 13100,
+          "source": "/cdn/value.136736dc2dda7d0882445564a535b954dc151a7b24a99e11cdbd2842148ddb40.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-squeezer-g"
+        },
+        {
+          "path": "audio/40-squeezer/40-squeezer-g.mp3",
+          "sha256": "4118f8a102cc0ad3da5764e6571d4f651ec505b34a0f57e4668b43a438b080bd",
+          "bytes": 22316,
+          "source": "/cdn/value.4118f8a102cc0ad3da5764e6571d4f651ec505b34a0f57e4668b43a438b080bd.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-squeezer-h"
+        },
+        {
+          "path": "audio/40-squeezer/sound.json",
+          "sha256": "e25ac9b979e58d537bda9c9875a0d6d2a768c8d63f2fd46df7e9fac3307fd894",
+          "bytes": 3118,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "40-loyalist",
+      "number": "40",
+      "doc_tracker": "40",
+      "doc_sound": 40,
+      "role": "canonical",
+      "name": "loyalist",
+      "label": "loyalist",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/40-loyalist",
+      "files": [
+        {
+          "path": "audio/40-loyalist/40-loyalist-a.mp3",
+          "sha256": "6b9e3d27a58bb8ea450f14ad96e33ae4cdc08d811f37ddbc12e32c3f697f4e37",
+          "bytes": 25004,
+          "source": "/cdn/value.6b9e3d27a58bb8ea450f14ad96e33ae4cdc08d811f37ddbc12e32c3f697f4e37.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-loyalist-a"
+        },
+        {
+          "path": "audio/40-loyalist/40-loyalist-b.mp3",
+          "sha256": "53dd7a86b6d8d9282e2556c557a0c8cb45c8966a2579230a467c1656f147a374",
+          "bytes": 23468,
+          "source": "/cdn/value.53dd7a86b6d8d9282e2556c557a0c8cb45c8966a2579230a467c1656f147a374.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-loyalist-c"
+        },
+        {
+          "path": "audio/40-loyalist/40-loyalist-c.mp3",
+          "sha256": "8e39beb0a3707e628f8e39a727ad410047dbdffd077acbd3528f0728eb6d6954",
+          "bytes": 17708,
+          "source": "/cdn/value.8e39beb0a3707e628f8e39a727ad410047dbdffd077acbd3528f0728eb6d6954.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-loyalist-d"
+        },
+        {
+          "path": "audio/40-loyalist/40-loyalist-d.mp3",
+          "sha256": "915ba9e4cdca08708b5200a0fa646e3f3b9c8380bbaaeff955bec3e794ff77aa",
+          "bytes": 18092,
+          "source": "/cdn/value.915ba9e4cdca08708b5200a0fa646e3f3b9c8380bbaaeff955bec3e794ff77aa.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-loyalist-e"
+        },
+        {
+          "path": "audio/40-loyalist/40-loyalist-e.mp3",
+          "sha256": "fae11c7bf1aeda6b74f8d97e918e61fc55b8d88d97c0e3b228579d22087a3fef",
+          "bytes": 25004,
+          "source": "/cdn/value.fae11c7bf1aeda6b74f8d97e918e61fc55b8d88d97c0e3b228579d22087a3fef.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-loyalist-f"
+        },
+        {
+          "path": "audio/40-loyalist/40-loyalist-f.mp3",
+          "sha256": "46d5b125f377d17074ae77ea7346786ac2c3d22c1e70905985c5e8f43a6eaf39",
+          "bytes": 25004,
+          "source": "/cdn/value.46d5b125f377d17074ae77ea7346786ac2c3d22c1e70905985c5e8f43a6eaf39.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-loyalist-g"
+        },
+        {
+          "path": "audio/40-loyalist/40-loyalist-g.mp3",
+          "sha256": "d25d0530ef5b8b5aaa61489ec73a8b8850ea546db8ee0a5692efde56c0b7d56a",
+          "bytes": 24236,
+          "source": "/cdn/value.d25d0530ef5b8b5aaa61489ec73a8b8850ea546db8ee0a5692efde56c0b7d56a.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-loyalist-h"
+        },
+        {
+          "path": "audio/40-loyalist/sound.json",
+          "sha256": "0d46662bc97840db699ba157abee4b14b75a5d0f7334fa9294c6a8596c54f059",
+          "bytes": 3120,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "40-bakery-buyer",
+      "number": "40",
+      "doc_tracker": "40",
+      "doc_sound": 40,
+      "role": "canonical",
+      "name": "bakery-buyer",
+      "label": "bakery buyer",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/40-bakery-buyer",
+      "files": [
+        {
+          "path": "audio/40-bakery-buyer/40-bakery-buyer-a.mp3",
+          "sha256": "cc4333ed6c97166f76c4c4b73ff7677cff22b32558239bd8d50ba883760fd6b5",
+          "bytes": 14636,
+          "source": "/cdn/value.cc4333ed6c97166f76c4c4b73ff7677cff22b32558239bd8d50ba883760fd6b5.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-bakery-buyer-a"
+        },
+        {
+          "path": "audio/40-bakery-buyer/40-bakery-buyer-b.mp3",
+          "sha256": "7dd19686bca1f6c46d7ca0d379dac90311e97b5e46896cd688904c944628882d",
+          "bytes": 7340,
+          "source": "/cdn/value.7dd19686bca1f6c46d7ca0d379dac90311e97b5e46896cd688904c944628882d.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-bakery-buyer-b"
+        },
+        {
+          "path": "audio/40-bakery-buyer/40-bakery-buyer-c.mp3",
+          "sha256": "86b10771db8ebafb94bb4aecb0f4dbaa30661070925d1446a6242bb9858e4ae1",
+          "bytes": 25004,
+          "source": "/cdn/value.86b10771db8ebafb94bb4aecb0f4dbaa30661070925d1446a6242bb9858e4ae1.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-bakery-buyer-c"
+        },
+        {
+          "path": "audio/40-bakery-buyer/40-bakery-buyer-d.mp3",
+          "sha256": "32f6b95a8429e8c605703a2990c7008dfacd6e692aeddea8020652cef52a01a4",
+          "bytes": 18860,
+          "source": "/cdn/value.32f6b95a8429e8c605703a2990c7008dfacd6e692aeddea8020652cef52a01a4.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-bakery-buyer-d"
+        },
+        {
+          "path": "audio/40-bakery-buyer/40-bakery-buyer-e.mp3",
+          "sha256": "3366848fbd7588e1ca7466d2ca5b8ed25d27d6f40399541df3e09f6d4c05474c",
+          "bytes": 20396,
+          "source": "/cdn/value.3366848fbd7588e1ca7466d2ca5b8ed25d27d6f40399541df3e09f6d4c05474c.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-bakery-buyer-e"
+        },
+        {
+          "path": "audio/40-bakery-buyer/40-bakery-buyer-f.mp3",
+          "sha256": "0b60c4a349877bc63b553f33bbc935f175b3264869748fea8f42194ebd77b76d",
+          "bytes": 15404,
+          "source": "/cdn/value.0b60c4a349877bc63b553f33bbc935f175b3264869748fea8f42194ebd77b76d.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-bakery-buyer-f"
+        },
+        {
+          "path": "audio/40-bakery-buyer/40-bakery-buyer-g.mp3",
+          "sha256": "95f6e2fa951433a0c6b788e60f5daebc7bb046662c86a2571b6168b05edeebcb",
+          "bytes": 25004,
+          "source": "/cdn/value.95f6e2fa951433a0c6b788e60f5daebc7bb046662c86a2571b6168b05edeebcb.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-bakery-buyer-g"
+        },
+        {
+          "path": "audio/40-bakery-buyer/40-bakery-buyer-h.mp3",
+          "sha256": "6634f785e76791d266a6be9eadff5c7caf45cda0856bbba1d09d8a3f2a7a92f8",
+          "bytes": 23852,
+          "source": "/cdn/value.6634f785e76791d266a6be9eadff5c7caf45cda0856bbba1d09d8a3f2a7a92f8.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-bakery-buyer-h"
+        },
+        {
+          "path": "audio/40-bakery-buyer/sound.json",
+          "sha256": "c0abb7a80df0975ad5ef94606b84bd4c0b59a9beda3835c5a77f0ff968c21615",
+          "bytes": 3541,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "40-market-trader",
+      "number": "40",
+      "doc_tracker": "40",
+      "doc_sound": 40,
+      "role": "canonical",
+      "name": "market-trader",
+      "label": "market trader",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/40-market-trader",
+      "files": [
+        {
+          "path": "audio/40-market-trader/40-market-trader-a.mp3",
+          "sha256": "ca1f815b746584d98f4d2999ae26241868aee281ab85fb783c271f014893a884",
+          "bytes": 25004,
+          "source": "/cdn/value.ca1f815b746584d98f4d2999ae26241868aee281ab85fb783c271f014893a884.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-market-trader-a"
+        },
+        {
+          "path": "audio/40-market-trader/40-market-trader-b.mp3",
+          "sha256": "09e87aeeb7391b85d744c12c38f931014bad1bc8df896e98d5d846f5e39a4ba8",
+          "bytes": 20012,
+          "source": "/cdn/value.09e87aeeb7391b85d744c12c38f931014bad1bc8df896e98d5d846f5e39a4ba8.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-market-trader-b"
+        },
+        {
+          "path": "audio/40-market-trader/40-market-trader-c.mp3",
+          "sha256": "cbc71ddedf1501f44e381a5e76125b4416f2f18be28d8247b29a9d6cabcc8faf",
+          "bytes": 9644,
+          "source": "/cdn/value.cbc71ddedf1501f44e381a5e76125b4416f2f18be28d8247b29a9d6cabcc8faf.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-market-trader-c"
+        },
+        {
+          "path": "audio/40-market-trader/40-market-trader-d.mp3",
+          "sha256": "0210f6377794f8217095b15f3db5e8be4b1d159a826dacf9476d9a9a169f3668",
+          "bytes": 16556,
+          "source": "/cdn/value.0210f6377794f8217095b15f3db5e8be4b1d159a826dacf9476d9a9a169f3668.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-market-trader-e"
+        },
+        {
+          "path": "audio/40-market-trader/40-market-trader-e.mp3",
+          "sha256": "2aac6c26b39e3c89a13648705b2035df8b04a8d022131af7dd4bcfd4cf2655e6",
+          "bytes": 15020,
+          "source": "/cdn/value.2aac6c26b39e3c89a13648705b2035df8b04a8d022131af7dd4bcfd4cf2655e6.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-market-trader-f"
+        },
+        {
+          "path": "audio/40-market-trader/40-market-trader-f.mp3",
+          "sha256": "06e41eeffe472f654305a932d862e5cf9d040908766c7e418f9ebeb23e70e30e",
+          "bytes": 12332,
+          "source": "/cdn/value.06e41eeffe472f654305a932d862e5cf9d040908766c7e418f9ebeb23e70e30e.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-market-trader-g"
+        },
+        {
+          "path": "audio/40-market-trader/40-market-trader-g.mp3",
+          "sha256": "08a00e82d66025bc35244ebdcf6510b6aa351e812ba616d44dad3f2e2794a3a9",
+          "bytes": 8492,
+          "source": "/cdn/value.08a00e82d66025bc35244ebdcf6510b6aa351e812ba616d44dad3f2e2794a3a9.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-market-trader-h"
+        },
+        {
+          "path": "audio/40-market-trader/sound.json",
+          "sha256": "d34983780b5dcb060b5d7dec5995dba8482c450982f454bfec38ea6c2c0ba5b6",
+          "bytes": 3243,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "40-wholesaler",
+      "number": "40",
+      "doc_tracker": "40",
+      "doc_sound": 40,
+      "role": "canonical",
+      "name": "wholesaler",
+      "label": "wholesaler",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/40-wholesaler",
+      "files": [
+        {
+          "path": "audio/40-wholesaler/40-wholesaler-a.mp3",
+          "sha256": "b4502e6a65dbac0dc6586a73afd77081de2fb69cf1472d760611dffbacf0766d",
+          "bytes": 25004,
+          "source": "/cdn/value.b4502e6a65dbac0dc6586a73afd77081de2fb69cf1472d760611dffbacf0766d.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-wholesaler-a"
+        },
+        {
+          "path": "audio/40-wholesaler/40-wholesaler-b.mp3",
+          "sha256": "71bb47dc1978af99e9017427e9d769e6f5db171774abe38a7aa867f75200bc0e",
+          "bytes": 25004,
+          "source": "/cdn/value.71bb47dc1978af99e9017427e9d769e6f5db171774abe38a7aa867f75200bc0e.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-wholesaler-b"
+        },
+        {
+          "path": "audio/40-wholesaler/40-wholesaler-c.mp3",
+          "sha256": "ce2802bd924df0c8fb66a98013e68161be13035b9b55818024f9efa90aeff5b0",
+          "bytes": 10412,
+          "source": "/cdn/value.ce2802bd924df0c8fb66a98013e68161be13035b9b55818024f9efa90aeff5b0.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-wholesaler-c"
+        },
+        {
+          "path": "audio/40-wholesaler/40-wholesaler-d.mp3",
+          "sha256": "bd7acfa406381ad52b68a5e72acb8bd22263068e26f76af090da885e2f64b730",
+          "bytes": 25004,
+          "source": "/cdn/value.bd7acfa406381ad52b68a5e72acb8bd22263068e26f76af090da885e2f64b730.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-wholesaler-d"
+        },
+        {
+          "path": "audio/40-wholesaler/40-wholesaler-e.mp3",
+          "sha256": "9f2eaad696d046be7d1f5a62bf55ba235d13915f558c86f92104e9d488ad8c40",
+          "bytes": 5420,
+          "source": "/cdn/value.9f2eaad696d046be7d1f5a62bf55ba235d13915f558c86f92104e9d488ad8c40.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-wholesaler-e"
+        },
+        {
+          "path": "audio/40-wholesaler/40-wholesaler-f.mp3",
+          "sha256": "b68b170339bceffc8147164d0d90c92dadb97137379637b7bcd674b694051ac3",
+          "bytes": 5420,
+          "source": "/cdn/value.b68b170339bceffc8147164d0d90c92dadb97137379637b7bcd674b694051ac3.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-wholesaler-f"
+        },
+        {
+          "path": "audio/40-wholesaler/40-wholesaler-g.mp3",
+          "sha256": "f973fdd3b8d2e500d2245ffa8a39f65c35aff89f433355862fcd684ed13645f5",
+          "bytes": 5420,
+          "source": "/cdn/value.f973fdd3b8d2e500d2245ffa8a39f65c35aff89f433355862fcd684ed13645f5.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-wholesaler-g"
+        },
+        {
+          "path": "audio/40-wholesaler/40-wholesaler-h.mp3",
+          "sha256": "7c942cad90f0a2651c1bb52d803d7395c5c50ee671df274b47b2cd0834496729",
+          "bytes": 14252,
+          "source": "/cdn/value.7c942cad90f0a2651c1bb52d803d7395c5c50ee671df274b47b2cd0834496729.mp3",
+          "role": "take",
+          "format": "mp3",
+          "spawnUploadName": "40-wholesaler-h"
+        },
+        {
+          "path": "audio/40-wholesaler/sound.json",
+          "sha256": "d27af464f0469ac10df3b1a5c37f0938643b70aa4d0fbdef44b080be7e8b4ad3",
+          "bytes": 3485,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "41-title",
+      "number": "41",
+      "doc_tracker": "41",
+      "doc_sound": 41,
+      "role": "canonical",
+      "name": "title",
+      "label": "title theme",
+      "kind": "music",
+      "sourceEasel": null,
+      "folder": "audio/41-title",
+      "files": [
+        {
+          "path": "audio/41-title/41-title-a.mp3",
+          "sha256": "c1f25a396c3b8528324c1289aed5bcf18a22aca89ce486e0f64f082beeb19b94",
+          "bytes": 2857536,
+          "source": "/cdn/moodboard-pixel-bright/music-confident-strutting-funky-bassline-plucky-chiptune-honky-tonk-piano-brass-stabs-loop.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/41-title/41-title-a-loop.ogg",
+          "sha256": "3f8a897ce546b795f113e9ef1c62e3b6c84aca954187f2880d35e43b0abd53bb",
+          "bytes": 2813209,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 48000,
+          "channels": 2,
+          "samples": 5711959,
+          "derivedFrom": "audio/41-title/41-title-a.mp3"
+        },
+        {
+          "path": "audio/41-title/sound.json",
+          "sha256": "a263276eef621fadebeb20ae3e85655a46c816e0da16c4338283a9048177bd2e",
+          "bytes": 897,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "42-farm-day",
+      "number": "42",
+      "doc_tracker": "42",
+      "doc_sound": 42,
+      "role": "canonical",
+      "name": "farm-day",
+      "label": "farm day",
+      "kind": "music",
+      "sourceEasel": null,
+      "folder": "audio/42-farm-day",
+      "files": [
+        {
+          "path": "audio/42-farm-day/42-farm-day-a.mp3",
+          "sha256": "2d1df2b1452f6da49cdfe7f629eebe1adc074bc69961cedb7300f6e4fdcee8af",
+          "bytes": 2559744,
+          "source": "/cdn/moodboard-pixel-bright/music-relaxed-upbeat-funky-chiptune-honky-tonk-piano-farm-groove-loop.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/42-farm-day/42-farm-day-a-loop.ogg",
+          "sha256": "251818437ea97bd7b779b3ee2d180f46a7028c2fb15467c125ad8fc8a6a6e700",
+          "bytes": 2623307,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 48000,
+          "channels": 2,
+          "samples": 5116347,
+          "derivedFrom": "audio/42-farm-day/42-farm-day-a.mp3"
+        },
+        {
+          "path": "audio/42-farm-day/sound.json",
+          "sha256": "acf10c68c89211aea26504d214c1c311227bac5db9781d39813909aa63eca063",
+          "bytes": 891,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "43-market-tension",
+      "number": "43",
+      "doc_tracker": "43",
+      "doc_sound": 43,
+      "role": "canonical",
+      "name": "market-tension",
+      "label": "market tension",
+      "kind": "music",
+      "sourceEasel": null,
+      "folder": "audio/43-market-tension",
+      "files": [
+        {
+          "path": "audio/43-market-tension/43-market-tension-a.mp3",
+          "sha256": "5bd7a724ac2298c1ecbe14a3034e5b614e3d2a181fc1298e39153bc56f745ac9",
+          "bytes": 1468800,
+          "source": "/cdn/moodboard-pixel-bright/music-fast-nervous-ticking-hi-hats-funky-bass-chiptune-rising-stakes-loop.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/43-market-tension/43-market-tension-a-loop.ogg",
+          "sha256": "dfd55eb54a1d744e707e3bb344e645ba78ec51da1fdefae5343e9a248c3fef7b",
+          "bytes": 1529547,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 48000,
+          "channels": 2,
+          "samples": 2935127,
+          "derivedFrom": "audio/43-market-tension/43-market-tension-a.mp3"
+        },
+        {
+          "path": "audio/43-market-tension/sound.json",
+          "sha256": "fd0de769968c532a073f6e014f16553bdc6900813b251c54f9cce8f73431f65b",
+          "bytes": 937,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "44-jingle",
+      "number": "44",
+      "doc_tracker": "44",
+      "doc_sound": 44,
+      "role": "canonical",
+      "name": "jingle",
+      "label": "short jingle",
+      "kind": "music",
+      "sourceEasel": null,
+      "folder": "audio/44-jingle",
+      "files": [
+        {
+          "path": "audio/44-jingle/44-jingle-a.mp3",
+          "sha256": "2799eb3bc6be480cfa642d9ad225d69db016371a5b710617bb3f2f7c32fd26fd",
+          "bytes": 289152,
+          "source": "/cdn/moodboard-pixel-bright/music-short-playful-chiptune-honky-tonk-jingle-motif-loop.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/44-jingle/44-jingle-a-loop.ogg",
+          "sha256": "a4c5a4f14da5d4d9fc7ee2afcfd0693d012f5fe2d8a2346dd7e08aca95b307b7",
+          "bytes": 300546,
+          "role": "loop",
+          "format": "ogg",
+          "sampleRate": 48000,
+          "channels": 2,
+          "samples": 575911,
+          "derivedFrom": "audio/44-jingle/44-jingle-a.mp3"
+        },
+        {
+          "path": "audio/44-jingle/sound.json",
+          "sha256": "e884f0b0ae7d48a8f767c254e8fbac0580f081520ba4b4390ce9a968586cf0b5",
+          "bytes": 869,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "45-deal-closed",
+      "number": "45",
+      "doc_tracker": "45",
+      "doc_sound": 45,
+      "role": "canonical",
+      "name": "deal-closed",
+      "label": "deal fanfare",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/45-deal-closed",
+      "files": [
+        {
+          "path": "audio/45-deal-closed/45-deal-closed-a.mp3",
+          "sha256": "fd305a86e068d718961632576a80e046f4fc3a96ae0891d09db7107f779b3142",
+          "bytes": 90432,
+          "source": "/cdn/moodboard-pixel-bright/sfx-triumphant-brass-chiptune-deal-closed-fanfare-sting.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/45-deal-closed/sound.json",
+          "sha256": "33895c894b0233057d9abf4f778796fe25fd18ceea57a1ec28578d45d47f1fd1",
+          "bytes": 616,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "45-rival-bust",
+      "number": "45",
+      "doc_tracker": "45",
+      "doc_sound": 45,
+      "role": "canonical",
+      "name": "rival-bust",
+      "label": "rival bust",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/45-rival-bust",
+      "files": [
+        {
+          "path": "audio/45-rival-bust/45-rival-bust-a.mp3",
+          "sha256": "deaf37334112b8836539fe405a3e7386dbcc304cc69e5a423f287dab5d996fd0",
+          "bytes": 49536,
+          "source": "/cdn/moodboard-pixel-bright/sfx-comic-collapsing-trombone-chiptune-rival-bust-sting.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/45-rival-bust/sound.json",
+          "sha256": "7d79d5b44268281a4041d5955116e93db2e53d3b9b7451877eb378da999b1e00",
+          "bytes": 610,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "45-market-crash",
+      "number": "45",
+      "doc_tracker": "45",
+      "doc_sound": 45,
+      "role": "canonical",
+      "name": "market-crash",
+      "label": "crash sting",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/45-market-crash",
+      "files": [
+        {
+          "path": "audio/45-market-crash/45-market-crash-a.mp3",
+          "sha256": "cc58f9b346d043d4f17ff8aeef54b73873f60532a5f3fd86ac609e047a73a9f2",
+          "bytes": 48384,
+          "source": "/cdn/moodboard-pixel-bright/sfx-dramatic-brass-chiptune-market-crash-sting.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/45-market-crash/sound.json",
+          "sha256": "019a31d3c4c32bb97a6560ee06c2ab4d7814ccc0e9e4ac2bd5e6a77827d245e5",
+          "bytes": 610,
+          "role": "sound"
+        }
+      ]
+    },
+    {
+      "id": "45-new-day",
+      "number": "45",
+      "doc_tracker": "45",
+      "doc_sound": 45,
+      "role": "canonical",
+      "name": "new-day",
+      "label": "new day",
+      "kind": "one-shot",
+      "sourceEasel": null,
+      "folder": "audio/45-new-day",
+      "files": [
+        {
+          "path": "audio/45-new-day/45-new-day-a.mp3",
+          "sha256": "8145716a58a118d82d70be5bfc1601a60669f29bf854e565216a09476e9fc231",
+          "bytes": 40320,
+          "source": "/cdn/moodboard-pixel-bright/sfx-sunny-chiptune-honky-tonk-new-day-sting.mp3",
+          "role": "take",
+          "format": "mp3"
+        },
+        {
+          "path": "audio/45-new-day/sound.json",
+          "sha256": "cda17516ce92761557390a435f5448654055a1b3a41c978738a0e69f315bcedf",
+          "bytes": 583,
+          "role": "sound"
+        }
+      ]
+    }
+  ],
+  "unmapped": {
+    "easels": [],
+    "uploads": [
+      {
+        "name": "40-upstart",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:52.319Z",
+        "path": "unmapped/audio/40-upstart.mp3",
+        "sha256": "044b17b702c556dbccdc933fda989ea2af4c9913b755fac2910ecdbe7a89e437",
+        "bytes": 25004,
+        "source": "/cdn/value.044b17b702c556dbccdc933fda989ea2af4c9913b755fac2910ecdbe7a89e437.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/40-upstart; not on any easel or the sound board"
+      },
+      {
+        "name": "31-flap",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:41.471Z",
+        "path": "unmapped/audio/31-flap.mp3",
+        "sha256": "c90ec74bd2f61d870304e846463fdd153dfbd6a9f427bfd6f2995e298c5f4feb",
+        "bytes": 8876,
+        "source": "/cdn/value.c90ec74bd2f61d870304e846463fdd153dfbd6a9f427bfd6f2995e298c5f4feb.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/31-flap; not on any easel or the sound board"
+      },
+      {
+        "name": "pv-2",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T02:24:00.095Z",
+        "path": "unmapped/art/pv-2.png",
+        "sha256": "d6d49c1fb45ee8c5c8605b5d38a791389138628a818cd527fd524d1659dc0957",
+        "bytes": 9520,
+        "source": "/cdn/value.d6d49c1fb45ee8c5c8605b5d38a791389138628a818cd527fd524d1659dc0957.png",
+        "width": 768,
+        "height": 768,
+        "usedBy": [],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "13-tray",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:24.336Z",
+        "path": "unmapped/audio/13-tray.mp3",
+        "sha256": "94fd37e7bb9fb0516ae02cd55591ba9964443be5367ed90bf6b61f8a17c1ebc1",
+        "bytes": 4268,
+        "source": "/cdn/value.94fd37e7bb9fb0516ae02cd55591ba9964443be5367ed90bf6b61f8a17c1ebc1.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/13-tray; not on any easel or the sound board"
+      },
+      {
+        "name": "pv-3",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T02:46:27.309Z",
+        "path": "unmapped/art/pv-3.png",
+        "sha256": "cc41361fb6bc99afb12e6cb0b741fad411c177e3c4f96322285c05d1e8b045d9",
+        "bytes": 17332,
+        "source": "/cdn/value.cc41361fb6bc99afb12e6cb0b741fad411c177e3c4f96322285c05d1e8b045d9.png",
+        "width": 2048,
+        "height": 384,
+        "usedBy": [],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "btn-n",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T03:20:09.580Z",
+        "path": "unmapped/art/btn-n.png",
+        "sha256": "4b5ca5abf2e4e8852f2a7733035d1b4c1d954c574a912f3ec7bfcaf83e996bd6",
+        "bytes": 740,
+        "source": "/cdn/value.4b5ca5abf2e4e8852f2a7733035d1b4c1d954c574a912f3ec7bfcaf83e996bd6.png",
+        "width": 384,
+        "height": 128,
+        "usedBy": [
+          "places/main/cells/x0z0.scene"
+        ],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "btn-r",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T03:20:13.963Z",
+        "path": "unmapped/art/btn-r.png",
+        "sha256": "8f1c28d62f4802e928c286c8e0d684a5360f53ab289a1ee3fd4d76bc89b6c45c",
+        "bytes": 792,
+        "source": "/cdn/value.8f1c28d62f4802e928c286c8e0d684a5360f53ab289a1ee3fd4d76bc89b6c45c.png",
+        "width": 384,
+        "height": 128,
+        "usedBy": [],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "pv",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T02:17:25.477Z",
+        "path": "unmapped/art/pv.png",
+        "sha256": "5f2ad7988ee60b0d968d26dfeb19c5d04da8c480ccfd9ac8c36a0ad7930949bd",
+        "bytes": 17901,
+        "source": "/cdn/value.5f2ad7988ee60b0d968d26dfeb19c5d04da8c480ccfd9ac8c36a0ad7930949bd.png",
+        "width": 960,
+        "height": 480,
+        "usedBy": [],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "conv-preview",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T01:58:19.649Z",
+        "path": "unmapped/art/conv-preview.png",
+        "sha256": "9dd0d88392bf816ceceb74e446cb0c2952fa05a9a4bbd2549bff38084fbeda6a",
+        "bytes": 3147,
+        "source": "/cdn/value.9dd0d88392bf816ceceb74e446cb0c2952fa05a9a4bbd2549bff38084fbeda6a.png",
+        "width": 640,
+        "height": 384,
+        "usedBy": [],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "08-egg-pop",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:17.198Z",
+        "path": "unmapped/audio/08-egg-pop.mp3",
+        "sha256": "cfad16b149a46282ce703c2c802b9c840f96cd5a9b02a3d9f3c660731be6dc35",
+        "bytes": 5804,
+        "source": "/cdn/value.cfad16b149a46282ce703c2c802b9c840f96cd5a9b02a3d9f3c660731be6dc35.mp3",
+        "usedBy": [
+          "scripts/stamp-desk.js"
+        ],
+        "note": "older upload under the same name as audio/08-egg-pop; not on any easel or the sound board"
+      },
+      {
+        "name": "logo",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T02:46:25.498Z",
+        "path": "unmapped/art/logo.png",
+        "sha256": "4f903c0b5af1d0c88f545097fac164efa23a974eba5d45770e4d134419d0b493",
+        "bytes": 33912,
+        "source": "/cdn/value.4f903c0b5af1d0c88f545097fac164efa23a974eba5d45770e4d134419d0b493.png",
+        "width": 4096,
+        "height": 768,
+        "usedBy": [],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "40-old-money",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:53.705Z",
+        "path": "unmapped/audio/40-old-money.mp3",
+        "sha256": "3f986f1d1add3d0afbcac06e575d7c5b07cf729992cb794d079f55e989bee47b",
+        "bytes": 25004,
+        "source": "/cdn/value.3f986f1d1add3d0afbcac06e575d7c5b07cf729992cb794d079f55e989bee47b.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/40-old-money; not on any easel or the sound board"
+      },
+      {
+        "name": "btn-l",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T03:20:12.192Z",
+        "path": "unmapped/art/btn-l.png",
+        "sha256": "60aedde4f5d2be7537ef27772b1640ba3d2c5eb9615d60113b151f7ac9d7da63",
+        "bytes": 792,
+        "source": "/cdn/value.60aedde4f5d2be7537ef27772b1640ba3d2c5eb9615d60113b151f7ac9d7da63.png",
+        "width": 384,
+        "height": 128,
+        "usedBy": [
+          "places/main/cells/x0z0.scene"
+        ],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "40-squeezer",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:54.975Z",
+        "path": "unmapped/audio/40-squeezer.mp3",
+        "sha256": "c51d4a9eaf3948b58dac23aed053e48d9a82048027997ac37a8dacaff8e339d0",
+        "bytes": 25004,
+        "source": "/cdn/value.c51d4a9eaf3948b58dac23aed053e48d9a82048027997ac37a8dacaff8e339d0.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/40-squeezer; not on any easel or the sound board"
+      },
+      {
+        "name": "pv-4",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T02:55:20.509Z",
+        "path": "unmapped/art/pv-4.png",
+        "sha256": "e0b7f324e6cb164407282f5a66919021018337853742b39ea0f3d07434e5324d",
+        "bytes": 17492,
+        "source": "/cdn/value.e0b7f324e6cb164407282f5a66919021018337853742b39ea0f3d07434e5324d.png",
+        "width": 2048,
+        "height": 384,
+        "usedBy": [],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "37-crow",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:50.928Z",
+        "path": "unmapped/audio/37-crow.mp3",
+        "sha256": "0bf560e7697c7e684a8c1ab65916a6d21799b88d3396c4e623abbd82a8527229",
+        "bytes": 26540,
+        "source": "/cdn/value.0bf560e7697c7e684a8c1ab65916a6d21799b88d3396c4e623abbd82a8527229.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/37-crow; not on any easel or the sound board"
+      },
+      {
+        "name": "17-card",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:29.155Z",
+        "path": "unmapped/audio/17-card.mp3",
+        "sha256": "b9a581ea069b2467ac914cd47a866038ac74d0fa94ea043b28d234e066cfe232",
+        "bytes": 7340,
+        "source": "/cdn/value.b9a581ea069b2467ac914cd47a866038ac74d0fa94ea043b28d234e066cfe232.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/17-card; not on any easel or the sound board"
+      },
+      {
+        "name": "28-grain",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:37.063Z",
+        "path": "unmapped/audio/28-grain.mp3",
+        "sha256": "61543c6a9ea681bc379867cf7b9300d2632c0a43fa1a84a40ba99af75d02e45c",
+        "bytes": 26540,
+        "source": "/cdn/value.61543c6a9ea681bc379867cf7b9300d2632c0a43fa1a84a40ba99af75d02e45c.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/28-grain; not on any easel or the sound board"
+      },
+      {
+        "name": "btn-p",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T03:20:16.280Z",
+        "path": "unmapped/art/btn-p.png",
+        "sha256": "8217388e926518fe30dd4e01571782f1562f4ed791abe4cc15b8533d694fea91",
+        "bytes": 677,
+        "source": "/cdn/value.8217388e926518fe30dd4e01571782f1562f4ed791abe4cc15b8533d694fea91.png",
+        "width": 384,
+        "height": 128,
+        "usedBy": [
+          "places/main/cells/x0z0.scene"
+        ],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "02-eyes-sleepy",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T13:13:13.115Z",
+        "path": "unmapped/art/02-eyes-sleepy.png",
+        "sha256": "d8a92ab16faf741087565f68512efa756590c35bc1600fc8b31bb551c1e5bf64",
+        "bytes": 1279545,
+        "source": "/cdn/value.d8a92ab16faf741087565f68512efa756590c35bc1600fc8b31bb551c1e5bf64.png",
+        "width": 1024,
+        "height": 1792,
+        "usedBy": [],
+        "note": "older upload under the same name as art/02-eyes-sleepy; not on any easel or the sound board"
+      },
+      {
+        "name": "18-stamp",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:30.500Z",
+        "path": "unmapped/audio/18-stamp.mp3",
+        "sha256": "9164507656ab43f6e3e47a4d042cd660f8cc2d1f0c27e0df8d8e09bff020254f",
+        "bytes": 8876,
+        "source": "/cdn/value.9164507656ab43f6e3e47a4d042cd660f8cc2d1f0c27e0df8d8e09bff020254f.mp3",
+        "usedBy": [
+          "scripts/stamp-desk.js"
+        ],
+        "note": "older upload under the same name as audio/18-stamp; not on any easel or the sound board"
+      },
+      {
+        "name": "40-market-trader",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:57.633Z",
+        "path": "unmapped/audio/40-market-trader.mp3",
+        "sha256": "2cfc13fb3315f5609a59926641cf0fb3737fc7cd6bac1cd56d77c0f50eb26091",
+        "bytes": 25004,
+        "source": "/cdn/value.2cfc13fb3315f5609a59926641cf0fb3737fc7cd6bac1cd56d77c0f50eb26091.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/40-market-trader; not on any easel or the sound board"
+      },
+      {
+        "name": "02-eyes-wild",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T13:13:17.093Z",
+        "path": "unmapped/art/02-eyes-wild.png",
+        "sha256": "e560260178c7071a51f01d90e4cc011e918cfeb3e18281bab2e2716d2a5a25f3",
+        "bytes": 1243723,
+        "source": "/cdn/value.e560260178c7071a51f01d90e4cc011e918cfeb3e18281bab2e2716d2a5a25f3.png",
+        "width": 1024,
+        "height": 1792,
+        "usedBy": [],
+        "note": "older upload under the same name as art/02-eyes-wild; not on any easel or the sound board"
+      },
+      {
+        "name": "panel",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T03:30:58.205Z",
+        "path": "unmapped/art/panel.png",
+        "sha256": "440cae128bc2a18ca877c329351b774852fce202f4b44f82fcda54f754676a0d",
+        "bytes": 1838,
+        "source": "/cdn/value.440cae128bc2a18ca877c329351b774852fce202f4b44f82fcda54f754676a0d.png",
+        "width": 384,
+        "height": 384,
+        "usedBy": [
+          "scripts/ui.js"
+        ],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "portrait-upstart-left",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T00:48:30.628Z",
+        "path": "unmapped/art/portrait-upstart-left.png",
+        "sha256": "a0d4677fa43194aacf7fa8abee12aa42c404b885091a8149526cc387803f7762",
+        "bytes": 1882042,
+        "source": "/cdn/value.a0d4677fa43194aacf7fa8abee12aa42c404b885091a8149526cc387803f7762.png",
+        "width": 1024,
+        "height": 1280,
+        "usedBy": [],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "now-playing",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:58:16.750Z",
+        "path": "unmapped/art/now-playing.png",
+        "sha256": "dc1055ac4d2c1b8586875afb83b8e593b13e9f7d1c15eda7468536083832a0a6",
+        "bytes": 1773046,
+        "source": "/cdn/value.dc1055ac4d2c1b8586875afb83b8e593b13e9f7d1c15eda7468536083832a0a6.png",
+        "width": 1920,
+        "height": 1080,
+        "usedBy": [
+          "scripts/architecture.json"
+        ],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "sound-board-open",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:42:16.407Z",
+        "path": "unmapped/art/sound-board-open.png",
+        "sha256": "ac1b09e7d79bb4b0f5f5139274874fa835dab18125f8a5b7e1235a344ac1cc1e",
+        "bytes": 1447715,
+        "source": "/cdn/value.ac1b09e7d79bb4b0f5f5139274874fa835dab18125f8a5b7e1235a344ac1cc1e.png",
+        "width": 1920,
+        "height": 1080,
+        "usedBy": [],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "40-bakery-buyer",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:56.344Z",
+        "path": "unmapped/audio/40-bakery-buyer.mp3",
+        "sha256": "5ebeb6b6a4b7be056c31625f38238321311fb52fbf0207c10c6300988e12e16a",
+        "bytes": 25004,
+        "source": "/cdn/value.5ebeb6b6a4b7be056c31625f38238321311fb52fbf0207c10c6300988e12e16a.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/40-bakery-buyer; not on any easel or the sound board"
+      },
+      {
+        "name": "40-wholesaler",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:58.980Z",
+        "path": "unmapped/audio/40-wholesaler.mp3",
+        "sha256": "26f08b47ca92a0168518ce447308da8b74c41ebd4d79964751cce6b4579b8d43",
+        "bytes": 25004,
+        "source": "/cdn/value.26f08b47ca92a0168518ce447308da8b74c41ebd4d79964751cce6b4579b8d43.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/40-wholesaler; not on any easel or the sound board"
+      },
+      {
+        "name": "30-stamp-thump",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:40.075Z",
+        "path": "unmapped/audio/30-stamp-thump.mp3",
+        "sha256": "b4218b9f2633340c219d43351e0f612a802f34b50dea2ff7db24eae5e100a080",
+        "bytes": 8876,
+        "source": "/cdn/value.b4218b9f2633340c219d43351e0f612a802f34b50dea2ff7db24eae5e100a080.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/30-stamp-thump; not on any easel or the sound board"
+      },
+      {
+        "name": "12-crate",
+        "kind": "audio",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T15:40:23.029Z",
+        "path": "unmapped/audio/12-crate.mp3",
+        "sha256": "a429ac08b93b5da2587625b9c4f1a8833bb754dd7adcd39a97001a99a301b270",
+        "bytes": 5804,
+        "source": "/cdn/value.a429ac08b93b5da2587625b9c4f1a8833bb754dd7adcd39a97001a99a301b270.mp3",
+        "usedBy": [],
+        "note": "older upload under the same name as audio/12-crate; not on any easel or the sound board"
+      },
+      {
+        "name": "portrait-oldmoney-left",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T00:48:33.602Z",
+        "path": "unmapped/art/portrait-oldmoney-left.png",
+        "sha256": "a788ed63ee52c0272c8c2aa66732d4c94666ec888940ddb5d014d3023cdc8499",
+        "bytes": 1967990,
+        "source": "/cdn/value.a788ed63ee52c0272c8c2aa66732d4c94666ec888940ddb5d014d3023cdc8499.png",
+        "width": 1024,
+        "height": 1280,
+        "usedBy": [],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "vista",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T12:42:10.818Z",
+        "path": "unmapped/art/vista.png",
+        "sha256": "6cbaa2a4e992306eb3a4fe548a0855b734c4fcffafb2ceda8433df07a5e893d0",
+        "bytes": 1388436,
+        "source": "/cdn/value.6cbaa2a4e992306eb3a4fe548a0855b734c4fcffafb2ceda8433df07a5e893d0.png",
+        "width": 1536,
+        "height": 864,
+        "usedBy": [],
+        "note": "uploaded to the world, not on any easel or the sound board"
+      },
+      {
+        "name": "02-acc-shades",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "uploadedAt": "2026-10-23T13:13:24.567Z",
+        "path": "unmapped/art/02-acc-shades.png",
+        "sha256": "ef674cd4256bdb7681eb1b48fe302eb3751713ac38cff177b1380142165fe821",
+        "bytes": 1236242,
+        "source": "/cdn/value.ef674cd4256bdb7681eb1b48fe302eb3751713ac38cff177b1380142165fe821.png",
+        "width": 1024,
+        "height": 1792,
+        "usedBy": [],
+        "note": "older upload under the same name as art/02-acc-shades; not on any easel or the sound board"
+      },
+      {
+        "name": "13-sack-cheap-fractional-cell",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "path": "unmapped/art/13-sack-cheap-fractional-cell.png",
+        "sha256": "d4932c03f09785977b72d5fa3213bb27a638d28958e79d2c23da005329c84fb5",
+        "bytes": 1299063,
+        "source": "/cdn/value.d4932c03f09785977b72d5fa3213bb27a638d28958e79d2c23da005329c84fb5.png",
+        "width": 1024,
+        "height": 1024,
+        "usedBy": [],
+        "note": "superseded sheet for art/13-sack-cheap: 256 x 341.333 cells, so frame edges fell between pixels. Replaced by the whole-pixel 256 x 384 sheet from Spawn commit 62432a9."
+      },
+      {
+        "name": "13-sack-standard-fractional-cell",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "path": "unmapped/art/13-sack-standard-fractional-cell.png",
+        "sha256": "95c2ae43dc2c8640fd12fd6dde37fcfe4a25879538e0d34416aa0610ecd3679a",
+        "bytes": 1311075,
+        "source": "/cdn/value.95c2ae43dc2c8640fd12fd6dde37fcfe4a25879538e0d34416aa0610ecd3679a.png",
+        "width": 1024,
+        "height": 1024,
+        "usedBy": [],
+        "note": "superseded sheet for art/13-sack-standard: 256 x 341.333 cells, so frame edges fell between pixels. Replaced by the whole-pixel 256 x 384 sheet from Spawn commit 62432a9."
+      },
+      {
+        "name": "13-sack-premium-fractional-cell",
+        "kind": "image",
+        "doc_tracker": null,
+        "role": "extra",
+        "path": "unmapped/art/13-sack-premium-fractional-cell.png",
+        "sha256": "8207153c1e92c58db3ac625897f0c0a0d443dcf3b9838a4c8e87d45311946ae8",
+        "bytes": 1318086,
+        "source": "/cdn/value.8207153c1e92c58db3ac625897f0c0a0d443dcf3b9838a4c8e87d45311946ae8.png",
+        "width": 1024,
+        "height": 1024,
+        "usedBy": [],
+        "note": "superseded sheet for art/13-sack-premium: 256 x 341.333 cells, so frame edges fell between pixels. Replaced by the whole-pixel 256 x 384 sheet from Spawn commit 62432a9."
+      }
+    ]
+  },
+  "traits": {
+    "path": "art/02-traits.json",
+    "doc_tracker": "02",
+    "role": "trait",
+    "sha256": "d07c7f2f4b4796a724295a45ca2aa1b6ddcf572c7859faa2c93d3bad6ffcff3f",
+    "bytes": 7457
+  }
+}
