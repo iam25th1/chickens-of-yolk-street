@@ -35,8 +35,9 @@ Chickens of Yolk Street puts a **real, shared economy** in a toy you can play wi
 | Seven agent wallets created as sub-accounts: `bakery1`, `loyalist1`, `oldmoney1`, `squeezer1`, `trader1`, `upstart1`, `wholesaler1` (each `.coys-game.testnet`) | on the first day close |
 | Day 1 settled: 94 egg tokens minted, 12 hen NFTs minted | [tW6D6wqy...](https://testnet.nearblocks.io/txns/tW6D6wqyd97366MCi59in83ge8N8RfRZwtKHuxEDrLm) |
 | Day 2 settled: 54 eggs minted, 4 burned (the player's street sale), 12 more hens | [2b2wWs9X...](https://testnet.nearblocks.io/txns/2b2wWs9XSU8MDcPmpUeyujtbmUXPRZfsbfduF17TS8MS) |
+| Day 3 settled: 26 eggs minted, 16 burned, 12 more hens | [42awyreg...](https://testnet.nearblocks.io/txns/42awyregh4i6BgKDQTXBmjqZa4MBfrPKSJTrfYHRQvTC) |
 
-Anyone can check it with view calls on `coys-game.testnet`: `day_record({"day": 2})`, `nft_total_supply`, `mt_batch_balance_of`. In that run NEAR AI Cloud answered 402 (the account had no credits yet), so every agent fell back to its rule policy and each fallback was logged: the path the tests also cover.
+Anyone can check it with view calls on `coys-game.testnet`: `day_record({"day": 2})`, `nft_total_supply`, `mt_batch_balance_of`. In that run NEAR AI Cloud answered 402 (the account had no credits yet), so every agent fell back to its rule policy and each fallback was logged: the path the tests also cover. The headless player sold to the street instead of delivering the Bakery contract it accepted, so that run has no holder-to-holder egg transfers; the sandbox tests cover transfers.
 
 ## Try it
 
