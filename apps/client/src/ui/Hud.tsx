@@ -193,7 +193,7 @@ export function Ticker({ extra = [] }: { extra?: string[] }) {
   const items = market
     ? [
         ...(['white', 'cream', 'brown', 'golden'] as const).map((g) => `${g.toUpperCase()} ${(market.pricesMilli[g] / 1000).toFixed(2)}`),
-        `MARKET X${market.multiplier.toFixed(2)}`,
+        `PRICES AT ${Math.round(market.multiplier * 100)}%`,
         `SUPPLY TODAY ${market.supplyToday}`,
         `FARMS ${market.farms.players + market.farms.agents}${market.farms.bust ? ` BUST ${market.farms.bust}` : ''}`,
         ...extra,

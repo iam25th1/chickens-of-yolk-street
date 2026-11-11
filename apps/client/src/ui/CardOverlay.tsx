@@ -8,7 +8,7 @@ import { ECONOMY, type CardChoice, type CardOutcome, type CardView } from '@coys
 import { uiSound, useServices } from '../app/services';
 import { juice } from '../motion/juice';
 import type { Action } from '../net/socket';
-import { CARD_ART, CARD_TITLE, CARD_UNIT, CHOICE_LABEL, LOOK } from './cast';
+import { CARD_ART, CARD_TITLE, CARD_UNIT, CHOICE_LABEL, LOOK, acceptMeaning } from './cast';
 import { SheetSprite } from './SheetSprite';
 
 export function Portrait({ sheet, row, loop, onDone }: { sheet: string; row: string; loop: boolean; onDone?: () => void }) {
@@ -176,7 +176,7 @@ export function CardOverlay({
     <div ref={root} className="layer" style={{ zIndex: 40 }}>
       <div className="dim" />
       <div className="stage640">
-      <div ref={portraitEl} className="panel" style={{ left: 40, top: 92, width: 240, height: 128, zIndex: 41 }}>
+      <div ref={portraitEl} className="panel" style={{ left: 40, top: 76, width: 240, height: 148, zIndex: 41 }}>
         <div className="row" style={{ alignItems: 'flex-start', gap: 8 }}>
           {look ? <Portrait sheet={look.portrait} row={portraitRow} loop={talking || portraitRow === 'idle'} /> : <div style={{ width: 64, height: 64 }} />}
           <div className="col" style={{ gap: 4, width: 150 }}>
@@ -186,6 +186,7 @@ export function CardOverlay({
             <span style={{ minHeight: 56, lineHeight: '10px' }}>{typed.toUpperCase()}</span>
           </div>
         </div>
+        {!result && <p className="meaning">{acceptMeaning(card)}</p>}
         {card.round > 0 && !result && <span style={{ color: '#8b5a2b' }}>ROUND {card.round} OF {ECONOMY.haggle.maxRounds}</span>}
       </div>
 

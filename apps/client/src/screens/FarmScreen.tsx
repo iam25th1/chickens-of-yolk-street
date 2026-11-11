@@ -18,7 +18,7 @@ import { FxLayer, uiFx } from '../ui/FxLayer';
 import { Ticker, TopBar } from '../ui/Hud';
 import { LedgerPanel } from '../ui/Ledger';
 import { MarketBoard } from '../ui/MarketBoard';
-import { Onboarding, onboardingSeen } from '../ui/Onboarding';
+import { Guide } from '../ui/Guide';
 import { ShopPanel, type ShopTab } from '../ui/Panels';
 import { HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
 
@@ -66,7 +66,6 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
   const [panel, setPanel] = useState<OpenPanel | null>(null);
   const [view, setView] = useState<'farm' | 'market'>('farm');
   // first run on this browser: three cards on collecting, selling and decision cards
-  const [tour, setTour] = useState(() => !onboardingSeen());
   const [overlay, setOverlay] = useState<{ card: CardView; result: OverlayResult | null; mood: 'warm' | 'firm' | 'cross' | null } | null>(null);
   const queue = useRef<CardView[]>([]);
   const socket = useRef<GameSocket | null>(null);
@@ -188,7 +187,7 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
             queue.current = [];
             setOverlay((cur) => (cur && !cur.result ? null : cur));
             const s = e.summary;
-            uiFx.emit({ kind: 'toast', text: `DAY ${s.day}: ${s.laid} LAID. MARKET X${s.nextMultiplier.toFixed(2)}${s.missed ? `. ${s.missed} DELIVERY MISSED` : ''}` });
+            uiFx.emit({ kind: 'toast', text: `DAY ${s.day}: ${s.laid} LAID. PRICES TOMORROW ${Math.round(s.nextMultiplier * 100)}%${s.missed ? `. ${s.missed} DELIVERY MISSED` : ''}` });
             if (s.fedMultiplier === 0) {
               audio.play('29-alarm-bell', { delayMs: 800 });
               uiFx.emit({ kind: 'toast', text: 'THE TROUGH IS EMPTY: NO EGGS TOMORROW', tone: 'bad' });
@@ -284,8 +283,8 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
             })()}
         </div>
       )}
-      {tour && view === 'farm' && <Onboarding onDone={() => setTour(false)} />}
-      {overlay && view === 'farm' && !tour && (
+      {view === 'farm' && <Guide farm={farm} send={send} />}
+      {overlay && view === 'farm' && (
         <CardOverlay key={overlay.card.id} card={overlay.card} result={overlay.result} haggleMood={overlay.mood} send={send} onClose={showNext} />
       )}
       <FxLayer />

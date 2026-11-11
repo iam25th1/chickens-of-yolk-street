@@ -1,6 +1,6 @@
 // How each agent looks and sounds: portrait sheet, voice babble set, and which portrait rows play
 // for a good outcome and a bad one.
-import type { AgentKind, CardKind } from '@coys/shared';
+import type { AgentKind, CardKind, CardView } from '@coys/shared';
 
 export interface CastLook {
   portrait: string;
@@ -57,6 +57,35 @@ export const CARD_UNIT: Record<CardKind, string> = {
   'glut-warning': '',
   'player-trade': 'EGG',
 };
+
+const GRADE_WORD: Record<string, string> = { white: 'WHITE EGGS', cream: 'CREAM EGGS', brown: 'BROWN EGGS', golden: 'GOLDEN EGGS', any: 'EGGS' };
+
+/** One plain line: what saying yes to this card means for the player. */
+export function acceptMeaning(card: CardView): string {
+  const price = (card.offerMilli / 1000).toFixed(2);
+  const eggs = GRADE_WORD[card.grade ?? 'any'] ?? 'EGGS';
+  const total = ((card.offerMilli * card.qty) / 1000).toFixed(2);
+  const feed = `${(card.tier ?? 'standard').toUpperCase()} FEED`;
+  switch (card.kind) {
+    case 'bulk-order':
+    case 'premium-order':
+      return `ACCEPT: SELL ${card.qty} ${eggs} FROM YOUR CRATE NOW AT ${price} EACH, ${total} COINS IN ALL.`;
+    case 'standing-contract':
+      return `ACCEPT: DELIVER ${card.qty} ${eggs} EVERY DAY FOR ${card.days ?? 0} DAYS AT ${price} EACH. A MISSED DAY COSTS A PENALTY.`;
+    case 'feed-deal':
+      return `ACCEPT: BUY ${card.qty} BAGS OF ${feed} AT ${price} A BAG.`;
+    case 'credit-terms':
+      return `ACCEPT: TAKE ${card.qty} BAGS OF ${feed} NOW AND PAY ${price} A BAG OVER ${card.days ?? 0} DAYS.`;
+    case 'undercut':
+      return `MATCH PRICE: SELL AT HIS LOWER PRICE NOW. HOLD: KEEP YOUR EGGS FOR A BETTER DAY.`;
+    case 'buyout-offer':
+      return `SELL HENS: HAND OVER ${card.qty} HENS FOR ${price} EACH, ${total} COINS IN ALL.`;
+    case 'glut-warning':
+      return `SELL NOW: EMPTY YOUR CRATE AT TODAY'S LOW PRICE. HOLD: WAIT FOR PRICES TO COME BACK.`;
+    case 'player-trade':
+      return `ACCEPT: TRADE ${card.qty} ${eggs} AT ${price} EACH WITH ANOTHER FARMER.`;
+  }
+}
 
 export const CHOICE_LABEL: Record<string, string> = {
   accept: 'ACCEPT',

@@ -74,6 +74,7 @@ import {
   type Outbound,
 } from './ctx';
 import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
+import { claimGoal, goalViews, markGoal } from './goals';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
 
 export { ActionError } from './ctx';
@@ -401,6 +402,7 @@ export class Game {
       contracts: await contractViews(ctx, farmId),
       debts: await debtViews(ctx, farmId),
       orders,
+      goals: await goalViews(q, farmId),
       shop: shopRows.map(
         (h): ShopHenView => ({
           ...henView(h),
@@ -682,8 +684,12 @@ export class Game {
       case 'sell': {
         const r = await streetSell(ctx, farm, action.items, unlocks);
         emit(ctx, farm, { kind: 'sold', items: r.sold, totalMilli: r.totalMilli, multiplier: r.multiplier });
+        if (r.totalMilli > 0) await markGoal(ctx.q, farm.id, 'sell');
         return;
       }
+      case 'claimGoal':
+        await claimGoal(ctx, farm, action.goal);
+        return;
       case 'collect': {
         const [egg] = await ctx.q.query('SELECT grade, at_ms, broken, collected FROM lay_events WHERE id = $1 AND farm_id = $2 AND day = $3', [action.eggId, farm.id, ctx.day]);
         if (!egg) throw new ActionError('not_found', 'egg not found');
@@ -694,6 +700,7 @@ export class Game {
         await ctx.q.query('UPDATE lay_events SET collected = true WHERE id = $1', [action.eggId]);
         await ctx.q.query(`UPDATE farms SET crate_${grade} = crate_${grade} + 1 WHERE id = $1`, [farm.id]);
         emit(ctx, farm, { kind: 'collected', eggId: action.eggId, grade });
+        await markGoal(ctx.q, farm.id, 'collect');
         return;
       }
       default:

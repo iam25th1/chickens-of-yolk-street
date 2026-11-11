@@ -21,6 +21,7 @@ import { motion } from '../motion/ui';
 import type { Action } from '../net/socket';
 import { henLayers } from '../pixi/farm/HenActor';
 import { settings } from '../state/settings';
+import { replayTour } from '../state/tour';
 import { useStore } from '../state/store';
 import { SheetSprite } from './SheetSprite';
 
@@ -71,7 +72,7 @@ function HenTile({ hen, cash, onBuy }: { hen: ShopHenView; cash: number; onBuy: 
     <div className="col" style={{ width: 70, gap: 2, alignItems: 'center', background: hen.source === 'auction' ? '#e3cc96' : undefined, padding: 2 }}>
       <img alt="" className="sprite" width={32} height={32} style={{ objectFit: 'none', objectPosition: '50% 100%' }} src={assets.henPortrait(henLayers(hen))} />
       <span style={{ textAlign: 'center' }}>{traits.join(' ').toUpperCase()}</span>
-      <span>LAYS X{hen.layingTrait.toFixed(2)}</span>
+      <span>LAYS {Math.round(hen.layingTrait * 100)}%</span>
       <button className={`btn ${hen.source === 'auction' ? 'red' : ''}`} disabled={cash < hen.priceMilli / 1000} onClick={onBuy}>
         {hen.source === 'auction' ? 'AUCTION ' : ''}
         {(hen.priceMilli / 1000).toFixed(0)}
@@ -143,7 +144,7 @@ export function ShopPanel({ farm, send, onClose, tab: initialTab = 'hens' }: { f
           <div className="row" style={{ gap: 4 }}>
             {FEED_TIERS.map((t) => (
               <button key={t} className={`chip ${t === tier ? 'on' : ''}`} style={{ border: 0, font: 'inherit' }} onClick={click(() => setTier(t))}>
-                {t.toUpperCase()} X{ECONOMY.feed.tiers[t].laying.toFixed(2)}
+                {t.toUpperCase()}: LAYING {Math.round(ECONOMY.feed.tiers[t].laying * 100)}%
               </button>
             ))}
             <button className="btn" onClick={click(() => void send({ t: 'setFeedTier', tier }))} disabled={farm.feedTier === tier}>
@@ -236,7 +237,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const s = useStore(settings, (v) => v);
   useEffect(() => audio.setVolumes(s.music, s.sfx), [audio, s.music, s.sfx]);
   return (
-    <Panel title="SETTINGS" x={176} y={88} w={288} h={168} onClose={onClose}>
+    <Panel title="SETTINGS" x={176} y={80} w={288} h={196} onClose={onClose}>
       <div className="col" style={{ gap: 10 }}>
         <label className="col">
           <span>MUSIC {Math.round(s.music * 100)}%</span>
@@ -267,6 +268,16 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             }}
           />
         </div>
+        <button
+          className="btn"
+          onClick={() => {
+            uiSound(audio, 'click');
+            replayTour();
+            onClose();
+          }}
+        >
+          REPLAY THE HOW-TO-PLAY TOUR
+        </button>
       </div>
     </Panel>
   );

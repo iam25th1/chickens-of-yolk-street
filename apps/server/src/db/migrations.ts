@@ -301,6 +301,15 @@ ALTER TABLE market_days ADD PRIMARY KEY (season, day);
 ALTER TABLE ledger ADD COLUMN season text NOT NULL DEFAULT 'legacy';
 `,
   },
+  {
+    id: 5,
+    name: 'goal chain',
+    sql: `
+-- The goal chain (collect, sell, fill the coop, win a haggle, first machine, outlast a rival):
+-- JSON text {"done": [...], "claimed": [...]}. Done flags come from actions; claims pay coins.
+ALTER TABLE farms ADD COLUMN goals text NOT NULL DEFAULT '{}';
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

@@ -51,7 +51,7 @@ export function Desk({ farm, send, onOpen }: { farm: FarmState; send: (a: Action
         ))}
       {hasClerk && (
         <div className="row" style={{ gap: 2 }}>
-          <span>CLERK X{farm.clerkFloor.toFixed(2)}</span>
+          <span>CLERK TAKES {Math.round(farm.clerkFloor * 100)}%+ OF PRICE</span>
           <button className="btn" onClick={click(() => void send({ t: 'setClerkFloor', floor: Math.max(ECONOMY.clerk.minFloor, Math.round((farm.clerkFloor - 0.05) * 100) / 100) }))}>
             -
           </button>
