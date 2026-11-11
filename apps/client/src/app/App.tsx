@@ -45,6 +45,8 @@ export function App() {
         // stage 1: the loading screen's own art (a few KB), on screen at once
         await assets.loadGroups([...BOOT_GROUPS]);
         pixi.setScene(new BackdropScene(assets, 'loading'));
+        // the page's own loading screen (index.html) hands over to the game's
+        document.getElementById('boot')?.remove();
         setServices({ assets, audio, pixi });
         // stage 2: the title (art, fonts, the button clicks); music streams after the first tap
         const total = TITLE_GROUPS.length + FONTS.length + 1;
