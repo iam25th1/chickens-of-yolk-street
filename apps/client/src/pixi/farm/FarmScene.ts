@@ -6,7 +6,7 @@ import type { CoopKind, FarmState, HenView, LaidEgg, UnlockId } from '@coys/shar
 import type { AssetStore } from '../../assets/store';
 import type { AudioEngine, LoopHandle } from '../../audio/audio';
 import { juice } from '../../motion/juice';
-import { dayElapsed, isNight, type ClientEvent } from '../../state/game';
+import { dayElapsed, isNight, sameDay, type ClientEvent } from '../../state/game';
 import { FrameSprite } from '../FrameSprite';
 import { Fx } from '../Fx';
 import type { Scene } from '../host';
@@ -578,7 +578,7 @@ export class FarmScene implements Scene {
   /** Lay events whose time has come: animate them on a hen (or drop them in place on load). */
   private processLays(): void {
     const farm = this.farm;
-    if (!farm) return;
+    if (!farm || !sameDay(farm)) return;
     const now = dayElapsed();
     const actors = [...this.hens.values()];
     for (const egg of farm.layPlan) {

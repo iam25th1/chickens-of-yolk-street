@@ -378,6 +378,7 @@ export class Game {
     const orders = await this.orderViews(`o.farm_id = $1`, [farmId], farmId);
     return {
       farmId,
+      day,
       name: farm.name,
       cashMilli: farm.cashMilli,
       feedTier: farm.feedTier,

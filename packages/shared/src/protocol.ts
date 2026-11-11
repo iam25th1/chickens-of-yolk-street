@@ -197,6 +197,8 @@ export interface AgentView {
 
 export interface FarmState {
   farmId: string;
+  /** The in-game day this state (and its lay plan) belongs to. */
+  day: number;
   name: string;
   cashMilli: number;
   feedTier: FeedTier;
