@@ -256,47 +256,200 @@ export function label(mask: Uint8Array, width: number, height: number): { labels
 }
 
 /**
- * Which cell owns each opaque pixel. A blob goes whole to the cell holding most of it (so art that
- * pokes into the next cell stays with its frame), unless no cell holds 85% of it: then it is two
- * things touching, and each pixel stays in the cell it sits in.
+ * Which cell owns each opaque pixel. Each cell's biggest blob is its main body. A blob that no cell
+ * holds 85% of is two bodies touching: each pixel stays in the cell it sits in. Every other blob (a
+ * comb a pixel above the head, a dropped egg, a sweat drop) belongs to the nearest main body, by
+ * pixel distance, even when it pokes into the next cell: that is how a comb stays on its own hen and
+ * never shows up under the hen in the row above.
  */
 export function cellOwners(mask: Uint8Array, width: number, height: number, cw: number, ch: number): Int32Array {
   const { labels, count } = label(mask, width, height);
   const cols = Math.round(width / cw);
-  const mass: Map<number, number>[] = Array.from({ length: count }, () => new Map());
+  const rowsN = Math.round(height / ch);
   const cellOf = (p: number) => {
     const y = (p / width) | 0;
     const x = p - y * width;
-    return Math.min(Math.floor(y / ch), Math.round(height / ch) - 1) * cols + Math.min(Math.floor(x / cw), cols - 1);
+    return Math.min(Math.floor(y / ch), rowsN - 1) * cols + Math.min(Math.floor(x / cw), cols - 1);
   };
+  const mass: Map<number, number>[] = Array.from({ length: count }, () => new Map());
+  const total = new Array<number>(count).fill(0);
   for (let p = 0; p < labels.length; p++) {
     const l = labels[p] ?? -1;
     if (l < 0) continue;
     const m = mass[l] as Map<number, number>;
     const c = cellOf(p);
     m.set(c, (m.get(c) ?? 0) + 1);
+    total[l] = (total[l] ?? 0) + 1;
   }
-  const winner = mass.map((m) => {
-    let total = 0;
+  const dominant = mass.map((m, l) => {
     let best = -1;
     let bestN = 0;
-    for (const [c, n] of m) {
-      total += n;
+    for (const [c, n] of m)
       if (n > bestN) {
         bestN = n;
         best = c;
       }
-    }
-    return bestN >= 0.85 * total ? best : -1;
+    return bestN >= 0.85 * (total[l] ?? 1) ? best : -1;
   });
+  // main body per cell
+  const main = new Map<number, number>();
+  for (let l = 0; l < count; l++) {
+    const c = dominant[l] ?? -1;
+    if (c < 0) continue;
+    const cur = main.get(c);
+    if (cur === undefined || (total[l] ?? 0) > (total[cur] ?? 0)) main.set(c, l);
+  }
+  const isMain = new Set(main.values());
+  // nearest main body for every pixel (breadth first from all main bodies at once)
+  const near = new Int32Array(labels.length).fill(-1);
+  const dist = new Int32Array(labels.length).fill(-1);
+  const queue = new Int32Array(labels.length);
+  let head = 0;
+  let tail = 0;
+  for (let p = 0; p < labels.length; p++) {
+    const l = labels[p] ?? -1;
+    if (l >= 0 && isMain.has(l)) {
+      near[p] = dominant[l] ?? -1;
+      dist[p] = 0;
+      queue[tail++] = p;
+    }
+  }
+  while (head < tail) {
+    const p = queue[head++] ?? 0;
+    const y = (p / width) | 0;
+    const x = p - y * width;
+    for (const q of [x > 0 ? p - 1 : -1, x < width - 1 ? p + 1 : -1, y > 0 ? p - width : -1, y < height - 1 ? p + width : -1]) {
+      if (q < 0 || dist[q] !== -1) continue;
+      dist[q] = (dist[p] ?? 0) + 1;
+      near[q] = near[p] ?? -1;
+      queue[tail++] = q;
+    }
+  }
+  const attach = new Array<number>(count).fill(-1);
+  const closest = new Array<number>(count).fill(Infinity);
+  for (let p = 0; p < labels.length; p++) {
+    const l = labels[p] ?? -1;
+    if (l < 0 || isMain.has(l) || dominant[l] === -1) continue;
+    const d = dist[p] ?? -1;
+    if (d >= 0 && d < (closest[l] ?? Infinity)) {
+      closest[l] = d;
+      attach[l] = near[p] ?? -1;
+    }
+  }
   const owner = new Int32Array(labels.length).fill(-1);
   for (let p = 0; p < labels.length; p++) {
     const l = labels[p] ?? -1;
     if (l < 0) continue;
-    const w = winner[l] ?? -1;
-    owner[p] = w >= 0 ? w : cellOf(p);
+    const d = dominant[l] ?? -1;
+    if (d < 0) owner[p] = cellOf(p);
+    else if (isMain.has(l)) owner[p] = d;
+    else owner[p] = (attach[l] ?? -1) >= 0 ? (attach[l] as number) : d;
   }
   return owner;
+}
+
+/**
+ * Cell ownership for stacked layers: cells are decided on the first layer (the body) alone, so tall
+ * trait art (a mohawk, a top hat) can never bridge two hens; every other layer's blobs then join
+ * the nearest body pixel's cell.
+ */
+export function layerOwners(layers: Rgba[], width: number, height: number, cw: number, ch: number): Int32Array {
+  const n = width * height;
+  const primary = opaqueMask(layers[0] as Rgba);
+  const owner = cellOwners(primary, width, height, cw, ch);
+  if (layers.length === 1) return owner;
+  // nearest body cell for every pixel
+  const near = new Int32Array(n).fill(-1);
+  const dist = new Int32Array(n).fill(-1);
+  const queue = new Int32Array(n);
+  let head = 0;
+  let tail = 0;
+  for (let p = 0; p < n; p++)
+    if ((owner[p] ?? -1) >= 0) {
+      near[p] = owner[p] ?? -1;
+      dist[p] = 0;
+      queue[tail++] = p;
+    }
+  while (head < tail) {
+    const p = queue[head++] ?? 0;
+    const y = (p / width) | 0;
+    const x = p - y * width;
+    for (const q of [x > 0 ? p - 1 : -1, x < width - 1 ? p + 1 : -1, y > 0 ? p - width : -1, y < height - 1 ? p + width : -1]) {
+      if (q < 0 || dist[q] !== -1) continue;
+      dist[q] = (dist[p] ?? 0) + 1;
+      near[q] = near[p] ?? -1;
+      queue[tail++] = q;
+    }
+  }
+  const rest = new Uint8Array(n);
+  for (const l of layers.slice(1)) for (let p = 0; p < n; p++) if ((l.data[p * 4 + 3] ?? 0) > 0 && !primary[p]) rest[p] = 1;
+  const { labels, count } = label(rest, width, height);
+  // a trait blob joins the body it touches along the most pixels (a comb sits on its own head's
+  // whole width; the feet of the hen above only graze its tips); far blobs join the nearest body
+  const best = new Array<number>(count).fill(Infinity);
+  const cell = new Array<number>(count).fill(-1);
+  const contact: Map<number, number>[] = Array.from({ length: count }, () => new Map());
+  for (let p = 0; p < n; p++) {
+    const l = labels[p] ?? -1;
+    if (l < 0) continue;
+    const d = dist[p] ?? -1;
+    const c = near[p] ?? -1;
+    if (d >= 0 && d <= 2 && c >= 0) {
+      const m = contact[l] as Map<number, number>;
+      m.set(c, (m.get(c) ?? 0) + 1);
+    }
+    if (d >= 0 && d < (best[l] ?? Infinity)) {
+      best[l] = d;
+      cell[l] = c;
+    }
+  }
+  contact.forEach((m, l) => {
+    let top = -1;
+    let topN = 0;
+    for (const [c, k] of m)
+      if (k > topN) {
+        topN = k;
+        top = c;
+      }
+    if (top >= 0) cell[l] = top;
+  });
+  for (let p = 0; p < n; p++) {
+    const l = labels[p] ?? -1;
+    if (l >= 0) owner[p] = cell[l] ?? -1;
+  }
+  return owner;
+}
+
+/** Carries a source-resolution owner map down to the derived grid: each block takes its most common owner. */
+export function downscaleOwner(owner: Int32Array, width: number, height: number, cw: number, ch: number, nx: number, ny: number, phase: { x: number; y: number }): Int32Array {
+  const cols = Math.round(width / cw);
+  const rows = Math.round(height / ch);
+  const outW = cols * nx;
+  const out = new Int32Array(outW * rows * ny).fill(-1);
+  const votes = new Map<number, number>();
+  for (let cy = 0; cy < rows; cy++)
+    for (let cx = 0; cx < cols; cx++) {
+      const ex = edges(cw, nx, phase.x).map((e) => Math.min(width, cx * cw + e));
+      const ey = edges(ch, ny, phase.y).map((e) => Math.min(height, cy * ch + e));
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++) {
+          votes.clear();
+          for (let y = ey[j] ?? 0; y < (ey[j + 1] ?? 0); y++)
+            for (let x = ex[i] ?? 0; x < (ex[i + 1] ?? 0); x++) {
+              const o = owner[y * width + x] ?? -1;
+              if (o >= 0) votes.set(o, (votes.get(o) ?? 0) + 1);
+            }
+          let best = -1;
+          let bestN = 0;
+          for (const [o, n] of votes)
+            if (n > bestN) {
+              bestN = n;
+              best = o;
+            }
+          out[(cy * ny + j) * outW + cx * nx + i] = best;
+        }
+    }
+  return out;
 }
 
 export function opaqueMask(img: Rgba): Uint8Array {
@@ -344,6 +497,7 @@ export interface Piece {
  */
 export function cutCells(
   layers: Rgba[],
+  owner: Int32Array,
   cols: number,
   rows: number,
   nx: number,
@@ -351,10 +505,7 @@ export function cutCells(
   anchors: Map<number, { ax: number; ay: number }>,
 ): Map<number, Piece[]> {
   const first = layers[0] as Rgba;
-  const { width, height } = first;
-  const union = new Uint8Array(width * height);
-  for (const l of layers) for (let i = 0; i < union.length; i++) if ((l.data[i * 4 + 3] ?? 0) > 0) union[i] = 1;
-  const owner = cellOwners(union, width, height, nx, ny);
+  const { width } = first;
   const boxes = new Map<number, { x0: number; y0: number; x1: number; y1: number }>();
   for (let p = 0; p < owner.length; p++) {
     const c = owner[p] ?? -1;
@@ -544,7 +695,10 @@ export function derive(input: DeriveInput): DeriveOutput {
         layerIds.push(`02-body@${colour}`);
       }
     }
-    const pieces = cutCells(layers, cols, rowsN, nx, ny, anchors);
+    // who owns what is decided at full resolution, where a comb touches its own head and not the feet above
+    const srcOwner = layerOwners(sources, first.png.width, first.png.height, cw, ch);
+    const owner = downscaleOwner(srcOwner, first.png.width, first.png.height, cw, ch, nx, ny, phase);
+    const pieces = cutCells(layers, owner, cols, rowsN, nx, ny, anchors);
     layerIds.forEach((id, li) => {
       const base = id.split('@')[0] as string;
       const src = input.sprites[base] as SourceSprite;
