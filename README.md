@@ -2,14 +2,16 @@
 
 # Chickens of Yolk Street
 
-Run an egg farm in **one shared live market** where every rival, supplier and buyer is an AI agent with its own cash, memory and wallet. Egg prices, gluts and bankruptcies come only from what everyone trades, never from a script. NEAR hackathon entry (tracks: games, agents, NFTs), built 1 to 14 November 2026.
+Run an egg farm in **one shared live market** where every rival, supplier and buyer is an AI agent with its own cash, memory and wallet. Egg prices, gluts and bankruptcies come only from what everyone trades, never from a script. Built at NEAR HACKATHON (tracks: games, agents, NFTs), 1 to 14 November 2026.
+
+**Play:** https://yolkstreet.25th.dev _(live URL placeholder: the deploy is set up in [deploy/pier](deploy/pier/README.md) and goes live before submission)_
 
 | | |
 |---|---|
-| **Play loop** | Hens lay on a schedule; you collect, sell, buy hens, feed, coops and machines. One in-game day is 3 real minutes, and each day brings 2 to 4 decision cards from the agents. |
-| **Market** | One price multiplier for everyone, set by the whole market's daily supply. Instant street sales, a real order book with limit orders, and player-to-player trades. |
-| **Agents** | Seven: two rival farms, two feed suppliers, three egg buyers. Each decides once a day on NEAR AI Cloud (structured JSON output) or its rule policy, pays for its thinking, remembers every deal, haggles in character, and can go bust. |
-| **Chain** | Hens are NEP-171 NFTs, eggs are NEP-245 tokens, and each day settles in one call on NEAR testnet. Agents hold sub-account wallets. Players sign in with email; their wallet is made silently. No crypto words in the game: one "on-chain receipt" link in the ledger. |
+| **Play loop** | Hens lay on a schedule; you collect, sell, buy hens, feed, coops and machines. One in-game day is 3 real minutes, and each day brings 2 to 4 decision cards from the agents. A first-run tour of three cards explains the rest. |
+| **Market** | One price multiplier for everyone, set by the whole market's daily supply against demand that grows with the number of farms. Instant street sales, a real order book with limit orders, and player-to-player trades. |
+| **Agents** | Seven: two rival farms, two feed suppliers, three egg buyers. Each decides once a day on NEAR AI Cloud (structured JSON output) or its rule policy, pays for its thinking, remembers every deal, haggles in character, borrows, and can go bust. |
+| **Chain** | Hens are NEP-171 NFTs, eggs are NEP-245 tokens, and each day settles in one call on NEAR testnet, keyed by season and day. Agents hold sub-account wallets. Players sign in with email; their wallet is made silently. No crypto words in the game: one "on-chain receipt" link in the ledger. |
 | **Feel** | Squash and stretch, hitstop, screen shake, particles and layered sound on every action, portraits that talk with voice babble, and a reduce-motion switch. |
 
 ## The problem
@@ -20,53 +22,70 @@ Chickens of Yolk Street puts a **real, shared economy** in a toy you can play wi
 
 ## How NEAR fits in
 
+NEAR tools used: **Privy social login** (email, with a silent NEAR wallet), **NEAR AI Cloud** (agent decisions), **NEP-171** hen NFTs, **NEP-245** egg tokens, **sub-account agent wallets**, and **batched testnet settlement** (one call per in-game day).
+
 | NEAR piece | What it does here | Status in this build |
 |---|---|---|
-| **Game contract on testnet** (`near-sdk` 5.30.1) | One contract on the game account: hen NFTs (NEP-171, `near-contract-standards` 5.30.1), egg tokens (NEP-245, `near-sdk-contract-tools` 4.0.0 from the near org), and `settle_day`, owner only, once per in-game day. | **Deployed** to `coys-game.testnet` (tx [`Bzhs5zTq...`](https://testnet.nearblocks.io/txns/Bzhs5zTqUJFNE83HzjZsCUonxhwkcHTXuV868nbMdGoc)). Wasm built in CI with `cargo near`, sha256 `df6fe36d...`. |
-| **Agent wallets** (near-api-js 7.5.3) | Each agent gets a testnet sub-account of the game account (`bakery1.coys-game.testnet` and so on), funded from it; its eggs and hens settle to it. | Created on the first day close with credentials. |
-| **Privy social login** (docs.near.org social login) | Email sign-in; a NEAR testnet wallet is created silently with Privy's extended-chains API; the server verifies the ES256 access token with `jose`. That wallet holds the player's hens and eggs. | Wired. Needs `PRIVY_APP_ID`; without it the game runs a labelled local dev login. |
-| **NEAR AI Cloud** (OpenAI-compatible) | Every agent's daily decision, as structured JSON output (`json_schema`, strict) checked against a zod schema; anything unusable falls back to rules and is logged. Hard daily spend cap. | Wired. Needs `NEARAI_API_KEY`; default model `Qwen/Qwen3.6-35B-A3B-FP8`, cheaper `z-ai/glm-5.3-flash` for struggling agents. |
+| **Game contract on testnet** (`near-sdk` 5.30.1) | One contract on the game account: hen NFTs (NEP-171, `near-contract-standards` 5.30.1), egg tokens (NEP-245, `near-sdk-contract-tools` 4.0.0 from the near org), and `settle_day`, owner only, once per in-game day of a season. | **Live** on `coys-game.testnet`, upgraded in place to the season-aware version (tx [`HXYRgKDn...`](https://testnet.nearblocks.io/txns/HXYRgKDnKS7TveYSwDHQp31nsNtzx2jnw64F2hUA39Cf)). Wasm built in CI with `cargo near`, sha256 `fc7645dc...`. Production gets its own account ([deploy/testnet.md](deploy/testnet.md)). |
+| **Agent wallets** (near-api-js 7.5.3) | Each agent gets a testnet sub-account of the game account (`bakery1.coys-game.testnet` and so on), funded from it; its eggs and hens settle to it. A contract delivery moves egg tokens from the player's wallet to the Bakery's. | **Live**: seven wallets, and a delivery proven on chain (below). |
+| **Privy social login** (docs.near.org social login) | Email sign-in; a NEAR testnet wallet is created silently with Privy's extended-chains API; the server verifies the ES256 access token with `jose`. That wallet holds the player's hens and eggs. | Wired. Needs `PRIVY_APP_ID` and the live domain in Privy's allowed domains. |
+| **NEAR AI Cloud** (OpenAI-compatible) | Every agent's daily decision, as structured JSON output (`json_schema`, strict) checked against a zod schema; anything unusable falls back to rules and is logged. Hard daily spend cap. | Wired. Needs `NEARAI_API_KEY` and account credits; default model `Qwen/Qwen3.6-35B-A3B-FP8`, cheaper `z-ai/glm-5.3-flash` for struggling agents. |
 
-**Live on NEAR testnet (11 November 2026).** A run of this build against testnet, with one headless player linked to a fresh implicit account:
+**Testnet receipts.** Every link opens the transaction on the testnet explorer.
 
-| What | Where |
-|---|---|
-| Game contract deployed and initialised on `coys-game.testnet` | [Bzhs5zTq...](https://testnet.nearblocks.io/txns/Bzhs5zTqUJFNE83HzjZsCUonxhwkcHTXuV868nbMdGoc) |
-| Seven agent wallets created as sub-accounts: `bakery1`, `loyalist1`, `oldmoney1`, `squeezer1`, `trader1`, `upstart1`, `wholesaler1` (each `.coys-game.testnet`) | on the first day close |
-| Day 1 settled: 94 egg tokens minted, 12 hen NFTs minted | [tW6D6wqy...](https://testnet.nearblocks.io/txns/tW6D6wqyd97366MCi59in83ge8N8RfRZwtKHuxEDrLm) |
-| Day 2 settled: 54 eggs minted, 4 burned (the player's street sale), 12 more hens | [2b2wWs9X...](https://testnet.nearblocks.io/txns/2b2wWs9XSU8MDcPmpUeyujtbmUXPRZfsbfduF17TS8MS) |
-| Day 3 settled: 26 eggs minted, 16 burned, 12 more hens | [42awyreg...](https://testnet.nearblocks.io/txns/42awyregh4i6BgKDQTXBmjqZa4MBfrPKSJTrfYHRQvTC) |
+| When | What | Transaction |
+|---|---|---|
+| 11 Nov | Game contract deployed and initialised on `coys-game.testnet` (version 1) | [Bzhs5zTq...](https://testnet.nearblocks.io/txns/Bzhs5zTqUJFNE83HzjZsCUonxhwkcHTXuV868nbMdGoc) |
+| 11 Nov | Seven agent wallets created: `bakery1`, `loyalist1`, `oldmoney1`, `squeezer1`, `trader1`, `upstart1`, `wholesaler1` (each `.coys-game.testnet`) | on the first day close |
+| 11 Nov | Day 1 settled: 94 egg tokens and 12 hen NFTs minted | [tW6D6wqy...](https://testnet.nearblocks.io/txns/tW6D6wqyd97366MCi59in83ge8N8RfRZwtKHuxEDrLm) |
+| 11 Nov | Day 2 settled: 54 eggs minted, 4 burned (a street sale), 12 more hens | [2b2wWs9X...](https://testnet.nearblocks.io/txns/2b2wWs9XSU8MDcPmpUeyujtbmUXPRZfsbfduF17TS8MS) |
+| 11 Nov | Day 3 settled: 26 eggs minted, 16 burned, 12 more hens | [42awyreg...](https://testnet.nearblocks.io/txns/42awyregh4i6BgKDQTXBmjqZa4MBfrPKSJTrfYHRQvTC) |
+| 11 Nov | Contract upgraded in place to seasons; `migrate` files days 1 to 3 under the season `legacy`, keeping all 36 hens and every egg balance | [HXYRgKDn...](https://testnet.nearblocks.io/txns/HXYRgKDnKS7TveYSwDHQp31nsNtzx2jnw64F2hUA39Cf) |
+| 11 Nov | Season `delivery-proof` day 1: a fresh season starts at day 1 on the same contract | [FwR1skf3...](https://testnet.nearblocks.io/txns/FwR1skf3G1weRLRypZLhyb7CbBcKzVKuoKQ3n6FQoFJQ) |
+| 11 Nov | Season `delivery-proof` day 2: the player delivers 3 eggs on a Bakery standing contract; two NEP-245 `mt_transfer` events move 1 white and 2 cream from the player's wallet `f9ad7ca1...` to `bakery1.coys-game.testnet`, which then bakes them (burned) | [2Erp19yX...](https://testnet.nearblocks.io/txns/2Erp19yXaNGekgt6a8EgK2q66gSnDRpAAmQmb3cH2ifF) |
+| 11 Nov | Season `tour5-20261111`: the headless tour behind the screenshots, one settlement per 30-second day for 12 days (the ledger links in the ledger screenshot are these) | day 1 [8WeCaoGp...](https://testnet.nearblocks.io/txns/8WeCaoGpJJ72nHqpVcnunnrN8FAEgzJWvAm44VbfT1ER), day 12 [2jebGi4R...](https://testnet.nearblocks.io/txns/2jebGi4RLcinhyvL6WC7pizakx5WAmpvepMqGYJEdNk6) |
 
-Anyone can check it with view calls on `coys-game.testnet`: `day_record({"day": 2})`, `nft_total_supply`, `mt_batch_balance_of`. In that run NEAR AI Cloud answered 402 (the account had no credits yet), so every agent fell back to its rule policy and each fallback was logged: the path the tests also cover. The headless player sold to the street instead of delivering the Bakery contract it accepted, so that run has no holder-to-holder egg transfers; the sandbox tests cover transfers.
+Check it yourself with view calls on `coys-game.testnet`: `day_record({"season": "delivery-proof", "day": 2})` (shows `egg_transfers: 2`), `last_settled_day({"season": "legacy"})` (3), `nft_total_supply()`; the `mt_transfer` events are in the day 2 transaction's receipts. NEAR AI Cloud answered 402 (no credits on the account yet) in these runs, so every agent used its rule policy and each fallback was logged: the path the tests also cover.
 
 ## Try it
 
-Node 22.22.2 or newer. Each step says what to do and what you should see.
+Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what to do and what you should see. Commands are the same in PowerShell and a POSIX shell unless shown otherwise.
 
-1. **Install.** Run `npm ci --ignore-scripts`. No package install scripts run (`.npmrc` also sets `ignore-scripts=true`).
-2. **Test.** Run `npm test`. You see **66 tests** pass, including the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply, a 30-hen coop **full on day 16**), a 30-day market simulation, haggling, model fallbacks, the chain batch, and two real WebSocket clients in one market.
-3. **Play.** Run `npm run dev` and open http://localhost:5173. An egg fills up over the loading plate, then the title: the logo stamps in and the price ticker scrolls.
+1. **Install.** Run `npm ci --ignore-scripts`. You see the lockfile install with no package install scripts (`.npmrc` also sets `ignore-scripts=true`).
+2. **Test.** Run `npm test`. On a fresh clone you see **82 tests pass and 3 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it), and the asset re-pack check needs a coys-assets checkout beside the repo. Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, and two real WebSocket clients in one market.
+3. **Play.** Run `npm run dev` and open http://localhost:5173. You see an egg fill up over the loading plate, then the title: the logo stamps in and the price ticker scrolls.
 4. **Sign in.** Press **PLAY**. With `PRIVY_APP_ID` set you sign in with email; without it a red **LOCAL DEV LOGIN** label asks for a name. You see your farm: 10 hens, a starter coop, **50.00** coins, **DAY001**.
-5. **Collect and sell.** Click an egg a hen just laid: it pops into the crate. Press **SELL N EGGS**: a **SOLD** stamp slams, coins arc to the counter.
-6. **Meet the agents.** At the start of day 2 the first card slides in: a portrait talks in its own voice while its line types out (the Bakery offering a standing contract, the Squeezer a feed deal, the Wholesaler a bulk order). Press **ACCEPT** and the right stamp slams.
-7. **Counter the Squeezer.** When the Squeezer offers feed, lower **YOUR PRICE** a few steps and press **COUNTER**. It answers with a counter of its own, stingier than the Loyalist would; three rounds at most. Ask too little and it walks away (fail sound). Land inside its walk-away price and the card flips to gold with confetti and the haggle win chime.
-8. **Sell into a glut and watch the price fall.** Open the **market board** (top bar). Sell a big crate (or post a sell order). Today's supply on the ticker board rises; at the day close the next multiplier falls, all prices drop, and the ticker turns red if it crashes (multiplier 0.80 or lower) while the tension music takes over.
-9. **Watch a rival bust.** Rivals pay 0.50 coins per decision; one that over-expands into a glut runs out of cash. Its sign tips over, a price wave crosses the ticker, feathers fall, and its hens appear in the shop as **AUCTION** hens at half price. A new rival opens three days later. (The test `a rival can go bust in a glut` drives this in seconds.)
-10. **Deliver a contract.** Accept the Bakery's contract, then press **DELIVER** on the desk each day (or buy the delivery cart and it delivers at dusk). Miss one and you pay a penalty and the Bakery remembers.
-11. **Read the ledger.** Open the **ledger** (top bar): day-by-day income, costs and net, contracts and debts, and an **ON-CHAIN RECEIPT** link for each settled day.
-12. **Comfort.** **SETTINGS**, **REDUCE MOTION**: stamps still slam and chime, but nothing shakes or freezes.
-
-Production build: `npm run build` then `npm start` serves the game and API on http://localhost:8787.
+5. **Take the tour.** On a first visit your hen talks you through three cards: **COLLECT**, **SELL**, **DECISION CARDS**. You see each card swing in while she talks; **SKIP** closes it, and it does not come back on that browser.
+6. **Collect and sell.** Click an egg a hen just laid: you see it pop into the crate. Press **SELL N EGGS**: a **SOLD** stamp slams and coins arc to the counter.
+7. **Meet the agents.** From day 2 cards slide in: a portrait talks in its own voice while its line types out (the Bakery offering a standing contract, the Wholesaler a bulk order, the Squeezer a feed deal). Press **ACCEPT**: you see the right stamp slam.
+8. **Win a haggle.** On a buyer's card, press **-** a few times so **YOUR PRICE** sits just above the offer, then **COUNTER**. You see the card flip to gold with confetti and the win chime (inside the agent's walk-away price).
+9. **Lose one.** On another card, press **+** many times and **COUNTER**. You see the agent counter, get cross, and after three rounds (or at once, if it is proud) walk off with the fail sound.
+10. **Sell into a glut.** Speed days up: `DEMO_DAY_SECONDS=30` before `npm run dev` (PowerShell: `$env:DEMO_DAY_SECONDS = "30"; npm run dev`). Open the **market board**: you see **SOLD n OF d**, today's sales against demand. When a day's supply runs well past demand (Old Money releasing its hoard, the Wholesaler reselling), you see the next multiplier fall, the ticker turn red at 0.80 or lower, the **GLUT WARNING** card in the tray, and the tension music take over.
+11. **Watch a rival bust.** The Upstart borrows feed from the Loyalist to grow on good weeks. When a glut meets its debt, it goes below zero: you see its sign tip over, a price wave cross the ticker, feathers fall, and its hens appear in the shop as **AUCTION** hens at half price; a new rival opens three days later. At 30-second days this usually happens 8 to 14 minutes into a season.
+12. **Deliver a contract.** Accept the Bakery's contract, then press **DELIVER** on the desk each day (or buy the delivery cart: it delivers at dusk). You see coins arrive; with testnet credentials the day's batch moves those egg tokens to the Bakery's wallet. Miss one and you pay a penalty and the Bakery remembers.
+13. **Read the ledger.** Open the **ledger** (top bar): you see the season, day-by-day income, costs and net, contracts and debts, and an **ON-CHAIN RECEIPT** link per settled day that opens the testnet explorer.
+14. **Comfort.** **SETTINGS**: music and sound volumes and **REDUCE MOTION** are kept per browser. With reduce motion, stamps still slam and chime, but nothing shakes or freezes.
+15. **Production build.** `npm run build`, then start it as production would (PowerShell):
+    `$env:NODE_ENV = "production"; $env:GAME_SEASON = "local"; $env:SESSION_SECRET = "a-long-random-string"; $env:DATABASE_URL = "postgres://..."; node apps/server/dist/main.js`.
+    Open http://localhost:8787/healthz: you see `{"ok":true,"version":"0.1.0","commit":"...","season":"local",...,"db":{"kind":"postgres","ok":true,...}}`. Without a Postgres at hand, `ALLOW_PGLITE_IN_PRODUCTION=1` with `DATABASE_URL=memory://` checks the build on PGlite (never for players).
 
 ## Screenshots and video
 
-| Card overlay | Market board |
+| Title | Sign in |
 |---|---|
-| ![The Bakery's portrait talks while its standing contract offer types out, with accept, counter and decline](docs/screenshots/card.png) | ![Market board over the town square: split-flap ticker board, order book, farms ranked with signs, the cast](docs/screenshots/market.png) |
-| **Shop: hens with visible traits** | **Farm** |
-| ![Listed hens drawn from their trait layers with laying trait and price](docs/screenshots/shop.png) | ![Farm with hens in three body colours, coop, trough, crate, HUD and the card tray](docs/screenshots/farm.png) |
+| ![The title plate: the logo stamped in over the farm, PLAY and SETTINGS, the live price ticker](docs/screenshots/title.png) | ![The login panel with the labelled local dev login](docs/screenshots/login.png) |
+| **First-run tour** | **Farm** |
+| ![The farm's hen talks while the COLLECT card explains clicking eggs into the crate](docs/screenshots/onboarding.png) | ![The farm on day 1: hens, coop, trough, crate, the HUD and the card tray](docs/screenshots/farm.png) |
+| **A sale** | **Haggle win** |
+| ![The SOLD stamp on the crate card after selling the day's eggs](docs/screenshots/sale.png) | ![The Wholesaler's bulk order flipped to gold with confetti and a SOLD stamp after a counter inside its walk-away price](docs/screenshots/haggle-win.png) |
+| **Haggle fail** | **Glut** |
+| ![A standing contract stamped DECLINED after the Bakery walked away from an ask far above its price](docs/screenshots/haggle-fail.png) | ![The ticker turned red, MARKET CRASH, and the GLUT WARNING card at 0.72x](docs/screenshots/glut.png) |
+| **Rival bust** | **Ledger with receipts** |
+| ![Upstart Eggs went bust: its sign tips over and its hens go to auction](docs/screenshots/bust.png) | ![The ledger for the season with an ON-CHAIN RECEIPT link per settled day](docs/screenshots/ledger.png) |
+| **Market board** | **Shop** |
+| ![Market board over the town square: split-flap ticker with sales against demand, order book, farms ranked with signs, the cast](docs/screenshots/market.png) | ![Listed hens drawn from their trait layers with laying trait and price](docs/screenshots/shop.png) |
 
-Screenshots are from a headless browser run of this build at 1280x720, with no credentials set.
+Screenshots come from a headless tour of the built game at 1280x720: the real server code in-process with 30-second demo days and live testnet settlement in the season `tour5-20261111`, and the built client in headless Edge, with 0 console errors or warnings. The sale, haggles, glut and receipts happened on their own. The bust was staged: a one-player tour had no natural bust by day 12, so the tour gave the Upstart a 64.80 Loyalist debt falling due that day, and the game's own rules did the rest (collected in full in a glut, below zero, bust). Natural busts are what the simulation shows.
 
 **Video:** _slot for a direct upload (drag the gameplay video into this section on GitHub)._
 
@@ -85,10 +104,10 @@ flowchart LR
     AG["Seven agents<br/>rules or model, memory, cash"]
     CW["Chain writer<br/>day batch"]
   end
-  DB[("Postgres<br/>PGlite locally")]
+  DB[("Postgres in production<br/>PGlite locally<br/>one season per database")]
   AI["NEAR AI Cloud<br/>structured JSON decisions"]
   subgraph Testnet["NEAR testnet"]
-    GC["coys-game.testnet<br/>NEP-171 hens, NEP-245 eggs,<br/>settle_day"]
+    GC["game contract<br/>NEP-171 hens, NEP-245 eggs,<br/>settle_day(season, day)"]
     SA["agent sub-accounts<br/>bakery1, upstart1, ..."]
     PW["player wallets<br/>(Privy)"]
   end
@@ -106,19 +125,43 @@ flowchart LR
   GC -. "eggs and hens held by" .-> PW
 ```
 
+**Where it runs.** One Node process per season serves the built client, the API and the WebSocket on one port; Pier runs it on a Mac behind a Cloudflare tunnel, and Render is the fallback with a restore path between them ([deploy/pier](deploy/pier/README.md), [deploy/render](deploy/render/README.md)).
+
+```mermaid
+flowchart LR
+  P["Players' browsers"] -- "https and wss" --> CF["Cloudflare tunnel<br/>yolkstreet.25th.dev"]
+  subgraph Mac["Pier on the Mac (main)"]
+    N["node apps/server/dist/main.js<br/>port 8787, /healthz"]
+    PG[("Postgres<br/>season s1")]
+    N <--> PG
+  end
+  CF --> N
+  subgraph Render["Render (fallback)"]
+    RN["web service<br/>same build and start"]
+    RPG[("Postgres 18<br/>private network")]
+    RN <--> RPG
+  end
+  PG -. "scripts/db-backup.ts<br/>daily and before deploys" .-> BK[["pg_dump<br/>backups/coys-time.dump"]]
+  BK -. "scripts/db-restore.ts<br/>in an outage" .-> RPG
+  N -- "settle_day" --> T["play.coys-game.testnet"]
+  RN -. "same season, same contract" .-> T
+```
+
 The client never sends a balance or an outcome. It asks for actions; the only prices it sends are proposals (a haggle ask, a limit order) that the server bounds and that an agent or counterparty must accept. The server applies every action in a database transaction and answers with state and events that drive the juice.
 
 ## The economy
 
 Every number lives in one object, `ECONOMY` in [`packages/shared/src/economy.ts`](packages/shared/src/economy.ts), including every agent's costs, markups, penalties and thresholds.
 
-**Market price.** One multiplier for every grade's base price (white 1.00, cream 1.20, brown 1.50, golden 6.00), set by the total eggs sold that day by all players and agents (street sales, order fills, card deals, contract deliveries and the wholesaler's resales):
+**Market price.** One multiplier for every grade's base price (white 1.00, cream 1.20, brown 1.50, golden 6.00), set by the total eggs sold that day by all players and agents (street sales, order fills, card deals, contract deliveries and the wholesaler's resales) against demand $D_d$, which grows with the number of active farms $F_d$ (player farms plus open agents):
 
 $$
-m_{d+1} = \operatorname{clamp}\left(\left(\frac{600}{S_d}\right)^{0.8},\ 0.40,\ 2.50\right)
+m_{d+1} = \operatorname{clamp}\left(\left(\frac{D_d}{S_d}\right)^{0.8},\ 0.40,\ 2.50\right)
+\qquad
+D_d = 15 \cdot F_d
 $$
 
-At $S = 1300$, $m = 0.54$. The market has crashed when $m \le 0.80$.
+With two players and the seven agents, $D = 135$: a typical day sits near $1.00$ whether Yolk Street has two farms or twenty. The economy sheet keeps the fixed reference $D = 600$ (at $S = 1300$, $m = 0.54$). The market has crashed when $m \le 0.80$.
 
 **Hen payback.** With base laying $0.80$, feed laying multiplier $f$, breakage $b$, the tier's expected egg price $\bar p$ at multiplier $m$, and feed at $0.12$ kg a day from a 25 kg bag of price $P$:
 
@@ -136,13 +179,13 @@ On standard feed at $m = 1$: margin $= 0.4624$, payback $= 17.3$ days.
 
 | Agent | Role | Character (rule policy and haggling) |
 |---|---|---|
-| **Upstart Eggs** | rival farm | Over-expands on good weeks (fills coops to 140% when the market is hot), cheap feed, dumps every egg: crashes hardest in a glut. Undercuts players to the trader. Haggles loosely. |
-| **Old Money Farms** | rival farm | Never panics: holds eggs in a slump, keeps cash, premium feed, buys bust farms' hens at auction. Makes buyout offers to struggling players. Proud: walks away from insulting asks. |
+| **Upstart Eggs** | rival farm | Lives on the Loyalist's feed credit. On a good week (recent closes averaging 1.08x or more) it borrows, puts every coin into hens and packs its coops past capacity; in a glut it dumps its fresh eggs below the Wholesaler's bid. Agents repay credit in full even into the red, so a boom that turns into a glut busts it. Undercuts players to the trader. Haggles loosely. |
+| **Old Money Farms** | rival farm | Never panics: below 0.90x it holds half its crate back and sells the lot once the price recovers (a glut of its own), keeps cash, premium feed, buys bust farms' hens at auction. Makes buyout offers to struggling players. Proud: walks away from insulting asks. |
 | **The Squeezer** | feed supplier | Reads desperation (low feed, low cash) and prices it in. Barely bends in a haggle. |
 | **The Loyalist** | feed supplier | Rewards repeat buyers with discounts and offers credit terms; never extends credit after a default. Bends the most. |
 | **Yolk Street Bakery** | egg buyer | Wants steady volume: offers standing contracts and posts daily buy orders. A missed delivery costs a penalty; two cancel the contract and start a sulk. |
 | **The Market Trader** | egg buyer | Pays a premium for brown and golden, up to what it resells for in town; walks away from farms whose quality slips; warns of gluts. |
-| **The Wholesaler** | egg buyer | Buys anything in bulk at a low price, resells it into the street the next day (adding to supply and pushing prices down). |
+| **The Wholesaler** | egg buyer | Buys anything in bulk at a low price (bulk-order cards sized from a farm's daily lay, standing bids under the market, deeper in a glut), resells it into the street the next day: the same eggs count as supply twice, which drags a glut out. |
 
 Each agent has its own cash, stock and **memory of every farm** (deals, value, refusals, haggles won and lost, missed deliveries, sulks) in Postgres. It decides once per in-game day and pays 0.50 coins per decision from its own cash. Below 40 coins it thinks only every other day, on the cheaper model, so a struggling business visibly gets worse. Below zero it closes: its orders and contracts end, a rival's hens go to auction at half price, and a new agent of the same role opens three days later under a fresh name.
 
@@ -181,21 +224,26 @@ Each agent has its own cash, stock and **memory of every farm** (deals, value, r
 <summary><b>Chain</b>: one contract, one call a day</summary>
 
 - `contracts/coys-game` (Rust, `near-sdk` 5.30.1): NEP-171 hens from `near-contract-standards`, NEP-245 eggs from `near-sdk-contract-tools` (`Nep245` derive without per-account storage fees, so holders need no deposit; the contract pays storage), `Owner` access control, and `settle_day`.
-- `settle_day(batch)`: owner only, days strictly in order and each once. It mints, transfers and burns egg tokens, mints hens with their metadata, moves hens that changed hands, stores the day's summary and digest, and emits a `day_settled` event.
+- `settle_day(batch)`: owner only; within a season, days strictly in order and each once. It mints, transfers and burns egg tokens, mints hens with their metadata, moves hens that changed hands, stores the day's summary and digest under (season, day), and emits a `day_settled` event with the season.
+- **Seasons**: a season is one game world from day 1, and one database holds one season (`GAME_SEASON`). A new season starts again at day 1 on the same contract while repeats within a season are refused; a server pointed at another season's database refuses to start. Version 1 settled days without seasons; `migrate` upgrades it in place and files those days under `legacy` (done on `coys-game.testnet`).
 - The batch (`apps/server/src/chain/batch.ts`): the day's trades between holders become egg transfers; then every account is reconciled to what it really holds (crate plus open sell orders, or a buyer's stock) with mints and burns, starting from the balances last confirmed on chain. A failed day is caught up by the next, and no burn exceeds a balance. Every farm's net result travels in the call with a SHA-256 digest.
 - **Hen images**: the stacked trait layers are rendered once at mint into a 32x32 PNG (about 1 KB) and stored in the token metadata as a data URI with its `media_hash`. Why: it is the simplest correct storage. The token is self-contained and verifiable from the chain alone, with no image host, pinning service or URL to keep alive, and a 1 KB portrait costs about 0.01 NEAR of storage. Mints are capped per day (`CHAIN_HEN_MINTS_PER_DAY`, default 12) and wait when the game account runs low.
 - **Agent wallets**: sub-accounts of the game account, funded from it (`AGENT_ACCOUNT_FUNDING_NEAR`, default 0.05), with keys derived from the game key by HMAC so no extra secret is stored.
 - **Players**: the Privy wallet holds their hens and eggs. Minting and transfers happen only in the day batch, never per click.
 - Testnet only, enforced in code before any key is used: accounts must be `.testnet` (or implicit), RPC hosts must be testnet, and the RPC's `chain_id` must say `testnet` before anything is signed. Without credentials, every day's batch is built the same way and logged as a NO-OP.
-- Tests: contract unit tests and **sandbox tests** (`contracts/sandbox-tests`, near-workspaces 0.24) for a full day settlement, holder transfers, and that no other account can settle or mint. They run in CI (Linux); the wasm CI builds is what gets deployed (`npm run deploy-contract -w @coys/server` checks its sha256).
+- **Deliveries on chain**: a contract delivery is a trade from the player's wallet to the Bakery's sub-account, so the day's batch moves the eggs as NEP-245 tokens between them (then burns them when the Bakery bakes). Proven on testnet (receipt above), in a dedicated test, and in every seed of the simulation.
+- Tests: 8 contract unit tests and 5 **sandbox tests** (`contracts/sandbox-tests`, near-workspaces 0.24): a full day settlement, holder transfers, only the game can settle or mint, a new season settling day 1 after an old season ended at day 3, and the version 1 wasm (kept in `contracts/sandbox-tests/res`) upgrading in place. They run in CI (Linux); the wasm CI builds is what gets deployed (`npm run deploy-contract` checks its sha256, testnet only, see [deploy/testnet.md](deploy/testnet.md)).
 
 </details>
 
 <details>
 <summary><b>Server</b>: authoritative, transactional, reconnect safe</summary>
 
-- `apps/server`: Node, `ws`, `pg` and PGlite behind one `Db` interface. `DATABASE_URL=postgres://...` uses Postgres; `pglite://<dir>` (default `.data/coys`) or `memory://` uses embedded PGlite.
-- Migrations: v1 (clock, market days, players, farms, coops, hens, unlocks, lay events, orders, ledger) and v2 (agents, memory, cards, contracts, debts, order book fields, trades, inference usage, confirmed chain balances).
+- `apps/server`: Node, `ws`, `pg` and PGlite behind one `Db` interface. `DATABASE_URL=postgres://...` uses Postgres; `pglite://<dir>` (default `.data/coys`) or `memory://` uses embedded PGlite for local play and tests. Production (`NODE_ENV=production`) refuses PGlite and requires `GAME_SEASON` and `SESSION_SECRET`.
+- Migrations run on every boot and are safe to repeat; on Postgres they run in one transaction under an advisory lock, so two instances booting together cannot race (tested on real Postgres in CI). v1 (clock, market days, players, farms, coops, hens, unlocks, lay events, orders, ledger), v2 (agents, memory, cards, contracts, debts, order book fields, trades, inference usage, confirmed chain balances), v3 (each day's demand), v4 (seasons on the clock, market days and every ledger row; market days keyed by season and day).
+- `/healthz` (and `/api/health`) reports the version and commit baked in at build time, the season, the day and a timed database round trip; it answers 503 when the database does not.
+- `DEMO_DAY_SECONDS` (20 to 3600) shortens the in-game day for recording; production ignores it unless `DEMO_MODE=1`. The client takes the day length from the server clock.
+- Backups: `scripts/db-backup.ts` (pg_dump to `backups/coys-<UTC time>.dump`) and `scripts/db-restore.ts` (pg_restore in one transaction, stops at the first error); the password reaches the tools as an environment variable, never on a command line. CI round-trips a backup between two Postgres databases.
 - Every farm cash change writes the balance and a ledger row in the same transaction; tests check the ledger total equals cash, for players and rival farms, across a 30-day simulation.
 - Mutations run one at a time; messages go out only after commit. Strict zod schemas reject any extra field. Per-player rate limits, reconnect-safe request ids.
 
@@ -210,19 +258,28 @@ Each agent has its own cash, stock and **memory of every farm** (deals, value, r
 - **Ledger**: day-by-day profit, contracts, debts, and the on-chain receipt link per day.
 - **Shop**: listed hens drawn from their trait layers with laying trait and price (auction hens marked), feed with supplier switching, coops, machines.
 - **Rival bust**: the sign tips over, a price wave crosses the ticker, medium shake, falling feathers, the collapse crash and the bust sting. **Glut**: the ticker drops red and the market tension music plays until prices recover.
+- **First-run tour**: three cards told by the farm's own hen (collecting, selling, decision cards), with the offer cards' art and swing-in; skippable and shown once per browser. Offer cards wait until it closes, and an unanswered card closes with its day.
+- **Page**: descriptive title and meta description, a favicon and a 1200x630 share image cut from the sprites by `scripts/make-share-images.ts`.
 - Everything from brief 1 stays: lays, hand collect, big haul, deal stamp, coop builds, unlocks, crash, new day.
 
 </details>
 
 <details>
-<summary><b>Simulation</b>: 30 in-game days, seven agents and two headless players</summary>
+<summary><b>Simulation</b>: 30 in-game days, five seeds, seven agents and two headless players</summary>
 
-`apps/server/test/sim.test.ts` runs the whole market for 30 days with a stub model that answers valid JSON on most calls and garbage on every fourth, under a 0.25 USD cap. One run:
+`apps/server/test/sim.test.ts` runs the whole market for 30 days on five fixed seeds. The stub model answers each agent's own in-character decision as JSON on most calls and garbage on every fourth, under a 0.25 USD cap; both headless players have wallets, and every day settles through a recording chain writer that builds the real batch. The test checks, per seed: the median day's multiplier is between 0.80 and 1.30, at least one day falls to 0.80 or below, contract eggs move on chain to the Bakery's wallet, the spend cap holds, and ledgers equal cash; and a rival busts naturally in at least three of the five seeds.
 
-- **Prices** follow supply: big supply days (271, 302, 418 eggs) drop the next day's multiplier to 1.89, 1.73 and 1.34; otherwise roughly 190 eggs a day keeps it near the 2.50 cap (the reference supply is 600, sized for a full market of players).
-- **Contracts**: 8 signed, 31 deliveries, 6 missed.
-- **Inference**: 203 decisions, 68 model calls, 152 rule fallbacks (cap reached, or a bad reply), 7 days skipped by struggling agents; spend 0.2432 USD against the 0.25 cap.
-- **Busts**: none in this 30-day run. The companion test forces a glut on Upstart Eggs (no cash, empty trough, crashed market): it goes bust on day 2, its hens go to auction, and Hatch and Dash opens as the new rival on day 5.
+| Seed | Median day | Lowest day | Days at 0.80x or below | Rival bust | Contracts (signed, delivered, missed) | Bakery contract eggs moved on chain | Wholesaler resold | Model calls, fallbacks, spend (cap 0.25 USD) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 1.10x | 0.67x | 11 | Upstart Eggs, day 25 | 8, 50, 8 | 103 | 168 | 66, 154, 0.2424 USD |
+| 2 | 1.08x | 0.66x | 10 | Upstart Eggs, day 15 | 9, 36, 13 | 78 | 231 | 64, 157, 0.2416 USD |
+| 3 | 1.07x | 0.65x | 10 | Upstart Eggs, day 17 | 8, 37, 9 | 89 | 205 | 65, 156, 0.2420 USD |
+| 4 | 1.10x | 0.66x | 11 | Upstart Eggs, day 15 | 9, 35, 13 | 94 | 239 | 64, 157, 0.2416 USD |
+| 5 | 1.16x | 0.64x | 10 | Upstart Eggs, day 15 | 8, 39, 9 | 101 | 189 | 63, 158, 0.2412 USD |
+
+Demand is 135 a day (two players and seven agents) and drops to 120 while a bust rival's successor is waiting to open. Seed 1, day by day (supply of demand, then the multiplier it set): days 6 to 18 swing between about 220 and 90 eggs as Old Money holds half its crate below 0.90x and releases it on the recovery, so the price alternates between roughly 1.3x and 0.7x; the Upstart's cash runs 12, 80, 104, 36, 121 and it busts on day 25 when its feed credit falls due in a glut. The only 2.50x day is day 2, after a first day with no sales. Hen and order ids are random, so the exact numbers move a little between runs; the acceptance holds on every run.
+
+The companion test forces a glut on Upstart Eggs (no cash, empty trough, crashed market): it goes bust on day 2, its hens go to auction, and Hatch and Dash opens as the new rival on day 5.
 
 </details>
 
@@ -245,11 +302,15 @@ Each agent has its own cash, stock and **memory of every farm** (deals, value, r
 
 ## Environment variables
 
-All optional. Copy `.env.example` to `.env` at the repo root.
+All optional for local play. Copy `.env.example` to `.env` at the repo root. Production needs `NODE_ENV=production`, `GAME_SEASON`, `SESSION_SECRET` and a Postgres `DATABASE_URL` ([deploy/pier](deploy/pier/README.md) lists every variable).
 
 | Variable | Used by | Without it |
 |---|---|---|
+| `NODE_ENV` | server | local play rules (PGlite allowed, demo days allowed) |
 | `PORT`, `DATABASE_URL`, `SESSION_SECRET` | server | 8787; PGlite at `.data/coys`; a random secret per boot |
+| `GAME_SEASON` | server | a fresh database makes its own `dev-...` season; an existing one keeps its own |
+| `DEMO_DAY_SECONDS`, `DEMO_MODE` | server | 180-second days; `DEMO_MODE=1` lets a production server use demo days |
+| `ALLOW_PGLITE_IN_PRODUCTION` | server | production refuses PGlite (set only to check a build) |
 | `ALLOW_DEV_LOGIN` | server | dev login only when Privy is not set up |
 | `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY` | server, client (via `/api/config`) | labelled local dev login |
 | `NEAR_TESTNET_ACCOUNT_ID`, `NEAR_TESTNET_PRIVATE_KEY` | server, deploy script | daily settlement is a recorded NO-OP |
@@ -268,7 +329,9 @@ All optional. Copy `.env.example` to `.env` at the repo root.
 | `npm test` | Vitest: economy, agents, haggling, market, chain batch, simulation, WebSocket, packer, pixel passes |
 | `npm run typecheck` / `npm run lint` | strict TypeScript; ESLint plus a check that no file holds an em dash |
 | `npm run build` / `npm start` | bundle the server and client; serve both on one port |
-| `npm run deploy-contract -w @coys/server` | deploy the CI-built contract to the game's testnet account (sha256 checked) |
+| `npm run deploy-contract -- --wasm <file> --account <id.testnet> [--create] [--migrate]` | deploy a CI-built contract to a testnet account (sha256 checked, mainnet refused; see [deploy/testnet.md](deploy/testnet.md)) |
+| `npx tsx scripts/db-backup.ts` / `scripts/db-restore.ts` | back up the Postgres database to `backups/`, or restore a dump into another (see [deploy/pier](deploy/pier/README.md)) |
+| `npx tsx scripts/make-share-images.ts` | cut the favicon and the share image from the sprites |
 | `cd contracts/coys-game && cargo test` | contract unit tests (CI also runs `cargo near build` and the sandbox tests) |
 
 ## Repository layout
@@ -278,25 +341,39 @@ apps/client          Vite + React shell + PixiJS world + anime.js motion + Web A
 apps/server          game server: HTTP, WebSocket, game, agents, cards, market, chain, db
 packages/shared      economy config and formulas, agent pricing, protocol, pixel passes
 contracts/coys-game  the game contract (Rust); res/ holds the CI-built wasm and its sha256
-contracts/sandbox-tests  near-workspaces sandbox tests for the contract
-scripts              asset packer, dev runner, text check
+contracts/sandbox-tests  near-workspaces sandbox tests for the contract (res/ holds the version 1 wasm)
+scripts              asset packer, dev runner, text check, testnet deploy, backups, share images
+deploy               Pier and Render settings, testnet contract accounts and seasons
+render.yaml          Render Blueprint (fallback host)
 docs/screenshots     headless captures of this build
+docs/submission      drafts: demo shot list, post drafts, form fields
 ```
 
 ## What is stubbed, and why
 
 - **Contract builds run in CI, not on this Windows machine**: Windows Application Control blocks the unsigned build scripts cargo compiles, so the contract is built and sandbox-tested on Linux in CI, and the deployed wasm is the CI artifact (its sha256 is committed and checked by the deploy script).
 - **Privy end to end** needs a real browser and inbox; the server and client sides are wired and tested headlessly up to the token check.
-- **Credit default** is remembered and blocks further credit, but there is no collection beyond the day's cash.
+- **NEAR AI decisions** need credits on the NEAR AI account (it answers 402 without them); until then every agent runs on its rule policy, which is also what the model is held to.
+- **Player credit default** is remembered and blocks further credit, but a player is never pushed below zero; agents always repay in full.
 - **Hen NFT mints are capped per day** to keep gas and the game account's storage in check; older hens catch up on later days.
+- **The live deploy** (Pier on the Mac, the tunnel, Render) is set up from [deploy/](deploy/); it is not run from this repository.
 
 ## Verification
 
-On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass; CI is green (TypeScript job and contracts job). The economy sheet tests hit their values exactly; a malformed model answer falls back to rules; the contract's sandbox tests pass and non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
+On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass. CI is green: the TypeScript job (with PostgreSQL 16: the Postgres tests, the production build booting against Postgres with `/healthz` checked, and a backup restored into a second database) and the contracts job (unit tests, `cargo near build`, sandbox tests). The economy sheet tests hit their values exactly; the five-seed simulation meets the economy acceptance; a malformed model answer falls back to rules; a new season settles day 1 after an old season ended at day 3; non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
 
-**Not verifiable headlessly:** how haggling and cards feel, whether portraits and voices read right, Privy login end to end, and how the market evolves over weeks of real play.
+**Not verifiable headlessly:** the live Pier deploy and its tunnel, a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
+
+### Brief 3: deploy, polish and submission prep (11 November 2026)
+
+- Economy tension: demand scales with active farms (15 per farm), so a typical day sits near 1.00x; the Upstart lives on feed credit and booms into busts, Old Money hoards and releases, the Wholesaler resells into gluts. Accepted on five seeds of the 30-day simulation.
+- Season-safe settlement: the contract keys days by (season, day), upgraded in place on testnet with version 1 days kept as `legacy`; one season per database, on every ledger row.
+- A Bakery contract delivery proven on testnet: egg tokens from the player's wallet to `bakery1.coys-game.testnet`.
+- Deploy readiness: `/healthz`, production checks, Postgres migrations under an advisory lock, demo days, backups and restore, Pier and Render settings, a testnet-only deploy script; CI runs Postgres, the production boot and a backup round trip.
+- Polish: first-run tour, favicon and share image, page meta, stale cards closed at the day's end; screenshots from a headless tour of the built game with live testnet receipts.
+- Submission drafts in `docs/submission`.
 
 ### Brief 2: agents, cards and chain (11 November 2026)
 
