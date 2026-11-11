@@ -1,8 +1,8 @@
 // The farm world. It mirrors the server's farm state (sync) and turns server events into motion
 // and sound (onEvent). It never decides an outcome: eggs, sales and builds come from the server.
 import { animate, createTimeline, steps } from 'animejs';
-import { Container, Graphics, RenderTexture, Sprite, type Renderer } from 'pixi.js';
-import type { CoopKind, FarmState, LaidEgg, UnlockId } from '@coys/shared';
+import { ColorMatrixFilter, Container, Graphics, Rectangle, RenderTexture, Sprite, type Renderer } from 'pixi.js';
+import type { CoopKind, FarmState, HenView, LaidEgg, UnlockId } from '@coys/shared';
 import type { AssetStore } from '../../assets/store';
 import type { AudioEngine, LoopHandle } from '../../audio/audio';
 import { juice } from '../../motion/juice';
@@ -16,8 +16,24 @@ import { FARM_W, PORTRAIT_FARM_TOP, PLOTS, PROPS, SPOTS, TRAY_W, TROUGH_SPOTS, Y
 const MAX_VISIBLE_HENS = 40;
 const TILE = 16;
 
+/** Something on the farm the player clicked. */
+export type WorldTarget =
+  | { kind: 'hen'; hen: HenView }
+  | { kind: 'crate' }
+  | { kind: 'feed' }
+  | { kind: 'coop'; coopId: string }
+  | { kind: 'farmhouse' }
+  | { kind: 'sign' }
+  | { kind: 'machine'; unlock: UnlockId };
+
+/** The hover highlight: a little brighter, nothing else changes. */
+const HOVER = new ColorMatrixFilter();
+HOVER.brightness(1.28, false);
+
 export interface FarmHooks {
   collect(eggId: string): Promise<boolean>;
+  /** Opens the card for a clicked world object. */
+  open(target: WorldTarget): void;
   /** Coins fly from a world point to the cash counter (drawn in the UI layer). */
   coins(from: Point, count: number): void;
 }
@@ -60,6 +76,7 @@ export class FarmScene implements Scene {
   private ground: Sprite | null = null;
   private readonly extras: FrameSprite[] = [];
   private view = { w: 640, h: 360, x: 0, y: 0 };
+  private readonly targetsList = new Map<FrameSprite, () => WorldTarget>();
 
   constructor(
     private readonly assets: AssetStore,
@@ -90,11 +107,11 @@ export class FarmScene implements Scene {
     }
 
     for (const p of PROPS) this.place(new FrameSprite(assets, ['24-farm-props'], p.row).desync(), p);
-    this.farmhouse = this.place(new FrameSprite(assets, ['16-farmhouse'], 'day'), SPOTS.farmhouse);
-    this.place(new FrameSprite(assets, ['17-sign-farm'], 'sway').desync(), SPOTS.sign);
-    this.trough = this.place(new FrameSprite(assets, ['14-trough'], 'full'), SPOTS.trough);
-    this.sack = this.place(new FrameSprite(assets, ['13-sack-standard'], 'idle'), SPOTS.sack);
-    this.crate = this.place(new FrameSprite(assets, ['12-crate'], 'empty'), SPOTS.crate);
+    this.farmhouse = this.clickable(this.place(new FrameSprite(assets, ['16-farmhouse'], 'day'), SPOTS.farmhouse), () => ({ kind: 'farmhouse' }));
+    this.clickable(this.place(new FrameSprite(assets, ['17-sign-farm'], 'sway').desync(), SPOTS.sign), () => ({ kind: 'sign' }));
+    this.trough = this.clickable(this.place(new FrameSprite(assets, ['14-trough'], 'full'), SPOTS.trough), () => ({ kind: 'feed' }));
+    this.sack = this.clickable(this.place(new FrameSprite(assets, ['13-sack-standard'], 'idle'), SPOTS.sack), () => ({ kind: 'feed' }));
+    this.crate = this.clickable(this.place(new FrameSprite(assets, ['12-crate'], 'empty'), SPOTS.crate), () => ({ kind: 'crate' }));
 
     this.ambience.day = audio.loop('39-day', { volume: 0.45, fadeMs: 1200 });
   }
@@ -105,6 +122,49 @@ export class FarmScene implements Scene {
     this.ysort.addChild(s);
     this.animated.push(s);
     return s;
+  }
+
+  /**
+   * Makes a world object answer the pointer: brighter on hover, the pointer cursor, a click sound
+   * and its card on click. The hit box is the art's own box, a pixel larger all round.
+   */
+  private clickable<T extends FrameSprite>(s: T, target: () => WorldTarget): T {
+    s.eventMode = 'static';
+    s.cursor = 'pointer';
+    const b = s.getLocalBounds();
+    s.hitArea = new Rectangle(b.minX - 1, b.minY - 1, b.maxX - b.minX + 2, b.maxY - b.minY + 2);
+    s.on('pointerover', () => {
+      s.filters = [HOVER];
+    });
+    s.on('pointerout', () => {
+      s.filters = [];
+    });
+    s.on('pointertap', () => {
+      this.audio.play('35-click', { volume: 0.6 });
+      this.hooks.open(target());
+    });
+    this.targetsList.set(s, target);
+    s.once('destroyed', () => this.targetsList.delete(s));
+    return s;
+  }
+
+  /**
+   * Every clickable thing on screen with its box in CSS pixels, and the ground eggs. Read only; the
+   * automated checks use it to find what to click (the world is drawn, not in the DOM).
+   */
+  targets(): { kind: string; id?: string; x: number; y: number; w: number; h: number }[] {
+    const box = (s: Container) => {
+      const b = s.getBounds();
+      return { x: Math.round(b.minX), y: Math.round(b.minY), w: Math.round(b.maxX - b.minX), h: Math.round(b.maxY - b.minY) };
+    };
+    const out: { kind: string; id?: string; x: number; y: number; w: number; h: number }[] = [];
+    for (const [s, t] of this.targetsList) {
+      if (s.destroyed || !s.visible) continue;
+      const v = t();
+      out.push({ kind: v.kind, id: v.kind === 'hen' ? v.hen.id : v.kind === 'machine' ? v.unlock : v.kind === 'coop' ? v.coopId : undefined, ...box(s) });
+    }
+    for (const [id, g] of this.eggs) if (!g.pending && !g.s.destroyed) out.push({ kind: 'egg', id, ...box(g.s) });
+    return out;
   }
 
   private unplace(s: FrameSprite): void {
@@ -192,6 +252,7 @@ export class FarmScene implements Scene {
     for (const h of shown) {
       if (this.hens.has(h.id)) continue;
       const actor = new HenActor(this.assets, h, first ? randomIn(YARD) : SPOTS.gate);
+      this.clickable(actor.sprite, () => ({ kind: 'hen', hen: this.farm?.hens.find((x) => x.id === h.id) ?? h }));
       this.hens.set(h.id, actor);
       this.ysort.addChild(actor.sprite);
       if (!first) actor.walkTo(randomIn(YARD));
@@ -203,7 +264,7 @@ export class FarmScene implements Scene {
       const plot = PLOTS[c.plot] ?? PLOTS[0];
       if (!plot) continue;
       if (!have) {
-        const s = this.place(new FrameSprite(this.assets, [`15-coop-${c.kind}`], 'idle').desync(), plot);
+        const s = this.clickable(this.place(new FrameSprite(this.assets, [`15-coop-${c.kind}`], 'idle').desync(), plot), () => ({ kind: 'coop', coopId: c.id }));
         this.coops.set(c.id, { s, kind: c.kind, plot: c.plot });
       } else if (have.kind !== c.kind) {
         have.kind = c.kind;
@@ -218,7 +279,7 @@ export class FarmScene implements Scene {
     const sackId = `13-sack-${farm.feedTier}`;
     if (!this.machines.has(`sack:${sackId}`)) {
       this.unplace(this.sack);
-      this.sack = this.place(new FrameSprite(this.assets, [sackId], 'idle'), SPOTS.sack);
+      this.sack = this.clickable(this.place(new FrameSprite(this.assets, [sackId], 'idle'), SPOTS.sack), () => ({ kind: 'feed' }));
       this.machines.set(`sack:${sackId}`, this.sack);
       for (const k of [...this.machines.keys()]) if (k.startsWith('sack:') && k !== `sack:${sackId}`) this.machines.delete(k);
     }
@@ -264,6 +325,7 @@ export class FarmScene implements Scene {
         const s = new FrameSprite(this.assets, ['18-conveyor'], row);
         s.position.set(x, SPOTS.conveyorY);
         s.zIndex = SPOTS.conveyorY - 12;
+        this.clickable(s, () => ({ kind: 'machine', unlock: 'conveyor' }));
         this.ysort.addChild(s);
         this.conveyor.push(s);
         if (boot) {
@@ -276,7 +338,7 @@ export class FarmScene implements Scene {
     }
     if (this.machines.has(u)) return;
     const m = MACHINE_SPRITES[u];
-    const s = this.place(new FrameSprite(this.assets, [m.id], m.idle).desync(), m.at);
+    const s = this.clickable(this.place(new FrameSprite(this.assets, [m.id], m.idle).desync(), m.at), () => ({ kind: 'machine', unlock: u }));
     this.machines.set(u, s);
     if (u === 'grader') this.machineLoops.set('grader', this.audio.loop('26-sorter', { volume: 0.14, fadeMs: 800 }) as LoopHandle);
     if (!boot) return;
@@ -435,11 +497,12 @@ export class FarmScene implements Scene {
       duration: 420,
       ease: 'inQuad',
       onUpdate: () => {
+        if (s.destroyed) return;
         const p = box.p;
         s.position.set(Math.round(from.x + (to.x - from.x) * p), Math.round(from.y + (to.y - from.y) * p - 36 * 4 * p * (1 - p)));
       },
       onComplete: () => {
-        s.destroy();
+        if (!s.destroyed) s.destroy();
         onLand();
       },
     });
@@ -463,6 +526,15 @@ export class FarmScene implements Scene {
     this.eggs.set(egg.id, g);
     s.eventMode = 'static';
     s.cursor = 'pointer';
+    const eb = s.getLocalBounds();
+    // eggs are small: a generous hit box so a tap on a phone finds them
+    s.hitArea = new Rectangle(eb.minX - 3, eb.minY - 3, eb.maxX - eb.minX + 6, eb.maxY - eb.minY + 6);
+    s.on('pointerover', () => {
+      s.filters = [HOVER];
+    });
+    s.on('pointerout', () => {
+      s.filters = [];
+    });
     s.on('pointertap', () => {
       if (g.pending) return;
       g.pending = true;
@@ -481,7 +553,7 @@ export class FarmScene implements Scene {
       duration: 260,
       ease: 'inQuad',
       onUpdate: () => {
-        s.y = Math.round(at.y + k.y);
+        if (!s.destroyed) s.y = Math.round(at.y + k.y);
       },
       onComplete: () => {
         const b = { sx: 1.35, sy: 0.65 };

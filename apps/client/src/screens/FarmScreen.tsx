@@ -2,11 +2,11 @@
 // the ledger, and the market board over the town square. Server state flows in through the
 // socket; player choices go out as actions and come back as events with juice.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isCrash, type CardView } from '@coys/shared';
+import { isCrash, type CardView, type UnlockId } from '@coys/shared';
 import { useServices } from '../app/services';
 import { worldToUi } from '../app/viewport';
 import { GameSocket, type Action } from '../net/socket';
-import { FarmScene } from '../pixi/farm/FarmScene';
+import { FarmScene, type WorldTarget } from '../pixi/farm/FarmScene';
 import { TownScene } from '../pixi/TownScene';
 import { events, game } from '../state/game';
 import { useStore } from '../state/store';
@@ -19,7 +19,35 @@ import { Ticker, TopBar } from '../ui/Hud';
 import { LedgerPanel } from '../ui/Ledger';
 import { MarketBoard } from '../ui/MarketBoard';
 import { Onboarding, onboardingSeen } from '../ui/Onboarding';
-import { ShopPanel } from '../ui/Panels';
+import { ShopPanel, type ShopTab } from '../ui/Panels';
+import { HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
+
+type OpenPanel =
+  | { kind: 'shop'; tab: ShopTab }
+  | { kind: 'ledger' }
+  | { kind: 'hen'; henId: string }
+  | { kind: 'sell' }
+  | { kind: 'machine'; unlock: UnlockId };
+
+/** What clicking each thing on the farm opens. */
+function panelFor(t: WorldTarget): OpenPanel | 'market' {
+  switch (t.kind) {
+    case 'hen':
+      return { kind: 'hen', henId: t.hen.id };
+    case 'crate':
+      return { kind: 'sell' };
+    case 'feed':
+      return { kind: 'shop', tab: 'feed' };
+    case 'coop':
+      return { kind: 'shop', tab: 'coops' };
+    case 'farmhouse':
+      return { kind: 'ledger' };
+    case 'sign':
+      return 'market';
+    case 'machine':
+      return { kind: 'machine', unlock: t.unlock };
+  }
+}
 
 const REFUSALS: Record<string, string> = {
   insufficient_funds: 'NOT ENOUGH COINS',
@@ -35,7 +63,7 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
   const farm = useStore(game, (s) => s.farm);
   const market = useStore(game, (s) => s.market);
   const status = useStore(game, (s) => s.status);
-  const [panel, setPanel] = useState<'shop' | 'ledger' | null>(null);
+  const [panel, setPanel] = useState<OpenPanel | null>(null);
   const [view, setView] = useState<'farm' | 'market'>('farm');
   // first run on this browser: three cards on collecting, selling and decision cards
   const [tour, setTour] = useState(() => !onboardingSeen());
@@ -76,8 +104,14 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
     const s = new FarmScene(assets, audio, pixi.app.renderer, {
       collect: (eggId) => send({ t: 'collect', eggId }),
       coins: (from, count) => uiFx.emit({ kind: 'coins', from: worldToUi(from), count }),
+      open: (target) => {
+        const p = panelFor(target);
+        if (p === 'market') setView('market');
+        else setPanel(p);
+      },
     });
     scene.current = s;
+    (window as unknown as { __coysFarm?: unknown }).__coysFarm = { targets: () => s.targets() };
     s.sync(farm);
     pixi.setScene(s);
   }, [farm, assets, audio, pixi, send]);
@@ -211,10 +245,10 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
     <div className="layer">
       <TopBar
         farm={farm}
-        onShop={() => setPanel('shop')}
+        onShop={() => setPanel({ kind: 'shop', tab: 'hens' })}
         onSettings={onSettings}
         onMarket={() => setView(view === 'market' ? 'farm' : 'market')}
-        onLedger={() => setPanel('ledger')}
+        onLedger={() => setPanel({ kind: 'ledger' })}
       />
       {view === 'market' ? (
         <div className="stage640">
@@ -237,8 +271,17 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
       )}
       {panel && (
         <div className="stage640" style={{ zIndex: 20 }}>
-          {panel === 'shop' && <ShopPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
-          {panel === 'ledger' && <LedgerPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
+          {panel.kind === 'shop' && <ShopPanel key={panel.tab} tab={panel.tab} farm={farm} send={send} onClose={() => setPanel(null)} />}
+          {panel.kind === 'ledger' && <LedgerPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
+          {panel.kind === 'sell' && <SellPanel farm={farm} market={market} send={send} onClose={() => setPanel(null)} />}
+          {panel.kind === 'machine' && (
+            <MachinePanel unlock={panel.unlock} farm={farm} onShop={() => setPanel({ kind: 'shop', tab: 'machines' })} onClose={() => setPanel(null)} />
+          )}
+          {panel.kind === 'hen' &&
+            (() => {
+              const hen = farm.hens.find((h) => h.id === panel.henId);
+              return hen ? <HenPanel hen={hen} onClose={() => setPanel(null)} /> : null;
+            })()}
         </div>
       )}
       {tour && view === 'farm' && <Onboarding onDone={() => setTour(false)} />}

@@ -81,6 +81,7 @@ export class FrameSprite extends Container {
   }
 
   face(dir: 1 | -1): void {
+    if (this.destroyed) return;
     this.facing = dir;
     this.scale.x = this.size * dir;
   }
@@ -91,6 +92,8 @@ export class FrameSprite extends Container {
 
   /** Scale on top of the art divisor (squash and stretch). */
   squash(sx: number, sy: number): void {
+    // tweens can outlive the sprite (an egg collected mid-bounce)
+    if (this.destroyed) return;
     this.scale.set(this.size * sx * this.facing, this.size * sy);
   }
 

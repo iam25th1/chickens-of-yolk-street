@@ -415,6 +415,42 @@ input[type='range'].slider::-moz-range-thumb {
   color: var(--cream);
 }
 
+.stat-label {
+  color: var(--straw);
+  margin-right: 2px;
+}
+
+/* Pixel tooltips under every HUD stat and button (hover, or focus on a keyboard). */
+[data-tip] {
+  position: relative;
+}
+
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  width: max-content;
+  max-width: 180px;
+  padding: 3px 4px;
+  background: var(--ink);
+  color: var(--cream);
+  box-shadow: 0 0 0 1px var(--straw);
+  font-family: var(--font-body);
+  font-size: 8px;
+  line-height: 10px;
+  white-space: normal;
+  text-align: left;
+  pointer-events: none;
+}
+
+.topbar > :nth-last-child(-n + 4)[data-tip]:hover::after {
+  left: auto;
+  right: 0;
+}
+
 .stat .value {
   min-width: 24px;
   text-align: right;

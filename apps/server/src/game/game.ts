@@ -367,8 +367,9 @@ export class Game {
       accessory: h.accessory as HenView['accessory'],
       layingTrait: num(h.laying_trait),
       ageDays: day - num(h.born_day),
+      ...(h.chain_owner === undefined ? {} : { chainOwner: h.chain_owner ? String(h.chain_owner) : null }),
     });
-    const hens = await q.query('SELECT id, body, eyes, comb, accessory, laying_trait, born_day FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id', [farmId, 'alive']);
+    const hens = await q.query('SELECT id, body, eyes, comb, accessory, laying_trait, born_day, chain_owner FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id', [farmId, 'alive']);
     const coops = await q.query('SELECT id, kind, plot FROM coops WHERE farm_id = $1 ORDER BY plot', [farmId]);
     const unlocks = await this.loadUnlocks(q, farmId);
     const eggs = await q.query('SELECT id, hen_id, at_ms, grade, broken, collected FROM lay_events WHERE farm_id = $1 AND day = $2 ORDER BY at_ms', [farmId, day]);

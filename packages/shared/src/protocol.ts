@@ -85,6 +85,8 @@ export interface HenView {
   accessory: 'none' | 'tophat' | 'bowtie' | 'shades';
   layingTrait: number;
   ageDays: number;
+  /** The NEAR testnet account holding her NFT (token hen-<id>), or null until a day close mints her. */
+  chainOwner?: string | null;
 }
 
 /** A hen in the shop: fresh from the breeder or from a bust farm's auction. */

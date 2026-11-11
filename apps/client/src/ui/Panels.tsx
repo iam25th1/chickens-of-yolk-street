@@ -56,7 +56,7 @@ export function Panel({ title, x, y, w, h, onClose, children }: { title: string;
   );
 }
 
-const UNLOCK_TEXT: Record<UnlockId, { name: string; effect: string; sprite: string; row: string }> = {
+export const UNLOCK_TEXT: Record<UnlockId, { name: string; effect: string; sprite: string; row: string }> = {
   conveyor: { name: 'CONVEYOR', effect: 'BREAKAGE 5% TO 2%', sprite: '18-conveyor', row: 'horizontal' },
   grader: { name: 'EGG GRADER', effect: '+10% EGG PRICE', sprite: '19-egg-grader', row: 'idle' },
   cart: { name: 'DELIVERY CART', effect: 'DELIVERS CONTRACTS AT DUSK', sprite: '20-delivery-cart', row: 'idle' },
@@ -80,9 +80,11 @@ function HenTile({ hen, cash, onBuy }: { hen: ShopHenView; cash: number; onBuy: 
   );
 }
 
-export function ShopPanel({ farm, send, onClose }: { farm: FarmState; send: (a: Action) => Promise<boolean>; onClose: () => void }) {
+export type ShopTab = 'hens' | 'feed' | 'coops' | 'machines';
+
+export function ShopPanel({ farm, send, onClose, tab: initialTab = 'hens' }: { farm: FarmState; send: (a: Action) => Promise<boolean>; onClose: () => void; tab?: ShopTab }) {
   const { audio } = useServices();
-  const [tab, setTab] = useState<'hens' | 'feed' | 'coops' | 'machines'>('hens');
+  const [tab, setTab] = useState<ShopTab>(initialTab);
   const [count, setCount] = useState(1);
   const [tier, setTier] = useState<FeedTier>(farm.feedTier);
   const [bags, setBags] = useState(1);
