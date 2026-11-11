@@ -3,7 +3,7 @@
 // limit order), which the server bounds, and which an agent or a counterparty must accept.
 // Schemas are strict, so unknown fields are rejected.
 import { z } from 'zod';
-import { COOP_KINDS, ECONOMY, EGG_GRADES, FEED_TIERS, UNLOCK_IDS } from './economy';
+import { COOP_KINDS, ECONOMY, EGG_GRADES, FEED_TIERS, GOAL_IDS, UNLOCK_IDS, type GoalId } from './economy';
 import type { BodyColour, CoopKind, EggGrade, FeedTier, UnlockId } from './economy';
 import type { AgentKind, AgentRole, CardKind } from './market';
 
@@ -45,6 +45,7 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
     })
     .strict(),
   z.object({ t: z.literal('collect'), rid, eggId: id }).strict(),
+  z.object({ t: z.literal('claimGoal'), rid, goal: z.enum(GOAL_IDS) }).strict(),
   z
     .object({ t: z.literal('linkWallet'), rid, accountId: z.string().regex(/^([0-9a-f]{64}|[a-z0-9_-]{2,48}\.testnet)$/) })
     .strict(),
@@ -85,6 +86,8 @@ export interface HenView {
   accessory: 'none' | 'tophat' | 'bowtie' | 'shades';
   layingTrait: number;
   ageDays: number;
+  /** The NEAR testnet account holding her NFT (token hen-<id>), or null until a day close mints her. */
+  chainOwner?: string | null;
 }
 
 /** A hen in the shop: fresh from the breeder or from a bust farm's auction. */
@@ -217,6 +220,14 @@ export interface FarmState {
   debts: DebtView[];
   orders: OrderView[];
   shop: ShopHenView[];
+  /** The goal chain: claimed ones, the one that is ready to claim, and the ones still open. */
+  goals: GoalView[];
+}
+
+export interface GoalView {
+  id: GoalId;
+  state: 'open' | 'ready' | 'claimed';
+  rewardMilli: number;
 }
 
 export interface ClockState {
@@ -309,6 +320,7 @@ export type GameEvent =
   | { kind: 'cardArrived'; card: CardView }
   | { kind: 'haggle'; card: CardView; mood: 'warm' | 'firm' | 'cross' }
   | { kind: 'cardResolved'; card: CardView; outcome: CardOutcome; totalMilli: number; auto: boolean }
+  | { kind: 'goalClaimed'; goal: GoalId; rewardMilli: number }
   | { kind: 'contractDelivered'; contractId: string; qty: number; totalMilli: number; auto: boolean }
   | { kind: 'contractMissed'; contractId: string; penaltyMilli: number }
   | { kind: 'debtCharged'; debtId: string; paidMilli: number; defaulted: boolean }

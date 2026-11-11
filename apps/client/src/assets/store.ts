@@ -1,23 +1,48 @@
-// Loads packed sprite sheets into PixiJS textures. Soft art gets a hard alpha cut first; the hen
-// body layer also gets brown and black palette swaps. The packed PNGs on disk stay untouched.
+// Sprites come from the derived atlases (scripts/derive-assets.ts): every frame is already at its
+// true pixel size, cut cleanly and with its pivot, so nothing is resampled or masked at load. Atlases
+// load by screen group: boot, title, farm, market, cards, ui, fx.
 import { ImageSource, Rectangle, Texture } from 'pixi.js';
-import { ASSET_BASE, divisorFor, needsAlphaCut, type AssetIndex, type SheetJson, type SpriteEntry } from './catalog';
-import { alphaCut, ownerRows, recolourBody } from './pixels';
+import { ASSET_BASE, type AssetIndex } from './catalog';
+import derivedJson from './derived.json';
 
-/** The base hen and its trait layers share one frame layout with headroom (see prepareHens). */
-const HEN_SHEET = /^(01-hen-anims|02-.+)$/;
+export type Group = 'boot' | 'title' | 'farm' | 'market' | 'cards' | 'ui' | 'fx';
+type DerivedFrame = [x: number, y: number, w: number, h: number, px: number, py: number, ms: number];
+interface DerivedSprite {
+  group: Group;
+  scale: number;
+  grid: number;
+  sheet?: { x: number; y: number; w: number; h: number };
+  rows: Record<string, { mode: 'loop' | 'once'; frames: DerivedFrame[] }>;
+}
+interface DerivedManifest {
+  atlases: Record<string, { file: string; w: number; h: number; bytes: number }>;
+  sprites: Record<string, DerivedSprite>;
+}
+export const derived = derivedJson as unknown as DerivedManifest;
 
 export interface Frame {
   texture: Texture;
   ms: number;
 }
 
+export interface FrameRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Pivot inside the frame. */
+  px: number;
+  py: number;
+  ms: number;
+}
+
+export const atlasUrl = (group: Group): string => `${ASSET_BASE}derived/${derived.atlases[group]?.file ?? ''}`;
+
 export class AssetStore {
-  private readonly sources = new Map<string, Texture>();
-  private readonly json = new Map<string, SheetJson>();
+  private readonly atlases = new Map<Group, Texture>();
+  private readonly images = new Map<Group, ImageBitmap>();
+  private readonly pending = new Map<Group, Promise<void>>();
   private readonly frameCache = new Map<string, Frame[]>();
-  private readonly henPixels = new Map<string, Uint8ClampedArray>();
-  private readonly prescaled = new Set<string>();
 
   constructor(readonly index: AssetIndex) {}
 
@@ -27,220 +52,185 @@ export class AssetStore {
     return new AssetStore((await res.json()) as AssetIndex);
   }
 
-  entry(id: string): SpriteEntry {
-    const e = this.index.sprites[id];
-    if (!e) throw new Error(`unknown sprite ${id}`);
-    return e;
+  private sprite(id: string): DerivedSprite {
+    const s = derived.sprites[id];
+    if (!s) throw new Error(`unknown sprite ${id}`);
+    return s;
   }
 
-  url(id: string): string {
-    return `${ASSET_BASE}${this.entry(id).png}`;
+  /** Loads atlas pages for screen groups; onEach fires once per finished group (progress bars). */
+  loadGroups(groups: Group[], onEach: () => void = () => undefined): Promise<void> {
+    return Promise.all(
+      groups.map((g) => {
+        let p = this.pending.get(g);
+        if (!p) {
+          p = (async () => {
+            const res = await fetch(atlasUrl(g));
+            if (!res.ok) throw new Error(`atlas ${g}: HTTP ${res.status}`);
+            const bitmap = await createImageBitmap(await res.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+            this.images.set(g, bitmap);
+            this.atlases.set(g, new Texture({ source: new ImageSource({ resource: bitmap, scaleMode: 'nearest' }) }));
+          })();
+          this.pending.set(g, p);
+          p.catch(() => this.pending.delete(g));
+        }
+        return p.then(onEach);
+      }),
+    ).then(() => undefined);
   }
 
-  divisor(id: string): number {
-    if (this.prescaled.has(id)) return 1;
-    return divisorFor(id.split('@')[0] ?? id, this.entry(id.split('@')[0] ?? id));
+  /** Every group a set of sprites lives in. */
+  groupsOf(ids: string[]): Group[] {
+    return [...new Set(ids.map((id) => this.sprite(id).group))];
   }
 
   has(id: string): boolean {
-    return this.sources.has(id);
+    const s = derived.sprites[id];
+    return Boolean(s && this.atlases.has(s.group));
   }
 
-  sheet(id: string): SheetJson {
-    const j = this.json.get(id.split('@')[0] ?? id);
-    if (!j) throw new Error(`sprite ${id} not loaded`);
-    return j;
+  /** World pixels per atlas pixel for this sprite (1 at true size). */
+  scale(id: string): number {
+    return this.sprite(id).scale;
   }
 
-  /** Loads sheets in parallel; onEach fires once per finished sheet for progress bars. */
-  async loadSprites(ids: string[], onEach: () => void = () => undefined): Promise<void> {
-    await Promise.all(
-      ids.map(async (id) => {
-        if (this.sources.has(id)) return onEach();
-        const entry = this.entry(id);
-        const [jsonRes, imgRes] = await Promise.all([fetch(`${ASSET_BASE}${entry.json}`), fetch(`${ASSET_BASE}${entry.png}`)]);
-        if (!jsonRes.ok || !imgRes.ok) throw new Error(`sprite ${id}: HTTP ${jsonRes.status}/${imgRes.status}`);
-        this.json.set(id, (await jsonRes.json()) as SheetJson);
-        const bitmap = await createImageBitmap(await imgRes.blob(), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
-        if (!needsAlphaCut(entry)) {
-          this.sources.set(id, new Texture({ source: new ImageSource({ resource: bitmap, scaleMode: 'nearest' }) }));
-          return onEach();
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) throw new Error('2d canvas unavailable');
-        ctx.drawImage(bitmap, 0, 0);
-        const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        alphaCut(pixels.data);
-        ctx.putImageData(pixels, 0, 0);
-        this.sources.set(id, Texture.from(canvas));
-        if (HEN_SHEET.test(id)) this.henPixels.set(id, pixels.data);
-        if (id === '02-body') {
-          for (const [colour, ramp] of Object.entries(this.index.traits.bodyRecolour)) {
-            const swap = document.createElement('canvas');
-            swap.width = canvas.width;
-            swap.height = canvas.height;
-            const sctx = swap.getContext('2d');
-            if (!sctx) continue;
-            const copy = new ImageData(new Uint8ClampedArray(pixels.data), pixels.width, pixels.height);
-            recolourBody(copy.data, ramp);
-            sctx.putImageData(copy, 0, 0);
-            this.sources.set(`${id}@${colour}`, Texture.from(swap));
-            this.henPixels.set(`${id}@${colour}`, copy.data);
-          }
-        }
-        bitmap.close();
-        onEach();
-      }),
-    );
+  /** Source pixels per atlas pixel (the art's true grid). */
+  grid(id: string): number {
+    return this.sprite(id).grid;
   }
 
-  /**
-   * Builds the hen layers' frames once all hen sheets are loaded: each frame keeps only the pixels
-   * of its own row (see ownerRows) and is sampled nearest-neighbour at the hen divisor, exactly the
-   * texels the GPU would pick, into a small atlas per layer.
-   */
-  prepareHens(): void {
-    const ids = [...this.henPixels.keys()];
-    if (!ids.length || this.prescaled.size) return;
-    const base = this.entry('01-hen-anims');
-    const W = base.width;
-    const H = base.height;
-    const masks = ids.filter((id) => !id.includes('@')).map((id) => this.henPixels.get(id) as Uint8ClampedArray);
-    const owner = ownerRows(masks, W, H, 256);
-    const sheet = this.sheet('01-hen-anims');
-    const rows = Object.keys(sheet.animations);
-    const d = divisorFor('01-hen-anims', base);
-    const cellW = Math.round(256 / d);
-    const cellH = Math.round(360 / d);
-    for (const id of ids) {
-      const src = this.henPixels.get(id) as Uint8ClampedArray;
-      const canvas = document.createElement('canvas');
-      canvas.width = cellW * 4;
-      canvas.height = cellH * rows.length;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) continue;
-      const img = ctx.createImageData(canvas.width, canvas.height);
-      const placed: { row: string; i: number; x: number; y: number; w: number; h: number; f: SheetJson['frames'][string] }[] = [];
-      rows.forEach((row, r) => {
-        (sheet.animations[row] ?? []).forEach((name, i) => {
-          const f = sheet.frames[name];
-          if (!f) return;
-          const w = Math.round(f.frame.w / d);
-          const h = Math.round(f.frame.h / d);
-          const ox = i * cellW;
-          const oy = r * cellH;
-          for (let y = 0; y < h; y++) {
-            const sy = f.frame.y + Math.floor(((y + 0.5) * f.frame.h) / h);
-            for (let x = 0; x < w; x++) {
-              const sx = f.frame.x + Math.floor(((x + 0.5) * f.frame.w) / w);
-              const s = sy * W + sx;
-              if (owner[s] !== r) continue;
-              const o = ((oy + y) * canvas.width + ox + x) * 4;
-              img.data[o] = src[s * 4] ?? 0;
-              img.data[o + 1] = src[s * 4 + 1] ?? 0;
-              img.data[o + 2] = src[s * 4 + 2] ?? 0;
-              img.data[o + 3] = src[s * 4 + 3] ?? 0;
-            }
-          }
-          placed.push({ row, i, x: ox, y: oy, w, h, f });
-        });
-      });
-      ctx.putImageData(img, 0, 0);
-      const atlas = Texture.from(canvas);
-      for (const row of rows) {
-        const frames = placed
-          .filter((p) => p.row === row)
-          .sort((a, b) => a.i - b.i)
-          .map((p) => ({
-            texture: new Texture({ source: atlas.source, frame: new Rectangle(p.x, p.y, p.w, p.h), defaultAnchor: p.f.anchor }),
-            ms: p.f.duration || 100,
-          }));
-        this.frameCache.set(`${id}/${row}`, frames);
-      }
-      this.prescaled.add(id);
-    }
-    this.henPixels.clear();
+  url(id: string): string {
+    return atlasUrl(this.sprite(id).group);
   }
 
-  /** Frames of a row, as textures cut from the sheet with per-frame anchor and duration. */
+  atlasSize(id: string): { w: number; h: number } {
+    const a = derived.atlases[this.sprite(id).group];
+    return { w: a?.w ?? 1, h: a?.h ?? 1 };
+  }
+
+  rows(id: string): string[] {
+    return Object.keys(this.sprite(id).rows);
+  }
+
+  frameRects(id: string, row: string): FrameRect[] {
+    const r = this.sprite(id).rows[row];
+    if (!r) throw new Error(`sprite ${id} has no row ${row}`);
+    return r.frames.map(([x, y, w, h, px, py, ms]) => ({ x, y, w, h, px, py, ms }));
+  }
+
+  private base(id: string): Texture {
+    const t = this.atlases.get(this.sprite(id).group);
+    if (!t) throw new Error(`sprite ${id} not loaded`);
+    return t;
+  }
+
+  /** Frames of a row, with per-frame pivot and duration. */
   frames(id: string, row: string): Frame[] {
     const key = `${id}/${row}`;
     const hit = this.frameCache.get(key);
     if (hit) return hit;
-    const base = this.sources.get(id);
-    if (!base) throw new Error(`sprite ${id} not loaded`);
-    const sheet = this.sheet(id);
-    const names = sheet.animations[row];
-    if (!names) throw new Error(`sprite ${id} has no row ${row}`);
-    const out = names.map((name) => {
-      const f = sheet.frames[name];
-      if (!f) throw new Error(`missing frame ${name}`);
-      const texture = new Texture({
-        source: base.source,
-        frame: new Rectangle(f.frame.x, f.frame.y, f.frame.w, f.frame.h),
-        defaultAnchor: f.anchor,
-      });
-      return { texture, ms: f.duration || 100 };
-    });
+    const base = this.base(id);
+    const out = this.frameRects(id, row).map((f) => ({
+      texture: new Texture({ source: base.source, frame: new Rectangle(f.x, f.y, f.w, f.h), defaultAnchor: { x: f.px / f.w, y: f.py / f.h } }),
+      ms: f.ms || 100,
+    }));
     this.frameCache.set(key, out);
     return out;
   }
 
-  /** An arbitrary rectangle of a sheet (static tiles that have no row of their own). */
+  /** A rectangle of an exact-grid sheet, given in the packed sheet's own pixels (tiles, flaps). */
   region(id: string, x: number, y: number, w: number, h: number): Texture {
-    const base = this.sources.get(id);
-    if (!base) throw new Error(`sprite ${id} not loaded`);
-    return new Texture({ source: base.source, frame: new Rectangle(x, y, w, h) });
+    const s = this.sprite(id);
+    if (!s.sheet) throw new Error(`sprite ${id} has no whole sheet`);
+    const g = s.grid;
+    return new Texture({ source: this.base(id).source, frame: new Rectangle(s.sheet.x + x / g, s.sheet.y + y / g, w / g, h / g) });
+  }
+
+  /** Where a source-pixel rectangle of an exact sheet sits in its atlas (for DOM backgrounds). */
+  regionRect(id: string, x: number, y: number, w: number, h: number): { x: number; y: number; w: number; h: number } {
+    const s = this.sprite(id);
+    const g = s.grid;
+    return { x: (s.sheet?.x ?? 0) + x / g, y: (s.sheet?.y ?? 0) + y / g, w: w / g, h: h / g };
+  }
+
+  rowMode(id: string, row: string): 'loop' | 'once' {
+    return this.sprite(id).rows[row]?.mode ?? 'loop';
   }
 
   private readonly thumbs = new Map<string, string>();
 
-  /** A frame drawn small for the DOM (soft art keeps its alpha cut), as a data URL. */
-  thumbnail(id: string, row: string, frame = 0, divisor = this.divisor(id)): string {
-    const key = `${id}/${row}/${frame}/${divisor}`;
+  /** A frame as a data URL at a whole-number zoom, for the DOM. */
+  thumbnail(id: string, row: string, frame = 0, zoom = 1): string {
+    const key = `${id}/${row}/${frame}/${zoom}`;
     const hit = this.thumbs.get(key);
     if (hit) return hit;
-    const tex = this.frames(id, row)[frame]?.texture;
-    if (!tex) return '';
-    const f = tex.frame;
+    const img = this.images.get(this.sprite(id).group);
+    const f = this.frameRects(id, row)[frame];
+    if (!img || !f) return '';
     const canvas = document.createElement('canvas');
-    canvas.width = Math.round(f.width / divisor);
-    canvas.height = Math.round(f.height / divisor);
+    canvas.width = Math.max(1, Math.round(f.w * zoom));
+    canvas.height = Math.max(1, Math.round(f.h * zoom));
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tex.source.resource as CanvasImageSource, f.x, f.y, f.width, f.height, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, f.x, f.y, f.w, f.h, 0, 0, canvas.width, canvas.height);
     const url = canvas.toDataURL();
     this.thumbs.set(key, url);
     return url;
   }
 
+  /** Average colour of each edge of a sprite's first frame, for filling the window around a plate. */
+  edgeColours(id: string): { left: number; right: number; top: number; bottom: number } {
+    const img = this.images.get(this.sprite(id).group);
+    const f = this.frameRects(id, this.rows(id)[0] ?? '')[0];
+    const fallback = { left: 0x2a160c, right: 0x2a160c, top: 0x2a160c, bottom: 0x2a160c };
+    if (!img || !f) return fallback;
+    const canvas = document.createElement('canvas');
+    canvas.width = f.w;
+    canvas.height = f.h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) return fallback;
+    ctx.drawImage(img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+    const d = ctx.getImageData(0, 0, f.w, f.h).data;
+    const avg = (pts: [number, number][]) => {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      for (const [x, y] of pts) {
+        const o = (y * f.w + x) * 4;
+        r += d[o] ?? 0;
+        g += d[o + 1] ?? 0;
+        b += d[o + 2] ?? 0;
+      }
+      const n = Math.max(1, pts.length);
+      return (Math.round(r / n) << 16) | (Math.round(g / n) << 8) | Math.round(b / n);
+    };
+    const col = (x: number) => Array.from({ length: f.h }, (_, y) => [x, y] as [number, number]);
+    const row = (y: number) => Array.from({ length: f.w }, (_, x) => [x, y] as [number, number]);
+    return { left: avg(col(0)), right: avg(col(f.w - 1)), top: avg(row(0)), bottom: avg(row(f.h - 1)) };
+  }
+
   private readonly portraits = new Map<string, string>();
 
-  /** A hen's stacked trait layers (first idle frame) as a data URL, for the shop and cards. */
-  henPortrait(layers: string[]): string {
-    const key = layers.join('+');
+  /** A hen's stacked trait layers (first idle frame) as a data URL, at a whole-number zoom. */
+  henPortrait(layers: string[], zoom = 1): string {
+    const key = `${layers.join('+')}@${zoom}`;
     const hit = this.portraits.get(key);
     if (hit) return hit;
-    const frames = layers.map((id) => this.frames(id, 'idle')[0]?.texture).filter((t): t is Texture => Boolean(t));
-    const first = frames[0];
-    if (!first) return '';
+    const first = layers[0];
+    const img = first ? this.images.get(this.sprite(first).group) : undefined;
+    const rects = layers.map((id) => this.frameRects(id, 'idle')[0]).filter((r): r is FrameRect => Boolean(r));
+    const r0 = rects[0];
+    if (!img || !r0) return '';
     const canvas = document.createElement('canvas');
-    canvas.width = first.frame.width;
-    canvas.height = first.frame.height;
+    canvas.width = r0.w * zoom;
+    canvas.height = r0.h * zoom;
     const ctx = canvas.getContext('2d');
     if (!ctx) return '';
     ctx.imageSmoothingEnabled = false;
-    for (const t of frames) ctx.drawImage(t.source.resource as CanvasImageSource, t.frame.x, t.frame.y, t.frame.width, t.frame.height, 0, 0, t.frame.width, t.frame.height);
+    for (const r of rects) ctx.drawImage(img, r.x, r.y, r.w, r.h, 0, 0, r.w * zoom, r.h * zoom);
     const url = canvas.toDataURL();
     this.portraits.set(key, url);
     return url;
-  }
-
-  rowMode(id: string, row: string): 'loop' | 'once' {
-    return this.entry(id.split('@')[0] ?? id).rows[row]?.mode ?? 'loop';
   }
 }

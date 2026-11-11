@@ -13,6 +13,11 @@ export type CoopKind = (typeof COOP_KINDS)[number];
 export const UNLOCK_IDS = ['conveyor', 'grader', 'cart', 'hopper', 'clerk'] as const;
 export type UnlockId = (typeof UNLOCK_IDS)[number];
 
+/** The goal chain that teaches the game, in order, with its coin rewards. */
+export const GOAL_IDS = ['collect', 'sell', 'coop', 'haggle', 'machine', 'rival'] as const;
+export type GoalId = (typeof GOAL_IDS)[number];
+export const GOAL_REWARDS: Record<GoalId, number> = { collect: 2, sell: 3, coop: 5, haggle: 5, machine: 8, rival: 10 };
+
 export const BODY_COLOURS = ['cream', 'brown', 'black'] as const;
 export type BodyColour = (typeof BODY_COLOURS)[number];
 

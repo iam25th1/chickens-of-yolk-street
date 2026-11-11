@@ -63,8 +63,8 @@ export function FxLayer() {
         if (fx.kind === 'coins') {
           const host = layer.current;
           if (!host) return;
-          const sheet = assets.sheet('35-particles');
-          const frame = sheet.frames['coin/0']?.frame;
+          const frame = assets.frameRects('35-particles', 'coin')[0];
+          const atlas = assets.atlasSize('35-particles');
           for (let i = 0; i < fx.count; i++) {
             const c = document.createElement('div');
             c.className = 'sprite';
@@ -75,8 +75,8 @@ export function FxLayer() {
               width: '16px',
               height: '16px',
               backgroundImage: `url(${assets.url('35-particles')})`,
-              backgroundSize: `${sheet.meta.size.w / 8}px ${sheet.meta.size.h / 8}px`,
-              backgroundPosition: frame ? `${-frame.x / 8}px ${-frame.y / 8}px` : '0 0',
+              backgroundSize: `${atlas.w}px ${atlas.h}px`,
+              backgroundPosition: frame ? `${-frame.x}px ${-frame.y}px` : '0 0',
             });
             host.appendChild(c);
             const from = { x: fx.from.x - 8 + (Math.random() * 16 - 8), y: fx.from.y - 8 };
@@ -105,13 +105,15 @@ export function FxLayer() {
 
   return (
     <div ref={layer} className="layer" style={{ zIndex: 25 }}>
-      {stamps.map((s) => (
-        <Stamp key={s.id} row={s.row} coins={s.coins} onDone={() => setStamps((all) => all.filter((x) => x.id !== s.id))} />
-      ))}
-      {bust && <BustBanner key={bust.id} name={bust.name} sign={bust.sign} />}
-      {toasts.map((t, i) => (
-        <Toast key={t.id} text={t.text} tone={t.tone} index={i} />
-      ))}
+      <div className="stage640">
+        {stamps.map((s) => (
+          <Stamp key={s.id} row={s.row} coins={s.coins} onDone={() => setStamps((all) => all.filter((x) => x.id !== s.id))} />
+        ))}
+        {bust && <BustBanner key={bust.id} name={bust.name} sign={bust.sign} />}
+        {toasts.map((t, i) => (
+          <Toast key={t.id} text={t.text} tone={t.tone} index={i} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -138,7 +140,7 @@ function BustBanner({ name, sign }: { name: string; sign: string | null }) {
   useEffect(() => {
     if (el.current) motion.enter(el.current);
     if (!sign) return;
-    const names = assets.sheet(sign).animations['tip-over'] ?? [];
+    const names = assets.frameRects(sign, 'tip-over');
     let i = 0;
     const t = setInterval(() => {
       i = Math.min(names.length - 1, i + 1);
@@ -148,7 +150,7 @@ function BustBanner({ name, sign }: { name: string; sign: string | null }) {
   }, [assets, sign]);
   return (
     <div ref={el} className="panel" style={{ left: 150, top: 110, width: 210, height: 96, zIndex: 35, textAlign: 'center' }}>
-      {sign && <img alt="" className="sprite" width={64} height={43} src={assets.thumbnail(sign, 'tip-over', frame, 6)} />}
+      {sign && <SheetSprite id={sign} row="tip-over" frame={frame} style={{ margin: '0 auto' }} />}
       <div className="display" style={{ color: '#b8321f' }}>{name.toUpperCase()}</div>
       <div>WENT BUST. THEIR HENS ARE AT AUCTION.</div>
     </div>

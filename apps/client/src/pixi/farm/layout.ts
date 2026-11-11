@@ -1,12 +1,18 @@
-// Where things stand on the farm, in game pixels (640x360). The HUD covers the top 24 px,
-// the card tray the right 132 px and the ticker the bottom 16 px.
+// Where things stand on the farm, in world pixels. The farm itself is FARM_W x 360; the window shows
+// more ground around it (see FarmScene.resize). The HUD covers the top 24 px, the card tray the
+// right 132 px (the bottom of the window in portrait) and the ticker the bottom 16 px.
 
 export interface Point {
   x: number;
   y: number;
 }
 
-export const FIELD = { left: 0, top: 24, right: 508, bottom: 344 };
+export const FARM_W = 508;
+export const TRAY_W = 132;
+/** In portrait the top bar wraps to two rows and the tray sits under the farm. */
+export const PORTRAIT_FARM_TOP = 40;
+
+export const FIELD = { left: 0, top: 24, right: FARM_W, bottom: 344 };
 
 /** The straw yard the hens roam. */
 export const YARD = { left: 24, top: 150, right: 392, bottom: 304 };

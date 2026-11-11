@@ -21,7 +21,9 @@ import { motion } from '../motion/ui';
 import type { Action } from '../net/socket';
 import { henLayers } from '../pixi/farm/HenActor';
 import { settings } from '../state/settings';
+import { replayTour } from '../state/tour';
 import { useStore } from '../state/store';
+import { SheetSprite } from './SheetSprite';
 
 export function Panel({ title, x, y, w, h, onClose, children }: { title: string; x: number; y: number; w: number; h: number; onClose: () => void; children: ReactNode }) {
   const { audio } = useServices();
@@ -55,7 +57,7 @@ export function Panel({ title, x, y, w, h, onClose, children }: { title: string;
   );
 }
 
-const UNLOCK_TEXT: Record<UnlockId, { name: string; effect: string; sprite: string; row: string }> = {
+export const UNLOCK_TEXT: Record<UnlockId, { name: string; effect: string; sprite: string; row: string }> = {
   conveyor: { name: 'CONVEYOR', effect: 'BREAKAGE 5% TO 2%', sprite: '18-conveyor', row: 'horizontal' },
   grader: { name: 'EGG GRADER', effect: '+10% EGG PRICE', sprite: '19-egg-grader', row: 'idle' },
   cart: { name: 'DELIVERY CART', effect: 'DELIVERS CONTRACTS AT DUSK', sprite: '20-delivery-cart', row: 'idle' },
@@ -68,9 +70,9 @@ function HenTile({ hen, cash, onBuy }: { hen: ShopHenView; cash: number; onBuy: 
   const traits = [hen.body, hen.eyes !== 'default' ? hen.eyes : '', hen.comb !== 'default' ? hen.comb : '', hen.accessory !== 'none' ? hen.accessory : ''].filter(Boolean);
   return (
     <div className="col" style={{ width: 70, gap: 2, alignItems: 'center', background: hen.source === 'auction' ? '#e3cc96' : undefined, padding: 2 }}>
-      <img alt="" className="sprite" width={43} height={44} style={{ objectFit: 'none', objectPosition: '0 0' }} src={assets.henPortrait(henLayers(hen))} />
+      <img alt="" className="sprite" width={32} height={32} style={{ objectFit: 'none', objectPosition: '50% 100%' }} src={assets.henPortrait(henLayers(hen))} />
       <span style={{ textAlign: 'center' }}>{traits.join(' ').toUpperCase()}</span>
-      <span>LAYS X{hen.layingTrait.toFixed(2)}</span>
+      <span>LAYS {Math.round(hen.layingTrait * 100)}%</span>
       <button className={`btn ${hen.source === 'auction' ? 'red' : ''}`} disabled={cash < hen.priceMilli / 1000} onClick={onBuy}>
         {hen.source === 'auction' ? 'AUCTION ' : ''}
         {(hen.priceMilli / 1000).toFixed(0)}
@@ -79,9 +81,11 @@ function HenTile({ hen, cash, onBuy }: { hen: ShopHenView; cash: number; onBuy: 
   );
 }
 
-export function ShopPanel({ farm, send, onClose }: { farm: FarmState; send: (a: Action) => Promise<boolean>; onClose: () => void }) {
-  const { audio, assets } = useServices();
-  const [tab, setTab] = useState<'hens' | 'feed' | 'coops' | 'machines'>('hens');
+export type ShopTab = 'hens' | 'feed' | 'coops' | 'machines';
+
+export function ShopPanel({ farm, send, onClose, tab: initialTab = 'hens' }: { farm: FarmState; send: (a: Action) => Promise<boolean>; onClose: () => void; tab?: ShopTab }) {
+  const { audio } = useServices();
+  const [tab, setTab] = useState<ShopTab>(initialTab);
   const [count, setCount] = useState(1);
   const [tier, setTier] = useState<FeedTier>(farm.feedTier);
   const [bags, setBags] = useState(1);
@@ -132,7 +136,7 @@ export function ShopPanel({ farm, send, onClose }: { farm: FarmState; send: (a: 
             <span>SUPPLIER</span>
             {(['loyalist', 'squeezer'] as const).map((s) => (
               <button key={s} className={`chip ${farm.supplier === s ? 'on' : ''}`} style={{ border: 0, font: 'inherit' }} onClick={click(() => void send({ t: 'setSupplier', supplier: s }))}>
-                <img alt="" className="sprite" width={16} height={16} src={assets.thumbnail(s === 'loyalist' ? '07-loyalist' : '06-squeezer', 'idle', 0, 16)} />
+                <SheetSprite id={s === 'loyalist' ? '07-loyalist' : '06-squeezer'} row="idle" zoom={0.25} />
                 {s === 'loyalist' ? 'THE LOYALIST' : 'THE SQUEEZER'}
               </button>
             ))}
@@ -140,7 +144,7 @@ export function ShopPanel({ farm, send, onClose }: { farm: FarmState; send: (a: 
           <div className="row" style={{ gap: 4 }}>
             {FEED_TIERS.map((t) => (
               <button key={t} className={`chip ${t === tier ? 'on' : ''}`} style={{ border: 0, font: 'inherit' }} onClick={click(() => setTier(t))}>
-                {t.toUpperCase()} X{ECONOMY.feed.tiers[t].laying.toFixed(2)}
+                {t.toUpperCase()}: LAYING {Math.round(ECONOMY.feed.tiers[t].laying * 100)}%
               </button>
             ))}
             <button className="btn" onClick={click(() => void send({ t: 'setFeedTier', tier }))} disabled={farm.feedTier === tier}>
@@ -206,7 +210,7 @@ export function ShopPanel({ farm, send, onClose }: { farm: FarmState; send: (a: 
             return (
               <div key={u} className="row spread" style={{ height: 32 }}>
                 <div className="row" style={{ gap: 6 }}>
-                  <img alt="" src={assets.thumbnail(t.sprite, t.row, 0, u === 'conveyor' ? 4 : 8)} width={32} height={32} className="sprite" />
+                  <SheetSprite id={t.sprite} row={t.row} zoom={u === 'conveyor' ? 2 : 0.5} />
                   <div className="col" style={{ gap: 2 }}>
                     <span>{t.name}</span>
                     <span style={{ color: '#8b5a2b' }}>{t.effect}</span>
@@ -233,7 +237,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const s = useStore(settings, (v) => v);
   useEffect(() => audio.setVolumes(s.music, s.sfx), [audio, s.music, s.sfx]);
   return (
-    <Panel title="SETTINGS" x={176} y={88} w={288} h={168} onClose={onClose}>
+    <Panel title="SETTINGS" x={176} y={80} w={288} h={196} onClose={onClose}>
       <div className="col" style={{ gap: 10 }}>
         <label className="col">
           <span>MUSIC {Math.round(s.music * 100)}%</span>
@@ -264,6 +268,16 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             }}
           />
         </div>
+        <button
+          className="btn"
+          onClick={() => {
+            uiSound(audio, 'click');
+            replayTour();
+            onClose();
+          }}
+        >
+          REPLAY THE HOW-TO-PLAY TOUR
+        </button>
       </div>
     </Panel>
   );

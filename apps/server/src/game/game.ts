@@ -74,6 +74,7 @@ import {
   type Outbound,
 } from './ctx';
 import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
+import { claimGoal, goalViews, markGoal } from './goals';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
 
 export { ActionError } from './ctx';
@@ -367,8 +368,9 @@ export class Game {
       accessory: h.accessory as HenView['accessory'],
       layingTrait: num(h.laying_trait),
       ageDays: day - num(h.born_day),
+      ...(h.chain_owner === undefined ? {} : { chainOwner: h.chain_owner ? String(h.chain_owner) : null }),
     });
-    const hens = await q.query('SELECT id, body, eyes, comb, accessory, laying_trait, born_day FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id', [farmId, 'alive']);
+    const hens = await q.query('SELECT id, body, eyes, comb, accessory, laying_trait, born_day, chain_owner FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id', [farmId, 'alive']);
     const coops = await q.query('SELECT id, kind, plot FROM coops WHERE farm_id = $1 ORDER BY plot', [farmId]);
     const unlocks = await this.loadUnlocks(q, farmId);
     const eggs = await q.query('SELECT id, hen_id, at_ms, grade, broken, collected FROM lay_events WHERE farm_id = $1 AND day = $2 ORDER BY at_ms', [farmId, day]);
@@ -400,6 +402,7 @@ export class Game {
       contracts: await contractViews(ctx, farmId),
       debts: await debtViews(ctx, farmId),
       orders,
+      goals: await goalViews(q, farmId),
       shop: shopRows.map(
         (h): ShopHenView => ({
           ...henView(h),
@@ -681,8 +684,12 @@ export class Game {
       case 'sell': {
         const r = await streetSell(ctx, farm, action.items, unlocks);
         emit(ctx, farm, { kind: 'sold', items: r.sold, totalMilli: r.totalMilli, multiplier: r.multiplier });
+        if (r.totalMilli > 0) await markGoal(ctx.q, farm.id, 'sell');
         return;
       }
+      case 'claimGoal':
+        await claimGoal(ctx, farm, action.goal);
+        return;
       case 'collect': {
         const [egg] = await ctx.q.query('SELECT grade, at_ms, broken, collected FROM lay_events WHERE id = $1 AND farm_id = $2 AND day = $3', [action.eggId, farm.id, ctx.day]);
         if (!egg) throw new ActionError('not_found', 'egg not found');
@@ -693,6 +700,7 @@ export class Game {
         await ctx.q.query('UPDATE lay_events SET collected = true WHERE id = $1', [action.eggId]);
         await ctx.q.query(`UPDATE farms SET crate_${grade} = crate_${grade} + 1 WHERE id = $1`, [farm.id]);
         emit(ctx, farm, { kind: 'collected', eggId: action.eggId, grade });
+        await markGoal(ctx.q, farm.id, 'collect');
         return;
       }
       default:

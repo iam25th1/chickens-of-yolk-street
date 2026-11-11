@@ -35,7 +35,7 @@ function Card({ id, title, top, children, z = 1 }: { id: string; title: string; 
   );
 }
 
-const GRADE_SHORT = { white: 'WHT', cream: 'CRM', brown: 'BRN', golden: 'GLD' } as const;
+export const GRADE_NAME = { white: 'WHITE', cream: 'CREAM', brown: 'BROWN', golden: 'GOLDEN' } as const;
 
 export function SellCard({ farm, market, send }: { farm: FarmState; market: MarketState; send: Send }) {
   const { audio } = useServices();
@@ -44,10 +44,14 @@ export function SellCard({ farm, market, send }: { farm: FarmState; market: Mark
   const value = saleValue(farm.crate, market.multiplier, farm.unlocks);
   return (
     <Card id="29-card-bulk-order" title="SELL THE CRATE" top={4}>
+      <div className="row spread" style={{ color: '#8b5a2b' }}>
+        <span>IN CRATE</span>
+        <span>EACH</span>
+      </div>
       {(['white', 'cream', 'brown', 'golden'] as const).map((g) => (
         <div key={g} className="row spread">
           <span>
-            {GRADE_SHORT[g]} X{farm.crate[g]}
+            {farm.crate[g]} {GRADE_NAME[g]}
           </span>
           <span>{eggPrice(g, market.multiplier, farm.unlocks).toFixed(2)}</span>
         </div>
@@ -76,8 +80,9 @@ export function GlutCard({ market }: { market: MarketState }) {
   return (
     <Card id="29-card-glut-warning" title="GLUT WARNING" top={72} z={3}>
       <span>TOO MANY EGGS ON THE STREET.</span>
+      <span>PRICES ARE AT</span>
       <span className="big" style={{ color: '#b8321f' }}>
-        X{market.multiplier.toFixed(2)}
+        {Math.round(market.multiplier * 100)}%
       </span>
       <span>HOLD YOUR CRATE OR SELL INTO THE DIP.</span>
     </Card>

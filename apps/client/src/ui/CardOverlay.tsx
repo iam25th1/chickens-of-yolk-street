@@ -8,14 +8,13 @@ import { ECONOMY, type CardChoice, type CardOutcome, type CardView } from '@coys
 import { uiSound, useServices } from '../app/services';
 import { juice } from '../motion/juice';
 import type { Action } from '../net/socket';
-import { CARD_ART, CARD_TITLE, CARD_UNIT, CHOICE_LABEL, LOOK } from './cast';
+import { CARD_ART, CARD_TITLE, CARD_UNIT, CHOICE_LABEL, LOOK, acceptMeaning } from './cast';
 import { SheetSprite } from './SheetSprite';
 
 export function Portrait({ sheet, row, loop, onDone }: { sheet: string; row: string; loop: boolean; onDone?: () => void }) {
   const { assets } = useServices();
   const [i, setI] = useState(0);
-  const json = assets.sheet(sheet);
-  const names = json.animations[row] ?? [];
+  const names = assets.frameRects(sheet, row);
   useEffect(() => {
     setI(0);
     let k = 0;
@@ -28,14 +27,14 @@ export function Portrait({ sheet, row, loop, onDone }: { sheet: string; row: str
         } else k++;
         setI(k);
         step();
-      }, json.frames[names[k] ?? '']?.duration || 120);
+      }, names[k]?.ms || 120);
     };
     step();
     return () => clearTimeout(timer);
-    // names and json are stable per sheet and row
+    // names are stable per sheet and row
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheet, row, loop]);
-  return <img alt="" className="sprite" width={64} height={64} src={assets.thumbnail(sheet, row, Math.min(i, names.length - 1), 4)} />;
+  return <SheetSprite id={sheet} row={row} frame={Math.min(i, names.length - 1)} zoom={assets.grid(sheet) / 4} />;
 }
 
 const coins = (milli: number): string => (milli / 1000).toFixed(2);
@@ -175,8 +174,9 @@ export function CardOverlay({
 
   return (
     <div ref={root} className="layer" style={{ zIndex: 40 }}>
-      <div style={{ position: 'absolute', left: 0, top: 24, width: 508, height: 320, background: 'rgba(42, 22, 12, 0.55)' }} />
-      <div ref={portraitEl} className="panel" style={{ left: 40, top: 92, width: 240, height: 128, zIndex: 41 }}>
+      <div className="dim" />
+      <div className="stage640">
+      <div ref={portraitEl} className="panel" style={{ left: 40, top: 76, width: 240, height: 148, zIndex: 41 }}>
         <div className="row" style={{ alignItems: 'flex-start', gap: 8 }}>
           {look ? <Portrait sheet={look.portrait} row={portraitRow} loop={talking || portraitRow === 'idle'} /> : <div style={{ width: 64, height: 64 }} />}
           <div className="col" style={{ gap: 4, width: 150 }}>
@@ -186,6 +186,7 @@ export function CardOverlay({
             <span style={{ minHeight: 56, lineHeight: '10px' }}>{typed.toUpperCase()}</span>
           </div>
         </div>
+        {!result && <p className="meaning">{acceptMeaning(card)}</p>}
         {card.round > 0 && !result && <span style={{ color: '#8b5a2b' }}>ROUND {card.round} OF {ECONOMY.haggle.maxRounds}</span>}
       </div>
 
@@ -238,6 +239,7 @@ export function CardOverlay({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

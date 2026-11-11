@@ -15,15 +15,17 @@ export class FrameSprite extends Container {
   private size = 1;
   row = '';
   speed = 1;
+  /** The row to settle on after a play-once row ends (see rest). */
+  private base: string | null = null;
 
   constructor(
     private readonly assets: AssetStore,
     private sheets: string[],
     row: string,
-    divisor?: number,
+    scale?: number,
   ) {
     super();
-    this.size = 1 / (divisor ?? assets.divisor(sheets[0] ?? ''));
+    this.size = scale ?? assets.scale(sheets[0] ?? '');
     this.scale.set(this.size);
     this.play(row);
   }
@@ -34,6 +36,22 @@ export class FrameSprite extends Container {
     const row = this.row;
     this.row = '';
     this.play(row, { loop: this.looping });
+  }
+
+  /**
+   * The row this sprite shows when nothing else is happening, from game state. A play-once row
+   * that is still running (a spill, a tip, a drop) finishes first and then settles here, so a
+   * state update never cuts an animation off or flips the sprite back and forth.
+   */
+  rest(row: string): this {
+    this.base = row;
+    if (this.busy) return this;
+    return this.play(row);
+  }
+
+  /** A play-once row is running. */
+  get busy(): boolean {
+    return !this.looping && !this.ended && this.row !== '';
   }
 
   play(row: string, opts: { loop?: boolean; onDone?: () => void; restart?: boolean } = {}): this {
@@ -63,6 +81,7 @@ export class FrameSprite extends Container {
   }
 
   face(dir: 1 | -1): void {
+    if (this.destroyed) return;
     this.facing = dir;
     this.scale.x = this.size * dir;
   }
@@ -73,6 +92,8 @@ export class FrameSprite extends Container {
 
   /** Scale on top of the art divisor (squash and stretch). */
   squash(sx: number, sy: number): void {
+    // tweens can outlive the sprite (an egg collected mid-bounce)
+    if (this.destroyed) return;
     this.scale.set(this.size * sx * this.facing, this.size * sy);
   }
 
@@ -96,7 +117,8 @@ export class FrameSprite extends Container {
           this.ended = true;
           const done = this.onDone;
           this.onDone = null;
-          done?.();
+          if (done) done();
+          else if (this.base && this.base !== this.row) this.play(this.base);
           break;
         }
         this.i = 0;

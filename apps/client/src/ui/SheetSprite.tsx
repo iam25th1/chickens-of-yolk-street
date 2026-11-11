@@ -1,5 +1,5 @@
-// A frame of a packed sheet as a DOM element (CSS background, pixelated), optionally animated with
-// the sheet's own per-frame durations.
+// A frame of a derived atlas as a DOM element (CSS background, pixelated), optionally animated with
+// the sprite's own per-frame durations. Needs only the manifest: the browser fetches the atlas.
 import { useEffect, useState, type CSSProperties, type HTMLAttributes } from 'react';
 import { useServices } from '../app/services';
 
@@ -9,55 +9,56 @@ export interface SheetSpriteProps extends HTMLAttributes<HTMLDivElement> {
   frame?: number;
   play?: 'loop' | 'once' | false;
   onDone?: () => void;
-  /** Override the sheet's divisor (art pixels per game pixel). */
+  /** Source pixels per UI pixel, as the packed sheets count them (kept for older call sites). */
   divisor?: number;
+  /** UI pixels per atlas pixel; defaults to the sprite's world scale. */
+  zoom?: number;
 }
 
-export function SheetSprite({ id, row, frame = 0, play = false, onDone, divisor, className, style, ...rest }: SheetSpriteProps) {
+export function SheetSprite({ id, row, frame = 0, play = false, onDone, divisor, zoom, className, style, ...rest }: SheetSpriteProps) {
   const { assets } = useServices();
-  const sheet = assets.sheet(id);
-  const names = sheet.animations[row] ?? [];
+  const rects = assets.frameRects(id, row);
   const [i, setI] = useState(frame);
 
   useEffect(() => setI(frame), [frame, row]);
 
   useEffect(() => {
-    if (!play || names.length < 2) return;
+    if (!play || rects.length < 2) return;
     let index = 0;
     let timer: ReturnType<typeof setTimeout>;
     const step = () => {
-      const f = sheet.frames[names[index] ?? ''];
       timer = setTimeout(() => {
-        if (index + 1 >= names.length) {
+        if (index + 1 >= rects.length) {
           if (play === 'once') return onDone?.();
           index = 0;
         } else index++;
         setI(index);
         step();
-      }, f?.duration || 100);
+      }, rects[index]?.ms || 100);
     };
     setI(0);
     step();
     return () => clearTimeout(timer);
-    // names and sheet are stable per id and row
+    // rects are stable per id and row
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, row, play]);
 
-  const f = sheet.frames[names[Math.min(i, names.length - 1)] ?? '']?.frame;
-  const d = divisor ?? assets.divisor(id);
+  const f = rects[Math.min(i, rects.length - 1)];
   if (!f) return null;
+  const z = zoom ?? (divisor ? assets.grid(id) / divisor : assets.scale(id));
+  const atlas = assets.atlasSize(id);
   const css: CSSProperties = {
-    width: f.w / d,
-    height: f.h / d,
+    width: f.w * z,
+    height: f.h * z,
     backgroundImage: `url(${assets.url(id)})`,
-    backgroundSize: `${sheet.meta.size.w / d}px ${sheet.meta.size.h / d}px`,
-    backgroundPosition: `${-f.x / d}px ${-f.y / d}px`,
+    backgroundSize: `${atlas.w * z}px ${atlas.h * z}px`,
+    backgroundPosition: `${-f.x * z}px ${-f.y * z}px`,
     ...style,
   };
   return <div className={`sprite ${className ?? ''}`} style={css} {...rest} />;
 }
 
-/** Characters on the split-flap sheet: 13 columns of 64x96 cells. */
+/** Characters on the split-flap sheet: 13 columns of 64x96 cells (source pixels). */
 const FLAP_ROWS = ['0123456789^v.', 'ABCDEFGHIJKLM', 'NOPQRSTUVWXYZ'];
 
 export function flapRect(ch: string): { x: number; y: number } | null {

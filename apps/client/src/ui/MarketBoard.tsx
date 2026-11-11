@@ -28,7 +28,7 @@ function Board({ title, x, y, w, h, children }: { title: string; x: number; y: n
 }
 
 export function MarketBoard({ farm, market, send, onBack }: { farm: FarmState; market: MarketState; send: (a: Action) => Promise<boolean>; onBack: () => void }) {
-  const { assets, audio } = useServices();
+  const { audio } = useServices();
   const [grade, setGrade] = useState<EggGrade>('brown');
   const [qty, setQty] = useState(5);
   const [price, setPrice] = useState(() => market.pricesMilli.brown);
@@ -56,7 +56,7 @@ export function MarketBoard({ farm, market, send, onBack }: { farm: FarmState; m
           </div>
         ))}
         <div className="row spread">
-          <span>MARKET X{market.multiplier.toFixed(2)}</span>
+          <span>PRICES AT {Math.round(market.multiplier * 100)}%</span>
           <span>
             SOLD {market.supplyToday} OF {market.reference}
           </span>
@@ -71,7 +71,7 @@ export function MarketBoard({ farm, market, send, onBack }: { farm: FarmState; m
               <div key={`${r.name}-${i}`} className="row spread" style={{ opacity: r.bust ? 0.5 : 1 }}>
                 <span className="row" style={{ gap: 3 }}>
                   {look?.sign ? (
-                    <img alt="" className="sprite" width={24} height={16} src={assets.thumbnail(look.sign, r.bust ? 'tip-over' : 'sway', r.bust ? 3 : 0, 16)} />
+                    <SheetSprite id={look.sign} row={r.bust ? 'tip-over' : 'sway'} frame={r.bust ? 3 : 0} divisor={16} />
                   ) : (
                     <SheetSprite id="32-icons" row="hen" divisor={16} />
                   )}

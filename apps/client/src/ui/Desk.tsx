@@ -17,7 +17,7 @@ export function Desk({ farm, send, onOpen }: { farm: FarmState; send: (a: Action
     fn();
   };
   return (
-    <div className="col" style={{ position: 'absolute', left: 6, top: 186, width: 122, height: 130, overflowY: 'auto', gap: 3, color: '#f6e7c1' }}>
+    <div className="col desk" style={{ gap: 3, color: '#f6e7c1' }}>
       <span className="display small" style={{ fontSize: 8, lineHeight: '8px', color: '#f2c94c' }}>
         TODAY {farm.cards.length}/{ECONOMY.cards.maxPerDay} CARDS
       </span>
@@ -51,7 +51,7 @@ export function Desk({ farm, send, onOpen }: { farm: FarmState; send: (a: Action
         ))}
       {hasClerk && (
         <div className="row" style={{ gap: 2 }}>
-          <span>CLERK X{farm.clerkFloor.toFixed(2)}</span>
+          <span>CLERK TAKES {Math.round(farm.clerkFloor * 100)}%+ OF PRICE</span>
           <button className="btn" onClick={click(() => void send({ t: 'setClerkFloor', floor: Math.max(ECONOMY.clerk.minFloor, Math.round((farm.clerkFloor - 0.05) * 100) / 100) }))}>
             -
           </button>

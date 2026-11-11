@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ECONOMY, coopCapacity, feedGramsPerHenDay, type FarmState } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { motion } from '../motion/ui';
-import { events, game, gameTime } from '../state/game';
+import { dayElapsed, events, game, gameTime } from '../state/game';
 import { useStore } from '../state/store';
 import { SheetSprite, flapRect } from './SheetSprite';
 
@@ -54,15 +54,16 @@ function FlapChar({ ch }: { ch: string }) {
       run.pause();
     };
   }, [ch, shown]);
-  const sheet = assets.sheet('33-split-flap');
   const url = assets.url('33-split-flap');
-  const size = `${sheet.meta.size.w / 8}px ${sheet.meta.size.h / 8}px`;
-  const rect = flip >= 0 ? { x: flip * 64, y: 288 } : flapRect(shown);
+  const atlas = assets.atlasSize('33-split-flap');
+  const size = `${atlas.w}px ${atlas.h}px`;
+  const src = flip >= 0 ? { x: flip * 64, y: 288 } : flapRect(shown);
+  const rect = src ? assets.regionRect('33-split-flap', src.x, src.y, 64, 96) : null;
   if (!rect) return <span style={{ width: 8, height: 12, display: 'inline-block', background: '#3a1f10' }} />;
   return (
     <span
       className="sprite"
-      style={{ display: 'inline-block', width: 8, height: 12, backgroundImage: `url(${url})`, backgroundSize: size, backgroundPosition: `${-rect.x / 8}px ${-rect.y / 8}px` }}
+      style={{ display: 'inline-block', width: 8, height: 12, backgroundImage: `url(${url})`, backgroundSize: size, backgroundPosition: `${-rect.x}px ${-rect.y}px` }}
     />
   );
 }
@@ -79,10 +80,39 @@ export function SplitFlap({ text }: { text: string }) {
 
 function Stat({ icon, children, title }: { icon: string; children: ReactNode; title: string }) {
   return (
-    <div className="stat" title={title}>
+    <div className="stat" title={title} data-tip={title.toUpperCase()} tabIndex={0}>
       <SheetSprite id="32-icons" row={icon} />
       {children}
     </div>
+  );
+}
+
+/** Laid today and still on the ground (the hens drop them through the day; click one to collect it). */
+export function groundEggs(farm: FarmState): number {
+  const now = dayElapsed();
+  return farm.layPlan.filter((e) => !e.collected && !e.broken && e.atMs <= now).length;
+}
+
+/** One truth for eggs: on the ground to collect, and in the crate ready to sell. */
+function EggStats({ farm }: { farm: FarmState }) {
+  const [ground, setGround] = useState(() => groundEggs(farm));
+  useEffect(() => {
+    setGround(groundEggs(farm));
+    const t = setInterval(() => setGround(groundEggs(farm)), 500);
+    return () => clearInterval(t);
+  }, [farm]);
+  const crate = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
+  return (
+    <>
+      <Stat icon="egg" title="Eggs on the ground: click them to collect">
+        <span className="stat-label">COLLECT</span>
+        <Counter value={ground} />
+      </Stat>
+      <Stat icon="egg" title="Eggs in the crate: ready to sell">
+        <span className="stat-label">SELL</span>
+        <Counter value={crate} />
+      </Stat>
+    </>
   );
 }
 
@@ -97,7 +127,7 @@ function DayClock() {
   }, []);
   const minute = Math.floor(time.m / 10) * 10;
   return (
-    <div className="stat" title="Day and time">
+    <div className="stat" title="Day and time" data-tip="DAY AND TIME: AT MIDNIGHT THE DAY CLOSES AND THE MARKET SETTLES" tabIndex={0}>
       <SplitFlap text={`DAY${pad(clock?.day ?? 1, 3)}`} />
       <SheetSprite id="32-icons" row="clock" frame={Math.floor(time.h / 6) % 4} />
       <SplitFlap text={`${pad(time.h, 2)}.${pad(minute, 2)}`} />
@@ -109,7 +139,6 @@ export const coins = (milli: number): string => (milli / 1000).toFixed(2);
 
 export function TopBar({ farm, onShop, onSettings, onMarket, onLedger }: { farm: FarmState; onShop: () => void; onSettings: () => void; onMarket: () => void; onLedger: () => void }) {
   const { audio } = useServices();
-  const eggs = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
   const capacity = coopCapacity(farm.coops.map((c) => c.kind));
   const feed = farm.feedGrams.cheap + farm.feedGrams.standard + farm.feedGrams.premium;
   const days = farm.hens.length ? feed / (farm.hens.length * feedGramsPerHenDay()) : 0;
@@ -119,6 +148,7 @@ export function TopBar({ farm, onShop, onSettings, onMarket, onLedger }: { farm:
       style={{ height: 18, padding: '0 2px' }}
       aria-label={label}
       title={label}
+      data-tip={label.toUpperCase()}
       onMouseEnter={() => uiSound(audio, 'hover')}
       onClick={() => {
         uiSound(audio, 'click');
@@ -130,25 +160,23 @@ export function TopBar({ farm, onShop, onSettings, onMarket, onLedger }: { farm:
   );
   return (
     <div className="topbar">
-      <Stat icon="cash" title="Cash">
+      <Stat icon="cash" title="Coins to spend">
         <Counter id="cash-counter" value={farm.cashMilli} format={(v) => coins(Math.round(v))} />
       </Stat>
-      <Stat icon="egg" title="Eggs in the crate">
-        <Counter value={eggs} />
-      </Stat>
-      <Stat icon="hen" title="Hens and coop space">
+      <EggStats farm={farm} />
+      <Stat icon="hen" title="Hens, and room in your coops">
         <span className={farm.hens.length > capacity ? 'down' : ''}>
           {farm.hens.length}/{capacity}
         </span>
       </Stat>
-      <Stat icon="feed" title="Days of feed in the trough">
+      <Stat icon="feed" title="Days of feed left for your hens">
         <span className={days < 2 ? 'down' : ''}>{days.toFixed(1)}D</span>
       </Stat>
-      <div style={{ flex: 1 }} />
+      <div className="spacer" style={{ flex: 1 }} />
       <DayClock />
-      {button('market', 'Market board', onMarket)}
-      {button('ledger', 'Ledger', onLedger)}
-      {button('shop', 'Shop', onShop)}
+      {button('market', 'Market board: prices and rivals', onMarket)}
+      {button('ledger', 'Ledger: your days in coins', onLedger)}
+      {button('shop', 'Shop: hens, feed, coops, machines', onShop)}
       {button('settings', 'Settings', onSettings)}
     </div>
   );
@@ -165,7 +193,7 @@ export function Ticker({ extra = [] }: { extra?: string[] }) {
   const items = market
     ? [
         ...(['white', 'cream', 'brown', 'golden'] as const).map((g) => `${g.toUpperCase()} ${(market.pricesMilli[g] / 1000).toFixed(2)}`),
-        `MARKET X${market.multiplier.toFixed(2)}`,
+        `PRICES AT ${Math.round(market.multiplier * 100)}%`,
         `SUPPLY TODAY ${market.supplyToday}`,
         `FARMS ${market.farms.players + market.farms.agents}${market.farms.bust ? ` BUST ${market.farms.bust}` : ''}`,
         ...extra,

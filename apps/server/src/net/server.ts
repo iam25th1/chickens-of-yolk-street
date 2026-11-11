@@ -2,7 +2,7 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { isIP } from 'node:net';
-import { extname, join, normalize, resolve, sep } from 'node:path';
+import { extname, join, normalize, relative, resolve, sep } from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
 import { z } from 'zod';
 import { PROTOCOL_VERSION, parseClientMessage, type ServerMessage } from '@coys/shared';
@@ -155,14 +155,30 @@ export function createGameServer(opts: GameServerOptions): Server {
     if (!existsSync(file) || statSync(file).isDirectory()) file = join(root, 'index.html');
     if (!existsSync(file)) return false;
     const type = MIME[extname(file)] ?? 'application/octet-stream';
-    const immutable = rel.startsWith('assets/') && !rel.endsWith('index.json');
-    res.writeHead(200, {
+    const served = relative(root, file).split(sep).join('/');
+    // content-hashed names never change: cache them for a year; the rest is checked every time
+    const hashed = served.startsWith('build/') || served.startsWith('assets/derived/');
+    const packed = served.startsWith('assets/') && !served.endsWith('index.json');
+    const headers: Record<string, string> = {
       'content-type': type,
-      'cache-control': immutable ? 'public, max-age=86400' : 'no-cache',
+      'cache-control': hashed ? 'public, max-age=31536000, immutable' : packed ? 'public, max-age=86400' : 'no-cache',
       'x-content-type-options': 'nosniff',
-    });
+      vary: 'Accept-Encoding',
+    };
+    // precompressed at build (scripts/compress-dist.mjs): brotli, else gzip, else the file itself
+    const accepts = String(req.headers['accept-encoding'] ?? '');
+    let body = file;
+    for (const [enc, ext] of [['br', '.br'], ['gzip', '.gz']] as const) {
+      if (new RegExp(`\\b${enc}\\b`).test(accepts) && existsSync(file + ext)) {
+        body = file + ext;
+        headers['content-encoding'] = enc;
+        break;
+      }
+    }
+    headers['content-length'] = String(statSync(body).size);
+    res.writeHead(200, headers);
     if (req.method === 'HEAD') res.end();
-    else createReadStream(file).pipe(res);
+    else createReadStream(body).pipe(res);
     return true;
   };
 

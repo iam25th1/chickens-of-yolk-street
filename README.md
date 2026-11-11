@@ -4,11 +4,11 @@
 
 Run an egg farm in **one shared live market** where every rival, supplier and buyer is an AI agent with its own cash, memory and wallet. Egg prices, gluts and bankruptcies come only from what everyone trades, never from a script. Built at NEAR HACKATHON (tracks: games, agents, NFTs), 1 to 14 November 2026.
 
-**Play:** https://yolkstreet.25th.dev _(live URL placeholder: the deploy is set up in [deploy/pier](deploy/pier/README.md) and goes live before submission)_
+**Play:** https://yolkstreet.25th.dev (live on NEAR testnet, season `s1`; how it is hosted: [deploy/pier](deploy/pier/README.md))
 
 | | |
 |---|---|
-| **Play loop** | Hens lay on a schedule; you collect, sell, buy hens, feed, coops and machines. One in-game day is 3 real minutes, and each day brings 2 to 4 decision cards from the agents. A first-run tour of three cards explains the rest. |
+| **Play loop** | Hens lay on a schedule; you collect, sell, buy hens, feed, coops and machines. One in-game day is 3 real minutes, and each day brings 2 to 4 decision cards from the agents. Everything on the farm is clickable; a first-run tour walks the loop by doing it, then a chain of goals pays coins for learning the rest. |
 | **Market** | One price multiplier for everyone, set by the whole market's daily supply against demand that grows with the number of farms. Instant street sales, a real order book with limit orders, and player-to-player trades. |
 | **Agents** | Seven: two rival farms, two feed suppliers, three egg buyers. Each decides once a day on NEAR AI Cloud (structured JSON output) or its rule policy, pays for its thinking, remembers every deal, haggles in character, borrows, and can go bust. |
 | **Chain** | Hens are NEP-171 NFTs, eggs are NEP-245 tokens, and each day settles in one call on NEAR testnet, keyed by season and day. Agents hold sub-account wallets. Players sign in with email; their wallet is made silently. No crypto words in the game: one "on-chain receipt" link in the ledger. |
@@ -79,11 +79,11 @@ agents only once the balance is back above 2.05 NEAR (12 NEAR recommended). Eggs
 Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what to do and what you should see. Commands are the same in PowerShell and a POSIX shell unless shown otherwise.
 
 1. **Install.** Run `npm ci --ignore-scripts`. You see the lockfile install with no package install scripts (`.npmrc` also sets `ignore-scripts=true`).
-2. **Test.** Run `npm test`. On a fresh clone you see **85 tests pass and 3 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it), and the asset re-pack check needs a coys-assets checkout beside the repo. Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, and two real WebSocket clients in one market.
+2. **Test.** Run `npm test`. On a fresh clone you see **224 tests pass and 3 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it), and the asset re-pack check needs a coys-assets checkout beside the repo. Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
 3. **Play.** Run `npm run dev` and open http://localhost:5173. You see an egg fill up over the loading plate, then the title: the logo stamps in and the price ticker scrolls.
 4. **Sign in.** Press **PLAY**. With `PRIVY_APP_ID` set you sign in with email; without it a red **LOCAL DEV LOGIN** label asks for a name. You see your farm: 10 hens, a starter coop, **50.00** coins, **DAY001**.
-5. **Take the tour.** On a first visit your hen talks you through three cards: **COLLECT**, **SELL**, **DECISION CARDS**. You see each card swing in while she talks; **SKIP** closes it, and it does not come back on that browser.
-6. **Collect and sell.** Click an egg a hen just laid: you see it pop into the crate. Press **SELL N EGGS**: a **SOLD** stamp slams and coins arc to the counter.
+5. **Take the tour.** On a first visit your hen walks you through the loop by doing it: collect an egg, sell, buy feed, answer a card. Each step ends when you do the thing; **SKIP** ends the tour, and **SETTINGS** replays it. After it, the goal in the corner shows what to aim for next, with a **CLAIM** button and coins when you reach it.
+6. **Collect and sell.** Click an egg a hen just laid: you see it pop into the crate, **COLLECT** in the top bar drops by one and **SELL** rises by one. Click the crate (or press **SELL N EGGS** on the card): a **SOLD** stamp slams and coins arc to the counter. Click anything else on the farm (a hen, the trough, a coop, the farmhouse, the sign, a machine) to open its card.
 7. **Meet the agents.** From day 2 cards slide in: a portrait talks in its own voice while its line types out (the Bakery offering a standing contract, the Wholesaler a bulk order, the Squeezer a feed deal). Press **ACCEPT**: you see the right stamp slam.
 8. **Win a haggle.** On a buyer's card, press **-** a few times so **YOUR PRICE** sits just above the offer, then **COUNTER**. You see the card flip to gold with confetti and the win chime (inside the agent's walk-away price).
 9. **Lose one.** On another card, press **+** many times and **COUNTER**. You see the agent counter, get cross, and after three rounds (or at once, if it is proud) walk off with the fail sound.
@@ -115,6 +115,44 @@ Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what 
 Screenshots come from a headless tour of the built game at 1280x720: the real server code in-process with 30-second demo days and live testnet settlement in the season `tour5-20261111`, and the built client in headless Edge, with 0 console errors or warnings. The sale, haggles, glut and receipts happened on their own. The bust was staged: a one-player tour had no natural bust by day 12, so the tour gave the Upstart a 64.80 Loyalist debt falling due that day, and the game's own rules did the rest (collected in full in a glut, below zero, bust). Natural busts are what the simulation shows.
 
 **Video:** _slot for a direct upload (drag the gameplay video into this section on GitHub)._
+
+## Playability rescue (12 November 2026)
+
+A screen recording of the first live build showed a small letterboxed game with blurry pixels, hens
+that blinked out, a trough that flickered between full and empty, nothing on the farm that answered
+a click, egg counts that disagreed, codes like `WHT X0`, and more than two minutes of loading. Each
+had one cause, now fixed:
+
+| What was seen | Cause | Fix |
+|---|---|---|
+| Over 2 minutes to load (52.8 MB before the farm) | 1024 to 4096 px painted sheets, 49 MB of them, decoded and resampled in the browser; 2.7 MB of title music decoded before the title | [`scripts/derive-assets.ts`](scripts/derive-assets.ts) builds true-pixel atlases (1.8 MB in all), loaded by screen; music streams after the first tap; hashed files are cached for a year and sent brotli compressed |
+| Hens vanishing between frames | the load-time row masking gave whole hens to the row below: idle frame 4, waddle frames 1 and 4, lay frame 4 and eat frame 3 were blank | frames are cut offline by body ownership at full resolution; a test checks every frame of every animation |
+| The trough flickering | every server update forced full or empty from yesterday's feeding, fighting the spill animation | sprites keep a resting row from game state that a play-once animation returns to |
+| Nothing clickable | a nested full-size layer took every pointer event over the canvas | layers are click-through; every world object has a hover highlight and a card |
+| Eggs on the ground, crate at 0 | only collected eggs counted, and nobody could click to collect | the top bar shows eggs to collect and eggs to sell |
+| A small blurry box | a 640x360 stage at the largest whole-number scale that fit | the world is 360 pixels tall and as wide as the window, at device resolution, nearest-neighbour |
+
+<details>
+<summary><b>True sprite sizes</b> (one art pixel = one world pixel unless noted)</summary>
+
+<br>
+
+Painted sheets have no exact grid, so each one's true grid was measured from outline thickness (a
+pixel-art outline is one art pixel wide) and every block takes its majority colour.
+
+| Sheet | Grid (source px per art px) | True cell | World scale |
+|---|---|---|---|
+| hen and its trait layers | 8 | 32x32 | 1 |
+| eggs | 12 | 21x21 | 1 |
+| crate, sacks, trough, farm sign | 8 | 32x32, 32x48, 48x32, 48x32 | 1 |
+| coops | 8 | 48x48 | 2 (drawn coarser than the farm needs) |
+| farmhouse | 4 | 96x96 | 1 |
+| machines (grader, sorter, cart, hopper, clerk) | 4 | 64x64 (hopper 64x96) | 0.5 (drawn finer than the hen's grid) |
+| character portraits | 4 | 64x64 | 1 |
+| tiles, props, UI, icons, particles, stamps | 8 (exact) | 16, 32 | 1 |
+| plates, cards, logo, loading and title animation | 2 or 4 (exact) | 640x360 plates | 1 |
+
+</details>
 
 ## Architecture
 
@@ -395,6 +433,15 @@ The live Pier deploy and its tunnel were checked end to end on 11 November 2026 
 **Not verifiable headlessly:** a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
+
+### Brief 4: playability rescue (12 November 2026)
+
+- True-pixel atlases built offline from the packed sheets (coys-assets stays read only); staged loading by screen; streamed music; immutable caching and brotli.
+- Full-window rendering: a 360-pixel-tall world as wide as the window, crisp on Retina, with a usable portrait layout; HUD pinned to the window edges.
+- No flicker: frames cut by body ownership, resting rows, persistent hens; a frame test over every animation.
+- Everything clickable: hens (with their on-chain status in words), eggs, crate, trough and sack, coops, farmhouse, sign and machines.
+- Clarity: plain labels and tooltips, a tour by doing, a goal chain that pays coins, hints when the farm needs something, one plain line on every card.
+- Submission field list matched to the form's own contract.
 
 ### Brief 3: deploy, polish and submission prep (11 November 2026)
 

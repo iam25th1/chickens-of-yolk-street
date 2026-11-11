@@ -37,6 +37,7 @@ import {
   type Ctx,
   type Farm,
 } from './ctx';
+import { markGoal } from './goals';
 import { emit, executeFill, liveMultiplier, loadOrderById, recordTrade, streetSell } from './market';
 
 export interface Candidate {
@@ -276,6 +277,7 @@ async function resolve(ctx: Ctx, farm: Farm, card: CardRow, status: CardView['st
   await ctx.q.query('UPDATE cards SET status = $2, outcome_milli = $3 WHERE id = $1', [card.id, status, totalMilli]);
   card.status = status;
   emit(ctx, farm, { kind: 'cardResolved', card: await cardView(ctx, card), outcome, totalMilli, auto });
+  if (outcome === 'won' && !auto) await markGoal(ctx.q, farm.id, 'haggle');
   ctx.touched.add(farm.id);
 }
 
