@@ -1,0 +1,36 @@
+{
+  "name": "chickens-of-yolk-street",
+  "private": true,
+  "version": "0.1.0",
+  "description": "An egg farm in one shared live market where every rival, supplier and buyer is an AI agent.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "workspaces": [
+    "packages/shared",
+    "apps/server",
+    "apps/client"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build -w @coys/server && npm run build -w @coys/client",
+    "start": "node apps/server/dist/main.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json && npm run typecheck --workspaces --if-present",
+    "lint": "eslint . && tsx scripts/check-text.ts",
+    "pack-assets": "tsx scripts/pack-assets.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.6",
+    "eslint": "10.14.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.14.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.2",
+    "vitest": "5.1.0"
+  }
+}
