@@ -20,3 +20,6 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# Rust build output
+target/
