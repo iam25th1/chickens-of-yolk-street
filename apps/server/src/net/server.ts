@@ -1,7 +1,7 @@
 // HTTP API, WebSocket game protocol and (in production) the built client, on one port.
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { extname, join, normalize, sep } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
 import { z } from 'zod';
 import { PROTOCOL_VERSION, parseClientMessage, type ServerMessage } from '@coys/shared';
@@ -132,7 +132,8 @@ export function createGameServer(opts: GameServerOptions): Server {
     json(res, 200, { session: sessions.sign(who.playerId), playerId: who.playerId, name: who.name });
 
   const serveStatic = (req: IncomingMessage, res: ServerResponse, path: string): boolean => {
-    const root = opts.clientDist;
+    // normalised, so the containment check below holds for any spelling of the path
+    const root = opts.clientDist ? resolve(opts.clientDist) : null;
     if (!root || !existsSync(root) || (req.method !== 'GET' && req.method !== 'HEAD')) return false;
     const rel = normalize(decodeURIComponent(path)).replace(/^([/\\])+/, '');
     let file = join(root, rel);
