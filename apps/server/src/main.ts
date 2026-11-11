@@ -24,7 +24,7 @@ if (config.sessionSecretEphemeral) log('[auth] SESSION_SECRET unset: using a ran
 if (!config.privyAppId) log('[auth] PRIVY_APP_ID unset: running with the LOCAL DEV LOGIN only');
 
 const db = await openDb(config.databaseUrl);
-log(`[db] ${db.kind}${db.kind === 'pglite' ? ` at ${config.databaseUrl.slice('pglite://'.length)}` : ''}`);
+log(`[db] ${db.kind}${config.databaseUrl === 'memory://' ? ' in memory' : db.kind === 'pglite' ? ` at ${config.databaseUrl.slice('pglite://'.length)}` : ''}`);
 
 const renderer = new HenRenderer(join(repoRoot, 'apps/client/public/assets'));
 const chain = createChainWriter(process.env, renderer, log);
