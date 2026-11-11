@@ -21,7 +21,8 @@
     "typecheck": "tsc -p tsconfig.json && npm run typecheck --workspaces --if-present",
     "lint": "eslint . && tsx scripts/check-text.ts",
     "pack-assets": "tsx scripts/pack-assets.ts",
-    "deploy-contract": "tsx scripts/deploy-testnet-contract.ts"
+    "deploy-contract": "tsx scripts/deploy-testnet-contract.ts",
+    "derive-assets": "tsx scripts/derive-assets.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
