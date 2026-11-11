@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ECONOMY, coopCapacity, feedGramsPerHenDay, type FarmState } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { motion } from '../motion/ui';
-import { dayElapsed, events, game, gameTime } from '../state/game';
+import { dayElapsed, events, game, gameTime, sameDay } from '../state/game';
 import { useStore } from '../state/store';
 import { SheetSprite, flapRect } from './SheetSprite';
 
@@ -89,6 +89,7 @@ function Stat({ icon, children, title }: { icon: string; children: ReactNode; ti
 
 /** Laid today and still on the ground (the hens drop them through the day; click one to collect it). */
 export function groundEggs(farm: FarmState): number {
+  if (!sameDay(farm)) return 0;
   const now = dayElapsed();
   return farm.layPlan.filter((e) => !e.collected && !e.broken && e.atMs <= now).length;
 }

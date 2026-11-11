@@ -29,6 +29,15 @@ export const events = new Emitter<ClientEvent>();
 export const serverNow = (): number => Date.now() + game.get().offset;
 
 /** Milliseconds into the current in-game day. */
+/**
+ * True while the clock and a farm's lay plan are on the same day. Around midnight the new plan can
+ * arrive a moment before the new clock: measured against the old day's time, every egg of the new
+ * day would look laid already.
+ */
+export function sameDay(farm: { day: number }): boolean {
+  return game.get().clock?.day === farm.day;
+}
+
 export function dayElapsed(): number {
   const c = game.get().clock;
   return c ? Math.max(0, serverNow() - c.dayStartedAt) : 0;

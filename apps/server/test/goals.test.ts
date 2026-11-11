@@ -16,6 +16,8 @@ describe('goal chain', () => {
     t = await makeGame();
     const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-goal', 'Gus');
     let farm = await t.game.getFarmState(farmId);
+    // the state names its day, so a client never measures this plan against another day's clock
+    expect(farm.day).toBe(t.game.getClock().day);
     expect(farm.goals.map((g) => g.id)).toEqual(['collect', 'sell', 'coop', 'haggle', 'machine', 'rival']);
     expect(farm.goals[0]).toMatchObject({ id: 'collect', state: 'open', rewardMilli: toMilli(GOAL_REWARDS.collect) });
     // out of order and too early are both refused
