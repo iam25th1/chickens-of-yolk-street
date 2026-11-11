@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "npm run build -w @coys/server && npm run build -w @coys/client",
+    "build": "npm run build -w @coys/server && npm run build -w @coys/client && node scripts/compress-dist.mjs",
     "start": "node apps/server/dist/main.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json && npm run typecheck --workspaces --if-present",
