@@ -1,5 +1,5 @@
 // Client mirror of the server's state. The server is authoritative; this only displays it.
-import type { ClockState, ErrorCode, FarmState, GameEvent, MarketState } from '@coys/shared';
+import type { ClockState, ErrorCode, FarmState, GameEvent, LedgerDay, MarketState } from '@coys/shared';
 import { ECONOMY } from '@coys/shared';
 import { Emitter, createStore } from './store';
 
@@ -13,9 +13,10 @@ export interface GameView {
   clock: ClockState | null;
   /** Server clock minus local clock, in ms. */
   offset: number;
+  ledger: LedgerDay[] | null;
 }
 
-export const game = createStore<GameView>({ status: 'idle', playerName: '', farm: null, market: null, clock: null, offset: 0 });
+export const game = createStore<GameView>({ status: 'idle', playerName: '', farm: null, market: null, clock: null, offset: 0, ledger: null });
 
 export type ClientEvent =
   | GameEvent

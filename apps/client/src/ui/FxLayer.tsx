@@ -9,7 +9,8 @@ import { SheetSprite } from './SheetSprite';
 export type UiFx =
   | { kind: 'coins'; from: { x: number; y: number }; count: number }
   | { kind: 'stamp'; row: 'sold' | 'accepted' | 'declined' | 'counter'; coins: number }
-  | { kind: 'toast'; text: string; tone?: 'good' | 'bad' };
+  | { kind: 'toast'; text: string; tone?: 'good' | 'bad' }
+  | { kind: 'bust'; name: string; sign: string | null };
 
 export const uiFx = new Emitter<UiFx>();
 
@@ -53,6 +54,7 @@ export function FxLayer() {
   const layer = useRef<HTMLDivElement>(null);
   const [stamps, setStamps] = useState<{ id: number; row: string; coins: number }[]>([]);
   const [toasts, setToasts] = useState<{ id: number; text: string; tone: 'good' | 'bad' }[]>([]);
+  const [bust, setBust] = useState<{ id: number; name: string; sign: string | null } | null>(null);
   const next = useRef(0);
 
   useEffect(
@@ -88,6 +90,10 @@ export function FxLayer() {
         } else if (fx.kind === 'stamp') {
           const id = next.current++;
           setStamps((s) => [...s, { id, row: fx.row, coins: fx.coins }]);
+        } else if (fx.kind === 'bust') {
+          const id = next.current++;
+          setBust({ id, name: fx.name, sign: fx.sign });
+          setTimeout(() => setBust((b) => (b?.id === id ? null : b)), 3200);
         } else {
           const id = next.current++;
           setToasts((t) => [...t.slice(-2), { id, text: fx.text, tone: fx.tone ?? 'good' }]);
@@ -102,6 +108,7 @@ export function FxLayer() {
       {stamps.map((s) => (
         <Stamp key={s.id} row={s.row} coins={s.coins} onDone={() => setStamps((all) => all.filter((x) => x.id !== s.id))} />
       ))}
+      {bust && <BustBanner key={bust.id} name={bust.name} sign={bust.sign} />}
       {toasts.map((t, i) => (
         <Toast key={t.id} text={t.text} tone={t.tone} index={i} />
       ))}
@@ -119,6 +126,31 @@ function Toast({ text, tone, index }: { text: string; tone: 'good' | 'bad'; inde
       <div ref={el} className="toast" role="status" style={{ background: tone === 'bad' ? '#7f2215' : undefined }}>
         {text}
       </div>
+    </div>
+  );
+}
+
+/** A rival's sign tips over while its name goes down. */
+function BustBanner({ name, sign }: { name: string; sign: string | null }) {
+  const { assets } = useServices();
+  const el = useRef<HTMLDivElement>(null);
+  const [frame, setFrame] = useState(0);
+  useEffect(() => {
+    if (el.current) motion.enter(el.current);
+    if (!sign) return;
+    const names = assets.sheet(sign).animations['tip-over'] ?? [];
+    let i = 0;
+    const t = setInterval(() => {
+      i = Math.min(names.length - 1, i + 1);
+      setFrame(i);
+    }, 260);
+    return () => clearInterval(t);
+  }, [assets, sign]);
+  return (
+    <div ref={el} className="panel" style={{ left: 150, top: 110, width: 210, height: 96, zIndex: 35, textAlign: 'center' }}>
+      {sign && <img alt="" className="sprite" width={64} height={43} src={assets.thumbnail(sign, 'tip-over', frame, 6)} />}
+      <div className="display" style={{ color: '#b8321f' }}>{name.toUpperCase()}</div>
+      <div>WENT BUST. THEIR HENS ARE AT AUCTION.</div>
     </div>
   );
 }

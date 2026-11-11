@@ -99,6 +99,9 @@ export class GameSocket {
       case 'error':
         if (m.code === 'unauthenticated') game.set({ status: 'unauthenticated' });
         break;
+      case 'ledger':
+        game.set({ ledger: m.days });
+        break;
       case 'pong':
         break;
     }

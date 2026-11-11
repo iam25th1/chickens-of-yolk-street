@@ -1,7 +1,7 @@
-// The card tray: selling the crate, buying feed, and the glut warning when the market crashes.
+// The card tray: selling the crate, and the glut warning when the market crashes. Feed lives in the shop.
 // Every price shown is display only; the server prices the action when it arrives.
 import { useEffect, useRef, useState } from 'react';
-import { ECONOMY, FEED_TIERS, eggPrice, feedBagPrice, saleValue, type FarmState, type FeedTier, type MarketState } from '@coys/shared';
+import { eggPrice, saleValue, type FarmState, type MarketState } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { motion } from '../motion/ui';
 import type { Action } from '../net/socket';
@@ -67,66 +67,6 @@ export function SellCard({ farm, market, send }: { farm: FarmState; market: Mark
         }}
       >
         SELL {total} EGGS
-      </button>
-    </Card>
-  );
-}
-
-export function FeedCard({ farm, send }: { farm: FarmState; send: Send }) {
-  const { audio } = useServices();
-  const [tier, setTier] = useState<FeedTier>(farm.feedTier);
-  const [bags, setBags] = useState(1);
-  const price = feedBagPrice(tier, farm.unlocks) * bags;
-  const short: Record<FeedTier, string> = { cheap: 'CHEAP', standard: 'STD', premium: 'PREM' };
-  return (
-    <Card id="29-card-feed-deal" title="FEED BAGS" top={140}>
-      <div className="row" style={{ gap: 2 }}>
-        {FEED_TIERS.map((t) => (
-          <button
-            key={t}
-            className={`chip ${t === tier ? 'on' : ''}`}
-            style={{ border: 0, font: 'inherit', cursor: 'inherit' }}
-            onMouseEnter={() => uiSound(audio, 'hover')}
-            onClick={() => {
-              uiSound(audio, 'click');
-              setTier(t);
-              if (t !== farm.feedTier) void send({ t: 'setFeedTier', tier: t });
-            }}
-          >
-            {short[t]}
-          </button>
-        ))}
-      </div>
-      <div className="row spread">
-        <span>LAYS X{ECONOMY.feed.tiers[tier].laying.toFixed(2)}</span>
-        <span>{(farm.feedGrams[tier] / 1000).toFixed(0)}KG</span>
-      </div>
-      <div className="row spread">
-        <button className="btn" style={{ padding: '0 4px' }} onClick={() => setBags(Math.max(1, bags - 1))} aria-label="Fewer bags">
-          -
-        </button>
-        <span>
-          {bags} X {ECONOMY.feed.bagKg}KG
-        </span>
-        <button
-          className="btn"
-          style={{ padding: '0 4px' }}
-          onClick={() => setBags(Math.min(ECONOMY.limits.maxBagsPerPurchase, bags + 1))}
-          aria-label="More bags"
-        >
-          +
-        </button>
-      </div>
-      <button
-        className="btn"
-        disabled={farm.cashMilli < price * 1000}
-        onMouseEnter={() => uiSound(audio, 'hover')}
-        onClick={() => {
-          uiSound(audio, 'click');
-          void send({ t: 'buyFeed', tier, bags });
-        }}
-      >
-        BUY {price.toFixed(0)}
       </button>
     </Card>
   );
