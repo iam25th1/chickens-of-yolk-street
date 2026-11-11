@@ -17,6 +17,7 @@ import { FxLayer, uiFx } from '../ui/FxLayer';
 import { Ticker, TopBar } from '../ui/Hud';
 import { LedgerPanel } from '../ui/Ledger';
 import { MarketBoard } from '../ui/MarketBoard';
+import { Onboarding, onboardingSeen } from '../ui/Onboarding';
 import { ShopPanel } from '../ui/Panels';
 
 const REFUSALS: Record<string, string> = {
@@ -35,6 +36,8 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
   const status = useStore(game, (s) => s.status);
   const [panel, setPanel] = useState<'shop' | 'ledger' | null>(null);
   const [view, setView] = useState<'farm' | 'market'>('farm');
+  // first run on this browser: three cards on collecting, selling and decision cards
+  const [tour, setTour] = useState(() => !onboardingSeen());
   const [overlay, setOverlay] = useState<{ card: CardView; result: OverlayResult | null; mood: 'warm' | 'firm' | 'cross' | null } | null>(null);
   const queue = useRef<CardView[]>([]);
   const socket = useRef<GameSocket | null>(null);
@@ -226,7 +229,8 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
       )}
       {panel === 'shop' && <ShopPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
       {panel === 'ledger' && <LedgerPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
-      {overlay && view === 'farm' && (
+      {tour && view === 'farm' && <Onboarding onDone={() => setTour(false)} />}
+      {overlay && view === 'farm' && !tour && (
         <CardOverlay key={overlay.card.id} card={overlay.card} result={overlay.result} haggleMood={overlay.mood} send={send} onClose={showNext} />
       )}
       <FxLayer />

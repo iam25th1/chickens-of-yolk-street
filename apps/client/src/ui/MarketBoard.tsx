@@ -57,7 +57,9 @@ export function MarketBoard({ farm, market, send, onBack }: { farm: FarmState; m
         ))}
         <div className="row spread">
           <span>MARKET X{market.multiplier.toFixed(2)}</span>
-          <span>SOLD TODAY {market.supplyToday}</span>
+          <span>
+            SOLD {market.supplyToday} OF {market.reference}
+          </span>
         </div>
       </Board>
 

@@ -13,12 +13,13 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
   const { audio } = useServices();
   const days = useStore(game, (s) => s.ledger);
   const explorer = useStore(game, (s) => s.market?.explorer ?? null);
+  const season = useStore(game, (s) => s.market?.season ?? '');
   useEffect(() => {
     void send({ t: 'getLedger' });
     audio.play('13-tray', { volume: 0.5 });
   }, [send, audio]);
   return (
-    <Panel title="LEDGER" x={60} y={40} w={384} h={286} onClose={onClose}>
+    <Panel title={season ? `LEDGER, SEASON ${season.toUpperCase()}` : 'LEDGER'} x={60} y={40} w={384} h={286} onClose={onClose}>
       <div className="row spread" style={{ color: '#8b5a2b', marginBottom: 4 }}>
         <span style={{ width: 40 }}>DAY</span>
         <span style={{ width: 60, textAlign: 'right' }}>IN</span>

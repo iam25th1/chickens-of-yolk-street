@@ -11,7 +11,7 @@ import type { Action } from '../net/socket';
 import { CARD_ART, CARD_TITLE, CARD_UNIT, CHOICE_LABEL, LOOK } from './cast';
 import { SheetSprite } from './SheetSprite';
 
-function Portrait({ sheet, row, loop, onDone }: { sheet: string; row: string; loop: boolean; onDone?: () => void }) {
+export function Portrait({ sheet, row, loop, onDone }: { sheet: string; row: string; loop: boolean; onDone?: () => void }) {
   const { assets } = useServices();
   const [i, setI] = useState(0);
   const json = assets.sheet(sheet);
