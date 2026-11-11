@@ -13,7 +13,7 @@ import { HenRenderer } from './chain/hen-image';
 import { openDb } from './db/db';
 import { describeEnv, readConfig } from './env';
 import { Game } from './game/game';
-import { createGameServer } from './net/server';
+import { createGameServer, DRAIN } from './net/server';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const envFile = join(repoRoot, '.env');
@@ -87,9 +87,14 @@ else server.listen(config.port, listening);
 
 const shutdown = (): void => {
   clearInterval(tick);
+  // open websockets would keep close() waiting for ever (the host then kills the process): drop
+  // them first, then idle keep-alive connections; a half-finished day close rolls back on its own
+  server.emit(DRAIN);
   server.close(() => {
     void db.close().then(() => process.exit(0));
   });
+  server.closeIdleConnections();
+  setTimeout(() => process.exit(0), 5000).unref();
 };
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

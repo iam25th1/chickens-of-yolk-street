@@ -222,3 +222,17 @@ describe('one shared market', () => {
     b.c.ws.close();
   });
 });
+
+describe('shutdown', () => {
+  it('drain drops open websockets so close() finishes instead of waiting on them', async () => {
+    const { DRAIN } = await import('../src/net/server');
+    const ws = new WebSocket(`ws://${base}/ws`);
+    await new Promise((resolve, reject) => {
+      ws.once('open', resolve);
+      ws.once('error', reject);
+    });
+    const closed = new Promise<number>((resolve) => ws.once('close', (code) => resolve(code)));
+    server.emit(DRAIN);
+    expect(await closed).toBe(1006);
+  });
+});

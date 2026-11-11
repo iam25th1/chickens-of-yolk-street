@@ -25,6 +25,9 @@ export function clientIp(req: Pick<IncomingMessage, 'headers' | 'socket'>): stri
   return LOOPBACK.has(remote) && isIP(forwarded) ? forwarded : remote;
 }
 
+/** Emitted on the server at shutdown: drops every websocket so close() can finish. */
+export const DRAIN = 'coys:drain';
+
 export interface GameServerOptions {
   game: Game;
   sessions: SessionSigner;
@@ -330,6 +333,11 @@ export function createGameServer(opts: GameServerOptions): Server {
     clearInterval(heartbeat);
     for (const ws of wss.clients) ws.terminate();
     wss.close();
+  });
+  // shutdown: websockets go first, or server.close() would wait on them
+  server.on(DRAIN, () => {
+    clearInterval(heartbeat);
+    for (const ws of wss.clients) ws.terminate();
   });
 
   return server;
