@@ -1,0 +1,234 @@
+{
+  "frames": {
+    "stamp-in/0": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 1024,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 60
+    },
+    "stamp-in/1": {
+      "frame": {
+        "x": 1024,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 1024,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 60
+    },
+    "stamp-in/2": {
+      "frame": {
+        "x": 2048,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 1024,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 60
+    },
+    "stamp-in/3": {
+      "frame": {
+        "x": 3072,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 1024,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 600
+    },
+    "idle/0": {
+      "frame": {
+        "x": 0,
+        "y": 384,
+        "w": 1024,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 1024,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 180
+    },
+    "idle/1": {
+      "frame": {
+        "x": 1024,
+        "y": 384,
+        "w": 1024,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 1024,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 180
+    },
+    "idle/2": {
+      "frame": {
+        "x": 2048,
+        "y": 384,
+        "w": 1024,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 1024,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 180
+    },
+    "idle/3": {
+      "frame": {
+        "x": 3072,
+        "y": 384,
+        "w": 1024,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1024,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 1024,
+        "h": 384
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 180
+    }
+  },
+  "animations": {
+    "stamp-in": [
+      "stamp-in/0",
+      "stamp-in/1",
+      "stamp-in/2",
+      "stamp-in/3"
+    ],
+    "idle": [
+      "idle/0",
+      "idle/1",
+      "idle/2",
+      "idle/3"
+    ]
+  },
+  "meta": {
+    "app": "chickens-of-yolk-street/scripts/pack-assets.ts",
+    "version": "1",
+    "image": "28-logo.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 4096,
+      "h": 768
+    },
+    "scale": "1",
+    "source": {
+      "path": "art/28-logo/28-logo.png",
+      "sha256": "75e3b357ab8d3ea1bccf2a3f2cb4188e180ca8f841743e3f24166d440394f821"
+    },
+    "grid": 4
+  }
+}

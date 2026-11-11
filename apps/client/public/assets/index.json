@@ -1,0 +1,4518 @@
+{
+  "version": 1,
+  "source": {
+    "repo": "iam25th1/coys-assets",
+    "commit": "0376fa58f006708602881f57810536040cfb2177",
+    "manifestSha256": "1967d56d6b3805234c7d1095556c8da51ba3c174406b9ce364b5822f62f15d0e"
+  },
+  "sprites": {
+    "01-hen-base": {
+      "json": "sprites/01-hen-base.json",
+      "png": "sprites/01-hen-base.png",
+      "sha256": "5b58747a6d00046c383040720d44c70440da853ac1f9a081da90561f018b22f9",
+      "source": "art/01-hen-base/01-hen-base.png",
+      "role": "canonical",
+      "docTracker": "01",
+      "label": "base hen · 4 views",
+      "width": 2048,
+      "height": 688,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "turnaround": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 6,
+          "totalMs": 2160
+        }
+      }
+    },
+    "01-hen-anims": {
+      "json": "sprites/01-hen-anims.json",
+      "png": "sprites/01-hen-anims.png",
+      "sha256": "56bea5544529f1500676d86b283f35c1e5860140503782540b491960427a5d70",
+      "source": "art/01-hen-anims/01-hen-anims.png",
+      "role": "canonical",
+      "docTracker": "01",
+      "label": "hen animations",
+      "width": 1024,
+      "height": 1792,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1020
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "lay": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "eat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 500
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "sleep": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1320
+        }
+      }
+    },
+    "03-chick": {
+      "json": "sprites/03-chick.json",
+      "png": "sprites/03-chick.png",
+      "sha256": "f763180d863d3910ad27135a6c9b54a6cfb0adcb0e90414e55ce7eedd004a8de",
+      "source": "art/03-chick/03-chick.png",
+      "role": "canonical",
+      "docTracker": "03",
+      "label": "baby chick",
+      "width": 1024,
+      "height": 1024,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "hop": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 460
+        },
+        "peck": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 340
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        }
+      }
+    },
+    "x-hen-portrait": {
+      "json": "sprites/x-hen-portrait.json",
+      "png": "sprites/x-hen-portrait.png",
+      "sha256": "e7a91e12111ab6e6aed213a15baad7f5114abd96fbbcde417291577e853581f4",
+      "source": "art/x-hen-portrait/x-hen-portrait.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "hen portrait",
+      "width": 1024,
+      "height": 1536,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "talk": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        },
+        "smug": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "delighted": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 560
+        },
+        "outraged": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        }
+      }
+    },
+    "04-upstart": {
+      "json": "sprites/04-upstart.json",
+      "png": "sprites/04-upstart.png",
+      "sha256": "47b9ce7c6e8086ded19dd857c36bda4d9f2f87ed8c80cc44a6a113440d2282a8",
+      "source": "art/04-upstart/04-upstart.png",
+      "role": "canonical",
+      "docTracker": "04",
+      "label": "the upstart",
+      "width": 1024,
+      "height": 1280,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "talk": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        },
+        "gloat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 560
+        },
+        "panic": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "bust": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1620
+        }
+      }
+    },
+    "05-old-money": {
+      "json": "sprites/05-old-money.json",
+      "png": "sprites/05-old-money.png",
+      "sha256": "48c18bbc9b30e8fb9ad7d20c077dffd55b8a9c91fda99a85b1da4cee6cd26d6c",
+      "source": "art/05-old-money/05-old-money.png",
+      "role": "canonical",
+      "docTracker": "05",
+      "label": "old money",
+      "width": 1024,
+      "height": 1280,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "talk": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        },
+        "smug": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 960
+        },
+        "pleased": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 560
+        },
+        "annoyed": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1000
+        }
+      }
+    },
+    "06-squeezer": {
+      "json": "sprites/06-squeezer.json",
+      "png": "sprites/06-squeezer.png",
+      "sha256": "72a159cfa2b4909074632d423c3c9f75bb99c9939fad99e431611587cf043d9b",
+      "source": "art/06-squeezer/06-squeezer.png",
+      "role": "canonical",
+      "docTracker": "06",
+      "label": "the squeezer",
+      "width": 1024,
+      "height": 1280,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "talk": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        },
+        "greedy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        },
+        "refuse": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 600
+        },
+        "deal": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1120
+        }
+      }
+    },
+    "07-loyalist": {
+      "json": "sprites/07-loyalist.json",
+      "png": "sprites/07-loyalist.png",
+      "sha256": "56be80de5f8f53e5a40bda5cbaa8a13e3dc671bca440b854e9ada28d10fb04df",
+      "source": "art/07-loyalist/07-loyalist.png",
+      "role": "canonical",
+      "docTracker": "07",
+      "label": "the loyalist",
+      "width": 1024,
+      "height": 1280,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "talk": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        },
+        "warm": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 640
+        },
+        "disappointed": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1480
+        },
+        "deal": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "08-bakery-buyer": {
+      "json": "sprites/08-bakery-buyer.json",
+      "png": "sprites/08-bakery-buyer.png",
+      "sha256": "b29dbdd753baaf1d1568ddde4641b4dc7abfae9baf4c972cd35d06a4707b1f04",
+      "source": "art/08-bakery-buyer/08-bakery-buyer.png",
+      "role": "canonical",
+      "docTracker": "08",
+      "label": "bakery buyer",
+      "width": 1024,
+      "height": 1024,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "talk": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "angry": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        }
+      }
+    },
+    "09-market-trader": {
+      "json": "sprites/09-market-trader.json",
+      "png": "sprites/09-market-trader.png",
+      "sha256": "88d2541484db2992d7bef7ffc69dc14051dc8bd772e4ec2052a14151d438c1e3",
+      "source": "art/09-market-trader/09-market-trader.png",
+      "role": "canonical",
+      "docTracker": "09",
+      "label": "market trader",
+      "width": 1024,
+      "height": 1024,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "talk": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        },
+        "impressed": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 960
+        },
+        "walks-away": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1220
+        }
+      }
+    },
+    "10-wholesaler": {
+      "json": "sprites/10-wholesaler.json",
+      "png": "sprites/10-wholesaler.png",
+      "sha256": "9fc2180a918b3c976bddebad013816c494b0eb165f52552a2f38db74702f3107",
+      "source": "art/10-wholesaler/10-wholesaler.png",
+      "role": "canonical",
+      "docTracker": "10",
+      "label": "wholesaler",
+      "width": 1024,
+      "height": 1024,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "talk": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        },
+        "lowball": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 820
+        },
+        "deal": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        }
+      }
+    },
+    "11-egg-cream": {
+      "json": "sprites/11-egg-cream.json",
+      "png": "sprites/11-egg-cream.png",
+      "sha256": "fc62e854a835ea74e76306a3418a9ed1c37d9b16c3bcf24c31ff6f36ea739e7c",
+      "source": "art/11-egg-cream/11-egg-cream.png",
+      "role": "canonical",
+      "docTracker": "11",
+      "label": "cream egg",
+      "width": 1024,
+      "height": 1280,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "wobble": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "roll": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "crack": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 920
+        },
+        "splat": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        },
+        "collect": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "11-egg-white": {
+      "json": "sprites/11-egg-white.json",
+      "png": "sprites/11-egg-white.png",
+      "sha256": "8f543c1539ae41d7b22c650f76f73ca6496049d280b3910ef786b6928cead019",
+      "source": "art/11-egg-white/11-egg-white.png",
+      "role": "canonical",
+      "docTracker": "11",
+      "label": "white egg",
+      "width": 1024,
+      "height": 1024,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "wobble": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "roll": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "crack": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 920
+        },
+        "splat": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "11-egg-brown": {
+      "json": "sprites/11-egg-brown.json",
+      "png": "sprites/11-egg-brown.png",
+      "sha256": "e27f03700902f75b4fe7aeea713a0051344d89cdcb961a7208455167d99900ac",
+      "source": "art/11-egg-brown/11-egg-brown.png",
+      "role": "canonical",
+      "docTracker": "11",
+      "label": "jumbo brown egg",
+      "width": 1024,
+      "height": 1024,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "wobble": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "roll": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "crack": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 920
+        },
+        "splat": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "11-egg-golden": {
+      "json": "sprites/11-egg-golden.json",
+      "png": "sprites/11-egg-golden.png",
+      "sha256": "bb1b85f1bf19c391b25134323354e192821281141f114e1eafda38249f6b91c2",
+      "source": "art/11-egg-golden/11-egg-golden.png",
+      "role": "canonical",
+      "docTracker": "11",
+      "label": "golden egg",
+      "width": 1024,
+      "height": 1280,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "wobble": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "roll": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "crack": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 920
+        },
+        "splat": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        },
+        "shimmer": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        }
+      }
+    },
+    "12-crate": {
+      "json": "sprites/12-crate.json",
+      "png": "sprites/12-crate.png",
+      "sha256": "6a58331f882a0bc95a4aebd0fce61b9ffa6eecb200ed8d671bd10de4d7328f61",
+      "source": "art/12-crate/12-crate.png",
+      "role": "canonical",
+      "docTracker": "12",
+      "label": "egg crate",
+      "width": 1024,
+      "height": 1536,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "empty": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "half": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "full": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "overflow": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "egg-drop": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        },
+        "spill": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        }
+      }
+    },
+    "13-sack-cheap": {
+      "json": "sprites/13-sack-cheap.json",
+      "png": "sprites/13-sack-cheap.png",
+      "sha256": "75bb2ba9b09b0dbf9f35ad5ba6c02271a3af11a8e176c13f00620938abff34c5",
+      "source": "art/13-sack-cheap/13-sack-cheap.png",
+      "role": "canonical",
+      "docTracker": "13",
+      "label": "cheap feed sack",
+      "width": 1024,
+      "height": 1152,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 960
+        },
+        "tip": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        },
+        "pour": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        }
+      }
+    },
+    "13-sack-standard": {
+      "json": "sprites/13-sack-standard.json",
+      "png": "sprites/13-sack-standard.png",
+      "sha256": "7e89dcf89612011c1ec8c11789df1f36dd3120ff3c481cbf58b6ee4cdd051a83",
+      "source": "art/13-sack-standard/13-sack-standard.png",
+      "role": "canonical",
+      "docTracker": "13",
+      "label": "standard feed sack",
+      "width": 1024,
+      "height": 1152,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 960
+        },
+        "tip": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        },
+        "pour": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        }
+      }
+    },
+    "13-sack-premium": {
+      "json": "sprites/13-sack-premium.json",
+      "png": "sprites/13-sack-premium.png",
+      "sha256": "3ec9c60b410adc3ff2e4b62e405ef91df9c59f8df785b82434d4b134391c7840",
+      "source": "art/13-sack-premium/13-sack-premium.png",
+      "role": "canonical",
+      "docTracker": "13",
+      "label": "premium feed sack",
+      "width": 1024,
+      "height": 1152,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 960
+        },
+        "tip": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        },
+        "pour": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        }
+      }
+    },
+    "14-trough": {
+      "json": "sprites/14-trough.json",
+      "png": "sprites/14-trough.png",
+      "sha256": "5ee99062dbe89abae4f7bdc3fd248bdc87d7deab989bb0bddb55193db7a04fca",
+      "source": "art/14-trough/14-trough.png",
+      "role": "canonical",
+      "docTracker": "14",
+      "label": "feeder trough",
+      "width": 1536,
+      "height": 1024,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "empty": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "full": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "spill": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 800
+        },
+        "pecked": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1140
+        }
+      }
+    },
+    "15-coop-red": {
+      "json": "sprites/15-coop-red.json",
+      "png": "sprites/15-coop-red.png",
+      "sha256": "b9ee3423030b7605c4adb5851ac51b2ea55db7ed7d46d4d1faa3b35f6549c82e",
+      "source": "art/15-coop-red/15-coop-red.png",
+      "role": "canonical",
+      "docTracker": "15",
+      "label": "chicken coop",
+      "width": 1536,
+      "height": 1152,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "build": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1520
+        },
+        "upgrade": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "15-coop-starter": {
+      "json": "sprites/15-coop-starter.json",
+      "png": "sprites/15-coop-starter.png",
+      "sha256": "d93b6bb1997edea9c482222e4aa9be312ed93fd7e2e2bd1ef157a07f389d77ab",
+      "source": "art/15-coop-starter/15-coop-starter.png",
+      "role": "canonical",
+      "docTracker": "15",
+      "label": "starter coop",
+      "width": 1536,
+      "height": 1152,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "build": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1520
+        },
+        "upgrade": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "15-coop-deluxe": {
+      "json": "sprites/15-coop-deluxe.json",
+      "png": "sprites/15-coop-deluxe.png",
+      "sha256": "97da04b9badea324ac20866bc4e7ee774a6210e03a6bc5f94adc6f67a5c0eead",
+      "source": "art/15-coop-deluxe/15-coop-deluxe.png",
+      "role": "canonical",
+      "docTracker": "15",
+      "label": "deluxe coop",
+      "width": 1536,
+      "height": 1152,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "build": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1520
+        },
+        "upgrade": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "16-farmhouse": {
+      "json": "sprites/16-farmhouse.json",
+      "png": "sprites/16-farmhouse.png",
+      "sha256": "b0f4ee3116c432cf710936a540a2c19e23bff9d66f34f3b5a66734a46ebf3243",
+      "source": "art/16-farmhouse/16-farmhouse.png",
+      "role": "canonical",
+      "docTracker": "16",
+      "label": "farmhouse",
+      "width": 1536,
+      "height": 768,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "day": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "night": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        }
+      }
+    },
+    "17-sign-farm": {
+      "json": "sprites/17-sign-farm.json",
+      "png": "sprites/17-sign-farm.png",
+      "sha256": "def1c6438706b1070d9a295a40003cc659c7c8155281f4f8428369e7e229791f",
+      "source": "art/17-sign-farm/17-sign-farm.png",
+      "role": "canonical",
+      "docTracker": "17",
+      "label": "farm sign",
+      "width": 1536,
+      "height": 512,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "sway": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 840
+        },
+        "tip-over": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1200
+        }
+      }
+    },
+    "17-sign-upstart": {
+      "json": "sprites/17-sign-upstart.json",
+      "png": "sprites/17-sign-upstart.png",
+      "sha256": "9a4396a8f82b9ab0202c89f6f12032e8ed85cdc54933d8f98dddc7173f335e80",
+      "source": "art/17-sign-upstart/17-sign-upstart.png",
+      "role": "canonical",
+      "docTracker": "17",
+      "label": "upstart sign",
+      "width": 1536,
+      "height": 512,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "sway": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 840
+        },
+        "tip-over": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1200
+        }
+      }
+    },
+    "17-sign-old-money": {
+      "json": "sprites/17-sign-old-money.json",
+      "png": "sprites/17-sign-old-money.png",
+      "sha256": "97441e595a9069db646faa47b70e7d19a71e6ba9589667bafbc3a68af8fa6b04",
+      "source": "art/17-sign-old-money/17-sign-old-money.png",
+      "role": "canonical",
+      "docTracker": "17",
+      "label": "old money sign",
+      "width": 1536,
+      "height": 512,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "sway": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 840
+        },
+        "tip-over": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1200
+        }
+      }
+    },
+    "18-conveyor": {
+      "json": "sprites/18-conveyor.json",
+      "png": "sprites/18-conveyor.png",
+      "sha256": "8224e6f6859572b74c2304c2185e6d182e0bd8b737d0af3c1e7aa1dd6a0139ec",
+      "source": "art/18-conveyor/18-conveyor.png",
+      "role": "canonical",
+      "docTracker": "18",
+      "label": "egg conveyor",
+      "width": 512,
+      "height": 640,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "horizontal": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "vertical": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "corner": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "start": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "end": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        }
+      }
+    },
+    "19b-egg-sorter": {
+      "json": "sprites/19b-egg-sorter.json",
+      "png": "sprites/19b-egg-sorter.png",
+      "sha256": "b9a36440a022137c4ca265dbece349d95c056b22c145702d18ab51fb56f8966f",
+      "source": "art/19b-egg-sorter/19b-egg-sorter.png",
+      "role": "alternate",
+      "docTracker": "19",
+      "label": "egg sorter",
+      "width": 1024,
+      "height": 1024,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "sorting": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "jammed": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 560
+        },
+        "upgrade": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "19-egg-grader": {
+      "json": "sprites/19-egg-grader.json",
+      "png": "sprites/19-egg-grader.png",
+      "sha256": "24044ff3fb83c635f6f02bb6d8f44e635eeb92a0c45d045d5d65568836781d5f",
+      "source": "art/19-egg-grader/19-egg-grader.png",
+      "role": "canonical",
+      "docTracker": "19",
+      "label": "egg grader",
+      "width": 1024,
+      "height": 768,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "running": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "sort-flash": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "20-delivery-cart": {
+      "json": "sprites/20-delivery-cart.json",
+      "png": "sprites/20-delivery-cart.png",
+      "sha256": "a7eb8752f17ea671df554145ce4a22bca7be04c32bc89ccb3ab8cf88bb069620",
+      "source": "art/20-delivery-cart/20-delivery-cart.png",
+      "role": "canonical",
+      "docTracker": "20",
+      "label": "delivery cart",
+      "width": 1024,
+      "height": 768,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "moving": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "unload": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 920
+        }
+      }
+    },
+    "21-feed-hopper": {
+      "json": "sprites/21-feed-hopper.json",
+      "png": "sprites/21-feed-hopper.png",
+      "sha256": "56c3d405e4d3cfaade25461ebc141863609ac67cc152c7a0287faef4bff381b4",
+      "source": "art/21-feed-hopper/21-feed-hopper.png",
+      "role": "canonical",
+      "docTracker": "21",
+      "label": "feed hopper",
+      "width": 1024,
+      "height": 1152,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "refilling": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "empty-alarm": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 320
+        }
+      }
+    },
+    "22-sales-clerk": {
+      "json": "sprites/22-sales-clerk.json",
+      "png": "sprites/22-sales-clerk.png",
+      "sha256": "1afb453389f1fbcfce96f1024a52d659414160db059b5425d547ece9d3ced0a0",
+      "source": "art/22-sales-clerk/22-sales-clerk.png",
+      "role": "canonical",
+      "docTracker": "22",
+      "label": "sales clerk",
+      "width": 1024,
+      "height": 768,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "stamping": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 420
+        },
+        "celebrate": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        }
+      }
+    },
+    "23-farm-tileset": {
+      "json": "sprites/23-farm-tileset.json",
+      "png": "sprites/23-farm-tileset.png",
+      "sha256": "ae9f9a65134e83db6218588ebaf5cea61662bbe2128f2e29d41df20cc7e8bfa4",
+      "source": "art/23-farm-tileset/23-farm-tileset.png",
+      "role": "canonical",
+      "docTracker": "23",
+      "label": "farm tileset",
+      "width": 512,
+      "height": 1024,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "grass-sway": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "straw-flutter": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        }
+      }
+    },
+    "24-farm-props": {
+      "json": "sprites/24-farm-props.json",
+      "png": "sprites/24-farm-props.png",
+      "sha256": "4cf5de0b8e44fa1361b22e01e4b3431110575ecf3c65ebbf9520b3033809c66f",
+      "source": "art/24-farm-props/24-farm-props.png",
+      "role": "canonical",
+      "docTracker": "24",
+      "label": "farm props",
+      "width": 1024,
+      "height": 1024,
+      "grid": 8,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "hay-bale": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "flowers": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 960
+        },
+        "puddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "signpost": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1000
+        }
+      }
+    },
+    "27-town-square-plate": {
+      "json": "sprites/27-town-square-plate.json",
+      "png": "sprites/27-town-square-plate.png",
+      "sha256": "70f2d68c4bcf0eb90c28e2b0cfacf0100be1320118e39c41c1ac8d7214a0f892",
+      "source": "art/27-town-square-plate/27-town-square-plate.png",
+      "role": "canonical",
+      "docTracker": "27",
+      "label": "yolk street plate",
+      "width": 1280,
+      "height": 720,
+      "grid": 2,
+      "anchor": "center",
+      "static": true,
+      "rows": {
+        "plate": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 0
+        }
+      }
+    },
+    "25-loading-anim": {
+      "json": "sprites/25-loading-anim.json",
+      "png": "sprites/25-loading-anim.png",
+      "sha256": "bdf9037c44f824ace0c11511976011b4a33d021240475ed615cb68b8e6c744d8",
+      "source": "art/25-loading-anim/25-loading-anim.png",
+      "role": "canonical",
+      "docTracker": "25",
+      "label": "loading sky + hens",
+      "width": 1024,
+      "height": 512,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "big-cloud": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1440
+        },
+        "small-clouds": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1440
+        },
+        "hen-bob": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "hen-peck": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        }
+      }
+    },
+    "26-title-anim": {
+      "json": "sprites/26-title-anim.json",
+      "png": "sprites/26-title-anim.png",
+      "sha256": "6906698de02227a95498642f1bb4b49fb99dd73dce1d7335c6be0f7a33f065f8",
+      "source": "art/26-title-anim/26-title-anim.png",
+      "role": "canonical",
+      "docTracker": "26",
+      "label": "title clouds + hen line",
+      "width": 1024,
+      "height": 512,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "clouds": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1440
+        },
+        "small-clouds": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1440
+        },
+        "hen-march": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 8,
+          "totalMs": 800
+        }
+      }
+    },
+    "27-town-square-anim": {
+      "json": "sprites/27-town-square-anim.json",
+      "png": "sprites/27-town-square-anim.png",
+      "sha256": "c76fdaafb964bf2227d526350e49e8a98c221bf640cc35db755c5ac05cb6b59f",
+      "source": "art/27-town-square-anim/27-town-square-anim.png",
+      "role": "canonical",
+      "docTracker": "27",
+      "label": "town square crowd",
+      "width": 1024,
+      "height": 448,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "bunting": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "milling": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "chatting": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        },
+        "pointing": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "28-logo": {
+      "json": "sprites/28-logo.json",
+      "png": "sprites/28-logo.png",
+      "sha256": "75e3b357ab8d3ea1bccf2a3f2cb4188e180ca8f841743e3f24166d440394f821",
+      "source": "art/28-logo/28-logo.png",
+      "role": "canonical",
+      "docTracker": "28",
+      "label": "animated logo",
+      "width": 4096,
+      "height": 768,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "stamp-in": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        },
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        }
+      }
+    },
+    "29-card-bulk-order": {
+      "json": "sprites/29-card-bulk-order.json",
+      "png": "sprites/29-card-bulk-order.png",
+      "sha256": "b253e34cc5f7f2052b82d9ee6fdbb4c56b579fa0244603700496c93de5ecb44c",
+      "source": "art/29-card-bulk-order/29-card-bulk-order.png",
+      "role": "canonical",
+      "docTracker": "29",
+      "label": "bulk order",
+      "width": 2048,
+      "height": 1408,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "flutter": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 860
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        }
+      }
+    },
+    "29-card-premium-order": {
+      "json": "sprites/29-card-premium-order.json",
+      "png": "sprites/29-card-premium-order.png",
+      "sha256": "69c4f74b886cddb4c9136d199f7e2504a44461250d7abea3c82a058f2b3715da",
+      "source": "art/29-card-premium-order/29-card-premium-order.png",
+      "role": "canonical",
+      "docTracker": "29",
+      "label": "premium order",
+      "width": 2048,
+      "height": 1408,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "flutter": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 860
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        }
+      }
+    },
+    "29-card-standing-contract": {
+      "json": "sprites/29-card-standing-contract.json",
+      "png": "sprites/29-card-standing-contract.png",
+      "sha256": "292595a742dde1251b1f2e85fc7dec08071ed6231381b0dc02a495ed04bc39be",
+      "source": "art/29-card-standing-contract/29-card-standing-contract.png",
+      "role": "canonical",
+      "docTracker": "29",
+      "label": "standing contract",
+      "width": 2048,
+      "height": 1408,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "flutter": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 860
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        }
+      }
+    },
+    "29-card-feed-deal": {
+      "json": "sprites/29-card-feed-deal.json",
+      "png": "sprites/29-card-feed-deal.png",
+      "sha256": "d5e44098355840d85812c305048302bd5fb4aca0503b360fe2616a7bd4236676",
+      "source": "art/29-card-feed-deal/29-card-feed-deal.png",
+      "role": "canonical",
+      "docTracker": "29",
+      "label": "feed deal",
+      "width": 2048,
+      "height": 1408,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "flutter": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 860
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        }
+      }
+    },
+    "29-card-credit-terms": {
+      "json": "sprites/29-card-credit-terms.json",
+      "png": "sprites/29-card-credit-terms.png",
+      "sha256": "3506d59423fd2bd7af595772744156db5dc9f0b0b4e6c461f502fe9c33840722",
+      "source": "art/29-card-credit-terms/29-card-credit-terms.png",
+      "role": "canonical",
+      "docTracker": "29",
+      "label": "credit terms",
+      "width": 2048,
+      "height": 1408,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "flutter": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 860
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        }
+      }
+    },
+    "29-card-undercut": {
+      "json": "sprites/29-card-undercut.json",
+      "png": "sprites/29-card-undercut.png",
+      "sha256": "9f16768418bf4fa329fc2333033fd332db5cd330f7ec6f93805ba324f52dad3b",
+      "source": "art/29-card-undercut/29-card-undercut.png",
+      "role": "canonical",
+      "docTracker": "29",
+      "label": "undercut",
+      "width": 2048,
+      "height": 1408,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "flutter": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 860
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        }
+      }
+    },
+    "29-card-buyout-offer": {
+      "json": "sprites/29-card-buyout-offer.json",
+      "png": "sprites/29-card-buyout-offer.png",
+      "sha256": "4fdda6b4d1b32e37947fb79dd19a897f3be6cc040ed97007625a3943880a17f8",
+      "source": "art/29-card-buyout-offer/29-card-buyout-offer.png",
+      "role": "canonical",
+      "docTracker": "29",
+      "label": "buyout offer",
+      "width": 2048,
+      "height": 1408,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "flutter": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 860
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        }
+      }
+    },
+    "29-card-glut-warning": {
+      "json": "sprites/29-card-glut-warning.json",
+      "png": "sprites/29-card-glut-warning.png",
+      "sha256": "7c3f08c13b5a8edcef3ae9e21c165b0dde43521e09053a1a1456c15f2d2e4740",
+      "source": "art/29-card-glut-warning/29-card-glut-warning.png",
+      "role": "canonical",
+      "docTracker": "29",
+      "label": "glut warning",
+      "width": 2048,
+      "height": 1408,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "flutter": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 860
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        }
+      }
+    },
+    "29-card-player-trade": {
+      "json": "sprites/29-card-player-trade.json",
+      "png": "sprites/29-card-player-trade.png",
+      "sha256": "16589eecaca532048675e4a30fddb674f77dfdd4b12b877365d8075b81420d7d",
+      "source": "art/29-card-player-trade/29-card-player-trade.png",
+      "role": "canonical",
+      "docTracker": "29",
+      "label": "player trade",
+      "width": 2048,
+      "height": 1408,
+      "grid": 4,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "flutter": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 860
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 900
+        }
+      }
+    },
+    "30-stamps": {
+      "json": "sprites/30-stamps.json",
+      "png": "sprites/30-stamps.png",
+      "sha256": "9bf77f2f08df8f9f6b5a2e80fda569d4d78c5f7a78ef103d1947484039afa2dd",
+      "source": "art/30-stamps/30-stamps.png",
+      "role": "canonical",
+      "docTracker": "30",
+      "label": "rubber stamps",
+      "width": 2048,
+      "height": 1024,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "accepted": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        },
+        "declined": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        },
+        "counter": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        },
+        "sold": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "31-ui-pieces": {
+      "json": "sprites/31-ui-pieces.json",
+      "png": "sprites/31-ui-pieces.png",
+      "sha256": "481911956e9ce0cfc0cf8ea19ce3ad4876733fd5eee6dab4904540b0a47cf117",
+      "source": "art/31-ui-pieces/31-ui-pieces.png",
+      "role": "canonical",
+      "docTracker": "31",
+      "label": "ui pieces",
+      "width": 1536,
+      "height": 640,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "button-hover": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "button-press": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 2,
+          "totalMs": 600
+        },
+        "panel": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1500
+        },
+        "icon-button": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1600
+        }
+      }
+    },
+    "32-icons": {
+      "json": "sprites/32-icons.json",
+      "png": "sprites/32-icons.png",
+      "sha256": "c87256a2976f0974cf6b33c41d0c08c588f524e98027a353a723d855111b3659",
+      "source": "art/32-icons/32-icons.png",
+      "role": "canonical",
+      "docTracker": "32",
+      "label": "icons",
+      "width": 512,
+      "height": 1280,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "cash": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "egg": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "feed": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "hen": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1280
+        },
+        "clock": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "settings": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "audio": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        },
+        "ledger": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "shop": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "market": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        }
+      }
+    },
+    "33-split-flap": {
+      "json": "sprites/33-split-flap.json",
+      "png": "sprites/33-split-flap.png",
+      "sha256": "c87247a947a66cdad97a6147b4f59be6ffd9bb79e22ac090455b695c4f14ae54",
+      "source": "art/33-split-flap/33-split-flap.png",
+      "role": "canonical",
+      "docTracker": "33",
+      "label": "split flap",
+      "width": 832,
+      "height": 384,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "flip": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        },
+        "count": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 10,
+          "totalMs": 4000
+        }
+      }
+    },
+    "34-cursor": {
+      "json": "sprites/34-cursor.json",
+      "png": "sprites/34-cursor.png",
+      "sha256": "25127b4e742590eac8311b3c7e9fb2088c95c1f474879aad32a4ea8feff1b869",
+      "source": "art/34-cursor/34-cursor.png",
+      "role": "canonical",
+      "docTracker": "34",
+      "label": "chicken cursor",
+      "width": 512,
+      "height": 384,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "default": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "grab": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 800
+        },
+        "click": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 780
+        }
+      }
+    },
+    "35-particles": {
+      "json": "sprites/35-particles.json",
+      "png": "sprites/35-particles.png",
+      "sha256": "22096f53982324b2fd41493754f49d6bac468eca9b5353fbc2167f377c690d19",
+      "source": "art/35-particles/35-particles.png",
+      "role": "canonical",
+      "docTracker": "35",
+      "label": "particle effects",
+      "width": 768,
+      "height": 1024,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "feather-puff": {
+          "mode": "once",
+          "vanish": true,
+          "frameCount": 6,
+          "totalMs": 360
+        },
+        "sparkle": {
+          "mode": "once",
+          "vanish": true,
+          "frameCount": 6,
+          "totalMs": 360
+        },
+        "coin": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 6,
+          "totalMs": 600
+        },
+        "dust-puff": {
+          "mode": "once",
+          "vanish": true,
+          "frameCount": 6,
+          "totalMs": 360
+        },
+        "steam-puff": {
+          "mode": "once",
+          "vanish": true,
+          "frameCount": 6,
+          "totalMs": 360
+        },
+        "confetti": {
+          "mode": "once",
+          "vanish": true,
+          "frameCount": 6,
+          "totalMs": 360
+        },
+        "cash-burst": {
+          "mode": "once",
+          "vanish": true,
+          "frameCount": 6,
+          "totalMs": 360
+        },
+        "falling-feather": {
+          "mode": "once",
+          "vanish": true,
+          "frameCount": 6,
+          "totalMs": 720
+        }
+      }
+    },
+    "25-loading-plate": {
+      "json": "sprites/25-loading-plate.json",
+      "png": "sprites/25-loading-plate.png",
+      "sha256": "0ffa6e8e509f49d49fa053befcdae2a0cd829154688e95ec7ba8f5428bbe6cc2",
+      "source": "art/25-loading-plate/25-loading-plate.png",
+      "role": "canonical",
+      "docTracker": "25",
+      "label": "dawn farm plate",
+      "width": 1280,
+      "height": 720,
+      "grid": 2,
+      "anchor": "center",
+      "static": true,
+      "rows": {
+        "plate": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 0
+        }
+      }
+    },
+    "26-title-plate": {
+      "json": "sprites/26-title-plate.json",
+      "png": "sprites/26-title-plate.png",
+      "sha256": "91aa1172786f5399b10580452ee432fc27053b19b62e5ec6496ef2adfe51c42a",
+      "source": "art/26-title-plate/26-title-plate.png",
+      "role": "canonical",
+      "docTracker": "26",
+      "label": "farm vista plate",
+      "width": 1280,
+      "height": 720,
+      "grid": 2,
+      "anchor": "center",
+      "static": true,
+      "rows": {
+        "plate": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 0
+        }
+      }
+    },
+    "02-comb-spiky": {
+      "json": "sprites/02-comb-spiky.json",
+      "png": "sprites/02-comb-spiky.png",
+      "sha256": "b1b42230a1dada3d6e8e89e31eadcf1fc5288d0fd6547b9435dbae9c65fd6c3b",
+      "source": "art/02-comb-spiky/02-comb-spiky.layer.png",
+      "role": "trait",
+      "docTracker": "02",
+      "label": "punk hen animations",
+      "width": 1024,
+      "height": 1792,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1020
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "lay": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "eat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 500
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "sleep": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1320
+        }
+      }
+    },
+    "02-comb-mohawk": {
+      "json": "sprites/02-comb-mohawk.json",
+      "png": "sprites/02-comb-mohawk.png",
+      "sha256": "10e536b961ab746826bf599297228dc1ec06d054a31fca13ab1f6970e347bf85",
+      "source": "art/02-comb-mohawk/02-comb-mohawk.layer.png",
+      "role": "trait",
+      "docTracker": "02",
+      "label": "slicked mohawk hen",
+      "width": 1024,
+      "height": 1792,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1020
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "lay": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "eat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 500
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "sleep": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1320
+        }
+      }
+    },
+    "02-comb-nub": {
+      "json": "sprites/02-comb-nub.json",
+      "png": "sprites/02-comb-nub.png",
+      "sha256": "d23a5ffd2b03c73512dfe8ea2d0515039f497f055acd108e3c8e981cb491028c",
+      "source": "art/02-comb-nub/02-comb-nub.layer.png",
+      "role": "trait",
+      "docTracker": "02",
+      "label": "02-comb-nub",
+      "width": 1024,
+      "height": 1792,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1020
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "lay": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "eat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 500
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "sleep": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1320
+        }
+      }
+    },
+    "02-eyes-sleepy": {
+      "json": "sprites/02-eyes-sleepy.json",
+      "png": "sprites/02-eyes-sleepy.png",
+      "sha256": "c0d5405dca7f7870f28aaebb15296db07e54d7defafe5844d32cfbdbf4b7de51",
+      "source": "art/02-eyes-sleepy/02-eyes-sleepy.layer.png",
+      "role": "trait",
+      "docTracker": "02",
+      "label": "02-eyes-sleepy",
+      "width": 1024,
+      "height": 1792,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1020
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "lay": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "eat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 500
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "sleep": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1320
+        }
+      }
+    },
+    "02-eyes-wild": {
+      "json": "sprites/02-eyes-wild.json",
+      "png": "sprites/02-eyes-wild.png",
+      "sha256": "a8f8234f69a45f4f97e79409227b9120a6ded10a57453df4417b0b922c5f47a6",
+      "source": "art/02-eyes-wild/02-eyes-wild.layer.png",
+      "role": "trait",
+      "docTracker": "02",
+      "label": "02-eyes-wild",
+      "width": 1024,
+      "height": 1792,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1020
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "lay": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "eat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 500
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "sleep": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1320
+        }
+      }
+    },
+    "02-acc-tophat": {
+      "json": "sprites/02-acc-tophat.json",
+      "png": "sprites/02-acc-tophat.png",
+      "sha256": "0b30e714be7339d0763ef286f01792ec799d12709bdaae10d20a0d8851982484",
+      "source": "art/02-acc-tophat/02-acc-tophat.layer.png",
+      "role": "trait",
+      "docTracker": "02",
+      "label": "02-acc-tophat",
+      "width": 1024,
+      "height": 1792,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1020
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "lay": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "eat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 500
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "sleep": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1320
+        }
+      }
+    },
+    "02-acc-bowtie": {
+      "json": "sprites/02-acc-bowtie.json",
+      "png": "sprites/02-acc-bowtie.png",
+      "sha256": "94979a65f587a1591e1102afa2975acb7336a0eb41eba1f7608b3f6a7d059daa",
+      "source": "art/02-acc-bowtie/02-acc-bowtie.layer.png",
+      "role": "trait",
+      "docTracker": "02",
+      "label": "02-acc-bowtie",
+      "width": 1024,
+      "height": 1792,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1020
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "lay": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "eat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 500
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "sleep": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1320
+        }
+      }
+    },
+    "02-acc-shades": {
+      "json": "sprites/02-acc-shades.json",
+      "png": "sprites/02-acc-shades.png",
+      "sha256": "a2c25b853cc43c137a0dc30c2b27d003a8c900d2fa27f9e8577161b651fe8981",
+      "source": "art/02-acc-shades/02-acc-shades.layer.png",
+      "role": "trait",
+      "docTracker": "02",
+      "label": "02-acc-shades",
+      "width": 1024,
+      "height": 1792,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1020
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "lay": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "eat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 500
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "sleep": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1320
+        }
+      }
+    },
+    "02-body": {
+      "json": "sprites/02-body.json",
+      "png": "sprites/02-body.png",
+      "sha256": "537aa895c34c4c6ffc8d2c2ebc80149a6e958857c4adb20b31e75b6534481304",
+      "source": "art/02-body/02-body.layer.png",
+      "role": "trait",
+      "docTracker": "02",
+      "label": "hen body layer (base white hen)",
+      "width": 1024,
+      "height": 1792,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1020
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "lay": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "eat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 500
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "sleep": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1320
+        }
+      }
+    },
+    "02-comb-default": {
+      "json": "sprites/02-comb-default.json",
+      "png": "sprites/02-comb-default.png",
+      "sha256": "7fdbd739af664ab1bb4affb85fc4cba4ce9df20700e5ef3a0e63e7f1552721ca",
+      "source": "art/02-comb-default/02-comb-default.layer.png",
+      "role": "trait",
+      "docTracker": "02",
+      "label": "default comb layer",
+      "width": 1024,
+      "height": 1792,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "idle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1020
+        },
+        "waddle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "lay": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "eat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 500
+        },
+        "happy": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "sad": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1080
+        },
+        "sleep": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1320
+        }
+      }
+    }
+  },
+  "sounds": {
+    "01-cluck": {
+      "docSound": 1,
+      "role": "canonical",
+      "label": "smug cluck",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "01-cluck-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "01-cluck-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "01-cluck-c.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "01-cluck-d.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "01-cluck-a.mp3": {
+          "sha256": "390ab822d2d804d64a6596910f7b2412a5969c98c3504a3bd4086ce8bfce13af",
+          "source": "audio/01-cluck/01-cluck-a.mp3"
+        },
+        "01-cluck-b.mp3": {
+          "sha256": "fba68dc1d5e356bfd88c3d5ded237ac68208c32a2ff8d0ebe2837c6c542fc9bd",
+          "source": "audio/01-cluck/01-cluck-b.mp3"
+        },
+        "01-cluck-c.mp3": {
+          "sha256": "3340b4c25a6664652af44816463243b10c68dde56b8f12ed52e48bf22cec5cd4",
+          "source": "audio/01-cluck/01-cluck-c.mp3"
+        },
+        "01-cluck-d.mp3": {
+          "sha256": "9beef765c34e010ec72ce39c1d3c4c4a48a5c734eeaf8ec6aea689e739fb0c95",
+          "source": "audio/01-cluck/01-cluck-d.mp3"
+        }
+      },
+      "loop": null
+    },
+    "02-lay": {
+      "docSound": 2,
+      "role": "canonical",
+      "label": "egg laid",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "02-lay-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "02-lay-a.mp3": {
+          "sha256": "df8f476d4a4c8b39df8572cded1f386934d172179ce6721a2f9d9cb76bd9d65e",
+          "source": "audio/02-lay/02-lay-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "03-flap": {
+      "docSound": 3,
+      "role": "canonical",
+      "label": "happy flap",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "03-flap-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "03-flap-a.mp3": {
+          "sha256": "a5d7106aff7e4695a3d6992ce5fe34041f646102606abafadcf7aa597023022d",
+          "source": "audio/03-flap/03-flap-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "04-sad": {
+      "docSound": 4,
+      "role": "canonical",
+      "label": "sad warble",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "04-sad-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "04-sad-a.mp3": {
+          "sha256": "2ac259f5d0bdac2f7f2f2eb7270fc9a2ad6662b8d95c0b4ff78da29ba8937a16",
+          "source": "audio/04-sad/04-sad-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "05-snore": {
+      "docSound": 5,
+      "role": "canonical",
+      "label": "snore loop",
+      "kind": "loop",
+      "presses": [
+        {
+          "file": "05-snore-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "05-snore-a.mp3": {
+          "sha256": "d8a7007db3737951db70727c46fa6360d8ae0b8c2cd1d1f75cd88e2eebda3f8c",
+          "source": "audio/05-snore/05-snore-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "05-snore-a-loop.ogg",
+        "sha256": "0c3bf760b3273f9ced13e1d29b9e7a1bac344036371616efd047750a9cf05683",
+        "loopStartSample": 0,
+        "loopEndSample": 238679,
+        "sampleRate": 48000,
+        "channels": 2,
+        "crossfadeMs": 10
+      }
+    },
+    "06-peep": {
+      "docSound": 6,
+      "role": "canonical",
+      "label": "chick peep",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "06-peep-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "06-peep-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "06-peep-c.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "06-peep-a.mp3": {
+          "sha256": "c6d5a6c3862edbba9a03bb4b995b54ee7d45bc97862f351171b1310de6a5039e",
+          "source": "audio/06-peep/06-peep-a.mp3"
+        },
+        "06-peep-b.mp3": {
+          "sha256": "f55d26b4167e556cd5eca5dac9b62d97c3b3b153072233a00ac9da4909350084",
+          "source": "audio/06-peep/06-peep-b.mp3"
+        },
+        "06-peep-c.mp3": {
+          "sha256": "c7d723b96dfcec544060d2a2124bcce6a46b95080ee2a7fa46b6d7e112085424",
+          "source": "audio/06-peep/06-peep-c.mp3"
+        }
+      },
+      "loop": null
+    },
+    "07-chorus": {
+      "docSound": 7,
+      "role": "canonical",
+      "label": "coop rush",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "07-chorus-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "07-chorus-a.mp3": {
+          "sha256": "46bcd1c773094655751319f0d73e3519288e0d68afa1acce621fe149779145a1",
+          "source": "audio/07-chorus/07-chorus-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "08-egg-pop": {
+      "docSound": 8,
+      "role": "canonical",
+      "label": "egg pickup",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "08-egg-pop-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "08-egg-pop-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "08-egg-pop-c.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "08-egg-pop-d.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "08-egg-pop-a.mp3": {
+          "sha256": "709cd5282846b1746607e200ab8ed2468dd31df5b2eebd5145812ccbbcbf0985",
+          "source": "audio/08-egg-pop/08-egg-pop-a.mp3"
+        },
+        "08-egg-pop-b.mp3": {
+          "sha256": "9c0e3fb0cacd8453f9abd3d3e51a68a47e8d6add6c66d493246aa50239c84e62",
+          "source": "audio/08-egg-pop/08-egg-pop-b.mp3"
+        },
+        "08-egg-pop-c.mp3": {
+          "sha256": "c786e7463f2fdc831b28aa1793b5359e007c9f8eaab3abcc9a30564359ebaa1f",
+          "source": "audio/08-egg-pop/08-egg-pop-c.mp3"
+        },
+        "08-egg-pop-d.mp3": {
+          "sha256": "41ce2278b2b58917f169a03f285c0c7b8b56bd952c846c79837d1487a78a70df",
+          "source": "audio/08-egg-pop/08-egg-pop-d.mp3"
+        }
+      },
+      "loop": null
+    },
+    "09-crack": {
+      "docSound": 9,
+      "role": "canonical",
+      "label": "shell crack",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "09-crack-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "09-crack-a.mp3": {
+          "sha256": "73d1bcc725082123213978bad740fd746409f29bce87c503795054c982c8188e",
+          "source": "audio/09-crack/09-crack-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "10-splat": {
+      "docSound": 10,
+      "role": "canonical",
+      "label": "egg splat",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "10-splat-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "10-splat-a.mp3": {
+          "sha256": "bc9d994d241f74e86fb25830882d2f58dd2560f003e1359decaf5116bcb7216c",
+          "source": "audio/10-splat/10-splat-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "11-golden": {
+      "docSound": 11,
+      "role": "canonical",
+      "label": "golden shimmer",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "11-golden-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "11-golden-a.mp3": {
+          "sha256": "6cfcfbeab4c0df9690f66c635e866214fd2886e4b0841e1d9fc3089d2be48f5b",
+          "source": "audio/11-golden/11-golden-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "12-crate": {
+      "docSound": 12,
+      "role": "canonical",
+      "label": "crate thunk",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "12-crate-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "12-crate-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "12-crate-c.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "12-crate-a.mp3": {
+          "sha256": "bbf1c41d655781058cf75a468e489d04ab5bd4490aa8e3743de472018d4ef483",
+          "source": "audio/12-crate/12-crate-a.mp3"
+        },
+        "12-crate-b.mp3": {
+          "sha256": "e56cc45ffee6eeeaee6a254f14556918ec81141a34907059a177febdfd76178c",
+          "source": "audio/12-crate/12-crate-b.mp3"
+        },
+        "12-crate-c.mp3": {
+          "sha256": "f38d1a61348cff05bb79dcc0fd6067f726fa127abf0c755e1ef9ab8537168f8b",
+          "source": "audio/12-crate/12-crate-c.mp3"
+        }
+      },
+      "loop": null
+    },
+    "13-tray": {
+      "docSound": 13,
+      "role": "canonical",
+      "label": "sorter click",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "13-tray-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "13-tray-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "13-tray-c.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "13-tray-a.mp3": {
+          "sha256": "3cf561285dff4d2de9ec8e63607464a2a7c72873a2c2358b3abc10ae770a566a",
+          "source": "audio/13-tray/13-tray-a.mp3"
+        },
+        "13-tray-b.mp3": {
+          "sha256": "8dc31df40b0cc88cb52b805a8e0b094bcd77bee976e2e3e8fa2773cf2613ebf4",
+          "source": "audio/13-tray/13-tray-b.mp3"
+        },
+        "13-tray-c.mp3": {
+          "sha256": "8c81e6be91a40b9c3089a7274ce7d81bf5f699eb5ab0486489f2f815917fb510",
+          "source": "audio/13-tray/13-tray-c.mp3"
+        }
+      },
+      "loop": null
+    },
+    "14-coins-small": {
+      "docSound": 14,
+      "role": "canonical",
+      "label": "coins small",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "14-coins-small-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "14-coins-small-a.mp3": {
+          "sha256": "fa1df93dfd1c67854fd03619d35c99a360429f0d24333ccd7853a027a0f97f2b",
+          "source": "audio/14-coins-small/14-coins-small-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "14-coins-large": {
+      "docSound": 14,
+      "role": "canonical",
+      "label": "coins large",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "14-coins-large-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "14-coins-large-a.mp3": {
+          "sha256": "6eedde134d8e0985028fb4caaf2ad9276cfbf9ca6bf7bd4d20610e088c300466",
+          "source": "audio/14-coins-large/14-coins-large-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "15-kaching": {
+      "docSound": 15,
+      "role": "canonical",
+      "label": "ka-ching",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "15-kaching-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "15-kaching-a.mp3": {
+          "sha256": "ddee39a8fef986502fd415be7f488f9e72f6ea4268e293d14bc2534d69d9938b",
+          "source": "audio/15-kaching/15-kaching-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "16-ticker": {
+      "docSound": 16,
+      "role": "canonical",
+      "label": "counter tick loop",
+      "kind": "loop",
+      "presses": [
+        {
+          "file": "16-ticker-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "16-ticker-a.mp3": {
+          "sha256": "2dba90485d72d2da2997f29df45543292af222c252bbe5ea7294f6df35629061",
+          "source": "audio/16-ticker/16-ticker-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "16-ticker-a-loop.ogg",
+        "sha256": "cf53d3288eb5b3b3081bce266bfeffa2ea406f743477d71b79dc5af675a60740",
+        "loopStartSample": 0,
+        "loopEndSample": 239991,
+        "sampleRate": 48000,
+        "channels": 2,
+        "crossfadeMs": 0
+      }
+    },
+    "17-card": {
+      "docSound": 17,
+      "role": "canonical",
+      "label": "card swoosh",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "17-card-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "17-card-b.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "17-card-a.mp3": {
+          "sha256": "0deb77cc44fe01b63aec4804d562f95adbf6e653a99ca31a862126e50b273dd7",
+          "source": "audio/17-card/17-card-a.mp3"
+        },
+        "17-card-b.mp3": {
+          "sha256": "b720100b07f48706251b586fc5eefbfb663ebb34d64ad4f44f4ca2d983f5bd3f",
+          "source": "audio/17-card/17-card-b.mp3"
+        }
+      },
+      "loop": null
+    },
+    "18-stamp": {
+      "docSound": 18,
+      "role": "canonical",
+      "label": "stamp slam",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "18-stamp-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "18-stamp-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "18-stamp-a.mp3",
+          "pitch": 0.88
+        },
+        {
+          "file": "18-stamp-c.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "18-stamp-a.mp3": {
+          "sha256": "254056e3d8fe21fa27e21859591b58924e88205764c82eb6aa2221c84762a654",
+          "source": "audio/18-stamp/18-stamp-a.mp3"
+        },
+        "18-stamp-b.mp3": {
+          "sha256": "17e5ab28df9b75050dfe01104932c30822af7b43db407e2315fae89331e92158",
+          "source": "audio/18-stamp/18-stamp-b.mp3"
+        },
+        "18-stamp-c.mp3": {
+          "sha256": "95a99988bc08970daec9f5291e7cf104976d3ec41e3bf6ce19de7be5eac5d522",
+          "source": "audio/18-stamp/18-stamp-c.mp3"
+        }
+      },
+      "loop": null
+    },
+    "19-haggle-win": {
+      "docSound": 19,
+      "role": "canonical",
+      "label": "haggle win",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "19-haggle-win-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "19-haggle-win-a.mp3": {
+          "sha256": "5278f24c88ac84203f3259194e3341d7a37366ef573f0f8e6dc455638daabc40",
+          "source": "audio/19-haggle-win/19-haggle-win-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "20-fail": {
+      "docSound": 20,
+      "role": "canonical",
+      "label": "wah-wah",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "20-fail-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "20-fail-a.mp3": {
+          "sha256": "1ffad248fbfcb5b872de86983a572f3a6ec02c5cd95f0c31ab1efe83382c297d",
+          "source": "audio/20-fail/20-fail-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "21-build": {
+      "docSound": 21,
+      "role": "canonical",
+      "label": "building",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "21-build-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "21-build-a.mp3": {
+          "sha256": "b99e464ce4ce1f2cd7a99b1be9aca59b3ac224f1b90f7b55ac683a5d6aee030b",
+          "source": "audio/21-build/21-build-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "22-boing": {
+      "docSound": 22,
+      "role": "canonical",
+      "label": "boing pop",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "22-boing-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "22-boing-a.mp3": {
+          "sha256": "43c0144ee0eebefd0b978d9f176b4e00673cdde76a23e1ef0dae0ed16268b3c8",
+          "source": "audio/22-boing/22-boing-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "23-sign-creak": {
+      "docSound": 23,
+      "role": "canonical",
+      "label": "sign creak",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "23-sign-creak-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "23-sign-creak-a.mp3": {
+          "sha256": "91bbe2ed644a274a4beadf84dbee0d988e4a784f687524bf3088fb099a4a0e34",
+          "source": "audio/23-sign-creak/23-sign-creak-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "23-sign-fall": {
+      "docSound": 23,
+      "role": "canonical",
+      "label": "sign falls",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "23-sign-fall-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "23-sign-fall-a.mp3": {
+          "sha256": "312d2b1b9f9dd413cc8d873afd1cf12526e53ff38f4889c44b3b53f9dcc7fac5",
+          "source": "audio/23-sign-fall/23-sign-fall-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "24-machine": {
+      "docSound": 24,
+      "role": "canonical",
+      "label": "machine start",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "24-machine-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "24-machine-a.mp3": {
+          "sha256": "404d48137a0cc1b724bac36c2b9c1f6df08b0e8cdc29378a1742e07c34fb9d5f",
+          "source": "audio/24-machine/24-machine-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "25-conveyor": {
+      "docSound": 25,
+      "role": "canonical",
+      "label": "conveyor loop",
+      "kind": "loop",
+      "presses": [
+        {
+          "file": "25-conveyor-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "25-conveyor-a.mp3": {
+          "sha256": "77ab3ddf715783df6e850265c3985c254032dde1c10ea71dc9dfe869451596b2",
+          "source": "audio/25-conveyor/25-conveyor-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "25-conveyor-a-loop.ogg",
+        "sha256": "4fa16ee72e4a20849ca0b1907d8a884dd5b81a3b395536eb70d54339b691dc76",
+        "loopStartSample": 0,
+        "loopEndSample": 287414,
+        "sampleRate": 48000,
+        "channels": 2,
+        "crossfadeMs": 10
+      }
+    },
+    "26-sorter": {
+      "docSound": 26,
+      "role": "canonical",
+      "label": "sorter loop",
+      "kind": "loop",
+      "presses": [
+        {
+          "file": "26-sorter-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "26-sorter-a.mp3": {
+          "sha256": "8c5e157b5259b181ea5f7a584dfe6529bf26da4e5d73cc3dad5c3c51ee345982",
+          "source": "audio/26-sorter/26-sorter-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "26-sorter-a-loop.ogg",
+        "sha256": "9204d16e4023b8c4e0f35378a74775d4acb355888ec87c8bf22137b3253dd4bd",
+        "loopStartSample": 0,
+        "loopEndSample": 239992,
+        "sampleRate": 48000,
+        "channels": 2,
+        "crossfadeMs": 0
+      }
+    },
+    "27-cart": {
+      "docSound": 27,
+      "role": "canonical",
+      "label": "cart loop",
+      "kind": "loop",
+      "presses": [
+        {
+          "file": "27-cart-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "27-cart-a.mp3": {
+          "sha256": "e291815725e411e0590b8a765c1d552ef05854b1b2b78d52b6b29ae8a34033a0",
+          "source": "audio/27-cart/27-cart-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "27-cart-a-loop.ogg",
+        "sha256": "f6d1de930ff8d15165f11fe8469b7b57b855d73b0b843a0ab8ad306497aabacf",
+        "loopStartSample": 0,
+        "loopEndSample": 287959,
+        "sampleRate": 48000,
+        "channels": 2,
+        "crossfadeMs": 0
+      }
+    },
+    "28-grain": {
+      "docSound": 28,
+      "role": "canonical",
+      "label": "grain pour",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "28-grain-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "28-grain-b.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "28-grain-a.mp3": {
+          "sha256": "4f0f05af243017b61ee1a58095308f7f5159a9f1fe7e5f65c5813ecdb6e8e9cb",
+          "source": "audio/28-grain/28-grain-a.mp3"
+        },
+        "28-grain-b.mp3": {
+          "sha256": "f7598f00068260604973893a48a2b3058ecfee8968c64bbc4cb3519ce50ce031",
+          "source": "audio/28-grain/28-grain-b.mp3"
+        }
+      },
+      "loop": null
+    },
+    "29-alarm-bell": {
+      "docSound": 29,
+      "role": "canonical",
+      "label": "alarm bell",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "29-alarm-bell-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "29-alarm-bell-a.mp3": {
+          "sha256": "c363ffc1d6169cac09679025ddfe0feb8b6a217a87de528c896f87262dd5105a",
+          "source": "audio/29-alarm-bell/29-alarm-bell-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "30-stamp-thump": {
+      "docSound": 30,
+      "role": "canonical",
+      "label": "stamp thumps",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "30-stamp-thump-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "30-stamp-thump-a.mp3",
+          "pitch": 1.15
+        },
+        {
+          "file": "30-stamp-thump-b.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "30-stamp-thump-a.mp3": {
+          "sha256": "d561e4b7b71ea56e06a83ef2ccba6171e83d7fa4e6d0d73d11513e752e723bb9",
+          "source": "audio/30-stamp-thump/30-stamp-thump-a.mp3"
+        },
+        "30-stamp-thump-b.mp3": {
+          "sha256": "e7b921c73432827006e08701fcf4229322d02b7cc9e015b77ee656be2a735bb4",
+          "source": "audio/30-stamp-thump/30-stamp-thump-b.mp3"
+        }
+      },
+      "loop": null
+    },
+    "31-flap": {
+      "docSound": 31,
+      "role": "canonical",
+      "label": "split flap",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "31-flap-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "31-flap-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "31-flap-c.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "31-flap-a.mp3": {
+          "sha256": "ecfae41b4091ce6e4aa87b1515354c3b4fc2ed03750ba77b7e428df9a3d92a85",
+          "source": "audio/31-flap/31-flap-a.mp3"
+        },
+        "31-flap-b.mp3": {
+          "sha256": "42340ab09aab674ba1e972a02af661e294bd9762a57f7ad5db26fa9d6b0cfad7",
+          "source": "audio/31-flap/31-flap-b.mp3"
+        },
+        "31-flap-c.mp3": {
+          "sha256": "438aa3e07ed8774de9416e6569b5aff836cdd774d09f94721128c081c9b08f8c",
+          "source": "audio/31-flap/31-flap-c.mp3"
+        }
+      },
+      "loop": null
+    },
+    "32-collapse": {
+      "docSound": 32,
+      "role": "canonical",
+      "label": "business crash",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "32-collapse-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "32-collapse-a.mp3": {
+          "sha256": "f111d3f115ce757fd900fd3c6cff72ff7cb5265842c7370da9f21e9efcf79e89",
+          "source": "audio/32-collapse/32-collapse-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "33-siren": {
+      "docSound": 33,
+      "role": "canonical",
+      "label": "crash siren",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "33-siren-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "33-siren-a.mp3": {
+          "sha256": "64af4e683ddf9f11806da56ed0e7a9742b3586bae23d22027093a3f966a37f01",
+          "source": "audio/33-siren/33-siren-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "34-market": {
+      "docSound": 34,
+      "role": "canonical",
+      "label": "market loop",
+      "kind": "loop",
+      "presses": [
+        {
+          "file": "34-market-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "34-market-a.mp3": {
+          "sha256": "067cec2e7d88fac047aab19a197545fbaf5189c95f38ad9a15bec08f46fe9962",
+          "source": "audio/34-market/34-market-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "34-market-a-loop.ogg",
+        "sha256": "11233676af29599e169600ffa4e4b32bfc46aa7ddd9506230f6baf5d85f164de",
+        "loopStartSample": 0,
+        "loopEndSample": 1322937,
+        "sampleRate": 44100,
+        "channels": 1,
+        "crossfadeMs": 0
+      }
+    },
+    "35-hover": {
+      "docSound": 35,
+      "role": "canonical",
+      "label": "ui hover",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "35-hover-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "35-hover-a.mp3": {
+          "sha256": "8cb7d56592c865c054418db55d51fe480dd078bb8cc1c598defc96721cc30172",
+          "source": "audio/35-hover/35-hover-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "35-click": {
+      "docSound": 35,
+      "role": "canonical",
+      "label": "ui click",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "35-click-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "35-click-a.mp3": {
+          "sha256": "4fb2c3a49afcb080696af70a0b8fa95c9b22ff14aed7224c8ffe6b738771b285",
+          "source": "audio/35-click/35-click-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "35-back": {
+      "docSound": 35,
+      "role": "canonical",
+      "label": "ui back",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "35-back-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "35-back-a.mp3": {
+          "sha256": "c65561e7008cab5e9a79054c40e29290183d89da7e30ff19dabd021b45a7211c",
+          "source": "audio/35-back/35-back-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "36-grab": {
+      "docSound": 36,
+      "role": "canonical",
+      "label": "grab pluck",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "36-grab-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "36-grab-a.mp3": {
+          "sha256": "a43fc00cef1a15ca209ebe5722fa1fca12a11cd73f68f2536334b4d2d13fe773",
+          "source": "audio/36-grab/36-grab-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "36-drop": {
+      "docSound": 36,
+      "role": "canonical",
+      "label": "drop thump",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "36-drop-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "36-drop-a.mp3": {
+          "sha256": "bdb277d68190bc7577474e661cbd836099a60fcdb2d8179187bce23033640d44",
+          "source": "audio/36-drop/36-drop-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "37-crow": {
+      "docSound": 37,
+      "role": "canonical",
+      "label": "rooster crow",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "37-crow-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "37-crow-b.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "37-crow-a.mp3": {
+          "sha256": "0b0eac434ba655dca3bbcaeca6f69ce148bfe7081c9c4dc64b6adb7e00b6df89",
+          "source": "audio/37-crow/37-crow-a.mp3"
+        },
+        "37-crow-b.mp3": {
+          "sha256": "925e0b2177041f4451c71f0e9ed012550b830cfa92542c9641e9d64b9c3a7fb4",
+          "source": "audio/37-crow/37-crow-b.mp3"
+        }
+      },
+      "loop": null
+    },
+    "38-night": {
+      "docSound": 38,
+      "role": "canonical",
+      "label": "night loop",
+      "kind": "loop",
+      "presses": [
+        {
+          "file": "38-night-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "38-night-a.mp3": {
+          "sha256": "edf547eafb96bfd70160e455aa992b79a5b42fdeb0ed9dabfbdffcf2072dd5d4",
+          "source": "audio/38-night/38-night-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "38-night-a-loop.ogg",
+        "sha256": "e4a6a4cace8bde1e3f5ecdac8e5d682026fd24b069c73918110b3a71ec945d78",
+        "loopStartSample": 0,
+        "loopEndSample": 1322531,
+        "sampleRate": 44100,
+        "channels": 1,
+        "crossfadeMs": 10
+      }
+    },
+    "39-day": {
+      "docSound": 39,
+      "role": "canonical",
+      "label": "farm day loop",
+      "kind": "loop",
+      "presses": [
+        {
+          "file": "39-day-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "39-day-a.mp3": {
+          "sha256": "0ea1ce60b2a207b1668c7d386a04aaabd4bcdfd2ca15d074fa05f44cd6f9a826",
+          "source": "audio/39-day/39-day-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "39-day-a-loop.ogg",
+        "sha256": "0adf449c7d5c165386efc4b49bd952beeea157c3713662c559ca1ab363d53207",
+        "loopStartSample": 0,
+        "loopEndSample": 2643943,
+        "sampleRate": 44100,
+        "channels": 1,
+        "crossfadeMs": 10
+      }
+    },
+    "40-upstart": {
+      "docSound": 40,
+      "role": "canonical",
+      "label": "upstart",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "40-upstart-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-upstart-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-upstart-c.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-upstart-d.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-upstart-e.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-upstart-f.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-upstart-g.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-upstart-a.mp3",
+          "pitch": 1.15
+        }
+      ],
+      "files": {
+        "40-upstart-a.mp3": {
+          "sha256": "49ff719c6bb3f6473eea8d187fe70217e600a00ccf94f1ec53444e27aa9d2696",
+          "source": "audio/40-upstart/40-upstart-a.mp3"
+        },
+        "40-upstart-b.mp3": {
+          "sha256": "499afa865d696baeeeb101e2d41d93a48be3a3df9d3b3357e4a9dbb95eceb816",
+          "source": "audio/40-upstart/40-upstart-b.mp3"
+        },
+        "40-upstart-c.mp3": {
+          "sha256": "7aa6a0d70133040e8827941db86c3a451bb89fd8528e20f03c79485ae28a1c78",
+          "source": "audio/40-upstart/40-upstart-c.mp3"
+        },
+        "40-upstart-d.mp3": {
+          "sha256": "d8c1ff12b698b68aa3ba9c028317bdae93046cae6136080028669db929aff7b6",
+          "source": "audio/40-upstart/40-upstart-d.mp3"
+        },
+        "40-upstart-e.mp3": {
+          "sha256": "91ead863877fec1638d56f628c458f2d2846cddbb8115bb4107937638d201db7",
+          "source": "audio/40-upstart/40-upstart-e.mp3"
+        },
+        "40-upstart-f.mp3": {
+          "sha256": "b1d874e85e7f570f00d04606c4b3704d10a9c41a5432b6f43a04270d4871f077",
+          "source": "audio/40-upstart/40-upstart-f.mp3"
+        },
+        "40-upstart-g.mp3": {
+          "sha256": "a4aed3cb71b0f1532a969b2ea2f9e3587b1e9825c45442b6d19abf6792def7de",
+          "source": "audio/40-upstart/40-upstart-g.mp3"
+        }
+      },
+      "loop": null
+    },
+    "40-old-money": {
+      "docSound": 40,
+      "role": "canonical",
+      "label": "old money",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "40-old-money-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-old-money-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-old-money-c.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-old-money-d.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-old-money-e.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-old-money-f.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-old-money-g.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-old-money-h.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "40-old-money-a.mp3": {
+          "sha256": "3dd1bc6d76056397c330309dc87f00a776ff427bb9d54cfb4359800f3c4d1391",
+          "source": "audio/40-old-money/40-old-money-a.mp3"
+        },
+        "40-old-money-b.mp3": {
+          "sha256": "a93af4068dc68271ca3254675421d28a73e5ae5d9c9a556e5f49e8a3a07e14f0",
+          "source": "audio/40-old-money/40-old-money-b.mp3"
+        },
+        "40-old-money-c.mp3": {
+          "sha256": "1f1c42547f487476ef6a645225b53a18fc00655778b151b5f010f380c6d31345",
+          "source": "audio/40-old-money/40-old-money-c.mp3"
+        },
+        "40-old-money-d.mp3": {
+          "sha256": "00ba115015f3e6de9374980a07bb38205730881eca8e4e6ecd28225315eb22a0",
+          "source": "audio/40-old-money/40-old-money-d.mp3"
+        },
+        "40-old-money-e.mp3": {
+          "sha256": "9fa902b4310fff63442ae2aaa3e2267299801bc8af1bdfd123e26f4a8b722421",
+          "source": "audio/40-old-money/40-old-money-e.mp3"
+        },
+        "40-old-money-f.mp3": {
+          "sha256": "1dac217fa13d5d7c2bbfa3d097058ddf0089dc1adf854a709f67f524a6abab7d",
+          "source": "audio/40-old-money/40-old-money-f.mp3"
+        },
+        "40-old-money-g.mp3": {
+          "sha256": "1f4b2ab315369404671bf0ebe81c1a36709d815df93c5c64afedbb0edf59fba8",
+          "source": "audio/40-old-money/40-old-money-g.mp3"
+        },
+        "40-old-money-h.mp3": {
+          "sha256": "9a0488cdda7853a28420a19c8aa7e89dc5b8d8a8ab34cf58c5d73cf9bd786cf3",
+          "source": "audio/40-old-money/40-old-money-h.mp3"
+        }
+      },
+      "loop": null
+    },
+    "40-squeezer": {
+      "docSound": 40,
+      "role": "canonical",
+      "label": "squeezer",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "40-squeezer-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-squeezer-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-squeezer-a.mp3",
+          "pitch": 0.88
+        },
+        {
+          "file": "40-squeezer-c.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-squeezer-d.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-squeezer-e.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-squeezer-f.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-squeezer-g.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "40-squeezer-a.mp3": {
+          "sha256": "4537c156fe360e79868f63970f783d03fb42a2d2b99df636eb9c25548ad291ba",
+          "source": "audio/40-squeezer/40-squeezer-a.mp3"
+        },
+        "40-squeezer-b.mp3": {
+          "sha256": "e6eba528bbbe69bec643b9456450fa8672b882a05512eb31356dfb163da43c95",
+          "source": "audio/40-squeezer/40-squeezer-b.mp3"
+        },
+        "40-squeezer-c.mp3": {
+          "sha256": "9e7ad51b0b0aec7c3ff3537b9618edb997dd185b78992f20123325b878f2e1f4",
+          "source": "audio/40-squeezer/40-squeezer-c.mp3"
+        },
+        "40-squeezer-d.mp3": {
+          "sha256": "bf455d2ab3e639f78b0533035042e41d90864c0fe4f475206d4e27f1a80a8499",
+          "source": "audio/40-squeezer/40-squeezer-d.mp3"
+        },
+        "40-squeezer-e.mp3": {
+          "sha256": "d432b7c4ad525ac6903061f2a82213f3ae4a0018afca0ed577490a811b291b3a",
+          "source": "audio/40-squeezer/40-squeezer-e.mp3"
+        },
+        "40-squeezer-f.mp3": {
+          "sha256": "136736dc2dda7d0882445564a535b954dc151a7b24a99e11cdbd2842148ddb40",
+          "source": "audio/40-squeezer/40-squeezer-f.mp3"
+        },
+        "40-squeezer-g.mp3": {
+          "sha256": "4118f8a102cc0ad3da5764e6571d4f651ec505b34a0f57e4668b43a438b080bd",
+          "source": "audio/40-squeezer/40-squeezer-g.mp3"
+        }
+      },
+      "loop": null
+    },
+    "40-loyalist": {
+      "docSound": 40,
+      "role": "canonical",
+      "label": "loyalist",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "40-loyalist-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-loyalist-a.mp3",
+          "pitch": 1.15
+        },
+        {
+          "file": "40-loyalist-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-loyalist-c.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-loyalist-d.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-loyalist-e.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-loyalist-f.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-loyalist-g.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "40-loyalist-a.mp3": {
+          "sha256": "6b9e3d27a58bb8ea450f14ad96e33ae4cdc08d811f37ddbc12e32c3f697f4e37",
+          "source": "audio/40-loyalist/40-loyalist-a.mp3"
+        },
+        "40-loyalist-b.mp3": {
+          "sha256": "53dd7a86b6d8d9282e2556c557a0c8cb45c8966a2579230a467c1656f147a374",
+          "source": "audio/40-loyalist/40-loyalist-b.mp3"
+        },
+        "40-loyalist-c.mp3": {
+          "sha256": "8e39beb0a3707e628f8e39a727ad410047dbdffd077acbd3528f0728eb6d6954",
+          "source": "audio/40-loyalist/40-loyalist-c.mp3"
+        },
+        "40-loyalist-d.mp3": {
+          "sha256": "915ba9e4cdca08708b5200a0fa646e3f3b9c8380bbaaeff955bec3e794ff77aa",
+          "source": "audio/40-loyalist/40-loyalist-d.mp3"
+        },
+        "40-loyalist-e.mp3": {
+          "sha256": "fae11c7bf1aeda6b74f8d97e918e61fc55b8d88d97c0e3b228579d22087a3fef",
+          "source": "audio/40-loyalist/40-loyalist-e.mp3"
+        },
+        "40-loyalist-f.mp3": {
+          "sha256": "46d5b125f377d17074ae77ea7346786ac2c3d22c1e70905985c5e8f43a6eaf39",
+          "source": "audio/40-loyalist/40-loyalist-f.mp3"
+        },
+        "40-loyalist-g.mp3": {
+          "sha256": "d25d0530ef5b8b5aaa61489ec73a8b8850ea546db8ee0a5692efde56c0b7d56a",
+          "source": "audio/40-loyalist/40-loyalist-g.mp3"
+        }
+      },
+      "loop": null
+    },
+    "40-bakery-buyer": {
+      "docSound": 40,
+      "role": "canonical",
+      "label": "bakery buyer",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "40-bakery-buyer-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-bakery-buyer-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-bakery-buyer-c.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-bakery-buyer-d.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-bakery-buyer-e.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-bakery-buyer-f.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-bakery-buyer-g.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-bakery-buyer-h.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "40-bakery-buyer-a.mp3": {
+          "sha256": "cc4333ed6c97166f76c4c4b73ff7677cff22b32558239bd8d50ba883760fd6b5",
+          "source": "audio/40-bakery-buyer/40-bakery-buyer-a.mp3"
+        },
+        "40-bakery-buyer-b.mp3": {
+          "sha256": "7dd19686bca1f6c46d7ca0d379dac90311e97b5e46896cd688904c944628882d",
+          "source": "audio/40-bakery-buyer/40-bakery-buyer-b.mp3"
+        },
+        "40-bakery-buyer-c.mp3": {
+          "sha256": "86b10771db8ebafb94bb4aecb0f4dbaa30661070925d1446a6242bb9858e4ae1",
+          "source": "audio/40-bakery-buyer/40-bakery-buyer-c.mp3"
+        },
+        "40-bakery-buyer-d.mp3": {
+          "sha256": "32f6b95a8429e8c605703a2990c7008dfacd6e692aeddea8020652cef52a01a4",
+          "source": "audio/40-bakery-buyer/40-bakery-buyer-d.mp3"
+        },
+        "40-bakery-buyer-e.mp3": {
+          "sha256": "3366848fbd7588e1ca7466d2ca5b8ed25d27d6f40399541df3e09f6d4c05474c",
+          "source": "audio/40-bakery-buyer/40-bakery-buyer-e.mp3"
+        },
+        "40-bakery-buyer-f.mp3": {
+          "sha256": "0b60c4a349877bc63b553f33bbc935f175b3264869748fea8f42194ebd77b76d",
+          "source": "audio/40-bakery-buyer/40-bakery-buyer-f.mp3"
+        },
+        "40-bakery-buyer-g.mp3": {
+          "sha256": "95f6e2fa951433a0c6b788e60f5daebc7bb046662c86a2571b6168b05edeebcb",
+          "source": "audio/40-bakery-buyer/40-bakery-buyer-g.mp3"
+        },
+        "40-bakery-buyer-h.mp3": {
+          "sha256": "6634f785e76791d266a6be9eadff5c7caf45cda0856bbba1d09d8a3f2a7a92f8",
+          "source": "audio/40-bakery-buyer/40-bakery-buyer-h.mp3"
+        }
+      },
+      "loop": null
+    },
+    "40-market-trader": {
+      "docSound": 40,
+      "role": "canonical",
+      "label": "market trader",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "40-market-trader-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-market-trader-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-market-trader-c.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-market-trader-a.mp3",
+          "pitch": 1.15
+        },
+        {
+          "file": "40-market-trader-d.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-market-trader-e.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-market-trader-f.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-market-trader-g.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "40-market-trader-a.mp3": {
+          "sha256": "ca1f815b746584d98f4d2999ae26241868aee281ab85fb783c271f014893a884",
+          "source": "audio/40-market-trader/40-market-trader-a.mp3"
+        },
+        "40-market-trader-b.mp3": {
+          "sha256": "09e87aeeb7391b85d744c12c38f931014bad1bc8df896e98d5d846f5e39a4ba8",
+          "source": "audio/40-market-trader/40-market-trader-b.mp3"
+        },
+        "40-market-trader-c.mp3": {
+          "sha256": "cbc71ddedf1501f44e381a5e76125b4416f2f18be28d8247b29a9d6cabcc8faf",
+          "source": "audio/40-market-trader/40-market-trader-c.mp3"
+        },
+        "40-market-trader-d.mp3": {
+          "sha256": "0210f6377794f8217095b15f3db5e8be4b1d159a826dacf9476d9a9a169f3668",
+          "source": "audio/40-market-trader/40-market-trader-d.mp3"
+        },
+        "40-market-trader-e.mp3": {
+          "sha256": "2aac6c26b39e3c89a13648705b2035df8b04a8d022131af7dd4bcfd4cf2655e6",
+          "source": "audio/40-market-trader/40-market-trader-e.mp3"
+        },
+        "40-market-trader-f.mp3": {
+          "sha256": "06e41eeffe472f654305a932d862e5cf9d040908766c7e418f9ebeb23e70e30e",
+          "source": "audio/40-market-trader/40-market-trader-f.mp3"
+        },
+        "40-market-trader-g.mp3": {
+          "sha256": "08a00e82d66025bc35244ebdcf6510b6aa351e812ba616d44dad3f2e2794a3a9",
+          "source": "audio/40-market-trader/40-market-trader-g.mp3"
+        }
+      },
+      "loop": null
+    },
+    "40-wholesaler": {
+      "docSound": 40,
+      "role": "canonical",
+      "label": "wholesaler",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "40-wholesaler-a.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-wholesaler-b.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-wholesaler-c.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-wholesaler-d.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-wholesaler-e.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-wholesaler-f.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-wholesaler-g.mp3",
+          "pitch": 1
+        },
+        {
+          "file": "40-wholesaler-h.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "40-wholesaler-a.mp3": {
+          "sha256": "b4502e6a65dbac0dc6586a73afd77081de2fb69cf1472d760611dffbacf0766d",
+          "source": "audio/40-wholesaler/40-wholesaler-a.mp3"
+        },
+        "40-wholesaler-b.mp3": {
+          "sha256": "71bb47dc1978af99e9017427e9d769e6f5db171774abe38a7aa867f75200bc0e",
+          "source": "audio/40-wholesaler/40-wholesaler-b.mp3"
+        },
+        "40-wholesaler-c.mp3": {
+          "sha256": "ce2802bd924df0c8fb66a98013e68161be13035b9b55818024f9efa90aeff5b0",
+          "source": "audio/40-wholesaler/40-wholesaler-c.mp3"
+        },
+        "40-wholesaler-d.mp3": {
+          "sha256": "bd7acfa406381ad52b68a5e72acb8bd22263068e26f76af090da885e2f64b730",
+          "source": "audio/40-wholesaler/40-wholesaler-d.mp3"
+        },
+        "40-wholesaler-e.mp3": {
+          "sha256": "9f2eaad696d046be7d1f5a62bf55ba235d13915f558c86f92104e9d488ad8c40",
+          "source": "audio/40-wholesaler/40-wholesaler-e.mp3"
+        },
+        "40-wholesaler-f.mp3": {
+          "sha256": "b68b170339bceffc8147164d0d90c92dadb97137379637b7bcd674b694051ac3",
+          "source": "audio/40-wholesaler/40-wholesaler-f.mp3"
+        },
+        "40-wholesaler-g.mp3": {
+          "sha256": "f973fdd3b8d2e500d2245ffa8a39f65c35aff89f433355862fcd684ed13645f5",
+          "source": "audio/40-wholesaler/40-wholesaler-g.mp3"
+        },
+        "40-wholesaler-h.mp3": {
+          "sha256": "7c942cad90f0a2651c1bb52d803d7395c5c50ee671df274b47b2cd0834496729",
+          "source": "audio/40-wholesaler/40-wholesaler-h.mp3"
+        }
+      },
+      "loop": null
+    },
+    "41-title": {
+      "docSound": 41,
+      "role": "canonical",
+      "label": "title theme",
+      "kind": "music",
+      "presses": [
+        {
+          "file": "41-title-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "41-title-a.mp3": {
+          "sha256": "c1f25a396c3b8528324c1289aed5bcf18a22aca89ce486e0f64f082beeb19b94",
+          "source": "audio/41-title/41-title-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "41-title-a-loop.ogg",
+        "sha256": "3f8a897ce546b795f113e9ef1c62e3b6c84aca954187f2880d35e43b0abd53bb",
+        "loopStartSample": 0,
+        "loopEndSample": 5711959,
+        "sampleRate": 48000,
+        "channels": 2,
+        "crossfadeMs": 0
+      }
+    },
+    "42-farm-day": {
+      "docSound": 42,
+      "role": "canonical",
+      "label": "farm day",
+      "kind": "music",
+      "presses": [
+        {
+          "file": "42-farm-day-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "42-farm-day-a.mp3": {
+          "sha256": "2d1df2b1452f6da49cdfe7f629eebe1adc074bc69961cedb7300f6e4fdcee8af",
+          "source": "audio/42-farm-day/42-farm-day-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "42-farm-day-a-loop.ogg",
+        "sha256": "251818437ea97bd7b779b3ee2d180f46a7028c2fb15467c125ad8fc8a6a6e700",
+        "loopStartSample": 0,
+        "loopEndSample": 5116347,
+        "sampleRate": 48000,
+        "channels": 2,
+        "crossfadeMs": 0
+      }
+    },
+    "43-market-tension": {
+      "docSound": 43,
+      "role": "canonical",
+      "label": "market tension",
+      "kind": "music",
+      "presses": [
+        {
+          "file": "43-market-tension-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "43-market-tension-a.mp3": {
+          "sha256": "5bd7a724ac2298c1ecbe14a3034e5b614e3d2a181fc1298e39153bc56f745ac9",
+          "source": "audio/43-market-tension/43-market-tension-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "43-market-tension-a-loop.ogg",
+        "sha256": "dfd55eb54a1d744e707e3bb344e645ba78ec51da1fdefae5343e9a248c3fef7b",
+        "loopStartSample": 0,
+        "loopEndSample": 2935127,
+        "sampleRate": 48000,
+        "channels": 2,
+        "crossfadeMs": 0
+      }
+    },
+    "44-jingle": {
+      "docSound": 44,
+      "role": "canonical",
+      "label": "short jingle",
+      "kind": "music",
+      "presses": [
+        {
+          "file": "44-jingle-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "44-jingle-a.mp3": {
+          "sha256": "2799eb3bc6be480cfa642d9ad225d69db016371a5b710617bb3f2f7c32fd26fd",
+          "source": "audio/44-jingle/44-jingle-a.mp3"
+        }
+      },
+      "loop": {
+        "file": "44-jingle-a-loop.ogg",
+        "sha256": "a4c5a4f14da5d4d9fc7ee2afcfd0693d012f5fe2d8a2346dd7e08aca95b307b7",
+        "loopStartSample": 0,
+        "loopEndSample": 575911,
+        "sampleRate": 48000,
+        "channels": 2,
+        "crossfadeMs": 0
+      }
+    },
+    "45-deal-closed": {
+      "docSound": 45,
+      "role": "canonical",
+      "label": "deal fanfare",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "45-deal-closed-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "45-deal-closed-a.mp3": {
+          "sha256": "fd305a86e068d718961632576a80e046f4fc3a96ae0891d09db7107f779b3142",
+          "source": "audio/45-deal-closed/45-deal-closed-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "45-rival-bust": {
+      "docSound": 45,
+      "role": "canonical",
+      "label": "rival bust",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "45-rival-bust-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "45-rival-bust-a.mp3": {
+          "sha256": "deaf37334112b8836539fe405a3e7386dbcc304cc69e5a423f287dab5d996fd0",
+          "source": "audio/45-rival-bust/45-rival-bust-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "45-market-crash": {
+      "docSound": 45,
+      "role": "canonical",
+      "label": "crash sting",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "45-market-crash-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "45-market-crash-a.mp3": {
+          "sha256": "cc58f9b346d043d4f17ff8aeef54b73873f60532a5f3fd86ac609e047a73a9f2",
+          "source": "audio/45-market-crash/45-market-crash-a.mp3"
+        }
+      },
+      "loop": null
+    },
+    "45-new-day": {
+      "docSound": 45,
+      "role": "canonical",
+      "label": "new day",
+      "kind": "one-shot",
+      "presses": [
+        {
+          "file": "45-new-day-a.mp3",
+          "pitch": 1
+        }
+      ],
+      "files": {
+        "45-new-day-a.mp3": {
+          "sha256": "8145716a58a118d82d70be5bfc1601a60669f29bf854e565216a09476e9fc231",
+          "source": "audio/45-new-day/45-new-day-a.mp3"
+        }
+      },
+      "loop": null
+    }
+  },
+  "traits": {
+    "stackOrder": [
+      "body",
+      "eyes",
+      "comb",
+      "accessory"
+    ],
+    "options": {
+      "body": [
+        "cream",
+        "brown",
+        "black"
+      ],
+      "eyes": [
+        "default",
+        "sleepy",
+        "wild"
+      ],
+      "comb": [
+        "default",
+        "spiky",
+        "mohawk",
+        "nub"
+      ],
+      "accessory": [
+        "none",
+        "tophat",
+        "bowtie",
+        "shades"
+      ]
+    },
+    "layers": {
+      "body:base": "02-body",
+      "eyes:wild": "02-eyes-wild",
+      "eyes:sleepy": "02-eyes-sleepy",
+      "comb:nub": "02-comb-nub",
+      "comb:spiky": "02-comb-spiky",
+      "comb:mohawk": "02-comb-mohawk",
+      "comb:default": "02-comb-default",
+      "accessory:bowtie": "02-acc-bowtie",
+      "accessory:shades": "02-acc-shades",
+      "accessory:tophat": "02-acc-tophat"
+    },
+    "baseFramesFrom": "01-hen-anims",
+    "bodyRecolour": {
+      "brown": [
+        [
+          92,
+          48,
+          26
+        ],
+        [
+          196,
+          128,
+          74
+        ]
+      ],
+      "black": [
+        [
+          16,
+          15,
+          20
+        ],
+        [
+          64,
+          60,
+          70
+        ]
+      ]
+    }
+  },
+  "canonical": {
+    "19": "19-egg-grader"
+  },
+  "unused": [
+    "19b-egg-sorter"
+  ]
+}
