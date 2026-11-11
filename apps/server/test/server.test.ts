@@ -82,13 +82,13 @@ async function login(deviceId: string): Promise<string> {
   return ((await res.json()) as { session: string }).session;
 }
 
-async function connected(deviceId: string): Promise<{ c: Client; cash: number }> {
+async function connected(deviceId: string): Promise<{ c: Client; cash: number; welcome: Extract<ServerMessage, { t: 'welcome' }> }> {
   const session = await login(deviceId);
   const c = await Client.open();
-  c.send({ t: 'hello', v: 1, session });
+  c.send({ t: 'hello', v: 2, session });
   const welcome = await c.next((m) => m.t === 'welcome');
   if (welcome.t !== 'welcome') throw new Error('no welcome');
-  return { c, cash: welcome.farm.cashMilli };
+  return { c, cash: welcome.farm.cashMilli, welcome };
 }
 
 async function cashNow(c: Client): Promise<number> {
@@ -127,7 +127,7 @@ describe('the server is authoritative', () => {
     const c = await Client.open();
     c.send({ t: 'buyHens', rid: 'h1', count: 1 });
     expect(await c.ack('h1')).toMatchObject({ ok: false, code: 'unauthenticated' });
-    c.send({ t: 'hello', v: 1, session: 'forged.token' });
+    c.send({ t: 'hello', v: 2, session: 'forged.token' });
     expect(await c.next((m) => m.t === 'error')).toMatchObject({ code: 'unauthenticated' });
   });
 
@@ -156,5 +156,31 @@ describe('the server is authoritative', () => {
     expect(market.market.day).toBe(1);
     const config = (await (await fetch(`http://${base}/api/config`)).json()) as { devLogin: boolean; privyAppId: null };
     expect(config).toMatchObject({ devLogin: true, privyAppId: null });
+  });
+});
+
+describe('one shared market', () => {
+  it('two real clients see the same prices and each other\'s trades', async () => {
+    const a = await connected('shared-mkt-a');
+    const b = await connected('shared-mkt-b');
+    const wa = a.welcome;
+    const wb = b.welcome;
+    expect(wa.market.pricesMilli).toEqual(wb.market.pricesMilli);
+    expect(wa.market.multiplier).toBe(wb.market.multiplier);
+
+    // A sells a crate of golden eggs into the street
+    await t.db.query('UPDATE farms SET crate_golden = 10 WHERE id = $1', [wa.farm.farmId]);
+    a.c.send({ t: 'sell', rid: 'gold', items: { golden: 10 } });
+    expect(await a.c.ack('gold')).toMatchObject({ ok: true });
+    const big = await b.c.next((m) => m.t === 'event' && m.event.kind === 'bigTrade');
+    if (big.t !== 'event' || big.event.kind !== 'bigTrade') throw new Error('no trade');
+    expect(big.event.trade).toMatchObject({ seller: wa.farm.name, grade: 'golden', qty: 10 });
+    const seenByB = await b.c.next((m) => m.t === 'market' && m.market.supplyToday >= 10);
+    const seenByA = await a.c.next((m) => m.t === 'market' && m.market.supplyToday >= 10);
+    if (seenByA.t !== 'market' || seenByB.t !== 'market') throw new Error('no market');
+    expect(seenByB.market.supplyToday).toBe(seenByA.market.supplyToday);
+    expect(seenByB.market.trades[0]).toMatchObject({ seller: wa.farm.name, qty: 10 });
+    a.c.ws.close();
+    b.c.ws.close();
   });
 });
