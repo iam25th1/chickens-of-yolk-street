@@ -1,0 +1,9 @@
+# text files are stored with LF
+* text=auto eol=lf
+
+# assets are bytes: never normalised, never diffed
+*.png binary
+*.mp3 binary
+*.ogg binary
+*.ttf binary
+*.wasm binary

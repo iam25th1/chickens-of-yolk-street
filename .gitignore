@@ -1,0 +1,22 @@
+# secrets: keys and tokens live in environment variables, never in this repo
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+coverage/
+
+# local data (PGlite database directory)
+.data/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
