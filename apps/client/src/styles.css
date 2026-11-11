@@ -462,9 +462,10 @@ input[type='range'].slider::-moz-range-thumb {
   top: 57px;
   width: 128px;
   text-align: center;
-  /* Pixelify Sans closes up below 16px (C reads as O, 2 as 8); Silkscreen is drawn for 8px */
+  /* Pixelify Sans closes up below 16px (C reads as O, 2 as 8); Silkscreen is drawn for 8px.
+     Regular weight: STANDING CONTRACT is 97px wide in it, inside the card (113px in bold) */
   font-family: var(--font-body);
-  font-weight: 700;
+  font-weight: 400;
   font-size: 8px;
   color: var(--barn);
 }
