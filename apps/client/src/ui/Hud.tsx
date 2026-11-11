@@ -54,15 +54,16 @@ function FlapChar({ ch }: { ch: string }) {
       run.pause();
     };
   }, [ch, shown]);
-  const sheet = assets.sheet('33-split-flap');
   const url = assets.url('33-split-flap');
-  const size = `${sheet.meta.size.w / 8}px ${sheet.meta.size.h / 8}px`;
-  const rect = flip >= 0 ? { x: flip * 64, y: 288 } : flapRect(shown);
+  const atlas = assets.atlasSize('33-split-flap');
+  const size = `${atlas.w}px ${atlas.h}px`;
+  const src = flip >= 0 ? { x: flip * 64, y: 288 } : flapRect(shown);
+  const rect = src ? assets.regionRect('33-split-flap', src.x, src.y, 64, 96) : null;
   if (!rect) return <span style={{ width: 8, height: 12, display: 'inline-block', background: '#3a1f10' }} />;
   return (
     <span
       className="sprite"
-      style={{ display: 'inline-block', width: 8, height: 12, backgroundImage: `url(${url})`, backgroundSize: size, backgroundPosition: `${-rect.x / 8}px ${-rect.y / 8}px` }}
+      style={{ display: 'inline-block', width: 8, height: 12, backgroundImage: `url(${url})`, backgroundSize: size, backgroundPosition: `${-rect.x}px ${-rect.y}px` }}
     />
   );
 }

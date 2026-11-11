@@ -61,7 +61,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     if (ready) return;
     let live = true;
-    void assets.loadSprites([NARRATOR]).then(
+    void assets.loadGroups(['title']).then(
       () => live && setReady(true),
       () => live && setReady(true),
     );

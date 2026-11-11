@@ -27,7 +27,7 @@ export class BackdropScene implements Scene {
     if (frame) {
       const bg = new Sprite(frame.texture);
       bg.anchor.set(0);
-      bg.scale.set(1 / assets.divisor(plate));
+      bg.scale.set(assets.scale(plate));
       this.root.addChild(bg);
     }
 

@@ -19,7 +19,7 @@ export class TownScene implements Scene {
     if (frame) {
       const bg = new Sprite(frame.texture);
       bg.anchor.set(0);
-      bg.scale.set(1 / assets.divisor('27-town-square-plate'));
+      bg.scale.set(assets.scale('27-town-square-plate'));
       this.root.addChild(bg);
     }
     for (let x = 32; x < GAME_W; x += 64) {

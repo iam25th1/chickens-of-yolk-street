@@ -22,6 +22,7 @@ import type { Action } from '../net/socket';
 import { henLayers } from '../pixi/farm/HenActor';
 import { settings } from '../state/settings';
 import { useStore } from '../state/store';
+import { SheetSprite } from './SheetSprite';
 
 export function Panel({ title, x, y, w, h, onClose, children }: { title: string; x: number; y: number; w: number; h: number; onClose: () => void; children: ReactNode }) {
   const { audio } = useServices();
@@ -68,7 +69,7 @@ function HenTile({ hen, cash, onBuy }: { hen: ShopHenView; cash: number; onBuy: 
   const traits = [hen.body, hen.eyes !== 'default' ? hen.eyes : '', hen.comb !== 'default' ? hen.comb : '', hen.accessory !== 'none' ? hen.accessory : ''].filter(Boolean);
   return (
     <div className="col" style={{ width: 70, gap: 2, alignItems: 'center', background: hen.source === 'auction' ? '#e3cc96' : undefined, padding: 2 }}>
-      <img alt="" className="sprite" width={43} height={44} style={{ objectFit: 'none', objectPosition: '0 0' }} src={assets.henPortrait(henLayers(hen))} />
+      <img alt="" className="sprite" width={32} height={32} style={{ objectFit: 'none', objectPosition: '50% 100%' }} src={assets.henPortrait(henLayers(hen))} />
       <span style={{ textAlign: 'center' }}>{traits.join(' ').toUpperCase()}</span>
       <span>LAYS X{hen.layingTrait.toFixed(2)}</span>
       <button className={`btn ${hen.source === 'auction' ? 'red' : ''}`} disabled={cash < hen.priceMilli / 1000} onClick={onBuy}>
@@ -80,7 +81,7 @@ function HenTile({ hen, cash, onBuy }: { hen: ShopHenView; cash: number; onBuy: 
 }
 
 export function ShopPanel({ farm, send, onClose }: { farm: FarmState; send: (a: Action) => Promise<boolean>; onClose: () => void }) {
-  const { audio, assets } = useServices();
+  const { audio } = useServices();
   const [tab, setTab] = useState<'hens' | 'feed' | 'coops' | 'machines'>('hens');
   const [count, setCount] = useState(1);
   const [tier, setTier] = useState<FeedTier>(farm.feedTier);
@@ -132,7 +133,7 @@ export function ShopPanel({ farm, send, onClose }: { farm: FarmState; send: (a: 
             <span>SUPPLIER</span>
             {(['loyalist', 'squeezer'] as const).map((s) => (
               <button key={s} className={`chip ${farm.supplier === s ? 'on' : ''}`} style={{ border: 0, font: 'inherit' }} onClick={click(() => void send({ t: 'setSupplier', supplier: s }))}>
-                <img alt="" className="sprite" width={16} height={16} src={assets.thumbnail(s === 'loyalist' ? '07-loyalist' : '06-squeezer', 'idle', 0, 16)} />
+                <SheetSprite id={s === 'loyalist' ? '07-loyalist' : '06-squeezer'} row="idle" zoom={0.25} />
                 {s === 'loyalist' ? 'THE LOYALIST' : 'THE SQUEEZER'}
               </button>
             ))}
@@ -206,7 +207,7 @@ export function ShopPanel({ farm, send, onClose }: { farm: FarmState; send: (a: 
             return (
               <div key={u} className="row spread" style={{ height: 32 }}>
                 <div className="row" style={{ gap: 6 }}>
-                  <img alt="" src={assets.thumbnail(t.sprite, t.row, 0, u === 'conveyor' ? 4 : 8)} width={32} height={32} className="sprite" />
+                  <SheetSprite id={t.sprite} row={t.row} zoom={u === 'conveyor' ? 2 : 0.5} />
                   <div className="col" style={{ gap: 2 }}>
                     <span>{t.name}</span>
                     <span style={{ color: '#8b5a2b' }}>{t.effect}</span>

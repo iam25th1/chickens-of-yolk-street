@@ -20,10 +20,10 @@ export class FrameSprite extends Container {
     private readonly assets: AssetStore,
     private sheets: string[],
     row: string,
-    divisor?: number,
+    scale?: number,
   ) {
     super();
-    this.size = 1 / (divisor ?? assets.divisor(sheets[0] ?? ''));
+    this.size = scale ?? assets.scale(sheets[0] ?? '');
     this.scale.set(this.size);
     this.play(row);
   }

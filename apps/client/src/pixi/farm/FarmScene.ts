@@ -117,7 +117,6 @@ export class FarmScene implements Scene {
     const g = new Container();
     const tile = (cx: number, cy: number, x: number, y: number) => {
       const t = new Sprite(this.assets.region('23-farm-tileset', cx * 128, cy * 128, 128, 128));
-      t.scale.set(1 / 8);
       t.position.set(x, y);
       g.addChild(t);
     };

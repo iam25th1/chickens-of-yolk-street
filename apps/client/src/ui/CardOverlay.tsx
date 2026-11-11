@@ -14,8 +14,7 @@ import { SheetSprite } from './SheetSprite';
 export function Portrait({ sheet, row, loop, onDone }: { sheet: string; row: string; loop: boolean; onDone?: () => void }) {
   const { assets } = useServices();
   const [i, setI] = useState(0);
-  const json = assets.sheet(sheet);
-  const names = json.animations[row] ?? [];
+  const names = assets.frameRects(sheet, row);
   useEffect(() => {
     setI(0);
     let k = 0;
@@ -28,14 +27,14 @@ export function Portrait({ sheet, row, loop, onDone }: { sheet: string; row: str
         } else k++;
         setI(k);
         step();
-      }, json.frames[names[k] ?? '']?.duration || 120);
+      }, names[k]?.ms || 120);
     };
     step();
     return () => clearTimeout(timer);
-    // names and json are stable per sheet and row
+    // names are stable per sheet and row
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheet, row, loop]);
-  return <img alt="" className="sprite" width={64} height={64} src={assets.thumbnail(sheet, row, Math.min(i, names.length - 1), 4)} />;
+  return <SheetSprite id={sheet} row={row} frame={Math.min(i, names.length - 1)} zoom={assets.grid(sheet) / 4} />;
 }
 
 const coins = (milli: number): string => (milli / 1000).toFixed(2);

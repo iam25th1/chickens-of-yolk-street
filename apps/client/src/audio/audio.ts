@@ -1,6 +1,7 @@
 // Web Audio engine. One-shots play the packed MP3 takes, with a random press (take and pitch) and
-// random pitch and volume variation on every play. The 12 loops play the gapless OGGs with their
-// sample-exact loop points (converted to seconds, so they survive resampling to the device rate).
+// random pitch and volume variation on every play. Ambience and machine loops play the gapless OGGs
+// with their sample-exact loop points. Music is never downloaded up front: it streams through a media
+// element once the player has touched the page, so the first screens do not wait for megabytes.
 import { ASSET_BASE, type AssetIndex } from '../assets/catalog';
 
 export interface LoopHandle {
@@ -21,7 +22,8 @@ export class AudioEngine {
   private readonly sfxBus: GainNode;
   private readonly takes = new Map<string, AudioBuffer>();
   private readonly loops = new Map<string, Decoded>();
-  private music: { id: string; handle: LoopHandle } | null = null;
+  private music: { id: string; el: HTMLAudioElement; gain: GainNode } | null = null;
+  private wantedMusic: { id: string; fadeMs: number } | null = null;
   private lastPlay = new Map<string, number>();
 
   constructor(private readonly index: AssetIndex) {
@@ -36,7 +38,12 @@ export class AudioEngine {
 
   /** Browsers start audio suspended until a user gesture. */
   unlock(): void {
-    if (this.ctx.state === 'suspended') void this.ctx.resume();
+    const start = () => {
+      const w = this.wantedMusic;
+      if (w && !this.music) this.playMusic(w.id, w.fadeMs);
+    };
+    if (this.ctx.state === 'suspended') void this.ctx.resume().then(start);
+    else start();
   }
 
   get unlocked(): boolean {
@@ -60,6 +67,7 @@ export class AudioEngine {
       ids.map(async (id) => {
         const s = this.index.sounds[id];
         if (!s) throw new Error(`unknown sound ${id}`);
+        if (s.kind === 'music') return onEach();
         if (s.loop && !this.loops.has(id)) {
           try {
             const buffer = await this.decode(`${ASSET_BASE}audio/${id}/${s.loop.file}`);
@@ -143,14 +151,39 @@ export class AudioEngine {
     };
   }
 
-  /** Crossfades to a music loop; null fades the music out. */
+  /** Crossfades to a streamed music track; null fades the music out. Waits for the first gesture. */
   playMusic(id: string | null, fadeMs = 800): void {
+    this.wantedMusic = id ? { id, fadeMs } : null;
     if (this.music?.id === id) return;
-    this.music?.handle.stop(fadeMs);
+    const old = this.music;
     this.music = null;
-    if (!id || !this.unlocked) return;
-    const handle = this.loop(id, { bus: 'music', volume: 0.7, fadeMs });
-    if (handle) this.music = { id, handle };
+    if (old) {
+      const now = this.ctx.currentTime;
+      old.gain.gain.cancelScheduledValues(now);
+      old.gain.gain.setValueAtTime(old.gain.gain.value, now);
+      old.gain.gain.linearRampToValueAtTime(0, now + fadeMs / 1000);
+      setTimeout(() => {
+        old.el.pause();
+        old.el.removeAttribute('src');
+        old.el.load();
+      }, fadeMs + 50);
+    }
+    const s = id ? this.index.sounds[id] : null;
+    if (!id || !s || !this.unlocked) return;
+    const el = new Audio();
+    el.loop = true;
+    el.preload = 'auto';
+    const ogg = s.loop && el.canPlayType('audio/ogg; codecs="vorbis"') !== '';
+    const file = ogg && s.loop ? s.loop.file : s.presses[0]?.file;
+    if (!file) return;
+    el.src = `${ASSET_BASE}audio/${id}/${file}`;
+    const gain = this.ctx.createGain();
+    const t = this.ctx.currentTime;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.7, t + fadeMs / 1000);
+    this.ctx.createMediaElementSource(el).connect(gain).connect(this.musicBus);
+    void el.play().catch(() => undefined);
+    this.music = { id, el, gain };
   }
 
   get musicId(): string | null {
