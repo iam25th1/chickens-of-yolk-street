@@ -1,38 +1,40 @@
 import { openDb, type Db } from '../src/db/db';
-import { NoopSettlement, type SettlementPayload, type SettlementResult, type SettlementWriter } from '../src/chain/settlement';
+import { InferenceBudget } from '../src/agents/brain';
+import type { NearAiClient } from '../src/ai/nearai';
+import { NoopChain } from '../src/chain/chain';
 import { Game } from '../src/game/game';
-import type { RivalSpec } from '../src/game/agents';
 import { seededRng } from '../src/game/rng';
-
-export class RecordingSettlement implements SettlementWriter {
-  readonly mode = 'noop' as const;
-  readonly payloads: SettlementPayload[] = [];
-  private readonly inner = new NoopSettlement('test', () => undefined);
-  async write(payload: SettlementPayload): Promise<SettlementResult> {
-    this.payloads.push(payload);
-    return this.inner.write(payload);
-  }
-}
 
 export interface TestGame {
   game: Game;
   db: Db;
-  settlement: RecordingSettlement;
   clock: { t: number };
+  logs: string[];
 }
 
-export async function makeGame(opts: { rivals?: readonly RivalSpec[]; seed?: number } = {}): Promise<TestGame> {
+export async function makeGame(opts: { cast?: boolean; seed?: number; client?: NearAiClient | null; capUsd?: number } = {}): Promise<TestGame> {
   const db = await openDb('memory://');
-  const clock = { t: 1_000_000 };
-  const settlement = new RecordingSettlement();
+  const clock = { t: Date.UTC(2026, 10, 11, 12) };
+  const logs: string[] = [];
+  const log = (line: string) => logs.push(line);
   const game = new Game({
     db,
-    settlement,
+    chain: new NoopChain('test', log),
     now: () => clock.t,
     rng: seededRng(opts.seed ?? 42),
-    rivals: opts.rivals ?? [],
-    log: () => undefined,
+    log,
+    cast: opts.cast ?? false,
+    brain: {
+      client: opts.client ?? null,
+      budget: new InferenceBudget(db, opts.capUsd ?? 1, () => clock.t),
+      model: 'test/main',
+      cheapModel: 'test/cheap',
+      pricing: new Map([
+        ['test/main', { input: 1, output: 5 }],
+        ['test/cheap', { input: 0.1, output: 0.5 }],
+      ]),
+    },
   });
   await game.init();
-  return { game, db, settlement, clock };
+  return { game, db, clock, logs };
 }

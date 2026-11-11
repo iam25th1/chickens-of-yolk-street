@@ -1,12 +1,27 @@
-// Shop and settings panels. Shop prices come from ECONOMY for display; the server charges.
+// Shop and settings panels. Prices shown come from ECONOMY and the shared formulas for display;
+// the server quotes and charges every purchase.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ECONOMY, UNLOCK_IDS, coopUpgradeCost, nextCoopKind, type FarmState, type UnlockId } from '@coys/shared';
+import {
+  ECONOMY,
+  FEED_TIERS,
+  UNLOCK_IDS,
+  coopUpgradeCost,
+  desperation,
+  feedGramsPerHenDay,
+  loyalistBagPrice,
+  nextCoopKind,
+  squeezerBagPrice,
+  type FarmState,
+  type FeedTier,
+  type ShopHenView,
+  type UnlockId,
+} from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { motion } from '../motion/ui';
 import type { Action } from '../net/socket';
+import { henLayers } from '../pixi/farm/HenActor';
 import { settings } from '../state/settings';
 import { useStore } from '../state/store';
-import { SheetSprite } from './SheetSprite';
 
 export function Panel({ title, x, y, w, h, onClose, children }: { title: string; x: number; y: number; w: number; h: number; onClose: () => void; children: ReactNode }) {
   const { audio } = useServices();
@@ -43,51 +58,112 @@ export function Panel({ title, x, y, w, h, onClose, children }: { title: string;
 const UNLOCK_TEXT: Record<UnlockId, { name: string; effect: string; sprite: string; row: string }> = {
   conveyor: { name: 'CONVEYOR', effect: 'BREAKAGE 5% TO 2%', sprite: '18-conveyor', row: 'horizontal' },
   grader: { name: 'EGG GRADER', effect: '+10% EGG PRICE', sprite: '19-egg-grader', row: 'idle' },
-  cart: { name: 'DELIVERY CART', effect: 'RUNS CONTRACTS (SOON)', sprite: '20-delivery-cart', row: 'idle' },
+  cart: { name: 'DELIVERY CART', effect: 'DELIVERS CONTRACTS AT DUSK', sprite: '20-delivery-cart', row: 'idle' },
   hopper: { name: 'FEED HOPPER', effect: '-10% FEED COST', sprite: '21-feed-hopper', row: 'idle' },
-  clerk: { name: 'SALES CLERK', effect: '+5% REVENUE', sprite: '22-sales-clerk', row: 'idle' },
+  clerk: { name: 'SALES CLERK', effect: '+5% REVENUE, TAKES GOOD OFFERS', sprite: '22-sales-clerk', row: 'idle' },
 };
+
+function HenTile({ hen, cash, onBuy }: { hen: ShopHenView; cash: number; onBuy: () => void }) {
+  const { assets } = useServices();
+  const traits = [hen.body, hen.eyes !== 'default' ? hen.eyes : '', hen.comb !== 'default' ? hen.comb : '', hen.accessory !== 'none' ? hen.accessory : ''].filter(Boolean);
+  return (
+    <div className="col" style={{ width: 70, gap: 2, alignItems: 'center', background: hen.source === 'auction' ? '#e3cc96' : undefined, padding: 2 }}>
+      <img alt="" className="sprite" width={43} height={44} style={{ objectFit: 'none', objectPosition: '0 0' }} src={assets.henPortrait(henLayers(hen))} />
+      <span style={{ textAlign: 'center' }}>{traits.join(' ').toUpperCase()}</span>
+      <span>LAYS X{hen.layingTrait.toFixed(2)}</span>
+      <button className={`btn ${hen.source === 'auction' ? 'red' : ''}`} disabled={cash < hen.priceMilli / 1000} onClick={onBuy}>
+        {hen.source === 'auction' ? 'AUCTION ' : ''}
+        {(hen.priceMilli / 1000).toFixed(0)}
+      </button>
+    </div>
+  );
+}
 
 export function ShopPanel({ farm, send, onClose }: { farm: FarmState; send: (a: Action) => Promise<boolean>; onClose: () => void }) {
   const { audio, assets } = useServices();
-  const [tab, setTab] = useState<'hens' | 'coops' | 'machines'>('hens');
+  const [tab, setTab] = useState<'hens' | 'feed' | 'coops' | 'machines'>('hens');
   const [count, setCount] = useState(1);
+  const [tier, setTier] = useState<FeedTier>(farm.feedTier);
+  const [bags, setBags] = useState(1);
   const cash = farm.cashMilli / 1000;
   const click = (fn: () => void) => () => {
     uiSound(audio, 'click');
     fn();
   };
   const freePlots = ECONOMY.coops.plots - farm.coops.length;
+  const feed = farm.feedGrams.cheap + farm.feedGrams.standard + farm.feedGrams.premium;
+  const feedDays = farm.hens.length ? feed / (farm.hens.length * feedGramsPerHenDay()) : 99;
+  const quote = (farm.supplier === 'squeezer' ? squeezerBagPrice(tier, desperation(feedDays, cash)) : loyalistBagPrice(tier, 0)) * (farm.unlocks.includes('hopper') ? 0.9 : 1);
   return (
-    <Panel title="FARM SHOP" x={92} y={56} w={320} h={232} onClose={onClose}>
-      <div className="row" style={{ gap: 4, marginBottom: 8 }}>
-        {(['hens', 'coops', 'machines'] as const).map((t) => (
+    <Panel title="FARM SHOP" x={60} y={36} w={388} h={292} onClose={onClose}>
+      <div className="row" style={{ gap: 4, marginBottom: 6 }}>
+        {(['hens', 'feed', 'coops', 'machines'] as const).map((t) => (
           <button key={t} className={`btn ${tab === t ? 'red' : ''}`} onMouseEnter={() => uiSound(audio, 'hover')} onClick={click(() => setTab(t))}>
             {t.toUpperCase()}
           </button>
         ))}
       </div>
       {tab === 'hens' && (
-        <div className="col">
-          <div className="row" style={{ gap: 8 }}>
-            <SheetSprite id="32-icons" row="hen" play="loop" />
-            <span>
-              HENS COST {ECONOMY.hen.price} EACH. EACH LAYS ABOUT {ECONOMY.hen.baseLaying} EGGS A DAY AND EATS {ECONOMY.feed.kgPerHenPerDay * 1000}G OF FEED.
-            </span>
+        <div className="col" style={{ gap: 6 }}>
+          <div className="row" style={{ gap: 4, flexWrap: 'wrap', height: 178, overflowY: 'auto', alignContent: 'flex-start' }}>
+            {farm.shop.map((h) => (
+              <HenTile key={h.id} hen={h} cash={cash} onBuy={click(() => void send({ t: 'buyHen', henId: h.id }))} />
+            ))}
+            {farm.shop.length === 0 && <span>THE BREEDER IS OUT. MORE AT DAWN.</span>}
           </div>
           <div className="row" style={{ gap: 6 }}>
+            <span>OR RANDOM HENS:</span>
             <button className="btn" onClick={click(() => setCount(Math.max(1, count - 1)))} aria-label="Fewer hens">
               -
             </button>
-            <span className="big">{count}</span>
+            <span>{count}</span>
             <button className="btn" onClick={click(() => setCount(Math.min(ECONOMY.limits.maxHensPerPurchase, count + 1)))} aria-label="More hens">
               +
             </button>
-            <button className="btn red" disabled={cash < count * ECONOMY.hen.price} onClick={click(() => void send({ t: 'buyHens', count }))}>
-              BUY FOR {count * ECONOMY.hen.price}
+            <button className="btn red" disabled={cash < count * ECONOMY.hen.price * ECONOMY.agents.auctionPriceFactor} onClick={click(() => void send({ t: 'buyHens', count }))}>
+              BUY UP TO {count * ECONOMY.hen.price}
             </button>
           </div>
-          <span>CROWDED COOPS LAY LESS: -15% FOR EVERY 10% OVER CAPACITY.</span>
+        </div>
+      )}
+      {tab === 'feed' && (
+        <div className="col" style={{ gap: 8 }}>
+          <div className="row" style={{ gap: 6 }}>
+            <span>SUPPLIER</span>
+            {(['loyalist', 'squeezer'] as const).map((s) => (
+              <button key={s} className={`chip ${farm.supplier === s ? 'on' : ''}`} style={{ border: 0, font: 'inherit' }} onClick={click(() => void send({ t: 'setSupplier', supplier: s }))}>
+                <img alt="" className="sprite" width={16} height={16} src={assets.thumbnail(s === 'loyalist' ? '07-loyalist' : '06-squeezer', 'idle', 0, 16)} />
+                {s === 'loyalist' ? 'THE LOYALIST' : 'THE SQUEEZER'}
+              </button>
+            ))}
+          </div>
+          <div className="row" style={{ gap: 4 }}>
+            {FEED_TIERS.map((t) => (
+              <button key={t} className={`chip ${t === tier ? 'on' : ''}`} style={{ border: 0, font: 'inherit' }} onClick={click(() => setTier(t))}>
+                {t.toUpperCase()} X{ECONOMY.feed.tiers[t].laying.toFixed(2)}
+              </button>
+            ))}
+            <button className="btn" onClick={click(() => void send({ t: 'setFeedTier', tier }))} disabled={farm.feedTier === tier}>
+              FEED THIS
+            </button>
+          </div>
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn" onClick={() => setBags(Math.max(1, bags - 1))}>
+              -
+            </button>
+            <span>
+              {bags} BAG{bags > 1 ? 'S' : ''} OF {ECONOMY.feed.bagKg}KG
+            </span>
+            <button className="btn" onClick={() => setBags(Math.min(ECONOMY.limits.maxBagsPerPurchase, bags + 1))}>
+              +
+            </button>
+            <button className="btn red" disabled={cash < quote * bags} onClick={click(() => void send({ t: 'buyFeed', tier, bags }))}>
+              BUY ABOUT {(quote * bags).toFixed(0)}
+            </button>
+          </div>
+          <span>
+            TROUGH: {feedDays.toFixed(1)} DAYS. {farm.supplier === 'squeezer' ? 'THE SQUEEZER CHARGES MORE WHEN YOU LOOK HUNGRY.' : 'THE LOYALIST GIVES REGULARS A DISCOUNT AND CREDIT.'}
+          </span>
         </div>
       )}
       {tab === 'coops' && (

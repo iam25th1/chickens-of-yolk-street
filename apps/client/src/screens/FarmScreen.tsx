@@ -1,43 +1,45 @@
-// The farm: the world on the canvas, the HUD, the card tray and the shop. Server state flows in
-// through the socket; player choices go out as actions and come back as events with juice.
+// The farm: the world on the canvas, the HUD, the card tray and desk, the card overlay, the shop,
+// the ledger, and the market board over the town square. Server state flows in through the
+// socket; player choices go out as actions and come back as events with juice.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isCrash } from '@coys/shared';
+import { isCrash, type CardView } from '@coys/shared';
 import { useServices } from '../app/services';
 import { GameSocket, type Action } from '../net/socket';
 import { FarmScene } from '../pixi/farm/FarmScene';
+import { TownScene } from '../pixi/TownScene';
 import { events, game } from '../state/game';
 import { useStore } from '../state/store';
-import { FeedCard, GlutCard, SellCard } from '../ui/Cards';
+import { CardOverlay, type OverlayResult } from '../ui/CardOverlay';
+import { GlutCard, SellCard } from '../ui/Cards';
+import { LOOK } from '../ui/cast';
+import { Desk } from '../ui/Desk';
 import { FxLayer, uiFx } from '../ui/FxLayer';
 import { Ticker, TopBar } from '../ui/Hud';
+import { LedgerPanel } from '../ui/Ledger';
+import { MarketBoard } from '../ui/MarketBoard';
 import { ShopPanel } from '../ui/Panels';
 
 const REFUSALS: Record<string, string> = {
   insufficient_funds: 'NOT ENOUGH COINS',
-  insufficient_stock: 'NOT ENOUGH EGGS',
+  insufficient_stock: 'NOT ENOUGH IN STOCK',
   rate_limited: 'EASY THERE, ONE THING AT A TIME',
   invalid_action: 'CANNOT DO THAT RIGHT NOW',
+  not_found: 'THAT IS GONE ALREADY',
   farm_bust: 'THIS FARM IS BUST',
 };
 
-export function FarmScreen({
-  session,
-  accountId,
-  onSignedOut,
-  onSettings,
-}: {
-  session: string;
-  accountId: string | null;
-  onSignedOut: () => void;
-  onSettings: () => void;
-}) {
+export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { session: string; accountId: string | null; onSignedOut: () => void; onSettings: () => void }) {
   const { assets, audio, pixi } = useServices();
   const farm = useStore(game, (s) => s.farm);
   const market = useStore(game, (s) => s.market);
   const status = useStore(game, (s) => s.status);
-  const [shop, setShop] = useState(false);
+  const [panel, setPanel] = useState<'shop' | 'ledger' | null>(null);
+  const [view, setView] = useState<'farm' | 'market'>('farm');
+  const [overlay, setOverlay] = useState<{ card: CardView; result: OverlayResult | null; mood: 'warm' | 'firm' | 'cross' | null } | null>(null);
+  const queue = useRef<CardView[]>([]);
   const socket = useRef<GameSocket | null>(null);
   const scene = useRef<FarmScene | null>(null);
+  const town = useRef<TownScene | null>(null);
   const linked = useRef(false);
 
   const send = useCallback(async (a: Action): Promise<boolean> => {
@@ -45,7 +47,6 @@ export function FarmScreen({
     return Boolean(ack?.ok);
   }, []);
 
-  // connect
   useEffect(() => {
     const s = new GameSocket(session);
     socket.current = s;
@@ -53,7 +54,7 @@ export function FarmScreen({
     return () => {
       s.close();
       socket.current = null;
-      game.set({ status: 'idle', farm: null });
+      game.set({ status: 'idle', farm: null, ledger: null });
     };
   }, [session]);
 
@@ -65,7 +66,7 @@ export function FarmScreen({
     }
   }, [status, accountId, onSignedOut, send]);
 
-  // world: created once the first farm state arrives
+  // the world
   useEffect(() => {
     if (!farm || scene.current) return;
     const s = new FarmScene(assets, audio, pixi.app.renderer, {
@@ -77,23 +78,66 @@ export function FarmScreen({
     pixi.setScene(s);
   }, [farm, assets, audio, pixi, send]);
 
-  useEffect(() => () => pixi.setScene(null), [pixi]);
+  useEffect(
+    () => () => {
+      town.current?.destroy();
+      pixi.setScene(null);
+    },
+    [pixi],
+  );
   useEffect(() => {
     if (farm) scene.current?.sync(farm);
   }, [farm]);
 
-  // music follows the market: tension while it has crashed
+  // the market board swaps the canvas to the town square; the farm keeps running behind it
+  useEffect(() => {
+    if (!scene.current) return;
+    if (view === 'market') {
+      town.current = new TownScene(assets, audio);
+      pixi.setScene(town.current, { keep: true });
+      audio.play('16-ticker', { volume: 0.4 });
+    } else if (town.current) {
+      pixi.setScene(scene.current);
+      town.current = null;
+    }
+  }, [view, assets, audio, pixi]);
+
   const crashed = market ? isCrash(market.multiplier) : false;
   useEffect(() => {
     audio.playMusic(crashed ? '43-market-tension' : '42-farm-day', 1200);
   }, [audio, crashed]);
 
-  // events: juice in the world, stamps and toasts in the UI
+  // cards: queue arrivals, show one at a time
+  const showNext = useCallback(() => {
+    const next = queue.current.shift();
+    setOverlay(next ? { card: next, result: null, mood: null } : null);
+  }, []);
+  const openCard = useCallback((card: CardView) => {
+    setOverlay((cur) => (cur ? cur : { card, result: null, mood: null }));
+  }, []);
+
   useEffect(
     () =>
       events.on((e) => {
         scene.current?.onEvent(e);
         switch (e.kind) {
+          case 'cardArrived':
+            setOverlay((cur) => {
+              if (!cur) return { card: e.card, result: null, mood: null };
+              if (!queue.current.some((c) => c.id === e.card.id) && cur.card.id !== e.card.id) queue.current.push(e.card);
+              return cur;
+            });
+            break;
+          case 'haggle':
+            setOverlay((cur) => (cur && cur.card.id === e.card.id ? { card: e.card, result: null, mood: e.mood } : cur));
+            break;
+          case 'cardResolved':
+            if (e.auto) {
+              uiFx.emit({ kind: 'toast', text: `THE CLERK TOOK ${e.card.from.toUpperCase()}'S OFFER: +${(e.totalMilli / 1000).toFixed(2)}` });
+              queue.current = queue.current.filter((c) => c.id !== e.card.id);
+              setOverlay((cur) => (cur && cur.card.id === e.card.id ? null : cur));
+            } else setOverlay((cur) => (cur && cur.card.id === e.card.id ? { card: e.card, result: { outcome: e.outcome, totalMilli: e.totalMilli }, mood: null } : cur));
+            break;
           case 'sold':
             uiFx.emit({ kind: 'stamp', row: 'sold', coins: e.totalMilli / 1000 });
             break;
@@ -103,15 +147,32 @@ export function FarmScreen({
             break;
           case 'dayEnded': {
             const s = e.summary;
-            uiFx.emit({ kind: 'toast', text: `DAY ${s.day}: ${s.laid} LAID, ${s.broken} BROKEN. MARKET X${s.nextMultiplier.toFixed(2)}` });
+            uiFx.emit({ kind: 'toast', text: `DAY ${s.day}: ${s.laid} LAID. MARKET X${s.nextMultiplier.toFixed(2)}${s.missed ? `. ${s.missed} DELIVERY MISSED` : ''}` });
             if (s.fedMultiplier === 0) {
               audio.play('29-alarm-bell', { delayMs: 800 });
               uiFx.emit({ kind: 'toast', text: 'THE TROUGH IS EMPTY: NO EGGS TOMORROW', tone: 'bad' });
             }
             break;
           }
+          case 'contractDelivered':
+            uiFx.emit({ kind: 'coins', from: { x: 444, y: 280 }, count: 4 });
+            if (e.auto) uiFx.emit({ kind: 'toast', text: `THE CART DELIVERED ${e.qty} EGGS` });
+            break;
+          case 'contractMissed':
+            uiFx.emit({ kind: 'toast', text: `MISSED A DELIVERY: -${(e.penaltyMilli / 1000).toFixed(2)}. THE BAKERY IS NOT HAPPY`, tone: 'bad' });
+            audio.play('20-fail', { volume: 0.6 });
+            break;
+          case 'debtCharged':
+            if (e.defaulted) uiFx.emit({ kind: 'toast', text: 'COULD NOT PAY THE LOYALIST IN FULL', tone: 'bad' });
+            break;
+          case 'orderFilled':
+            uiFx.emit({ kind: 'toast', text: `${e.side === 'sell' ? 'SOLD' : 'BOUGHT'} ${e.qty} ${e.side === 'sell' ? 'TO' : 'FROM'} ${e.counterparty.toUpperCase()}` });
+            break;
           case 'rivalBust':
-            uiFx.emit({ kind: 'toast', text: `${e.name.toUpperCase()} WENT BUST. ${e.hens} HENS AT AUCTION` });
+            uiFx.emit({ kind: 'bust', name: e.name, sign: LOOK[e.agentKind].sign });
+            break;
+          case 'agentOpened':
+            uiFx.emit({ kind: 'toast', text: `NEW IN TOWN: ${e.name.toUpperCase()}` });
             break;
           case 'crash':
             if (e.on) uiFx.emit({ kind: 'toast', text: 'MARKET CRASH! TOO MANY EGGS', tone: 'bad' });
@@ -141,19 +202,33 @@ export function FarmScreen({
 
   return (
     <div className="layer">
-      <TopBar farm={farm} onShop={() => setShop(true)} onSettings={onSettings} />
-      <div className="tray">
-        <SellCard farm={farm} market={market} send={send} />
-        <FeedCard farm={farm} send={send} />
-        {market.crash && <GlutCard market={market} />}
-      </div>
+      <TopBar
+        farm={farm}
+        onShop={() => setPanel('shop')}
+        onSettings={onSettings}
+        onMarket={() => setView(view === 'market' ? 'farm' : 'market')}
+        onLedger={() => setPanel('ledger')}
+      />
+      {view === 'market' ? (
+        <MarketBoard farm={farm} market={market} send={send} onBack={() => setView('farm')} />
+      ) : (
+        <div className="tray">
+          <SellCard farm={farm} market={market} send={send} />
+          <Desk farm={farm} send={send} onOpen={openCard} />
+          {market.crash && <GlutCard market={market} />}
+        </div>
+      )}
       <Ticker extra={[farm.name.toUpperCase()]} />
       {status === 'offline' && (
         <div className="toast" style={{ position: 'absolute', left: 190, top: 300 }}>
           RECONNECTING TO THE MARKET
         </div>
       )}
-      {shop && <ShopPanel farm={farm} send={send} onClose={() => setShop(false)} />}
+      {panel === 'shop' && <ShopPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
+      {panel === 'ledger' && <LedgerPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
+      {overlay && view === 'farm' && (
+        <CardOverlay key={overlay.card.id} card={overlay.card} result={overlay.result} haggleMood={overlay.mood} send={send} onClose={showNext} />
+      )}
       <FxLayer />
     </div>
   );

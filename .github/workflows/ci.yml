@@ -2,8 +2,9 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'build/**']
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -23,3 +24,42 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/coys-game/target
+            contracts/sandbox-tests/target
+          key: cargo-${{ hashFiles('contracts/*/Cargo.lock', 'contracts/*/rust-toolchain.toml') }}
+      - name: Install cargo-near 0.23.0 (checksum verified)
+        run: |
+          base=https://github.com/near/cargo-near/releases/download/cargo-near-v0.23.0
+          f=cargo-near-x86_64-unknown-linux-gnu.tar.gz
+          curl -sSfL -o "$f" "$base/$f"
+          curl -sSfL -o "$f.sha256" "$base/$f.sha256"
+          echo "$(cut -d' ' -f1 "$f.sha256")  $f" | sha256sum -c
+          mkdir -p cn && tar -xzf "$f" -C cn
+          find cn -name cargo-near -type f -exec install -m 755 {} "$HOME/.cargo/bin/" \;
+          cargo near --version
+      - name: Contract unit tests
+        working-directory: contracts/coys-game
+        run: cargo test --locked
+      - name: Build the contract (cargo near)
+        working-directory: contracts/coys-game
+        run: cargo near build non-reproducible-wasm --locked
+      - name: Sandbox tests (mint, transfer, batch settlement, access control)
+        working-directory: contracts/sandbox-tests
+        env:
+          COYS_WASM: ${{ github.workspace }}/contracts/coys-game/target/near/coys_game.wasm
+        run: cargo test --locked -- --test-threads=1
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: coys-game-wasm
+          path: contracts/coys-game/target/near/coys_game.wasm
+          if-no-files-found: error

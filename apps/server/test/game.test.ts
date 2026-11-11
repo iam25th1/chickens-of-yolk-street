@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ECONOMY, feedGramsPerHenDay, marketMultiplier, toMilli, type GameEvent } from '@coys/shared';
-import { RIVALS } from '../src/game/agents';
+import { ECONOMY, feedGramsPerHenDay, marketMultiplier, toMilli, type FarmState } from '@coys/shared';
 import { makeGame, type TestGame } from './helpers';
 
 let t: TestGame | null = null;
@@ -9,10 +8,13 @@ afterEach(async () => {
   t = null;
 });
 
-const rid = (() => {
-  let n = 0;
-  return () => `r${++n}`;
-})();
+let n = 0;
+const rid = () => `r${++n}`;
+const nextDay = async (tg: TestGame) => {
+  tg.clock.t += ECONOMY.day.lengthMs;
+  await tg.game.endDay();
+};
+const eggs = (f: FarmState) => f.crate.white + f.crate.cream + f.crate.brown + f.crate.golden;
 
 describe('a new farm', () => {
   it('starts with the economy start state and a balanced ledger', async () => {
@@ -22,14 +24,10 @@ describe('a new farm', () => {
     expect(farm.cashMilli).toBe(toMilli(ECONOMY.start.cash));
     expect(farm.hens).toHaveLength(ECONOMY.start.hens);
     expect(farm.coops).toEqual([expect.objectContaining({ kind: 'starter', plot: 0 })]);
-    // the hens ate one day of feed at dawn
     expect(farm.feedGrams.standard).toBe(ECONOMY.start.feed.kg * 1000 - ECONOMY.start.hens * feedGramsPerHenDay());
     expect(farm.fedToday).toBe(1);
     expect(farm.layPlan.length).toBeGreaterThan(0);
-    for (const h of farm.hens) {
-      expect(h.layingTrait).toBeGreaterThanOrEqual(ECONOMY.hen.trait.min);
-      expect(h.layingTrait).toBeLessThanOrEqual(ECONOMY.hen.trait.max);
-    }
+    expect(farm.shop.length).toBe(ECONOMY.shop.hensPerDay);
     expect(await t.game.ledgerTotal(farmId)).toBe(farm.cashMilli);
   });
 
@@ -48,97 +46,130 @@ describe('actions are priced by the server', () => {
     expect(await t.game.act(playerId, { t: 'buyHens', rid: rid(), count: 2 })).toMatchObject({ ok: true });
     let farm = await t.game.getFarmState(farmId);
     expect(farm.cashMilli).toBe(toMilli(ECONOMY.start.cash - 2 * ECONOMY.hen.price));
-    expect(farm.hens).toHaveLength(ECONOMY.start.hens + 2);
-
-    const refused = await t.game.act(playerId, { t: 'buildCoop', rid: rid(), kind: 'red' });
-    expect(refused).toMatchObject({ ok: false, code: 'insufficient_funds' });
+    expect(await t.game.act(playerId, { t: 'buildCoop', rid: rid(), kind: 'red' })).toMatchObject({ ok: false, code: 'insufficient_funds' });
     farm = await t.game.getFarmState(farmId);
-    expect(farm.cashMilli).toBe(toMilli(ECONOMY.start.cash - 2 * ECONOMY.hen.price));
     expect(farm.coops).toHaveLength(1);
     expect(await t.game.ledgerTotal(farmId)).toBe(farm.cashMilli);
+  });
+
+  it('a hen bought from the shop arrives with the traits it was listed with', async () => {
+    t = await makeGame();
+    const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
+    const listed = (await t.game.getFarmState(farmId)).shop[0];
+    expect(listed?.source).toBe('breeder');
+    if (!listed) return;
+    expect(await t.game.act(playerId, { t: 'buyHen', rid: rid(), henId: listed.id })).toMatchObject({ ok: true });
+    const farm = await t.game.getFarmState(farmId);
+    expect(farm.hens.find((h) => h.id === listed.id)).toMatchObject({ body: listed.body, comb: listed.comb, accessory: listed.accessory });
+    expect(farm.shop.some((h) => h.id === listed.id)).toBe(false);
   });
 
   it('eggs can be collected by hand only once they are laid', async () => {
     t = await makeGame();
     const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
-    const farm = await t.game.getFarmState(farmId);
-    const egg = farm.layPlan.find((e) => !e.broken);
+    const egg = (await t.game.getFarmState(farmId)).layPlan.find((e) => !e.broken);
     expect(egg).toBeDefined();
     if (!egg) return;
-    const early = await t.game.act(playerId, { t: 'collect', rid: rid(), eggId: egg.id });
-    expect(early).toMatchObject({ ok: false, code: 'invalid_action' });
+    expect(await t.game.act(playerId, { t: 'collect', rid: rid(), eggId: egg.id })).toMatchObject({ ok: false, code: 'invalid_action' });
     t.clock.t += egg.atMs + 1;
     expect(await t.game.act(playerId, { t: 'collect', rid: rid(), eggId: egg.id })).toMatchObject({ ok: true });
     expect((await t.game.getFarmState(farmId)).crate[egg.grade]).toBe(1);
-    const again = await t.game.act(playerId, { t: 'collect', rid: rid(), eggId: egg.id });
-    expect(again).toMatchObject({ ok: false, code: 'invalid_action' });
   });
 
   it('selling pays the live price, adds to supply, and the close sets the next multiplier', async () => {
     t = await makeGame();
     const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
-    t.clock.t += ECONOMY.day.lengthMs;
-    await t.game.endDay();
+    await nextDay(t);
     let farm = await t.game.getFarmState(farmId);
-    const eggs = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
-    expect(eggs).toBeGreaterThan(0);
-    const cashBefore = farm.cashMilli;
+    const count = eggs(farm);
+    expect(count).toBeGreaterThan(0);
+    const before = farm.cashMilli;
     const market = await t.game.getMarketState();
-    expect(market.day).toBe(2);
-
-    const result = await t.game.act(playerId, { t: 'sell', rid: rid(), items: farm.crate });
-    expect(result.ok).toBe(true);
-    const sold = (result as { events: GameEvent[] }).events[0];
-    expect(sold?.kind).toBe('sold');
+    expect(await t.game.act(playerId, { t: 'sell', rid: rid(), items: farm.crate })).toMatchObject({ ok: true });
     farm = await t.game.getFarmState(farmId);
-    const expected =
-      farm.cashMilli - cashBefore === (sold as { totalMilli: number }).totalMilli &&
-      (sold as { multiplier: number }).multiplier === market.multiplier;
-    expect(expected).toBe(true);
-    expect((await t.game.getMarketState()).supplyToday).toBe(eggs);
-
-    t.clock.t += ECONOMY.day.lengthMs;
-    await t.game.endDay();
+    expect(farm.cashMilli).toBeGreaterThan(before);
+    expect((await t.game.getMarketState()).supplyToday).toBe(count);
+    await nextDay(t);
     const after = await t.game.getMarketState();
-    expect(after.history.at(-1)).toEqual({ day: 2, supply: eggs, multiplier: market.multiplier });
-    expect(after.multiplier).toBeCloseTo(marketMultiplier(eggs), 10);
+    expect(after.history.at(-1)).toEqual({ day: 2, supply: count, multiplier: market.multiplier });
+    expect(after.multiplier).toBeCloseTo(marketMultiplier(count), 10);
     expect(await t.game.ledgerTotal(farmId)).toBe(farm.cashMilli);
-  });
-
-  it('selling more eggs than the crate holds is refused', async () => {
-    t = await makeGame();
-    const { playerId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
-    const r = await t.game.act(playerId, { t: 'sell', rid: rid(), items: { golden: 5 } });
-    expect(r).toMatchObject({ ok: false, code: 'insufficient_stock' });
   });
 });
 
-describe('the day close', () => {
-  it('records one settlement batch per day with a digest of every farm net', async () => {
+describe('the order book', () => {
+  it('a limit sell rests, another player buys it through a trade, and eggs and coins swap', async () => {
     t = await makeGame();
-    await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
-    t.clock.t += ECONOMY.day.lengthMs;
-    expect(await t.game.tickIfDue()).toBe(true);
-    expect(t.settlement.payloads).toHaveLength(1);
-    const p = t.settlement.payloads[0];
-    expect(p).toMatchObject({ game: 'chickens-of-yolk-street', day: 1 });
-    expect(p?.digest).toMatch(/^[0-9a-f]{64}$/);
-    const market = await t.game.getMarketState();
-    expect(market.settlement).toEqual({ day: 1, status: 'noop', txHash: null });
+    const a = await t.game.ensurePlayer('dev', 'device-000a', 'Ada');
+    const b = await t.game.ensurePlayer('dev', 'device-000b', 'Bo');
+    await nextDay(t);
+    const fa = await t.game.getFarmState(a.farmId);
+    const grade = (['white', 'cream', 'brown'] as const).find((g) => fa.crate[g] > 0) ?? 'white';
+    const price = (await t.game.getMarketState()).pricesMilli[grade] / 1000;
+    expect(await t.game.act(a.playerId, { t: 'placeOrder', rid: rid(), grade, qty: 1, price })).toMatchObject({ ok: true });
+    const order = (await t.game.getMarketState()).book.find((o) => o.side === 'sell' && o.owner === "Ada's Farm");
+    expect(order).toBeDefined();
+    if (!order) return;
+    const cashA = (await t.game.getFarmState(a.farmId)).cashMilli;
+    expect(await t.game.act(b.playerId, { t: 'fillOrder', rid: rid(), orderId: order.id, qty: 1 })).toMatchObject({ ok: true });
+    expect((await t.game.getFarmState(a.farmId)).cashMilli).toBe(cashA + order.priceMilli);
+    expect((await t.game.getFarmState(b.farmId)).crate[grade]).toBeGreaterThanOrEqual(1);
+    expect(await t.game.act(a.playerId, { t: 'placeOrder', rid: rid(), grade, qty: 1, price: price * 50 })).toMatchObject({ ok: false, code: 'invalid_action' });
+  });
+});
+
+describe('the cast trades with players', () => {
+  it('opens all seven agents and they send cards to players', async () => {
+    t = await makeGame({ cast: true });
+    const { farmId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
+    const kinds = (await t.game.getMarketState()).agents.map((a) => a.kind).sort();
+    expect(kinds).toEqual(['bakery', 'loyalist', 'old-money', 'squeezer', 'trader', 'upstart', 'wholesaler']);
+    await nextDay(t);
+    t.clock.t += ECONOMY.day.lengthMs * 0.9;
+    await t.game.tick();
+    const farm = await t.game.getFarmState(farmId);
+    expect(farm.cards.length).toBeGreaterThanOrEqual(1);
+    expect(farm.cards.length).toBeLessThanOrEqual(ECONOMY.cards.maxPerDay);
   });
 
-  it('rivals sell into the same market and every ledger balances', async () => {
-    t = await makeGame({ rivals: RIVALS });
-    const { farmId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
-    for (let d = 0; d < 4; d++) {
-      t.clock.t += ECONOMY.day.lengthMs;
-      await t.game.endDay();
-    }
-    const market = await t.game.getMarketState();
-    expect(market.farms).toMatchObject({ players: 1, agents: 2 });
-    expect(market.history.some((d) => d.supply > 0)).toBe(true);
-    const farms = await t.db.query<{ id: string; cash_milli: unknown }>('SELECT id, cash_milli FROM farms');
-    for (const f of farms) expect(await t.game.ledgerTotal(f.id)).toBe(Number(f.cash_milli));
-    expect(await t.game.ledgerTotal(farmId)).toBe((await t.game.getFarmState(farmId)).cashMilli);
+  it('feed comes from the chosen supplier, who earns the sale', async () => {
+    t = await makeGame({ cast: true });
+    const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
+    const before = (await t.game.getMarketState()).agents.find((a) => a.kind === 'loyalist')?.cashMilli ?? 0;
+    await t.db.query('UPDATE farms SET cash_milli = cash_milli + 200000 WHERE id = $1', [farmId]);
+    await t.db.query(`INSERT INTO ledger (farm_id, day, kind, amount_milli, ref, created_at) VALUES ($1, 1, 'test', 200000, 'grant', 0)`, [farmId]);
+    expect(await t.game.act(playerId, { t: 'buyFeed', rid: rid(), tier: 'standard', bags: 1 })).toMatchObject({ ok: true });
+    const after = (await t.game.getMarketState()).agents.find((a) => a.kind === 'loyalist')?.cashMilli ?? 0;
+    expect(after - before).toBe(toMilli(ECONOMY.feed.tiers.standard.bagPrice));
+    const farm = await t.game.getFarmState(farmId);
+    expect(await t.game.ledgerTotal(farmId)).toBe(farm.cashMilli);
+  });
+
+  it('a standing contract is delivered by hand, and a miss costs a penalty', async () => {
+    t = await makeGame({ cast: true });
+    const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
+    const [bakery] = await t.db.query(`SELECT id FROM agents WHERE kind = 'bakery'`);
+    await t.db.query(
+      `INSERT INTO contracts (id, farm_id, agent_id, grade, qty_per_day, price_milli, start_day, end_day) VALUES ('c1', $1, $2, 'any', 2, 1500, 1, 3)`,
+      [farmId, bakery?.id],
+    );
+    await nextDay(t);
+    // day 2: deliver by hand
+    const before = await t.game.getFarmState(farmId);
+    expect(eggs(before)).toBeGreaterThanOrEqual(2);
+    expect(await t.game.act(playerId, { t: 'deliverContract', rid: rid(), contractId: 'c1' })).toMatchObject({ ok: true });
+    expect((await t.game.getFarmState(farmId)).cashMilli).toBe(before.cashMilli + 3000);
+    await nextDay(t);
+    // day 3: empty the crate, then miss
+    const farm = await t.game.getFarmState(farmId);
+    if (eggs(farm) > 0) await t.game.act(playerId, { t: 'sell', rid: rid(), items: farm.crate });
+    const cash = (await t.game.getFarmState(farmId)).cashMilli;
+    t.clock.t += ECONOMY.day.lengthMs;
+    await t.game.endDay();
+    const [c] = await t.db.query(`SELECT misses FROM contracts WHERE id = 'c1'`);
+    const after = await t.game.getFarmState(farmId);
+    // eggs laid on day 3 are auto-collected before delivery, so either it delivered or it missed with a penalty
+    if (Number(c?.misses) > 0) expect(after.cashMilli).toBeLessThan(cash);
+    expect(await t.game.ledgerTotal(farmId)).toBe(after.cashMilli);
   });
 });

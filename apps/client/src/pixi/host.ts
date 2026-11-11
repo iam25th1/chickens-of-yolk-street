@@ -44,10 +44,11 @@ export class PixiHost {
     return host;
   }
 
-  setScene(scene: Scene | null): void {
-    if (this.scene) {
+  /** Swaps scenes; keep leaves the old one alive (the farm keeps running behind the market board). */
+  setScene(scene: Scene | null, opts: { keep?: boolean } = {}): void {
+    if (this.scene && this.scene !== scene) {
       this.app.stage.removeChild(this.scene.root);
-      this.scene.destroy();
+      if (!opts.keep) this.scene.destroy();
     }
     this.scene = scene;
     if (scene) this.app.stage.addChild(scene.root);

@@ -82,6 +82,95 @@ export const ECONOMY = {
     bustBelowCash: 0,
     /** Bust hens are auctioned at this fraction of the hen price. */
     auctionPriceFactor: 0.5,
+    /** Below this cash an agent thinks only every other day, on the cheaper model. */
+    struggleCash: 40,
+    /** Days after a bust before a new agent of the same role opens. */
+    replaceAfterDays: 3,
+  },
+  /** Feed suppliers buy bags wholesale and sell them to farms. */
+  suppliers: {
+    startCash: 500,
+    startBags: 80,
+    /** What a supplier pays per bag, as a share of the list price. */
+    wholesaleShare: 0.72,
+    restockBelowBags: 30,
+    restockBags: 60,
+    squeezer: {
+      /** Price = list x (base + desperation x how desperate the farm is, 0 to 1). */
+      baseMarkup: 1.05,
+      desperationMarkup: 0.5,
+    },
+    loyalist: {
+      baseMarkup: 1.0,
+      discountPerDeal: 0.02,
+      maxDiscount: 0.15,
+      creditDays: 5,
+      creditInterest: 0.08,
+      /** Most coins of feed a farm may owe the Loyalist at once. */
+      creditLimit: 300,
+    },
+  },
+  /** Egg buyers pay farms, then earn from what they make or resell. */
+  buyers: {
+    bakery: {
+      startCash: 700,
+      /** Coins the bakery earns per egg it bakes. */
+      bakeValue: 2.1,
+      contractDays: { min: 4, max: 8 },
+      qtyPerDay: { min: 3, max: 8 },
+      /** Contract price per egg, as a share of the live white price. */
+      priceShare: 1.15,
+      /** Share of one day's contract value charged for a missed delivery. */
+      missPenaltyShare: 0.25,
+      cancelAfterMisses: 2,
+      /** Days the bakery refuses new contracts after a cancellation. */
+      sulkDays: 4,
+    },
+    trader: {
+      startCash: 600,
+      /** What the trader resells brown and golden eggs for in town. */
+      resale: { brown: 2.6, golden: 9.5 },
+      /** Premium over the live price it offers for brown and golden. */
+      premium: 1.25,
+      /** Share of brown and golden among a farm's recent sales below which the trader walks away. */
+      minQuality: 0.3,
+      walkAwayDays: 3,
+    },
+    wholesaler: {
+      startCash: 900,
+      /** Bulk price as a share of the live price. */
+      priceShare: 0.72,
+      bulkQty: { min: 15, max: 50 },
+      /** The wholesaler resells everything it buys into the street market the next day. */
+      resellShare: 1.0,
+    },
+  },
+  cards: {
+    minPerDay: 2,
+    maxPerDay: 4,
+    /** Cards arrive spread through the day at these fractions. */
+    arriveAt: [0.12, 0.3, 0.48, 0.64],
+  },
+  haggle: {
+    maxRounds: 3,
+    /** Asks further than this share from the agent's offer are refused outright. */
+    maxAskStretch: 0.8,
+  },
+  orders: {
+    maxOpenPerFarm: 10,
+    expireAfterDays: 3,
+    /** Limit prices must sit within these shares of the live price. */
+    minPriceShare: 0.2,
+    maxPriceShare: 5,
+  },
+  clerk: {
+    defaultFloor: 1.0,
+    minFloor: 0.5,
+    maxFloor: 3,
+  },
+  shop: {
+    /** Fresh hens offered each morning, beside any auction hens. */
+    hensPerDay: 6,
   },
   start: {
     cash: 50,

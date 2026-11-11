@@ -134,6 +134,150 @@ CREATE TABLE ledger (
 CREATE INDEX ledger_farm_day ON ledger (farm_id, day);
 `,
   },
+  {
+    id: 2,
+    name: 'agents, cards, contracts, order book, chain outbox',
+    sql: `
+-- the shop sells listed hens: fresh from the breeder (forsale) or from bust farms (auction)
+ALTER TABLE hens DROP CONSTRAINT hens_status_check;
+ALTER TABLE hens ADD CONSTRAINT hens_status_check CHECK (status IN ('alive', 'auction', 'forsale'));
+ALTER TABLE hens ADD COLUMN chain_owner text;
+
+ALTER TABLE farms ADD COLUMN supplier text NOT NULL DEFAULT 'loyalist';
+ALTER TABLE farms ADD COLUMN clerk_floor double precision NOT NULL DEFAULT 1.0;
+-- share of brown and golden in the farm's recent sales; the market trader watches it
+ALTER TABLE farms ADD COLUMN quality double precision NOT NULL DEFAULT 0.35;
+
+-- the cast: rival farms, feed suppliers and egg buyers, each with its own cash and stock
+CREATE TABLE agents (
+  id text PRIMARY KEY,
+  kind text NOT NULL,
+  role text NOT NULL CHECK (role IN ('rival', 'supplier', 'buyer')),
+  name text NOT NULL,
+  generation integer NOT NULL DEFAULT 1,
+  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'bust')),
+  cash_milli bigint NOT NULL DEFAULT 0,
+  farm_id text REFERENCES farms(id),
+  stock jsonb NOT NULL DEFAULT '{}',
+  opened_day integer NOT NULL,
+  bust_day integer,
+  last_decided_day integer NOT NULL DEFAULT 0,
+  last_brain text,
+  near_account_id text,
+  UNIQUE (kind, generation)
+);
+
+-- what each agent remembers about each farm it has dealt with
+CREATE TABLE agent_memory (
+  agent_id text NOT NULL REFERENCES agents(id),
+  farm_id text NOT NULL REFERENCES farms(id),
+  deals integer NOT NULL DEFAULT 0,
+  value_milli bigint NOT NULL DEFAULT 0,
+  refusals integer NOT NULL DEFAULT 0,
+  haggles_won integer NOT NULL DEFAULT 0,
+  haggles_lost integer NOT NULL DEFAULT 0,
+  misses integer NOT NULL DEFAULT 0,
+  sulk_until integer NOT NULL DEFAULT 0,
+  last_day integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (agent_id, farm_id)
+);
+
+-- decision cards: offers made by agents (or other players), answered by the player
+CREATE TABLE cards (
+  id text PRIMARY KEY,
+  farm_id text NOT NULL REFERENCES farms(id),
+  agent_id text REFERENCES agents(id),
+  kind text NOT NULL,
+  day integer NOT NULL,
+  arrive_at_ms integer NOT NULL,
+  notified boolean NOT NULL DEFAULT false,
+  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'accepted', 'declined', 'expired', 'won', 'failed')),
+  round integer NOT NULL DEFAULT 0,
+  offer_milli bigint NOT NULL,
+  -- the agent's walk-away price, never sent to clients
+  reserve_milli bigint NOT NULL,
+  side text NOT NULL CHECK (side IN ('agent_buys', 'agent_sells', 'none')),
+  qty integer NOT NULL DEFAULT 0,
+  grade text,
+  tier text,
+  days integer,
+  ref text,
+  line text NOT NULL,
+  outcome_milli bigint
+);
+CREATE INDEX cards_farm_day ON cards (farm_id, day);
+
+CREATE TABLE contracts (
+  id text PRIMARY KEY,
+  farm_id text NOT NULL REFERENCES farms(id),
+  agent_id text NOT NULL REFERENCES agents(id),
+  grade text NOT NULL,
+  qty_per_day integer NOT NULL CHECK (qty_per_day > 0),
+  price_milli bigint NOT NULL,
+  start_day integer NOT NULL,
+  end_day integer NOT NULL,
+  last_delivered_day integer NOT NULL DEFAULT 0,
+  misses integer NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'done', 'cancelled'))
+);
+
+CREATE TABLE debts (
+  id text PRIMARY KEY,
+  farm_id text NOT NULL REFERENCES farms(id),
+  agent_id text NOT NULL REFERENCES agents(id),
+  principal_milli bigint NOT NULL,
+  due_milli bigint NOT NULL,
+  paid_milli bigint NOT NULL DEFAULT 0,
+  due_day integer NOT NULL,
+  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'paid', 'defaulted'))
+);
+
+-- the order book now holds resting limit orders from farms and buyer agents
+ALTER TABLE orders ALTER COLUMN farm_id DROP NOT NULL;
+ALTER TABLE orders ADD COLUMN agent_id text REFERENCES agents(id);
+ALTER TABLE orders ADD COLUMN filled_qty integer NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN expires_day integer;
+CREATE INDEX orders_open ON orders (status, side, grade);
+
+-- every egg sale, for the market board and the chain batch
+CREATE TABLE trades (
+  id bigserial PRIMARY KEY,
+  day integer NOT NULL,
+  at bigint NOT NULL,
+  seller text NOT NULL,
+  seller_farm text,
+  seller_agent text,
+  buyer text NOT NULL,
+  buyer_farm text,
+  buyer_agent text,
+  grade text NOT NULL,
+  qty integer NOT NULL,
+  price_milli bigint NOT NULL,
+  total_milli bigint NOT NULL,
+  via text NOT NULL
+);
+CREATE INDEX trades_day ON trades (day);
+
+-- NEAR AI Cloud spend per UTC day, against the hard cap
+CREATE TABLE inference_usage (
+  utc_day text PRIMARY KEY,
+  calls integer NOT NULL DEFAULT 0,
+  fallbacks integer NOT NULL DEFAULT 0,
+  skipped integer NOT NULL DEFAULT 0,
+  spend_micro_usd bigint NOT NULL DEFAULT 0
+);
+
+-- egg token balances as last settled on chain, so each batch only moves the difference
+CREATE TABLE chain_balances (
+  account text NOT NULL,
+  grade text NOT NULL,
+  amount bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (account, grade)
+);
+
+ALTER TABLE market_days ADD COLUMN settlement_error text;
+`,
+  },
 ];
 
 export async function migrate(db: Db): Promise<number[]> {

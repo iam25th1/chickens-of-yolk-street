@@ -46,7 +46,7 @@ const privyLoginBody = z.object({ accessToken: z.string().min(20).max(4096), nam
 export function createGameServer(opts: GameServerOptions): Server {
   const log = opts.log ?? ((line: string) => console.log(line));
   const { game, sessions } = opts;
-  const loginLimiter = new RateLimiter(5, 0.5);
+  const loginLimiter = new RateLimiter(10, 1);
   const actionLimiter = new RateLimiter(12, 6);
   const connections = new Map<string, WebSocket>();
   const recentRids = new Map<string, Map<string, ActionResult>>();
