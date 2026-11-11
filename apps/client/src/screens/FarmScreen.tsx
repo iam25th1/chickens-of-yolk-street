@@ -149,6 +149,9 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
             audio.play('35-back', { volume: 0.6 });
             break;
           case 'dayEnded': {
+            // every card closes with its day: drop queued ones and any card still waiting for an answer
+            queue.current = [];
+            setOverlay((cur) => (cur && !cur.result ? null : cur));
             const s = e.summary;
             uiFx.emit({ kind: 'toast', text: `DAY ${s.day}: ${s.laid} LAID. MARKET X${s.nextMultiplier.toFixed(2)}${s.missed ? `. ${s.missed} DELIVERY MISSED` : ''}` });
             if (s.fedMultiplier === 0) {
