@@ -16,6 +16,11 @@ describe('configuration', () => {
     expect(() => readConfig({ ...prod, GAME_SEASON: 'Season 1' }, '/repo')).toThrow(/a-z, 0-9/);
   });
 
+  it('HOST picks the listen address; unset listens on every interface', () => {
+    expect(readConfig({}, '/repo').host).toBeNull();
+    expect(readConfig({ ...prod, HOST: '127.0.0.1' }, '/repo').host).toBe('127.0.0.1');
+  });
+
   it('DEMO_DAY_SECONDS shortens the day locally; production ignores it unless DEMO_MODE=1', () => {
     expect(readConfig({}, '/repo').dayLengthMs).toBe(ECONOMY.day.lengthMs);
     expect(readConfig({}, '/repo').dayLengthMs).toBe(180_000);

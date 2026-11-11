@@ -1,6 +1,7 @@
 // HTTP API, WebSocket game protocol and (in production) the built client, on one port.
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { isIP } from 'node:net';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
 import { z } from 'zod';
@@ -10,6 +11,19 @@ import type { PrivyVerifier } from '../auth/privy';
 import type { SessionSigner } from '../auth/session';
 import type { ActionResult, Game } from '../game/game';
 import { RateLimiter } from './ratelimit';
+
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+/**
+ * The visitor's address, for rate limits. Behind a Cloudflare tunnel every request reaches the server
+ * from loopback, so only then does CF-Connecting-IP name the visitor; from anywhere else it is ignored.
+ */
+export function clientIp(req: Pick<IncomingMessage, 'headers' | 'socket'>): string {
+  const remote = req.socket.remoteAddress ?? 'unknown';
+  const header = req.headers['cf-connecting-ip'];
+  const forwarded = typeof header === 'string' ? header.trim() : '';
+  return LOOPBACK.has(remote) && isIP(forwarded) ? forwarded : remote;
+}
 
 export interface GameServerOptions {
   game: Game;
@@ -155,7 +169,7 @@ export function createGameServer(opts: GameServerOptions): Server {
   const server = createServer((req, res) => {
     void (async () => {
       const url = new URL(req.url ?? '/', 'http://localhost');
-      const ip = req.socket.remoteAddress ?? 'unknown';
+      const ip = clientIp(req);
       try {
         // the host's health check: version, season and a database round trip (503 when the database is down)
         if (req.method === 'GET' && (url.pathname === '/healthz' || url.pathname === '/api/health')) {
