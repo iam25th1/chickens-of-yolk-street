@@ -127,6 +127,12 @@ body {
   line-height: 16px;
 }
 
+/* small titles: Silkscreen bold, which is drawn for 8px, instead of Pixelify Sans */
+.display.small,
+.panel-title.small {
+  font-family: var(--font-body);
+}
+
 .big {
   font-size: 16px;
   line-height: 16px;
@@ -456,7 +462,8 @@ input[type='range'].slider::-moz-range-thumb {
   top: 57px;
   width: 128px;
   text-align: center;
-  font-family: var(--font-display);
+  /* Pixelify Sans closes up below 16px (C reads as O, 2 as 8); Silkscreen is drawn for 8px */
+  font-family: var(--font-body);
   font-weight: 700;
   font-size: 8px;
   color: var(--barn);

@@ -18,7 +18,7 @@ export function Desk({ farm, send, onOpen }: { farm: FarmState; send: (a: Action
   };
   return (
     <div className="col" style={{ position: 'absolute', left: 6, top: 186, width: 122, height: 130, overflowY: 'auto', gap: 3, color: '#f6e7c1' }}>
-      <span className="display" style={{ fontSize: 8, lineHeight: '8px', color: '#f2c94c' }}>
+      <span className="display small" style={{ fontSize: 8, lineHeight: '8px', color: '#f2c94c' }}>
         TODAY {farm.cards.length}/{ECONOMY.cards.maxPerDay} CARDS
       </span>
       {open.map((c) => (

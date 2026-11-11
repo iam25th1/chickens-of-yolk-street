@@ -122,7 +122,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         <div className="row" style={{ alignItems: 'flex-start', gap: 8 }}>
           <Portrait sheet={NARRATOR} row={talking ? 'talk' : 'idle'} loop />
           <div className="col" style={{ gap: 4, width: 150 }}>
-            <span className="panel-title" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
+            <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
               YOUR HEN
             </span>
             <span style={{ minHeight: 56, lineHeight: '10px' }}>{typed.toUpperCase()}</span>

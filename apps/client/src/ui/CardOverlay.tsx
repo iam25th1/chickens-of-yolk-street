@@ -180,7 +180,7 @@ export function CardOverlay({
         <div className="row" style={{ alignItems: 'flex-start', gap: 8 }}>
           {look ? <Portrait sheet={look.portrait} row={portraitRow} loop={talking || portraitRow === 'idle'} /> : <div style={{ width: 64, height: 64 }} />}
           <div className="col" style={{ gap: 4, width: 150 }}>
-            <span className="panel-title" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
+            <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
               {card.from.toUpperCase()}
             </span>
             <span style={{ minHeight: 56, lineHeight: '10px' }}>{typed.toUpperCase()}</span>

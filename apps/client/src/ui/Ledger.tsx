@@ -50,7 +50,7 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
         ))}
       </div>
       <div className="col" style={{ gap: 3, marginTop: 6 }}>
-        <span className="panel-title" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
+        <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
           CONTRACTS AND DEBTS
         </span>
         {farm.contracts.length === 0 && farm.debts.length === 0 && <span>NONE OPEN</span>}
