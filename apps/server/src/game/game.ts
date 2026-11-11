@@ -100,6 +100,8 @@ export interface GameOptions {
   log?: (line: string) => void;
   /** Open the seven agents (default true; some tests run a quiet market). */
   cast?: boolean;
+  /** In-game day length in ms (default ECONOMY.day.lengthMs; DEMO_DAY_SECONDS shortens it). */
+  dayLengthMs?: number;
   /** GAME_SEASON. A fresh database takes it (or makes a dev season); an existing one must match. */
   season?: string | null;
 }
@@ -118,6 +120,7 @@ export class Game {
   private readonly log: (line: string) => void;
   private readonly withCast: boolean;
   private readonly wantSeason: string | null;
+  private readonly dayMs: number;
   /** The database's season, known after init(). */
   season = '';
   private readonly listeners = new Set<(out: Outbound) => void>();
@@ -136,6 +139,7 @@ export class Game {
     this.brain = { ...opts.brain, log: this.log };
     this.withCast = opts.cast ?? true;
     this.wantSeason = opts.season ?? null;
+    this.dayMs = opts.dayLengthMs ?? ECONOMY.day.lengthMs;
   }
 
   // ---- plumbing -------------------------------------------------------------------------------
@@ -161,6 +165,7 @@ export class Game {
       q,
       season: this.season,
       day: this.clock.day,
+      dayMs: this.dayMs,
       now,
       elapsed: now - this.clock.dayStartedAt,
       rng: this.rng,
@@ -192,7 +197,7 @@ export class Game {
   }
 
   getClock(): ClockState {
-    return { day: this.clock.day, dayStartedAt: this.clock.dayStartedAt, dayLengthMs: ECONOMY.day.lengthMs, serverNow: this.now() };
+    return { day: this.clock.day, dayStartedAt: this.clock.dayStartedAt, dayLengthMs: this.dayMs, serverNow: this.now() };
   }
 
   // ---- lifecycle ------------------------------------------------------------------------------
@@ -228,7 +233,7 @@ export class Game {
 
   /** Called every second: cards arrive through the day; the day closes when its time is up. */
   async tick(): Promise<void> {
-    if (this.now() >= this.clock.dayStartedAt + ECONOMY.day.lengthMs) {
+    if (this.now() >= this.clock.dayStartedAt + this.dayMs) {
       await this.tickIfDue();
       return;
     }
@@ -236,7 +241,7 @@ export class Game {
   }
 
   async tickIfDue(): Promise<boolean> {
-    if (this.ticking || this.now() < this.clock.dayStartedAt + ECONOMY.day.lengthMs) return false;
+    if (this.ticking || this.now() < this.clock.dayStartedAt + this.dayMs) return false;
     this.ticking = true;
     try {
       await this.endDay();
@@ -739,7 +744,7 @@ export class Game {
       ids.push(String(h.id));
       progress.push(p);
       for (let i = 0; i < n; i++) {
-        const atMs = Math.floor((start + this.rng() * (end - start)) * ECONOMY.day.lengthMs);
+        const atMs = Math.floor((start + this.rng() * (end - start)) * this.dayMs);
         eggs.push([newId(), farmId, String(h.id), day, atMs, gradeForRoll(gradeTier, this.rng()), this.rng() < breakage]);
       }
     }
@@ -836,8 +841,8 @@ export class Game {
         await q.query('UPDATE market_days SET closed_at = $2, next_multiplier = $3, reference = $4 WHERE day = $1', [day, ctx.now, nextMultiplier, reference]);
         // 5. the next day opens
         const newDay = day + 1;
-        let start = this.clock.dayStartedAt + ECONOMY.day.lengthMs;
-        if (ctx.now - start > ECONOMY.day.lengthMs) start = ctx.now; // after downtime, start fresh instead of replaying days
+        let start = this.clock.dayStartedAt + this.dayMs;
+        if (ctx.now - start > this.dayMs) start = ctx.now; // after downtime, start fresh instead of replaying days
         await q.query('UPDATE game_clock SET day = $1, day_started_at = $2 WHERE id = 1', [newDay, start]);
         await q.query('INSERT INTO market_days (season, day, multiplier) VALUES ($1, $2, $3)', [ctx.season, newDay, nextMultiplier]);
         this.clock = { day: newDay, dayStartedAt: start };

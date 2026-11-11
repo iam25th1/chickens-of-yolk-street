@@ -5,6 +5,7 @@ import { extname, join, normalize, sep } from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
 import { z } from 'zod';
 import { PROTOCOL_VERSION, parseClientMessage, type ServerMessage } from '@coys/shared';
+import { BUILD } from '../build-info';
 import type { PrivyVerifier } from '../auth/privy';
 import type { SessionSigner } from '../auth/session';
 import type { ActionResult, Game } from '../game/game';
@@ -19,7 +20,20 @@ export interface GameServerOptions {
   clientDist: string | null;
   settlementMode: string;
   dbKind: string;
+  /** Round trip to the database for /healthz. */
+  pingDb?: () => Promise<unknown>;
   log?: (line: string) => void;
+}
+
+export interface HealthReport {
+  ok: boolean;
+  version: string;
+  commit: string | null;
+  season: string;
+  day: number;
+  db: { kind: string; ok: boolean; ms: number };
+  settlement: string;
+  uptimeS: number;
 }
 
 const MIME: Record<string, string> = {
@@ -89,6 +103,31 @@ export function createGameServer(opts: GameServerOptions): Server {
       req.on('error', reject);
     });
 
+  const health = async (): Promise<HealthReport> => {
+    const started = Date.now();
+    let ok = true;
+    if (opts.pingDb) {
+      let timer: NodeJS.Timeout | undefined;
+      try {
+        await Promise.race([opts.pingDb(), new Promise((_, reject) => (timer = setTimeout(() => reject(new Error('timeout')), 3000)))]);
+      } catch {
+        ok = false;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    return {
+      ok,
+      version: BUILD.version,
+      commit: BUILD.commit,
+      season: game.season,
+      day: game.getClock().day,
+      db: { kind: opts.dbKind, ok, ms: Date.now() - started },
+      settlement: opts.settlementMode,
+      uptimeS: Math.round(process.uptime()),
+    };
+  };
+
   const issue = (res: ServerResponse, who: { playerId: string; name: string }): void =>
     json(res, 200, { session: sessions.sign(who.playerId), playerId: who.playerId, name: who.name });
 
@@ -117,8 +156,10 @@ export function createGameServer(opts: GameServerOptions): Server {
       const url = new URL(req.url ?? '/', 'http://localhost');
       const ip = req.socket.remoteAddress ?? 'unknown';
       try {
-        if (req.method === 'GET' && url.pathname === '/api/health') {
-          return json(res, 200, { ok: true, day: game.getClock().day, db: opts.dbKind, settlement: opts.settlementMode });
+        // the host's health check: version, season and a database round trip (503 when the database is down)
+        if (req.method === 'GET' && (url.pathname === '/healthz' || url.pathname === '/api/health')) {
+          const report = await health();
+          return json(res, report.ok ? 200 : 503, report);
         }
         if (req.method === 'GET' && url.pathname === '/api/config') {
           return json(res, 200, { protocol: PROTOCOL_VERSION, privyAppId: opts.privyAppId, devLogin: opts.devLogin });

@@ -202,7 +202,7 @@ export async function createCards(ctx: Ctx, candidates: Candidate[], playerTrade
     list.sort((a, b) => b.s - a.s);
     const pick = list.slice(0, ECONOMY.cards.maxPerDay);
     for (const [i, item] of pick.entries()) {
-      const at = Math.floor((ECONOMY.cards.arriveAt[i] ?? 0.7) * ECONOMY.day.lengthMs);
+      const at = Math.floor((ECONOMY.cards.arriveAt[i] ?? 0.7) * ctx.dayMs);
       if (item.offer && item.agent) {
         const p = price(item.offer, m);
         const kind = item.agent.kind as AgentKind;

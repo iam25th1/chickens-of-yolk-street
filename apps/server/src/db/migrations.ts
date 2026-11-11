@@ -303,19 +303,44 @@ ALTER TABLE ledger ADD COLUMN season text NOT NULL DEFAULT 'legacy';
   },
 ];
 
+/** Key for the Postgres advisory lock that serialises migrations across server instances. */
+const MIGRATION_LOCK = 727_274_001;
+
+const record = (m: { id: number; name: string }): string =>
+  `INSERT INTO schema_migrations (id, name, applied_at) VALUES (${m.id}, '${m.name.replace(/'/g, "''")}', ${Date.now()})`;
+
+/**
+ * Applies pending migrations on boot; safe to run again and again. On Postgres everything runs in
+ * one transaction under an advisory lock, so two instances booting at once cannot race and a
+ * failed migration leaves nothing half applied. PGlite is one process, one migration at a time.
+ */
 export async function migrate(db: Db): Promise<number[]> {
-  await db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+  const table = `CREATE TABLE IF NOT EXISTS schema_migrations (
     id integer PRIMARY KEY,
     name text NOT NULL,
     applied_at bigint NOT NULL
-  )`);
-  const done = new Set((await db.query<{ id: number }>('SELECT id FROM schema_migrations')).map((r) => Number(r.id)));
+  )`;
   const applied: number[] = [];
+  if (db.kind === 'postgres') {
+    await db.tx(async (q) => {
+      await q.query(`SELECT pg_advisory_xact_lock(${MIGRATION_LOCK})`);
+      await q.query(table);
+      const done = new Set((await q.query<{ id: number }>('SELECT id FROM schema_migrations')).map((r) => Number(r.id)));
+      for (const m of MIGRATIONS) {
+        if (done.has(m.id)) continue;
+        // no parameters: the simple protocol runs every statement of the migration
+        await q.query(m.sql);
+        await q.query(record(m));
+        applied.push(m.id);
+      }
+    });
+    return applied;
+  }
+  await db.exec(table);
+  const done = new Set((await db.query<{ id: number }>('SELECT id FROM schema_migrations')).map((r) => Number(r.id)));
   for (const m of MIGRATIONS) {
     if (done.has(m.id)) continue;
-    await db.exec(
-      `BEGIN;\n${m.sql}\nINSERT INTO schema_migrations (id, name, applied_at) VALUES (${m.id}, '${m.name.replace(/'/g, "''")}', ${Date.now()});\nCOMMIT;`,
-    );
+    await db.exec(`BEGIN;\n${m.sql}\n${record(m)};\nCOMMIT;`);
     applied.push(m.id);
   }
   return applied;

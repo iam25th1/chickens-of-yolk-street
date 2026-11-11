@@ -24,6 +24,7 @@ beforeAll(async () => {
     clientDist: null,
     settlementMode: 'noop',
     dbKind: t.db.kind,
+    pingDb: () => t.db.query('SELECT 1'),
     log: () => undefined,
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -97,6 +98,16 @@ async function cashNow(c: Client): Promise<number> {
   const farm = await c.next((m) => m.t === 'farm');
   return farm.t === 'farm' ? farm.farm.cashMilli : NaN;
 }
+
+describe('the health check', () => {
+  it('/healthz reports the version, the season and the database', async () => {
+    const res = await fetch(`http://${base}/healthz`);
+    expect(res.status).toBe(200);
+    const h = (await res.json()) as Record<string, unknown>;
+    expect(h).toMatchObject({ ok: true, version: 'dev', season: t.game.season, db: { kind: 'pglite', ok: true }, settlement: 'noop' });
+    expect(typeof h.day).toBe('number');
+  });
+});
 
 describe('the server is authoritative', () => {
   it('rejects a sell that carries a client price', async () => {

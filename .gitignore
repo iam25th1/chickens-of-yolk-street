@@ -23,3 +23,7 @@ desktop.ini
 
 # Rust build output
 target/
+
+# database backups (scripts/db-backup.ts)
+backups/
+*.dump

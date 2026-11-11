@@ -22,6 +22,8 @@ export interface Ctx {
   /** The database's season: stored with every ledger row and every settled day. */
   season: string;
   day: number;
+  /** Length of an in-game day in milliseconds (ECONOMY.day.lengthMs unless a demo shortens it). */
+  dayMs: number;
   now: number;
   /** Milliseconds into the current day. */
   elapsed: number;
