@@ -32,7 +32,7 @@ const farm = (over: Partial<AgentContext['farms'][number]> = {}): AgentContext['
 const ctx = (kind: AgentContext['agent']['kind'], over: Partial<AgentContext> = {}): AgentContext => ({
   day: 4,
   agent: { id: 'a1', kind, role: CAST[kind].role, name: CAST[kind].names[0] ?? kind, cash: 500, stock: { cheap: 10, standard: 10, premium: 10 }, struggling: false },
-  market: { multiplier: 1.2, prices: { white: 1.2, cream: 1.44, brown: 1.8, golden: 7.2 }, supplyYesterday: 300, history: [], crash: false, auctionHens: 0 },
+  market: { multiplier: 1.2, prices: { white: 1.2, cream: 1.44, brown: 1.8, golden: 7.2 }, reference: 270, supplyYesterday: 240, history: [], crash: false, auctionHens: 0 },
   own: null,
   farms: [farm()],
   ...over,
@@ -53,9 +53,31 @@ describe('rule policies follow each character', () => {
     expect(slipped.offers.some((o) => o.kind === 'premium-order')).toBe(false);
   });
 
-  it('the wholesaler offers to buy a big crate cheap and warns of a glut', () => {
-    const d = ruleDecision(ctx('wholesaler', { market: { ...ctx('wholesaler').market, supplyYesterday: 900 } }));
-    expect(d.offers.map((o) => o.kind).sort()).toEqual(['bulk-order', 'glut-warning']);
+  it('the wholesaler offers to buy a big crate cheap and warns a farm it cannot buy from of a glut', () => {
+    const small = farm({ farmId: 'f2', hens: 6, crate: { white: 2, cream: 1, brown: 0, golden: 0 }, dailyEggs: 4 });
+    const d = ruleDecision(ctx('wholesaler', { market: { ...ctx('wholesaler').market, supplyYesterday: 900 }, farms: [farm(), small] }));
+    // one card per farm from each agent: the order where it can buy, the warning where it cannot
+    expect(d.offers.map((o) => `${o.farmId}:${o.kind}`).sort()).toEqual(['f1:bulk-order', 'f2:glut-warning']);
+  });
+
+  it('the Upstart borrows to grow on a good week and dumps fresh eggs in a glut', () => {
+    const own = { hens: 28, capacity: 30, freePlots: 2, crate: { white: 0, cream: 0, brown: 0, golden: 0 }, feedGrams: { cheap: 5000, standard: 0, premium: 0 }, feedTier: 'cheap' as const, unlocks: [], owes: 0 };
+    const boom = ctx('upstart', { own, market: { ...ctx('upstart').market, history: [1, 2, 3, 4, 5].map((day) => ({ day, supply: 100, multiplier: 1.3 })) } });
+    expect(ruleDecision(boom).farmActions.some((a) => a.t === 'buyFeedOnCredit')).toBe(true);
+    const glut = ctx('upstart', { own, market: { ...ctx('upstart').market, multiplier: 0.6, supplyYesterday: 400 } });
+    const d = ruleDecision(glut);
+    expect(d.sellOrders.length).toBeGreaterThan(0);
+    expect(d.sellOrders.every((s) => s.priceShare < 0.7)).toBe(true);
+  });
+
+  it('Old Money holds half its crate back in a slump and sells the lot once the price recovers', () => {
+    const own = { hens: 100, capacity: 102, freePlots: 1, crate: { white: 40, cream: 40, brown: 40, golden: 4 }, feedGrams: { cheap: 0, standard: 0, premium: 90_000 }, feedTier: 'premium' as const, unlocks: [], owes: 0 };
+    const sold = (m: number) => {
+      const a = ruleDecision(ctx('old-money', { own, market: { ...ctx('old-money').market, multiplier: m } })).farmActions.find((x) => x.t === 'sell');
+      return a && a.t === 'sell' ? a.items.white + a.items.cream + a.items.brown + a.items.golden : 0;
+    };
+    expect(sold(0.85)).toBe(62);
+    expect(sold(1.0)).toBe(124);
   });
 });
 

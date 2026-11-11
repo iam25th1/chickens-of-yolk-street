@@ -253,6 +253,8 @@ export interface MarketState {
   /** Price of one egg per grade in milli-coins at the live multiplier, before farm bonuses. */
   pricesMilli: Record<EggGrade, number>;
   supplyToday: number;
+  /** Today's demand: the supply at which tomorrow's multiplier would be 1.00. Grows with active farms. */
+  reference: number;
   crash: boolean;
   history: MarketDay[];
   farms: { players: number; agents: number; bust: number };

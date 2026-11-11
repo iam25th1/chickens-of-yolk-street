@@ -61,6 +61,8 @@ export interface AgentContext {
   market: {
     multiplier: number;
     prices: Record<EggGrade, number>;
+    /** Demand: the daily supply at which the multiplier is 1.00 (grows with active farms). */
+    reference: number;
     supplyYesterday: number;
     history: MarketDay[];
     crash: boolean;
@@ -75,6 +77,8 @@ export interface AgentContext {
     feedGrams: FeedStock;
     feedTier: FeedTier;
     unlocks: UnlockId[];
+    /** Feed credit still owed to suppliers, in coins. */
+    owes: number;
   } | null;
   farms: FarmBrief[];
 }
@@ -88,6 +92,8 @@ const line = z.string().max(160);
 export const farmActionSchema = z.discriminatedUnion('t', [
   z.strictObject({ t: z.literal('buyHens'), count: z.number().int().min(1).max(20) }),
   z.strictObject({ t: z.literal('buyFeed'), tier, bags: z.number().int().min(1).max(10) }),
+  // feed now from the Loyalist, paid with interest when it falls due; an agent cannot default
+  z.strictObject({ t: z.literal('buyFeedOnCredit'), tier, bags: z.number().int().min(1).max(10) }),
   z.strictObject({ t: z.literal('setFeedTier'), tier }),
   z.strictObject({ t: z.literal('buildCoop'), kind: z.enum(COOP_KINDS).exclude(['starter']) }),
   z.strictObject({ t: z.literal('buyUnlock'), unlock: z.enum(UNLOCK_IDS) }),

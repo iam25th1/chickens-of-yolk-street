@@ -91,13 +91,16 @@ export async function closeContracts(ctx: Ctx): Promise<Map<string, { delivered:
   return tally;
 }
 
-/** Day close: feed credit falling due is taken from cash; what cannot be paid is a default. */
+/**
+ * Day close: feed credit falling due is taken from cash; what a player cannot pay is a default.
+ * An agent's farm pays in full even into the red, which is how an over-borrowed rival goes bust.
+ */
 export async function closeDebts(ctx: Ctx): Promise<void> {
   const rows = await ctx.q.query(`SELECT * FROM debts WHERE status = 'open' AND due_day <= $1`, [ctx.day]);
   for (const d of rows) {
     const farm = await loadFarm(ctx.q, String(d.farm_id));
     const owed = num(d.due_milli) - num(d.paid_milli);
-    const pay = Math.min(owed, Math.max(0, farm.cashMilli));
+    const pay = farm.ownerKind === 'agent' ? owed : Math.min(owed, Math.max(0, farm.cashMilli));
     if (pay > 0) await moveCash(ctx, farm.id, 'credit repaid', -pay, String(d.id));
     const [a] = await ctx.q.query(`SELECT ${AGENT_COLUMNS} FROM agents WHERE id = $1`, [d.agent_id]);
     if (a && pay > 0) await moveAgentCash(ctx, toAgent(a), pay, 'credit repaid', farm.id);

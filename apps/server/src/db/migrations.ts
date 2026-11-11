@@ -278,6 +278,14 @@ CREATE TABLE chain_balances (
 ALTER TABLE market_days ADD COLUMN settlement_error text;
 `,
   },
+  {
+    id: 3,
+    name: 'market demand scales with active farms',
+    sql: `
+-- the reference supply each day closed against: demand per active farm times active farms
+ALTER TABLE market_days ADD COLUMN reference integer;
+`,
+  },
 ];
 
 export async function migrate(db: Db): Promise<number[]> {

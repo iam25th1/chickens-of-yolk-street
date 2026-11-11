@@ -18,6 +18,7 @@ import {
   henLayingRate,
   isCrash,
   marketMultiplier,
+  marketReference,
   nextCoopKind,
   toMilli,
   type ActionMessage,
@@ -51,6 +52,7 @@ import {
   buildContext,
   chargeForThinking,
   ensureCast,
+  loyalistCreditQuote,
   openAgents,
   supplierQuote,
   turnOverStock,
@@ -70,7 +72,7 @@ import {
   type Farm,
   type Outbound,
 } from './ctx';
-import { cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
+import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
 
 export { ActionError } from './ctx';
@@ -400,6 +402,7 @@ export class Game {
     const history = (await this.db.query('SELECT day, supply, multiplier FROM market_days WHERE closed_at IS NOT NULL ORDER BY day DESC LIMIT 30'))
       .map((r): MarketDay => ({ day: num(r.day), supply: num(r.supply), multiplier: num(r.multiplier) }))
       .reverse();
+    const reference = marketReference(await activeFarms(this.db));
     const counts = await this.db.query(`SELECT owner_kind, (bust_day IS NOT NULL) AS bust, count(*) AS n FROM farms GROUP BY owner_kind, (bust_day IS NOT NULL)`);
     const farms = { players: 0, agents: 0, bust: 0 };
     for (const c of counts) {
@@ -438,6 +441,7 @@ export class Game {
       multiplier,
       pricesMilli: Object.fromEntries(EGG_GRADES.map((g) => [g, toMilli(eggPrice(g, multiplier, []))])) as Record<EggGrade, number>,
       supplyToday: num(today?.supply ?? 0),
+      reference,
       crash: isCrash(multiplier),
       history,
       farms,
@@ -592,6 +596,11 @@ export class Game {
           await ctx.q.query(`UPDATE farms SET feed_${action.tier}_g = feed_${action.tier}_g + $2 WHERE id = $1`, [farm.id, action.bags * ECONOMY.feed.bagKg * 1000]);
           emit(ctx, farm, { kind: 'feedBought', tier: action.tier, bags: action.bags, costMilli: unit * action.bags, supplier: 'the feed mill' });
         }
+        return;
+      }
+      case 'buyFeedOnCredit': {
+        const quote = await loyalistCreditQuote(ctx, farm, action.tier, action.bags);
+        await buyBagsFrom(ctx, farm, quote.agent, action.tier, action.bags, quote.unitMilli, true);
         return;
       }
       case 'setFeedTier':
@@ -787,11 +796,12 @@ export class Game {
           await q.query('UPDATE agents SET last_decided_day = $2, last_brain = $3 WHERE id = $1', [agent.id, day, result.brain]);
           await bustIfBroke(ctx, agent);
         }
-        // 4. the market closes on the day's total supply
+        // 4. the market closes on the day's total supply, against demand from every active farm
         const [md] = await q.query('SELECT multiplier, supply FROM market_days WHERE day = $1', [day]);
         const supply = num(md?.supply ?? 0);
-        const nextMultiplier = marketMultiplier(supply);
-        await q.query('UPDATE market_days SET closed_at = $2, next_multiplier = $3 WHERE day = $1', [day, ctx.now, nextMultiplier]);
+        const reference = marketReference(await activeFarms(q));
+        const nextMultiplier = marketMultiplier(supply, reference);
+        await q.query('UPDATE market_days SET closed_at = $2, next_multiplier = $3, reference = $4 WHERE day = $1', [day, ctx.now, nextMultiplier, reference]);
         // 5. the next day opens
         const newDay = day + 1;
         let start = this.clock.dayStartedAt + ECONOMY.day.lengthMs;
@@ -822,7 +832,7 @@ export class Game {
         await createCards(ctx, candidates, trades);
         await arriveCards(ctx);
         ctx.marketChanged = true;
-        return { day, supply, nextMultiplier, collected, laid, plans, tally };
+        return { day, supply, reference, nextMultiplier, collected, laid, plans, tally };
       });
       const ctx = ctxOut as unknown as Ctx;
       const players = await this.db.query<{ id: string; player_id: string }>(`SELECT id, player_id FROM farms WHERE owner_kind = 'player'`);
@@ -844,7 +854,7 @@ export class Game {
       }
       await this.flush(ctx);
       this.emit(null, { t: 'clock', clock: this.getClock() });
-      this.log(`[day] ${outcome.day} closed: supply ${outcome.supply}, next multiplier ${outcome.nextMultiplier.toFixed(3)}; day ${this.clock.day} begins`);
+      this.log(`[day] ${outcome.day} closed: supply ${outcome.supply} of ${outcome.reference} demand, next multiplier ${outcome.nextMultiplier.toFixed(3)}; day ${this.clock.day} begins`);
       return outcome.day;
     });
 
