@@ -177,8 +177,11 @@ export class FarmScene implements Scene {
     const first = this.farm === null;
     this.farm = farm;
 
-    // hens: show up to MAX_VISIBLE_HENS; new ones waddle in through the gate
-    const shown = farm.hens.slice(0, MAX_VISIBLE_HENS);
+    // hens: show up to MAX_VISIBLE_HENS, keeping the ones already on screen (they persist by id);
+    // new ones waddle in through the gate
+    const present = new Set(farm.hens.map((h) => h.id));
+    const keep = [...this.hens.keys()].filter((id) => present.has(id)).slice(0, MAX_VISIBLE_HENS);
+    const shown = [...farm.hens.filter((h) => keep.includes(h.id)), ...farm.hens.filter((h) => !keep.includes(h.id))].slice(0, MAX_VISIBLE_HENS);
     const ids = new Set(shown.map((h) => h.id));
     for (const [id, actor] of this.hens) {
       if (!ids.has(id)) {
@@ -211,7 +214,7 @@ export class FarmScene implements Scene {
     // machines bought with unlocks
     for (const u of farm.unlocks) this.ensureMachine(u, false);
 
-    this.trough.play(farm.fedToday > 0 ? 'full' : 'empty');
+    this.trough.rest(this.troughRow());
     const sackId = `13-sack-${farm.feedTier}`;
     if (!this.machines.has(`sack:${sackId}`)) {
       this.unplace(this.sack);
@@ -219,7 +222,7 @@ export class FarmScene implements Scene {
       this.machines.set(`sack:${sackId}`, this.sack);
       for (const k of [...this.machines.keys()]) if (k.startsWith('sack:') && k !== `sack:${sackId}`) this.machines.delete(k);
     }
-    this.crate.play(this.crateRow());
+    this.crate.rest(this.crateRow());
 
     // eggs collected elsewhere (or already, after a reconnect) leave the ground
     for (const e of farm.layPlan) {
@@ -229,6 +232,22 @@ export class FarmScene implements Scene {
         this.eggs.delete(e.id);
       }
     }
+    // a new day's plan: yesterday's eggs still on the ground went into the crate at the close
+    const plan = new Set(farm.layPlan.map((e) => e.id));
+    let i = 0;
+    for (const [id, g] of this.eggs) {
+      if (plan.has(id) || g.pending) continue;
+      this.eggs.delete(id);
+      this.flyToCrate(g.s, 40 * i++, () => undefined);
+    }
+    for (const id of this.spawned) if (!plan.has(id)) this.spawned.delete(id);
+  }
+
+  /** Full while there is feed for the active tier (hens eat it at dawn), empty when it has run out. */
+  private troughRow(): string {
+    const f = this.farm;
+    if (!f) return 'empty';
+    return (f.feedGrams[f.feedTier] ?? 0) > 0 || f.fedToday > 0 ? 'full' : 'empty';
   }
 
   private crateRow(): string {
@@ -289,7 +308,7 @@ export class FarmScene implements Scene {
           },
         });
         this.audio.play('28-grain');
-        this.trough.play('spill', { loop: false, restart: true, onDone: () => this.trough.play('full') });
+        this.trough.play('spill', { loop: false, restart: true });
         break;
       }
       case 'coopBuilt': {
@@ -351,7 +370,7 @@ export class FarmScene implements Scene {
       }
       case 'sold': {
         this.fx.burst('cash-burst', SPOTS.crate.x, SPOTS.crate.y - 16);
-        this.crate.play('egg-drop', { loop: false, restart: true, onDone: () => this.crate.play(this.crateRow()) });
+        this.crate.play('egg-drop', { loop: false, restart: true });
         this.hooks.coins(this.toStage({ x: SPOTS.crate.x, y: SPOTS.crate.y - 20 }), Math.min(12, 3 + Math.round(e.totalMilli / 4000)));
         let n = 0;
         for (const a of this.hens.values()) if (n++ < 8 && Math.random() < 0.6) a.cheer();
