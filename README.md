@@ -70,9 +70,9 @@ Checked on 11 November 2026 at about 20:06 UTC:
 
 Also checked live: the title page, `/build/index-BL-i4f2Y.js` and `/assets/sprites/12-crate.png` answer 200, a
 WebSocket on `wss://yolkstreet.25th.dev/ws` upgrades (101) and answers a ping, and `/api/market` serves the market
-state. Waiting on a top-up: after the contract's storage and the seven wallets, `play.coys-game.testnet` holds about
-1.5 NEAR available, under the 2 NEAR reserve, so hen mints wait and the server links the seven wallets to their
-agents only once the balance is back above 2.05 NEAR (12 NEAR recommended). Eggs settle meanwhile.
+state. Waiting on a top-up: after the contract's storage, the seven wallets and two days of settlements,
+`play.coys-game.testnet` held 1.403 NEAR available on 12 November, 0.647 short of the 2.05 NEAR the server needs
+before it mints hens and links the seven wallets to their agents (12 NEAR recommended). Eggs settle meanwhile.
 
 ## Try it
 
@@ -98,6 +98,19 @@ Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what 
 
 ## Screenshots and video
 
+The live site on 12 November 2026 (season `s1`, a verify farm), from a fresh headless browser through the tunnel:
+
+| 1280x720 | 1920x1080 |
+|---|---|
+| ![The farm filling a 1280x720 window: top bar with coins, eggs to collect and to sell, hens and feed; the farm, the sell card and the cards on the desk](docs/screenshots/live-1280x720.png) | ![The same farm at 1920x1080, three screen pixels per art pixel, with a crate-filling hint and the first goal ready to claim](docs/screenshots/live-1920x1080.png) |
+| **2560x1440** | **390x844 (phone)** |
+| ![The farm at 2560x1440, four screen pixels per art pixel](docs/screenshots/live-2560x1440.png) | ![The phone layout: the top bar on two rows, the farm across the width, the sell card and the desk below](docs/screenshots/live-390x844.png) |
+
+<details>
+<summary><b>The earlier build (11 November): title, tour, sale, haggles, glut, bust, ledger, market, shop</b></summary>
+
+<br>
+
 | Title | Sign in |
 |---|---|
 | ![The title plate: the logo stamped in over the farm, PLAY and SETTINGS, the live price ticker](docs/screenshots/title.png) | ![The login panel with the labelled local dev login](docs/screenshots/login.png) |
@@ -114,6 +127,8 @@ Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what 
 
 Screenshots come from a headless tour of the built game at 1280x720: the real server code in-process with 30-second demo days and live testnet settlement in the season `tour5-20261111`, and the built client in headless Edge, with 0 console errors or warnings. The sale, haggles, glut and receipts happened on their own. The bust was staged: a one-player tour had no natural bust by day 12, so the tour gave the Upstart a 64.80 Loyalist debt falling due that day, and the game's own rules did the rest (collected in full in a glut, below zero, bust). Natural busts are what the simulation shows.
 
+</details>
+
 **Video:** _slot for a direct upload (drag the gameplay video into this section on GitHub)._
 
 ## Playability rescue (12 November 2026)
@@ -125,12 +140,26 @@ had one cause, now fixed:
 
 | What was seen | Cause | Fix |
 |---|---|---|
-| Over 2 minutes to load (52.8 MB before the farm) | 1024 to 4096 px painted sheets, 49 MB of them, decoded and resampled in the browser; 2.7 MB of title music decoded before the title | [`scripts/derive-assets.ts`](scripts/derive-assets.ts) builds true-pixel atlases (1.8 MB in all), loaded by screen; music streams after the first tap; hashed files are cached for a year and sent brotli compressed |
+| Over 2 minutes to load (52.8 MB before the farm; now 7.4 s, see below) | 1024 to 4096 px painted sheets, 49 MB of them, decoded and resampled in the browser; 2.7 MB of title music decoded before the title | [`scripts/derive-assets.ts`](scripts/derive-assets.ts) builds true-pixel atlases (1.8 MB in all), loaded by screen; music streams after the first tap; hashed files are cached for a year and sent brotli compressed |
 | Hens vanishing between frames | the load-time row masking gave whole hens to the row below: idle frame 4, waddle frames 1 and 4, lay frame 4 and eat frame 3 were blank | frames are cut offline by body ownership at full resolution; a test checks every frame of every animation |
 | The trough flickering | every server update forced full or empty from yesterday's feeding, fighting the spill animation | sprites keep a resting row from game state that a play-once animation returns to |
 | Nothing clickable | a nested full-size layer took every pointer event over the canvas | layers are click-through; every world object has a hover highlight and a card |
 | Eggs on the ground, crate at 0 | only collected eggs counted, and nobody could click to collect | the top bar shows eggs to collect and eggs to sell |
 | A small blurry box | a 640x360 stage at the largest whole-number scale that fit | the world is 360 pixels tall and as wide as the window, at device resolution, nearest-neighbour |
+
+**Measured live**, cold, in a fresh headless browser through the tunnel, on the Pier Mac:
+
+| | Before (11 November) | After (12 November) |
+|---|---|---|
+| Loading screen on screen | after the bundle and WebGL | **0.98 s** (inlined in the page) |
+| Title screen | 8.3 s, 3.7 MB, 48 requests | **3.3 s**, 1.3 MB, 34 requests (the farm's art already downloading) |
+| Farm playable | about 66 s and 52.8 MB of network alone, then decode | **7.4 s**, 5.4 MB, 143 requests (sounds still arriving in the background) |
+
+A 20-second capture of the live farm checked every hen on every animation frame (1201 frames): 10
+hens on every frame, no frame where a hen's drawing shrank to nothing. An automated browser on the
+live site clicked every kind of world object (hen, crate, trough, coop, farmhouse, sign, machine),
+saw its card open each time, and collected a ground egg: **COLLECT** went down by one and **SELL**
+up by one. Before the fix the farm canvas took no clicks at all.
 
 <details>
 <summary><b>True sprite sizes</b> (one art pixel = one world pixel unless noted)</summary>
@@ -429,6 +458,8 @@ docs/submission      drafts: demo shot list, post drafts, form fields
 On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass. CI is green: the TypeScript job (with PostgreSQL 16: the Postgres tests, the production build booting against Postgres with `/healthz` checked, and a backup restored into a second database) and the contracts job (unit tests, `cargo near build`, sandbox tests). The economy sheet tests hit their values exactly; the five-seed simulation meets the economy acceptance; a malformed model answer falls back to rules; a new season settles day 1 after an old season ended at day 3; non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
 
 The live Pier deploy and its tunnel were checked end to end on 11 November 2026 (receipts under [How NEAR fits in](#how-near-fits-in)).
+
+The playability rescue was checked live on 12 November 2026: cold load, the four window sizes, every world object's card, an egg collected, and a 20-second flicker capture (numbers under [Playability rescue](#playability-rescue-12-november-2026)).
 
 **Not verifiable headlessly:** a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
