@@ -1,6 +1,7 @@
 // One database interface over real Postgres (pg) and embedded Postgres (PGlite).
 // DATABASE_URL picks the driver: postgres:// or postgresql:// uses pg; pglite://<dir> stores
 // PGlite data in <dir>; memory:// keeps PGlite in memory (tests).
+import { mkdirSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import pg from 'pg';
 
@@ -60,6 +61,8 @@ async function openPostgres(url: string): Promise<Db> {
 }
 
 async function openPglite(dataDir: string | undefined): Promise<Db> {
+  // PGlite creates only the last directory level; make the rest (the default is .data/coys)
+  if (dataDir) mkdirSync(dataDir, { recursive: true });
   const lite = dataDir ? await PGlite.create(dataDir) : await PGlite.create();
   return {
     kind: 'pglite',
