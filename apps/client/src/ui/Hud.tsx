@@ -1,9 +1,9 @@
-import { animate } from 'animejs';
+import { animate, stagger } from 'animejs';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ECONOMY, coopCapacity, feedGramsPerHenDay, type FarmState } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { motion } from '../motion/ui';
-import { game, gameTime } from '../state/game';
+import { events, game, gameTime } from '../state/game';
 import { useStore } from '../state/store';
 import { SheetSprite, flapRect } from './SheetSprite';
 
@@ -107,7 +107,7 @@ function DayClock() {
 
 export const coins = (milli: number): string => (milli / 1000).toFixed(2);
 
-export function TopBar({ farm, onShop, onSettings }: { farm: FarmState; onShop: () => void; onSettings: () => void }) {
+export function TopBar({ farm, onShop, onSettings, onMarket, onLedger }: { farm: FarmState; onShop: () => void; onSettings: () => void; onMarket: () => void; onLedger: () => void }) {
   const { audio } = useServices();
   const eggs = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
   const capacity = coopCapacity(farm.coops.map((c) => c.kind));
@@ -146,6 +146,8 @@ export function TopBar({ farm, onShop, onSettings }: { farm: FarmState; onShop: 
       </Stat>
       <div style={{ flex: 1 }} />
       <DayClock />
+      {button('market', 'Market board', onMarket)}
+      {button('ledger', 'Ledger', onLedger)}
       {button('shop', 'Shop', onShop)}
       {button('settings', 'Settings', onSettings)}
     </div>
@@ -183,6 +185,16 @@ export function Ticker({ extra = [] }: { extra?: string[] }) {
   useEffect(() => {
     if (crash && strip.current) motion.crash(strip.current);
   }, [crash]);
+
+  // a bust sends a price wave along the ticker
+  useEffect(
+    () =>
+      events.on((e) => {
+        if (e.kind !== 'rivalBust' || !track.current) return;
+        animate(track.current.querySelectorAll('.ticker-item'), { translateY: [0, -4, 2, 0], duration: 520, delay: stagger(45), ease: 'outQuad' });
+      }),
+    [],
+  );
 
   const row = (key: string) => (
     <div key={key} style={{ display: 'flex', gap: 16 }}>

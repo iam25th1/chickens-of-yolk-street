@@ -218,6 +218,28 @@ export class AssetStore {
     return url;
   }
 
+  private readonly portraits = new Map<string, string>();
+
+  /** A hen's stacked trait layers (first idle frame) as a data URL, for the shop and cards. */
+  henPortrait(layers: string[]): string {
+    const key = layers.join('+');
+    const hit = this.portraits.get(key);
+    if (hit) return hit;
+    const frames = layers.map((id) => this.frames(id, 'idle')[0]?.texture).filter((t): t is Texture => Boolean(t));
+    const first = frames[0];
+    if (!first) return '';
+    const canvas = document.createElement('canvas');
+    canvas.width = first.frame.width;
+    canvas.height = first.frame.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    ctx.imageSmoothingEnabled = false;
+    for (const t of frames) ctx.drawImage(t.source.resource as CanvasImageSource, t.frame.x, t.frame.y, t.frame.width, t.frame.height, 0, 0, t.frame.width, t.frame.height);
+    const url = canvas.toDataURL();
+    this.portraits.set(key, url);
+    return url;
+  }
+
   rowMode(id: string, row: string): 'loop' | 'once' {
     return this.entry(id.split('@')[0] ?? id).rows[row]?.mode ?? 'loop';
   }

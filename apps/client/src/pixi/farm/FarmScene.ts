@@ -333,6 +333,7 @@ export class FarmScene implements Scene {
         }
         break;
       case 'rivalBust':
+        for (let i = 0; i < 8; i++) this.fx.burst('falling-feather', 40 + i * 58, 40 + (i % 3) * 14, { count: 1, gravity: 0.00002 });
         this.audio.play('32-collapse');
         this.audio.play('23-sign-fall', { delayMs: 250 });
         this.audio.play('45-rival-bust', { delayMs: 600 });
