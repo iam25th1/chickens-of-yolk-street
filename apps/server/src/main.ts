@@ -45,6 +45,7 @@ const game = new Game({
   db,
   chain,
   log,
+  season: config.season,
   brain: {
     client: nearAi,
     budget: new InferenceBudget(db, capUsd),
@@ -54,6 +55,7 @@ const game = new Game({
   },
 });
 await game.init();
+log(`[season] ${game.season}${config.season ? '' : ' (GAME_SEASON unset: kept from the database, or made for a fresh one)'}`);
 
 const server = createGameServer({
   game,

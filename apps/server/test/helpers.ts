@@ -1,7 +1,8 @@
 import { openDb, type Db } from '../src/db/db';
 import { InferenceBudget } from '../src/agents/brain';
 import type { NearAiClient } from '../src/ai/nearai';
-import { NoopChain } from '../src/chain/chain';
+import { buildDayBatch, commitBatch, type DayBatch } from '../src/chain/batch';
+import { NoopChain, agentAccountName, type ChainWriter, type SettleResult } from '../src/chain/chain';
 import { Game } from '../src/game/game';
 import { seededRng } from '../src/game/rng';
 
@@ -12,18 +13,43 @@ export interface TestGame {
   logs: string[];
 }
 
-export async function makeGame(opts: { cast?: boolean; seed?: number; client?: NearAiClient | null; capUsd?: number } = {}): Promise<TestGame> {
-  const db = await openDb('memory://');
+/**
+ * A chain writer that does everything the testnet writer does except sign: it names agent wallets
+ * under the game account, builds each day's batch, keeps it, and commits the balances it implies,
+ * returning a receipt id per (season, day).
+ */
+export class RecordingChain implements ChainWriter {
+  readonly mode = 'near-testnet' as const;
+  readonly explorer = 'https://testnet.nearblocks.io/txns/';
+  readonly batches: DayBatch[] = [];
+  constructor(readonly gameAccount = 'game.testnet') {}
+
+  async settleDay(db: Db, season: string, day: number): Promise<SettleResult> {
+    for (const a of await db.query('SELECT id, kind, generation FROM agents WHERE near_account_id IS NULL')) {
+      await db.query('UPDATE agents SET near_account_id = $2 WHERE id = $1', [a.id, agentAccountName(String(a.kind), Number(a.generation), this.gameAccount)]);
+    }
+    const built = await buildDayBatch(db, season, day, { henMintCap: 0, renderer: null });
+    this.batches.push(built.batch);
+    await commitBatch(db, built);
+    return { status: 'sent', txHash: `recorded-${season}-${day}` };
+  }
+}
+
+export async function makeGame(
+  opts: { cast?: boolean; seed?: number; client?: NearAiClient | null; capUsd?: number; season?: string; db?: Db; chain?: ChainWriter } = {},
+): Promise<TestGame> {
+  const db = opts.db ?? (await openDb('memory://'));
   const clock = { t: Date.UTC(2026, 10, 11, 12) };
   const logs: string[] = [];
   const log = (line: string) => logs.push(line);
   const game = new Game({
     db,
-    chain: new NoopChain('test', log),
+    chain: opts.chain ?? new NoopChain('test', log),
     now: () => clock.t,
     rng: seededRng(opts.seed ?? 42),
     log,
     cast: opts.cast ?? false,
+    season: opts.season ?? null,
     brain: {
       client: opts.client ?? null,
       budget: new InferenceBudget(db, opts.capUsd ?? 1, () => clock.t),

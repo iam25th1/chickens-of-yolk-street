@@ -286,6 +286,21 @@ ALTER TABLE market_days ADD COLUMN settlement_error text;
 ALTER TABLE market_days ADD COLUMN reference integer;
 `,
   },
+  {
+    id: 4,
+    name: 'seasons',
+    sql: `
+-- One database holds one season (GAME_SEASON); settlement is keyed by (season, day) on chain and
+-- here. Databases from before seasons carry on as the season 'legacy', matching the contract's
+-- migrate, which files version 1 days under that name.
+ALTER TABLE game_clock ADD COLUMN season text;
+UPDATE game_clock SET season = 'legacy';
+ALTER TABLE market_days ADD COLUMN season text NOT NULL DEFAULT 'legacy';
+ALTER TABLE market_days DROP CONSTRAINT market_days_pkey;
+ALTER TABLE market_days ADD PRIMARY KEY (season, day);
+ALTER TABLE ledger ADD COLUMN season text NOT NULL DEFAULT 'legacy';
+`,
+  },
 ];
 
 export async function migrate(db: Db): Promise<number[]> {

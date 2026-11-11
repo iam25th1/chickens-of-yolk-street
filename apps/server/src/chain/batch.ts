@@ -1,4 +1,4 @@
-// Builds one day's settlement batch for the game contract.
+// Builds one day's settlement batch for the game contract, keyed by (season, day).
 //
 // Eggs: the day's trades between holders with accounts become egg token transfers; then every
 // account is reconciled to what it really holds (crate plus eggs in open sell orders, or a buyer's
@@ -35,6 +35,7 @@ export interface HenMint {
 }
 
 export interface DayBatch {
+  season: string;
   day: number;
   supply: number;
   multiplier_milli: number;
@@ -58,7 +59,7 @@ const token = (grade: EggGrade): string => `egg-${grade}`;
 
 export const digestOf = (farms: FarmNet[]): string => createHash('sha256').update(JSON.stringify(farms)).digest('hex');
 
-export async function buildDayBatch(db: Db, day: number, opts: { henMintCap: number; renderer: HenRenderer | null }): Promise<BuiltBatch> {
+export async function buildDayBatch(db: Db, season: string, day: number, opts: { henMintCap: number; renderer: HenRenderer | null }): Promise<BuiltBatch> {
   // who holds what, off chain
   const farmAccounts = new Map<string, string>();
   for (const r of await db.query(
@@ -159,15 +160,16 @@ export async function buildDayBatch(db: Db, day: number, opts: { henMintCap: num
     }
   }
 
-  const [md] = await db.query('SELECT supply, multiplier FROM market_days WHERE day = $1', [day]);
+  const [md] = await db.query('SELECT supply, multiplier FROM market_days WHERE season = $1 AND day = $2', [season, day]);
   const nets = await db.query(
-    `SELECT f.id, COALESCE(SUM(l.amount_milli), 0) AS net FROM farms f LEFT JOIN ledger l ON l.farm_id = f.id AND l.day = $1
+    `SELECT f.id, COALESCE(SUM(l.amount_milli), 0) AS net FROM farms f LEFT JOIN ledger l ON l.farm_id = f.id AND l.season = $1 AND l.day = $2
      GROUP BY f.id ORDER BY f.id`,
-    [day],
+    [season, day],
   );
   const farms: FarmNet[] = nets.map((n) => ({ farm: String(n.id), account: farmAccounts.get(String(n.id)) ?? null, net_milli: String(num(n.net)) }));
   return {
     batch: {
+      season,
       day,
       supply: num(md?.supply ?? 0),
       multiplier_milli: Math.round(num(md?.multiplier ?? 1) * 1000),

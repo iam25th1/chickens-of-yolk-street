@@ -5,7 +5,9 @@ import { buildDayBatch, commitBatch } from '../src/chain/batch';
 import { NoopChain, agentAccountName, agentPublicKey, assertTestnetConfig } from '../src/chain/chain';
 import { HenRenderer } from '../src/chain/hen-image';
 import { decodePng } from '../src/chain/png';
-import { makeGame } from './helpers';
+import { openDb } from '../src/db/db';
+import { MIGRATIONS } from '../src/db/migrations';
+import { RecordingChain, makeGame } from './helpers';
 
 const assets = fileURLToPath(new URL('../../client/public/assets', import.meta.url));
 
@@ -33,7 +35,7 @@ describe('the daily batch', () => {
     const farm = await t.game.getFarmState(farmId);
     const day = (await t.game.getMarketState()).day - 1;
     const renderer = new HenRenderer(assets);
-    const first = await buildDayBatch(t.db, day, { henMintCap: 5, renderer });
+    const first = await buildDayBatch(t.db, t.game.season, day, { henMintCap: 5, renderer });
     const mintsToAda = first.batch.eggs.filter((m) => m.kind === 'Mint' && m.to === 'ada.testnet');
     const crate = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
     expect(mintsToAda.reduce((s, m) => s + Number(m.amount), 0)).toBeGreaterThanOrEqual(crate);
@@ -43,17 +45,63 @@ describe('the daily batch', () => {
     await commitBatch(t.db, first);
 
     // the same day again moves nothing: chain balances already match what everyone holds
-    const again = await buildDayBatch(t.db, day, { henMintCap: 0, renderer: null });
+    const again = await buildDayBatch(t.db, t.game.season, day, { henMintCap: 0, renderer: null });
     expect(again.batch.eggs.filter((m) => m.kind !== 'Transfer' && (m.to === 'ada.testnet' || m.from === 'ada.testnet'))).toEqual([]);
     await t.db.close();
+  });
+
+  it('a database keeps one season: ledger rows and batches carry it, and another GAME_SEASON is refused', async () => {
+    const chain = new RecordingChain();
+    const t = await makeGame({ season: 's1', chain });
+    expect(t.game.season).toBe('s1');
+    await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
+    t.clock.t += ECONOMY.day.lengthMs;
+    await t.game.endDay();
+    expect(chain.batches.map((b) => [b.season, b.day])).toEqual([['s1', 1]]);
+    const seasons = await t.db.query('SELECT DISTINCT season FROM ledger');
+    expect(seasons.map((r) => r.season)).toEqual(['s1']);
+    const [day1] = await t.db.query(`SELECT settlement_tx FROM market_days WHERE season = 's1' AND day = 1`);
+    expect(day1?.settlement_tx).toBe('recorded-s1-1');
+    expect((await t.game.getMarketState()).season).toBe('s1');
+
+    await expect(makeGame({ db: t.db, season: 's2' })).rejects.toThrow(/holds season s1 but GAME_SEASON is s2/);
+    expect((await makeGame({ db: t.db })).game.season).toBe('s1');
+    await t.db.close();
+  });
+
+  it('a fresh database without GAME_SEASON makes its own season, so it never repeats a settled day', async () => {
+    const a = await makeGame();
+    const b = await makeGame();
+    expect(a.game.season).toMatch(/^dev-\d{8}-[0-9a-f]{6}$/);
+    expect(a.game.season).not.toBe(b.game.season);
+    await a.db.close();
+    await b.db.close();
+  });
+
+  it('a database from before seasons carries on as the legacy season, like the upgraded contract', async () => {
+    const db = await openDb('memory://');
+    await db.exec('CREATE TABLE schema_migrations (id integer PRIMARY KEY, name text NOT NULL, applied_at bigint NOT NULL)');
+    for (const m of MIGRATIONS.filter((x) => x.id <= 3)) {
+      await db.exec(m.sql);
+      await db.query('INSERT INTO schema_migrations (id, name, applied_at) VALUES ($1, $2, 0)', [m.id, m.name]);
+    }
+    await db.query('INSERT INTO game_clock (id, day, day_started_at) VALUES (1, 4, $1)', [Date.UTC(2026, 10, 11, 12)]);
+    await db.query('INSERT INTO market_days (day, multiplier) VALUES (3, 2.5), (4, 2.5)');
+    const t = await makeGame({ db });
+    expect(t.game.season).toBe('legacy');
+    expect(t.game.getClock().day).toBe(4);
+    // (season, day) is the key now: the same day number may exist in another season
+    await db.query(`INSERT INTO market_days (season, day, multiplier) VALUES ('s2', 4, 1)`);
+    expect((await db.query('SELECT season FROM market_days WHERE day = 4 ORDER BY season')).map((r) => r.season)).toEqual(['legacy', 's2']);
+    await db.close();
   });
 
   it('without credentials every day is a loud, recorded no-op', async () => {
     const lines: string[] = [];
     const t = await makeGame();
-    const r = await new NoopChain('no keys', (l) => lines.push(l)).settleDay(t.db, 1);
+    const r = await new NoopChain('no keys', (l) => lines.push(l)).settleDay(t.db, t.game.season, 1);
     expect(r).toEqual({ status: 'noop', txHash: null });
-    expect(lines.join('\n')).toMatch(/NO-OP for day 1/);
+    expect(lines.join('\n')).toMatch(new RegExp(`NO-OP for season ${t.game.season} day 1`));
     await t.db.close();
   });
 });

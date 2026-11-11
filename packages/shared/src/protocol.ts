@@ -247,6 +247,8 @@ export interface RivalRank {
 }
 
 export interface MarketState {
+  /** Season id: one game world from day 1; settled on chain as (season, day). */
+  season: string;
   day: number;
   /** Live multiplier for today, set by yesterday's total supply. */
   multiplier: number;
