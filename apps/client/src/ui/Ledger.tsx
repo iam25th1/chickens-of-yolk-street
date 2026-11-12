@@ -85,29 +85,31 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
             {d.agentName.toUpperCase()}: {coins(d.dueMilli)} DUE DAY {d.dueDay} ({d.status.toUpperCase()})
           </span>
         ))}
-        <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: '4px 0 0' }}>
-          FOUNDING HEN CERTIFICATES
+        <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: '4px 0 0' }} data-ui="ledger-feathers">
+          FEATHERS AND TICKETS
         </span>
-        {farm.hens.filter((h) => h.mintTx).length === 0 && <span>NONE YET: FOUNDING HENS ARE WON AT MILESTONES</span>}
-        {farm.hens
-          .filter((h) => h.mintTx)
-          .map((h) => (
-            <span key={h.id} className="row spread">
-              <span>
-                {h.founding?.number ? `FOUNDING HEN #${h.founding.number}` : `HEN-${h.id.slice(0, 8).toUpperCase()}`} DAY {h.mintDay ?? '?'}
-              </span>
-              {explorer && h.mintTx ? (
-                <a href={`${explorer}${h.mintTx}`} target="_blank" rel="noreferrer" style={{ color: '#2f6f9e' }}>
-                  RECEIPT
-                </a>
-              ) : null}
+        {farm.tickets.length === 0 && <span>NONE YET: FEATHER TICKETS ARE WON AT MILESTONES</span>}
+        {farm.tickets.map((t) => (
+          <span key={t.id} className="row spread">
+            <span>
+              {t.status === 'minted' && t.number
+                ? `FEATHER #${String(t.number).padStart(3, '0')} (${(t.grade ?? '').toUpperCase().replace('-', ' ')}) DAY ${t.mintDay ?? '?'}`
+                : t.status === 'queued'
+                  ? `TICKET (${MILESTONE_TEXT[t.milestone]}): MINTS AT THE NEXT DAY CLOSE`
+                  : `TICKET (${MILESTONE_TEXT[t.milestone]}): HELD, REDEEM ON THE MINT PAGE`}
             </span>
-          ))}
+            {explorer && t.mintTx ? (
+              <a href={`${explorer}${t.mintTx}`} target="_blank" rel="noreferrer" style={{ color: '#2f6f9e' }}>
+                RECEIPT
+              </a>
+            ) : null}
+          </span>
+        ))}
         <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: '4px 0 0' }} data-ui="milestones">
           MILESTONES
         </span>
         <span style={{ lineHeight: '10px', color: farm.standing.good ? '#2f6f9e' : '#b8321f' }}>
-          {farm.standing.good ? 'IN GOOD STANDING: EACH MILESTONE GIVES ONE CHANCE AT A FOUNDING HEN.' : `NOT IN GOOD STANDING (${farm.standing.reasons.join(', ').toUpperCase()}): MILESTONES WAIT.`}
+          {farm.standing.good ? 'IN GOOD STANDING: EACH MILESTONE GIVES ONE CHANCE AT A FEATHER TICKET.' : `NOT IN GOOD STANDING (${farm.standing.reasons.join(', ').toUpperCase()}): MILESTONES WAIT.`}
         </span>
         {farm.milestones.map((m) => (
           <span key={m.id} className="row spread">
