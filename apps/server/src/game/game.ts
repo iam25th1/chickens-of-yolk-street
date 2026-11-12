@@ -36,6 +36,7 @@ import {
   type LedgerDay,
   type MarketDay,
   type MarketState,
+  type MilestoneId,
   type OrderView,
   type ServerMessage,
   type ShopHenView,
@@ -45,6 +46,7 @@ import { num, type Db, type Queryable } from '../db/db';
 import { migrate } from '../db/migrations';
 import { decide, type BrainOptions, type DecisionResult } from '../agents/brain';
 import type { FarmAction } from '../agents/decision';
+import { henToken } from '../chain/batch';
 import type { ChainWriter } from '../chain/chain';
 import { arriveCards, buyBagsFrom, createCards, expireCards, farmCards, practiceCard, respondCard, type Candidate } from './cards';
 import {
@@ -74,7 +76,9 @@ import {
   type Outbound,
 } from './ctx';
 import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
-import { claimGoal, goalViews, markGoal } from './goals';
+import { foundingCount, milestoneViews, nextMilestone, rollMilestones, standing } from './founding';
+import { claimGoal, goalViews, markGoal, markToured, toured } from './goals';
+import { conveyorCarry, hopperRefill, logMachine, logSale, machineDay } from './machines';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
 
 export { ActionError } from './ctx';
@@ -238,7 +242,12 @@ export class Game {
       await this.tickIfDue();
       return;
     }
-    await this.serial(() => this.inTx((ctx) => arriveCards(ctx)));
+    await this.serial(() =>
+      this.inTx(async (ctx) => {
+        await arriveCards(ctx);
+        await conveyorCarry(ctx);
+      }),
+    );
   }
 
   async tickIfDue(): Promise<boolean> {
@@ -374,9 +383,12 @@ export class Game {
       ageDays: day - num(h.born_day),
       ...(h.chain_owner === undefined ? {} : { chainOwner: h.chain_owner ? String(h.chain_owner) : null }),
       ...(h.mint_tx === undefined ? {} : { mintTx: h.mint_tx ? String(h.mint_tx) : null, mintDay: h.mint_day === null ? null : num(h.mint_day) }),
+      ...(h.founding_milestone
+        ? { founding: { milestone: h.founding_milestone as MilestoneId, day: num(h.founding_day), number: h.founding_no === null ? null : num(h.founding_no) } }
+        : {}),
     });
     const hens = await q.query(
-      'SELECT id, body, eyes, comb, accessory, laying_trait, born_day, chain_owner, mint_tx, mint_day FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id',
+      'SELECT id, body, eyes, comb, accessory, laying_trait, born_day, chain_owner, mint_tx, mint_day, founding_milestone, founding_day, founding_no FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id',
       [farmId, 'alive'],
     );
     const coops = await q.query('SELECT id, kind, plot FROM coops WHERE farm_id = $1 ORDER BY plot', [farmId]);
@@ -412,6 +424,11 @@ export class Game {
       debts: await debtViews(ctx, farmId),
       orders,
       goals: await goalViews(q, farmId),
+      tourDone: await toured(q, farmId),
+      milestones: await milestoneViews(q, farmId),
+      standing: await standing(q, farmId, Math.max(1, day - 1)),
+      machines: await machineDay(q, farmId, day),
+      hopperCapMilli: farm.hopperCapMilli,
       shop: shopRows.map(
         (h): ShopHenView => ({
           ...henView(h),
@@ -519,6 +536,7 @@ export class Game {
       })),
       explorer: this.chain.explorer,
       minting: this.chain.minting,
+      founding: await foundingCount(this.db, this.chain.foundingMinted),
     };
   }
 
@@ -541,6 +559,11 @@ export class Game {
       }
       d.byKind[String(r.kind)] = (d.byKind[String(r.kind)] ?? 0) + amount;
       out.set(day, d);
+    }
+    for (const r of await this.db.query('SELECT day, machine, units, saved, milli FROM machine_days WHERE farm_id = $1 AND day >= $2', [farmId, this.clock.day - 30])) {
+      const d = out.get(num(r.day));
+      if (!d) continue;
+      d.machines = { ...d.machines, [String(r.machine)]: { units: num(r.units), saved: num(r.saved), milli: num(r.milli) } };
     }
     return [...out.values()].sort((a, b) => b.day - a.day);
   }
@@ -603,6 +626,8 @@ export class Game {
         return this.buyHen(ctx, farm, action.henId);
       case 'practiceCard':
         return practiceCard(ctx, farm);
+      case 'tourDone':
+        return markToured(ctx.q, farm.id);
       default:
         return this.applyFarmAction(ctx, farm, action);
     }
@@ -637,19 +662,9 @@ export class Game {
         emit(ctx, farm, { kind: 'hensBought', count: action.count, fromAuction: auction.length, costMilli: cost, henIds: [...auction.map((h) => h.id), ...born] });
         return;
       }
-      case 'buyFeed': {
-        const [h] = await ctx.q.query(`SELECT count(*) AS n FROM hens WHERE farm_id = $1 AND status = 'alive'`, [farm.id]);
-        const quote = await supplierQuote(ctx, farm, action.tier, num(h?.n));
-        const unit = Math.round(quote.unitMilli * (unlocks.includes('hopper') ? 1 - ECONOMY.unlocks.hopper.feedCostDiscount : 1));
-        if (quote.agent) {
-          await buyBagsFrom(ctx, farm, quote.agent, action.tier, action.bags, unit, false);
-        } else {
-          await spend(ctx, farm, 'feed', unit * action.bags, `${action.bags} ${action.tier} bags from the mill`);
-          await ctx.q.query(`UPDATE farms SET feed_${action.tier}_g = feed_${action.tier}_g + $2 WHERE id = $1`, [farm.id, action.bags * ECONOMY.feed.bagKg * 1000]);
-          emit(ctx, farm, { kind: 'feedBought', tier: action.tier, bags: action.bags, costMilli: unit * action.bags, supplier: 'the feed mill' });
-        }
+      case 'buyFeed':
+        await this.buyFeedFor(ctx, farm, action.tier, action.bags, unlocks, null);
         return;
-      }
       case 'buyFeedOnCredit': {
         const quote = await loyalistCreditQuote(ctx, farm, action.tier, action.bags);
         await buyBagsFrom(ctx, farm, quote.agent, action.tier, action.bags, quote.unitMilli, true);
@@ -657,6 +672,9 @@ export class Game {
       }
       case 'setFeedTier':
         await ctx.q.query('UPDATE farms SET feed_tier = $2 WHERE id = $1', [farm.id, action.tier]);
+        return;
+      case 'setHopperCap':
+        await ctx.q.query('UPDATE farms SET hopper_cap_milli = $2 WHERE id = $1', [farm.id, toMilli(action.cap)]);
         return;
       case 'buildCoop': {
         const used = new Set((await ctx.q.query<{ plot: number }>('SELECT plot FROM coops WHERE farm_id = $1', [farm.id])).map((r) => num(r.plot)));
@@ -695,6 +713,7 @@ export class Game {
       }
       case 'sell': {
         const r = await streetSell(ctx, farm, action.items, unlocks);
+        await logSale(ctx, farm, r.sold, r.multiplier, unlocks);
         emit(ctx, farm, { kind: 'sold', items: r.sold, totalMilli: r.totalMilli, multiplier: r.multiplier });
         if (r.totalMilli > 0) await markGoal(ctx.q, farm.id, 'sell');
         return;
@@ -728,6 +747,32 @@ export class Game {
   // ---- the day --------------------------------------------------------------------------------
 
   /** Dawn: the hens eat (active tier first) and each hen's laying builds up lay progress. */
+  /**
+   * A farm's feed purchase from its supplier (or the mill when none is open), with the hopper's
+   * discount when it has one. With a cap it is the hopper buying on its own: it skips a price over
+   * the cap, buys only what the farm can pay for, and returns what it bought (null for nothing).
+   */
+  private async buyFeedFor(ctx: Ctx, farm: Farm, tier: FeedTier, bags: number, unlocks: UnlockId[], capMilli: number | null): Promise<{ bags: number; unitMilli: number } | null> {
+    const [h] = await ctx.q.query(`SELECT count(*) AS n FROM hens WHERE farm_id = $1 AND status = 'alive'`, [farm.id]);
+    const quote = await supplierQuote(ctx, farm, tier, num(h?.n));
+    const unit = Math.round(quote.unitMilli * (unlocks.includes('hopper') ? 1 - ECONOMY.unlocks.hopper.feedCostDiscount : 1));
+    const auto = capMilli !== null;
+    if (auto) {
+      if (unit > capMilli) return null;
+      bags = Math.min(bags, Math.floor(farm.cashMilli / unit), quote.agent ? (quote.agent.stock[tier] ?? 0) : bags);
+      if (bags <= 0) return null;
+    }
+    if (quote.agent) {
+      await buyBagsFrom(ctx, farm, quote.agent, tier, bags, unit, false, auto);
+    } else {
+      await spend(ctx, farm, 'feed', unit * bags, `${bags} ${tier} bags from the mill${auto ? ' (hopper)' : ''}`);
+      await ctx.q.query(`UPDATE farms SET feed_${tier}_g = feed_${tier}_g + $2 WHERE id = $1`, [farm.id, bags * ECONOMY.feed.bagKg * 1000]);
+      emit(ctx, farm, { kind: 'feedBought', tier, bags, costMilli: unit * bags, supplier: 'the feed mill', ...(auto ? { auto: true } : {}) });
+    }
+    ctx.touched.add(farm.id);
+    return { bags, unitMilli: unit };
+  }
+
   private async planFarmDay(q: Queryable, farmId: string, day: number): Promise<{ feedGramsUsed: number; fedMultiplier: number }> {
     const [row] = await q.query(`SELECT ${FARM_COLUMNS} FROM farms WHERE id = $1`, [farmId]);
     if (!row) throw new Error(`farm ${farmId} missing`);
@@ -752,6 +797,9 @@ export class Game {
     );
     const crowding = crowdingFactor(hens.length, coopCapacity(kinds));
     const breakage = breakageRate(unlocks);
+    // eggs the conveyor keeps from cracking: they would have broken at the plain rate
+    const plainBreakage = ECONOMY.eggs.breakage;
+    let saved = 0;
     const { start, end } = ECONOMY.day.layWindow;
     const ids: string[] = [];
     const progress: number[] = [];
@@ -765,7 +813,11 @@ export class Game {
       progress.push(p);
       for (let i = 0; i < n; i++) {
         const atMs = Math.floor((start + this.rng() * (end - start)) * this.dayMs);
-        eggs.push([newId(), farmId, String(h.id), day, atMs, gradeForRoll(gradeTier, this.rng()), this.rng() < breakage]);
+        const grade = gradeForRoll(gradeTier, this.rng());
+        const roll = this.rng();
+        const keep = roll >= breakage && roll < plainBreakage;
+        if (keep) saved++;
+        eggs.push([newId(), farmId, String(h.id), day, atMs, grade, roll < breakage, keep]);
       }
     }
     if (ids.length) await q.query('UPDATE hens SET lay_progress = v.p FROM unnest($1::text[], $2::float8[]) AS v(id, p) WHERE hens.id = v.id', [ids, progress]);
@@ -775,10 +827,11 @@ export class Game {
       const rows = chunk.map((e) => {
         const b = values.length;
         values.push(...e);
-        return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}, $${b + 7})`;
+        return `($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}, $${b + 7}, $${b + 8})`;
       });
-      await q.query(`INSERT INTO lay_events (id, farm_id, hen_id, day, at_ms, grade, broken) VALUES ${rows.join(', ')}`, values);
+      await q.query(`INSERT INTO lay_events (id, farm_id, hen_id, day, at_ms, grade, broken, saved) VALUES ${rows.join(', ')}`, values);
     }
+    if (saved > 0) await logMachine(q, farmId, day, 'conveyor', { saved });
     return { feedGramsUsed, fedMultiplier };
   }
 
@@ -859,6 +912,23 @@ export class Game {
         const reference = marketReference(await activeFarms(q));
         const nextMultiplier = marketMultiplier(supply, reference);
         await q.query('UPDATE market_days SET closed_at = $2, next_multiplier = $3, reference = $4 WHERE day = $1', [day, ctx.now, nextMultiplier, reference]);
+        // 4b. milestones: one auditable roll each, once, for player farms in good standing
+        const rolls = await rollMilestones(ctx, this.chain.foundingMinted, async (farmId) => {
+          const [henId] = await this.insertHens(ctx, farmId, 1);
+          if (!henId) throw new Error('no hen inserted');
+          return henId;
+        });
+        if (rolls.length) {
+          const { remaining } = await foundingCount(q, this.chain.foundingMinted);
+          for (const r of rolls) {
+            if (!r.playerId) continue;
+            const next = await nextMilestone(q, r.farmId);
+            ctx.out.push({
+              playerId: r.playerId,
+              msg: { t: 'event', event: { kind: 'milestoneRoll', milestone: r.milestone, won: r.won, henId: r.henId, next, remaining, roll: r.roll, odds: ECONOMY.founding.odds } },
+            });
+          }
+        }
         // 5. the next day opens
         const newDay = day + 1;
         let start = this.clock.dayStartedAt + this.dayMs;
@@ -868,6 +938,10 @@ export class Game {
         this.clock = { day: newDay, dayStartedAt: start };
         ctx.day = newDay;
         ctx.elapsed = ctx.now - start;
+        // the feed hoppers top up low troughs before the hens eat at dawn
+        for (const f of await q.query<{ farm_id: string }>(`SELECT u.farm_id FROM unlocks u JOIN farms f ON f.id = u.farm_id WHERE u.unlock_id = 'hopper' AND f.bust_day IS NULL`)) {
+          await hopperRefill(ctx, f.farm_id, (c, farm, tier, bags, cap) => this.buyFeedFor(c, farm, tier, bags, ['hopper'], cap));
+        }
         const plans = new Map<string, { feedGramsUsed: number; fedMultiplier: number }>();
         for (const f of await q.query<{ id: string }>('SELECT id FROM farms WHERE bust_day IS NULL')) plans.set(f.id, await this.planFarmDay(q, f.id, newDay));
         await q.query('DELETE FROM lay_events WHERE day < $1', [newDay - 1]);
@@ -923,21 +997,34 @@ export class Game {
       result.txHash,
       result.error ?? null,
     ]);
-    if (result.status === 'sent' && result.txHash && result.minted?.length) await this.announceMints(result.minted, result.txHash, closedDay);
+    if (result.status === 'sent' && result.txHash && result.minted?.length) await this.announceMints(result.minted, result.txHash, closedDay, result.numbers);
     this.emit(null, { t: 'market', market: await this.getMarketState() });
   }
 
-  /** Each minted hen's owner hears about it (the certificate moment) and gets the hen's new card. */
-  private async announceMints(henIds: string[], txHash: string, day: number): Promise<void> {
-    const rows = await this.db.query<{ id: string; chain_owner: string; farm_id: string; player_id: string | null }>(
-      `SELECT h.id, h.chain_owner, h.farm_id, f.player_id FROM hens h JOIN farms f ON f.id = h.farm_id WHERE h.id = ANY($1::text[]) AND f.owner_kind = 'player'`,
+  /** Each minted Founding Hen's owner hears about it (the certificate moment) and gets the hen's new card. */
+  private async announceMints(henIds: string[], txHash: string, day: number, numbers?: Map<string, number>): Promise<void> {
+    const rows = await this.db.query<{ id: string; chain_owner: string; farm_id: string; player_id: string | null; founding_milestone: string | null }>(
+      `SELECT h.id, h.chain_owner, h.farm_id, f.player_id, h.founding_milestone FROM hens h JOIN farms f ON f.id = h.farm_id WHERE h.id = ANY($1::text[]) AND f.owner_kind = 'player'`,
       [henIds],
     );
     const farms = new Map<string, string>();
     for (const r of rows) {
       if (!r.player_id) continue;
       farms.set(String(r.farm_id), String(r.player_id));
-      this.emit(String(r.player_id), { t: 'event', event: { kind: 'henMinted', henId: String(r.id), token: `hen-${String(r.id)}`, owner: String(r.chain_owner), txHash, day } });
+      const id = String(r.id);
+      this.emit(String(r.player_id), {
+        t: 'event',
+        event: {
+          kind: 'henMinted',
+          henId: id,
+          token: henToken(id, true),
+          owner: String(r.chain_owner),
+          txHash,
+          day,
+          number: numbers?.get(id) ?? null,
+          milestone: (r.founding_milestone as MilestoneId | null) ?? null,
+        },
+      });
     }
     for (const [farmId, playerId] of farms) this.emit(playerId, { t: 'farm', farm: await this.getFarmState(farmId) });
   }

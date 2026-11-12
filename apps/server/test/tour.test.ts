@@ -2,7 +2,7 @@
 // and the hen certificate moment (a day close that mints a player's hen tells the player, and her
 // card carries the receipt).
 import { describe, expect, it } from 'vitest';
-import { ECONOMY, type GameEvent } from '@coys/shared';
+import { ECONOMY, MILESTONE_IDS, type GameEvent } from '@coys/shared';
 import { RecordingChain, makeGame } from './helpers';
 
 describe('the practice offer', () => {
@@ -53,8 +53,8 @@ describe('feed on credit', () => {
   });
 });
 
-describe('the hen certificate moment', () => {
-  it('a day close that mints a hen tells her owner, with the token and receipt on her card', async () => {
+describe('the Founding Hen certificate moment', () => {
+  it('a day close mints a won Founding Hen and tells her owner, with her number, milestone and receipt; ordinary hens stay off chain', async () => {
     const chain = new RecordingChain('game.testnet', 3);
     const t = await makeGame({ chain, season: 'mint', seed: 9 });
     const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-mint', 'Mina');
@@ -65,19 +65,32 @@ describe('the hen certificate moment', () => {
     });
     let farm = await t.game.getFarmState(farmId);
     expect(farm.hens.every((h) => h.chainOwner === null && h.mintTx === null)).toBe(true);
+    const won = farm.hens[0]?.id ?? '';
+    await t.db.query(`UPDATE hens SET founding_milestone = 'full-coop', founding_day = 0 WHERE id = $1`, [won]);
+    // every milestone already rolled, so this day close mints only her
+    for (const m of MILESTONE_IDS) {
+      await t.db.query(`INSERT INTO milestone_rolls (farm_id, milestone, season, day, anchor, seed, roll, odds, won, hen_id) VALUES ($1, $2, 'mint', 0, 'none', 'x', 0.9, 0.3, false, NULL)`, [farmId, m]);
+    }
 
     t.clock.t = t.game.getClock().dayStartedAt + ECONOMY.day.lengthMs;
     await t.game.endDay();
 
     const minted = events.filter((e) => e.kind === 'henMinted');
-    expect(minted).toHaveLength(3);
+    expect(minted).toEqual([
+      { kind: 'henMinted', henId: won, token: `founding-${won}`, owner: 'mina.testnet', txHash: 'recorded-mint-1', day: 1, number: 1, milestone: 'full-coop' },
+    ]);
     farm = await t.game.getFarmState(farmId);
-    for (const e of minted) {
-      if (e.kind !== 'henMinted') continue;
-      expect(e).toMatchObject({ owner: 'mina.testnet', txHash: 'recorded-mint-1', day: 1, token: `hen-${e.henId}` });
-      expect(farm.hens.find((h) => h.id === e.henId)).toMatchObject({ chainOwner: 'mina.testnet', mintTx: 'recorded-mint-1', mintDay: 1 });
-    }
-    expect((await t.game.getMarketState()).minting).toBe('live');
+    expect(farm.hens.find((h) => h.id === won)).toMatchObject({
+      chainOwner: 'mina.testnet',
+      mintTx: 'recorded-mint-1',
+      mintDay: 1,
+      founding: { milestone: 'full-coop', day: 0, number: 1 },
+    });
+    expect(farm.hens.filter((h) => h.id !== won).every((h) => h.chainOwner === null && !h.founding)).toBe(true);
+    expect(chain.batches.flatMap((b) => b.hen_mints)).toEqual([]);
+    const market = await t.game.getMarketState();
+    expect(market.minting).toBe('live');
+    expect(market.founding).toMatchObject({ max: 777, minted: 1 });
     await t.db.close();
   });
 });

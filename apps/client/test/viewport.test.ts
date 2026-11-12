@@ -1,9 +1,9 @@
 // The layout: at every supported window size the UI zones never overlap, the modal and the guide
-// stay clear of the HUD, the farm's composition fits whole in the world zone, and the goal tracker
-// and toasts sit only over ground. Zooms are whole: nothing is ever drawn at a fractional scale.
+// stay clear of the HUD, the farm fills the world zone, and the goal tracker and toasts sit only
+// over ground. Zooms are whole: nothing is ever drawn at a fractional scale.
 import { describe, expect, it } from 'vitest';
 import { measure, type Rect } from '../src/app/viewport';
-import { COMP, SAFE_X, SAFE_Y } from '../src/pixi/farm/layout';
+import { MIN_H, MIN_W, farmLayout } from '../src/pixi/farm/layout';
 
 const SIZES: [number, number, number][] = [
   [1280, 720, 1],
@@ -17,7 +17,6 @@ const SIZES: [number, number, number][] = [
 ];
 
 const overlap = (a: Rect, b: Rect): boolean => Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0.01 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.01;
-const inside = (a: Rect, b: Rect): boolean => a.x >= b.x - 0.01 && a.y >= b.y - 0.01 && a.x + a.w <= b.x + b.w + 0.01 && a.y + a.h <= b.y + b.h + 0.01;
 
 describe.each(SIZES)('layout at %ix%i, %i device pixels per CSS pixel', (w, h, dpr) => {
   const v = measure(w, h, dpr);
@@ -46,22 +45,30 @@ describe.each(SIZES)('layout at %ix%i, %i device pixels per CSS pixel', (w, h, d
     expect(z.modal.h).toBeGreaterThanOrEqual(200);
   });
 
-  it('shows the whole farm in the world zone, with only ground under the guide', () => {
-    const farm = {
-      x: (v.farm.offX + COMP.left * v.farm.k) / v.p,
-      y: (v.farm.offY + COMP.top * v.farm.k) / v.p,
-      w: ((COMP.right - COMP.left) * v.farm.k) / v.p,
-      h: ((COMP.bottom - COMP.top) * v.farm.k) / v.p,
-    };
-    expect(inside(farm, { x: 0, y: z.top.h, w: v.portrait ? v.uiW : z.side.x, h: v.uiH - z.top.h })).toBe(true);
-    expect(overlap(farm, z.top)).toBe(false);
-    if (!v.portrait) expect(overlap(farm, z.side)).toBe(false);
-    // everything the farm draws above its safe line, and right of SAFE_X, stays clear of the guide
-    const busy = { x: farm.x, y: farm.y, w: farm.w, h: ((SAFE_Y - COMP.top) * v.farm.k) / v.p };
-    const right = { x: (v.farm.offX + SAFE_X * v.farm.k) / v.p, y: farm.y, w: ((COMP.right - SAFE_X) * v.farm.k) / v.p, h: farm.h };
-    for (const g of [z.tracker, z.toasts]) {
-      expect(overlap(busy, g)).toBe(false);
-      expect(overlap(v.portrait ? farm : right, g)).toBe(false);
+  it('fills the world zone with the farm, with only ground under the guide', () => {
+    const f = v.farm;
+    const toUi = (x: number, y: number) => ({ x: (f.offX + x * f.k) / v.p, y: (f.offY + y * f.k) / v.p });
+    // the farm area is the free zone (to within a world pixel)
+    const o = toUi(0, 0);
+    const end = toUi(f.w, f.h);
+    expect(o.x).toBeCloseTo(v.portrait ? 0 : z.world.x, 5);
+    expect(o.y).toBeCloseTo(z.top.h, 5);
+    expect(end.x).toBeLessThanOrEqual((v.portrait ? v.uiW : z.side.x) + 0.01);
+    expect(end.x).toBeGreaterThan((v.portrait ? v.uiW : z.side.x) - f.k / v.p - 0.01);
+    expect(f.w).toBeGreaterThanOrEqual(MIN_W);
+    expect(f.h).toBeGreaterThanOrEqual(MIN_H);
+    // the guide band covers the tracker and the toasts (landscape); in portrait they sit below the farm
+    const l = farmLayout(f.w, f.h, f.guide);
+    if (v.portrait) expect(z.toasts.y).toBeGreaterThanOrEqual(end.y);
+    else {
+      const band = { ...toUi(0, l.guide.top), r: toUi(l.guide.right, 0).x };
+      expect(band.r).toBeGreaterThanOrEqual(z.tracker.x + z.tracker.w);
+      expect(band.y).toBeLessThanOrEqual(z.toasts.y + 0.01);
+    }
+    // nothing the farm stands up sits in the guide band
+    for (const p of [...l.plots, l.farmhouse, l.sign, l.trough, l.sack, l.crate, ...Object.values(l.machines)]) {
+      const at = toUi(p.x, p.y);
+      for (const g of v.portrait ? [] : [z.tracker, z.toasts]) expect(at.x > g.x + g.w || at.y < g.y, JSON.stringify(p)).toBe(true);
     }
   });
 });

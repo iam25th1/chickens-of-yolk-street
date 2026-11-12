@@ -3,6 +3,7 @@
 // with their sample-exact loop points. Music is never downloaded up front: it streams through a media
 // element once the player has touched the page, so the first screens do not wait for megabytes.
 import { ASSET_BASE, type AssetIndex } from '../assets/catalog';
+import { CATEGORY_OF, SOUND_CATEGORIES, gainOf, type SoundBus, type SoundLevels } from './categories';
 
 export interface LoopHandle {
   stop(fadeMs?: number): void;
@@ -18,8 +19,8 @@ interface Decoded {
 export class AudioEngine {
   readonly ctx: AudioContext;
   private readonly master: GainNode;
-  private readonly musicBus: GainNode;
-  private readonly sfxBus: GainNode;
+  /** One bus per sound category, each into the master (Settings sets their levels). */
+  private readonly buses = new Map<SoundBus, GainNode>();
   private readonly takes = new Map<string, AudioBuffer>();
   private readonly loops = new Map<string, Decoded>();
   private music: { id: string; el: HTMLAudioElement; gain: GainNode } | null = null;
@@ -29,10 +30,12 @@ export class AudioEngine {
   constructor(private readonly index: AssetIndex) {
     this.ctx = new AudioContext({ latencyHint: 'interactive' });
     this.master = this.ctx.createGain();
-    this.musicBus = this.ctx.createGain();
-    this.sfxBus = this.ctx.createGain();
-    this.musicBus.connect(this.master);
-    this.sfxBus.connect(this.master);
+    for (const c of SOUND_CATEGORIES) {
+      if (c === 'master') continue;
+      const g = this.ctx.createGain();
+      g.connect(this.master);
+      this.buses.set(c, g);
+    }
     this.master.connect(this.ctx.destination);
   }
 
@@ -50,10 +53,15 @@ export class AudioEngine {
     return this.ctx.state === 'running';
   }
 
-  setVolumes(music: number, sfx: number): void {
+  /** Applies Settings' levels at once: each category's bus to master times its own (zero when muted). */
+  setLevels(levels: SoundLevels): void {
     const t = this.ctx.currentTime;
-    this.musicBus.gain.setTargetAtTime(music * music, t, 0.05);
-    this.sfxBus.gain.setTargetAtTime(sfx * sfx, t, 0.05);
+    for (const [c, g] of this.buses) g.gain.setTargetAtTime(gainOf(levels, c), t, 0.03);
+  }
+
+  /** The bus a sound plays on (its category's). */
+  private busFor(id: string): GainNode {
+    return this.buses.get(CATEGORY_OF[id] ?? 'ui') as GainNode;
   }
 
   private async decode(url: string): Promise<AudioBuffer> {
@@ -111,12 +119,12 @@ export class AudioEngine {
     src.playbackRate.value = press.pitch * (opts.pitch ?? 1) * (0.94 + Math.random() * 0.12);
     const gain = this.ctx.createGain();
     gain.gain.value = (opts.volume ?? 1) * (0.82 + Math.random() * 0.18);
-    src.connect(gain).connect(this.sfxBus);
+    src.connect(gain).connect(this.busFor(id));
     src.start(this.ctx.currentTime + (opts.delayMs ?? 0) / 1000);
   }
 
-  /** Gapless loop on the music or effects bus. */
-  loop(id: string, opts: { bus?: 'music' | 'sfx'; volume?: number; fadeMs?: number } = {}): LoopHandle | null {
+  /** Gapless loop on its category's bus. */
+  loop(id: string, opts: { volume?: number; fadeMs?: number } = {}): LoopHandle | null {
     const d = this.loops.get(id);
     if (!d) return null;
     const src = this.ctx.createBufferSource();
@@ -129,7 +137,7 @@ export class AudioEngine {
     const t = this.ctx.currentTime;
     gain.gain.setValueAtTime(opts.fadeMs ? 0 : target, t);
     if (opts.fadeMs) gain.gain.linearRampToValueAtTime(target, t + opts.fadeMs / 1000);
-    src.connect(gain).connect(opts.bus === 'music' ? this.musicBus : this.sfxBus);
+    src.connect(gain).connect(this.busFor(id));
     src.start(t, d.loopStart);
     let stopped = false;
     return {
@@ -181,7 +189,7 @@ export class AudioEngine {
     const t = this.ctx.currentTime;
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(0.7, t + fadeMs / 1000);
-    this.ctx.createMediaElementSource(el).connect(gain).connect(this.musicBus);
+    this.ctx.createMediaElementSource(el).connect(gain).connect(this.busFor(id));
     void el.play().catch(() => undefined);
     this.music = { id, el, gain };
   }

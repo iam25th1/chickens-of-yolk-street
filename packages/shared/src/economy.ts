@@ -15,6 +15,13 @@ export type UnlockId = (typeof UNLOCK_IDS)[number];
 
 /** The goal chain that teaches the game, in order, with its coin rewards. */
 export const GOAL_IDS = ['collect', 'sell', 'coop', 'haggle', 'machine', 'rival'] as const;
+
+/**
+ * Founding Hen milestones: each gives a farm in good standing one roll, once. In order of how soon
+ * a farm usually reaches them.
+ */
+export const MILESTONE_IDS = ['full-coop', 'good-week', 'eggs-sold', 'haggles-won', 'all-machines', 'outlast-rival', 'top-three'] as const;
+export type MilestoneId = (typeof MILESTONE_IDS)[number];
 export type GoalId = (typeof GOAL_IDS)[number];
 export const GOAL_REWARDS: Record<GoalId, number> = { collect: 2, sell: 3, coop: 5, haggle: 5, machine: 8, rival: 10 };
 
@@ -194,12 +201,33 @@ export const ECONOMY = {
     feed: { tier: 'standard' as FeedTier, kg: 25 },
   },
   unlocks: {
-    conveyor: { price: 40, breakage: 0.02 },
+    /** Eggs ride the belt into the crate carryMs after they are laid. */
+    conveyor: { price: 40, breakage: 0.02, carryMs: 5000 },
     grader: { price: 80, eggPriceBonus: 0.1 },
     cart: { price: 120 },
-    hopper: { price: 100, feedCostDiscount: 0.1 },
+    /** Pours feed in at day close when the trough holds less than refillBelowDays, up to fillToDays. */
+    hopper: { price: 100, feedCostDiscount: 0.1, refillBelowDays: 1.5, fillToDays: 3 },
     clerk: { price: 160, revenueBonus: 0.05 },
   } satisfies Record<UnlockId, { price: number; [effect: string]: number }>,
+  /**
+   * The Founding Hens: the only hens recorded on NEAR, 777 ever (the contract enforces the cap). A
+   * farm in good standing gets one roll at each milestone; a win becomes a Founding Hen on the farm
+   * and is minted at the next day close.
+   */
+  founding: {
+    maxSupply: 777,
+    /** Chance a milestone's roll wins. */
+    odds: 0.3,
+    /** Good standing: never bust this season, no credit past its due day, no contract missed in this many days. */
+    missWindowDays: 3,
+    /** Milestone thresholds. */
+    goodDays: 7,
+    eggsSold: 500,
+    hagglesWon: 10,
+    topRank: 3,
+    /** Founding mints in one day's settlement (keeps one settle_day call well inside its gas). */
+    mintsPerBatch: 20,
+  },
   limits: {
     maxHensPerPurchase: 20,
     maxBagsPerPurchase: 10,

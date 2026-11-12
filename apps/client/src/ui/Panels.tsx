@@ -21,7 +21,8 @@ import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import type { Action } from '../net/socket';
 import { henLayers } from '../pixi/farm/HenActor';
-import { settings } from '../state/settings';
+import { CATEGORY_LABEL, SOUND_CATEGORIES, type SoundCategory } from '../audio/categories';
+import { DEFAULT_SETTINGS, settings } from '../state/settings';
 import { useStore } from '../state/store';
 import { replayTour } from '../state/tour';
 import { uiEvents, type ShopTab } from '../state/ui';
@@ -287,29 +288,48 @@ export function ShopPanel({
   );
 }
 
-/** Settings: sound, motion and the tour. On the farm it is the modal; on the title a panel. */
-export function SettingsBody({ onClose }: { onClose: () => void }) {
+/** Settings: a volume and mute for every sound category, reduce motion, the guide and the tour. */
+export function SettingsBody({ onClose, onGuide }: { onClose: () => void; onGuide?: () => void }) {
   const { audio } = useServices();
   const s = useStore(settings, (v) => v);
-  useEffect(() => audio.setVolumes(s.music, s.sfx), [audio, s.music, s.sfx]);
+  useEffect(() => audio.setLevels(s.sound), [audio, s.sound]);
+  const set = (c: SoundCategory, patch: Partial<{ volume: number; muted: boolean }>) => settings.set({ sound: { ...s.sound, [c]: { ...s.sound[c], ...patch } } });
+  // a sample of each category so the player hears the level they set
+  const SAMPLE: Partial<Record<SoundCategory, string>> = { hens: '01-cluck', eggs: '08-egg-pop', cards: '18-stamp', haggling: '19-haggle-win', machines: '24-machine', market: '23-sign-creak', voices: '40-loyalist', ui: '35-click', stings: '45-new-day' };
   return (
-    <div className="col" style={{ gap: 10 }}>
-      <label className="col">
-        <span>MUSIC {Math.round(s.music * 100)}%</span>
-        <input className="slider" type="range" min={0} max={100} value={Math.round(s.music * 100)} onChange={(e) => settings.set({ music: Number(e.target.value) / 100 })} />
-      </label>
-      <label className="col">
-        <span>EFFECTS {Math.round(s.sfx * 100)}%</span>
-        <input
-          className="slider"
-          type="range"
-          min={0}
-          max={100}
-          value={Math.round(s.sfx * 100)}
-          onChange={(e) => settings.set({ sfx: Number(e.target.value) / 100 })}
-          onMouseUp={() => audio.play('08-egg-pop')}
-        />
-      </label>
+    <div className="col" style={{ gap: 8 }}>
+      <div className="col" style={{ gap: 3 }} data-ui="sound-settings">
+        {SOUND_CATEGORIES.map((c) => (
+          <div key={c} className="row" style={{ gap: 4 }}>
+            <span style={{ width: 128, flex: 'none', color: c === 'master' ? '#b8321f' : undefined }}>{CATEGORY_LABEL[c]}</span>
+            <input
+              className="slider"
+              type="range"
+              min={0}
+              max={100}
+              aria-label={`${CATEGORY_LABEL[c]} volume`}
+              value={Math.round(s.sound[c].volume * 100)}
+              onChange={(e) => set(c, { volume: Number(e.target.value) / 100 })}
+              onMouseUp={() => {
+                const id = SAMPLE[c];
+                if (id) audio.play(id);
+              }}
+            />
+            <span style={{ width: 28, flex: 'none', textAlign: 'right' }}>{s.sound[c].muted ? 'OFF' : `${Math.round(s.sound[c].volume * 100)}%`}</span>
+            <button className="toggle" role="switch" aria-checked={!s.sound[c].muted} aria-label={`${CATEGORY_LABEL[c]} on`} onClick={() => set(c, { muted: !s.sound[c].muted })} />
+          </div>
+        ))}
+        <button
+          className="btn"
+          style={{ alignSelf: 'flex-start' }}
+          onClick={() => {
+            uiSound(audio, 'click');
+            settings.set({ sound: DEFAULT_SETTINGS.sound });
+          }}
+        >
+          RESET SOUND TO DEFAULT
+        </button>
+      </div>
       <div className="row spread">
         <span>REDUCE MOTION (NO SHAKE OR HITSTOP)</span>
         <button
@@ -323,25 +343,41 @@ export function SettingsBody({ onClose }: { onClose: () => void }) {
           }}
         />
       </div>
-      <button
-        className="btn"
-        data-tour="replay-tour"
-        onClick={() => {
-          uiSound(audio, 'click');
-          replayTour();
-          onClose();
-        }}
-      >
-        REPLAY THE HOW-TO-PLAY TOUR
-      </button>
+      <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+        {onGuide && (
+          <button
+            className="btn red"
+            data-tour="open-guide"
+            onClick={() => {
+              uiSound(audio, 'click');
+              onGuide();
+            }}
+          >
+            HOW TO PLAY
+          </button>
+        )}
+        <button
+          className="btn"
+          data-tour="replay-tour"
+          onClick={() => {
+            uiSound(audio, 'click');
+            replayTour();
+            onClose();
+          }}
+        >
+          REPLAY THE TOUR
+        </button>
+      </div>
     </div>
   );
 }
 
-export function SettingsPanel({ onClose }: { onClose: () => void }) {
+export function SettingsPanel({ onClose, onGuide }: { onClose: () => void; onGuide?: () => void }) {
   return (
-    <Panel title="SETTINGS" x={176} y={80} w={288} h={196} onClose={onClose}>
-      <SettingsBody onClose={onClose} />
+    <Panel title="SETTINGS" x={140} y={24} w={360} h={312} onClose={onClose}>
+      <div style={{ height: 268, overflowY: 'auto' }}>
+        <SettingsBody onClose={onClose} onGuide={onGuide} />
+      </div>
     </Panel>
   );
 }

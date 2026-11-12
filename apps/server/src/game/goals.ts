@@ -12,6 +12,8 @@ interface GoalRecord {
   claimed: GoalId[];
   /** The tour's practice offer has been sent (once per farm). */
   practice?: boolean;
+  /** The player finished or skipped the how-to-play tour (so it shows once per player, on any browser). */
+  toured?: boolean;
 }
 
 async function read(q: Queryable, farmId: string): Promise<{ goals: GoalRecord; createdDay: number }> {
@@ -23,6 +25,7 @@ async function read(q: Queryable, farmId: string): Promise<{ goals: GoalRecord; 
       done: (parsed.done ?? []).filter((g) => GOAL_IDS.includes(g)),
       claimed: (parsed.claimed ?? []).filter((g) => GOAL_IDS.includes(g)),
       ...(parsed.practice ? { practice: true } : {}),
+      ...(parsed.toured ? { toured: true } : {}),
     };
   } catch {
     // a bad value reads as a fresh chain
@@ -32,6 +35,17 @@ async function read(q: Queryable, farmId: string): Promise<{ goals: GoalRecord; 
 
 async function write(q: Queryable, farmId: string, goals: GoalRecord): Promise<void> {
   await q.query('UPDATE farms SET goals = $2 WHERE id = $1', [farmId, JSON.stringify(goals)]);
+}
+
+/** Marks the how-to-play tour as done for the farm's player. */
+export async function markToured(q: Queryable, farmId: string): Promise<void> {
+  const { goals } = await read(q, farmId);
+  if (!goals.toured) await write(q, farmId, { ...goals, toured: true });
+}
+
+/** Whether the farm's player has done the tour. */
+export async function toured(q: Queryable, farmId: string): Promise<boolean> {
+  return (await read(q, farmId)).goals.toured === true;
 }
 
 /** Marks the tour's practice offer as sent; false when it already was. */

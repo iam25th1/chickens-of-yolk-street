@@ -86,11 +86,13 @@ jobs:
       - name: Build the contract (cargo near)
         working-directory: contracts/coys-game
         run: cargo near build non-reproducible-wasm --locked
-      - name: Sandbox tests (mint, transfer, batch settlement, access control)
+      - name: Sandbox tests (Founding Hens and the 777 cap, upgrade, transfer, settlement, access control)
         working-directory: contracts/sandbox-tests
         env:
           COYS_WASM: ${{ github.workspace }}/contracts/coys-game/target/near/coys_game.wasm
-        run: cargo test --locked -- --test-threads=1
+        run: cargo test --locked -- --test-threads=1 --nocapture
+      - name: Contract size
+        run: wc -c contracts/coys-game/target/near/coys_game.wasm
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: coys-game-wasm

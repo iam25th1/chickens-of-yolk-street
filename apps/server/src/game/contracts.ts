@@ -3,6 +3,7 @@ import { ECONOMY, type ContractView, type DebtView, type EggGrade } from '@coys/
 import { num } from '../db/db';
 import { sellToAgent } from './cards';
 import { ActionError, AGENT_COLUMNS, loadFarm, moveAgentCash, moveCash, remember, toAgent, type Ctx, type Farm } from './ctx';
+import { logMachine } from './machines';
 import { emit } from './market';
 
 interface ContractRow {
@@ -69,7 +70,10 @@ export async function closeContracts(ctx: Ctx): Promise<Map<string, { delivered:
     else {
       const [cart] = await ctx.q.query(`SELECT 1 FROM unlocks WHERE farm_id = $1 AND unlock_id = 'cart'`, [farm.id]);
       const ok = cart ? await deliver(ctx, farm, c, true).catch(() => false) : false;
-      if (ok) t.delivered++;
+      if (ok) {
+        t.delivered++;
+        await logMachine(ctx.q, farm.id, ctx.day, 'cart', { units: c.qtyPerDay, milli: c.qtyPerDay * c.priceMilli });
+      }
       else {
         t.missed++;
         const penalty = Math.min(farm.cashMilli, Math.round(ECONOMY.buyers.bakery.missPenaltyShare * c.qtyPerDay * c.priceMilli));
@@ -81,6 +85,7 @@ export async function closeContracts(ctx: Ctx): Promise<Map<string, { delivered:
         const misses = c.misses + 1;
         const cancel = misses >= ECONOMY.buyers.bakery.cancelAfterMisses;
         await ctx.q.query(`UPDATE contracts SET misses = $2, status = CASE WHEN $3 THEN 'cancelled' ELSE status END WHERE id = $1`, [c.id, misses, cancel]);
+        await ctx.q.query('UPDATE farms SET last_missed_day = $2 WHERE id = $1', [farm.id, ctx.day]);
         await remember(ctx, c.agentId, farm.id, { misses: 1 }, cancel ? ctx.day + ECONOMY.buyers.bakery.sulkDays : undefined);
         emit(ctx, farm, { kind: 'contractMissed', contractId: c.id, penaltyMilli: penalty });
       }

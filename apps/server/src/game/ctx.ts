@@ -50,10 +50,12 @@ export interface Farm {
   supplier: 'squeezer' | 'loyalist';
   clerkFloor: number;
   quality: number;
+  /** The feed hopper's price cap per bag in milli-coins (0: the list price). */
+  hopperCapMilli: number;
 }
 
 export const FARM_COLUMNS = `id, owner_kind, player_id, agent_key, name, cash_milli, feed_tier, feed_cheap_g, feed_standard_g,
-  feed_premium_g, fed_multiplier, crate_white, crate_cream, crate_brown, crate_golden, bust_day, supplier, clerk_floor, quality`;
+  feed_premium_g, fed_multiplier, crate_white, crate_cream, crate_brown, crate_golden, bust_day, supplier, clerk_floor, quality, hopper_cap_milli`;
 
 export function toFarm(r: Record<string, unknown>): Farm {
   return {
@@ -71,6 +73,7 @@ export function toFarm(r: Record<string, unknown>): Farm {
     supplier: r.supplier === 'squeezer' ? 'squeezer' : 'loyalist',
     clerkFloor: num(r.clerk_floor ?? 1),
     quality: num(r.quality ?? 0.35),
+    hopperCapMilli: num(r.hopper_cap_milli ?? 0),
   };
 }
 

@@ -320,6 +320,60 @@ ALTER TABLE hens ADD COLUMN mint_tx text;
 ALTER TABLE hens ADD COLUMN mint_day integer;
 `,
   },
+  {
+    id: 7,
+    name: 'machines at work',
+    sql: `
+-- What each machine did each day (eggs carried and saved, eggs graded, deliveries, bags poured,
+-- offers taken), for the machine cards and the ledger. Eggs a conveyor kept from cracking are
+-- flagged when the day is planned. The feed hopper buys only at or under the farm's price cap
+-- (0: the list price).
+CREATE TABLE machine_days (
+  farm_id text NOT NULL REFERENCES farms(id),
+  day integer NOT NULL,
+  machine text NOT NULL,
+  units integer NOT NULL DEFAULT 0,
+  saved integer NOT NULL DEFAULT 0,
+  milli bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (farm_id, day, machine)
+);
+ALTER TABLE lay_events ADD COLUMN saved boolean NOT NULL DEFAULT false;
+ALTER TABLE farms ADD COLUMN hopper_cap_milli bigint NOT NULL DEFAULT 0;
+`,
+  },
+  {
+    id: 8,
+    name: 'founding hens',
+    sql: `
+-- The Founding Hens: only hens won at milestones are minted on NEAR, 777 ever. A founding hen
+-- records the milestone she was won at and the day, and her number of 777 once minted.
+ALTER TABLE hens ADD COLUMN founding_milestone text;
+ALTER TABLE hens ADD COLUMN founding_day integer;
+ALTER TABLE hens ADD COLUMN founding_no integer;
+-- Every milestone roll, once per farm and milestone, with the inputs that make it auditable:
+-- seed = sha256 of the season, day, farm, milestone and the previous day's settlement tx (anchor).
+CREATE TABLE milestone_rolls (
+  farm_id text NOT NULL REFERENCES farms(id),
+  milestone text NOT NULL,
+  season text NOT NULL,
+  day integer NOT NULL,
+  anchor text NOT NULL,
+  seed text NOT NULL,
+  roll double precision NOT NULL,
+  odds double precision NOT NULL,
+  won boolean NOT NULL,
+  hen_id text,
+  PRIMARY KEY (farm_id, milestone)
+);
+-- Good standing and the counters milestones read.
+ALTER TABLE farms ADD COLUMN good_since_day integer;
+ALTER TABLE farms ADD COLUMN last_missed_day integer;
+ALTER TABLE farms ADD COLUMN eggs_sold integer NOT NULL DEFAULT 0;
+ALTER TABLE farms ADD COLUMN haggles_won integer NOT NULL DEFAULT 0;
+UPDATE farms SET eggs_sold = COALESCE((SELECT SUM(t.qty) FROM trades t WHERE t.seller_farm = farms.id), 0);
+UPDATE farms SET haggles_won = (SELECT count(*) FROM cards c WHERE c.farm_id = farms.id AND c.status = 'won');
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

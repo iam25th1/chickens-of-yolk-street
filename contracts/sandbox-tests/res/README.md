@@ -1,5 +1,6 @@
-`coys_game_v1.wasm` is the version 1 game contract (days without seasons), byte for byte the build
-deployed to `coys-game.testnet` on 11 November 2026 (sha256
-`df6fe36d8a31357a5fc18a9b4857fffc6a5372eac0a0c9e3a107b7d330ee1d00`, from CI run 43058947236). The
-sandbox upgrade test deploys it, settles days, then deploys the current build over it and calls
-`migrate`.
+`coys_game_v2.wasm` is the version 2 game contract (seasons, ordinary hens minted), byte for byte
+the code deployed on the game's account `play.coys-game.testnet` (and on `coys-game.testnet`, the
+same code) on 12 November 2026 (code hash `HzWLn4LX75AJwbkgDfR1tnScDiZ8LazengtBZQQjqtsu`, sha256
+`fc7645dc2fe83e1670db99e026b754a413af69a838a7114d28ce9452665bd2f4`, 341,943 bytes, read with the
+RPC method `view_code`). The sandbox upgrade test deploys it, settles days with ordinary hens,
+then deploys the current build over it and calls `migrate`.

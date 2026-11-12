@@ -4,7 +4,7 @@
 // hen, a machine, the crate, a hen's certificate, settings). Server state flows in through the
 // socket; player choices go out as actions and come back as events with juice.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isCrash, type CardView } from '@coys/shared';
+import { ECONOMY, isCrash, type CardView } from '@coys/shared';
 import { useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { worldToUi } from '../app/viewport';
@@ -13,7 +13,7 @@ import { FarmScene, type WorldTarget } from '../pixi/farm/FarmScene';
 import { TownScene } from '../pixi/TownScene';
 import { events, game } from '../state/game';
 import { useStore } from '../state/store';
-import { tour } from '../state/tour';
+import { startTourFor, tour } from '../state/tour';
 import { closeModal, openModal, ui, type ModalState } from '../state/ui';
 import { CardOverlay, type OverlayResult } from '../ui/CardOverlay';
 import { LOOK } from '../ui/cast';
@@ -23,6 +23,7 @@ import { ToastArea, Tracker } from '../ui/Guide';
 import { TopBar } from '../ui/Hud';
 import { LedgerPanel } from '../ui/Ledger';
 import { MarketBoard } from '../ui/MarketBoard';
+import { HowToPlay, MILESTONE_TEXT } from '../ui/HowToPlay';
 import { Modal } from '../ui/Modal';
 import { SettingsBody, ShopPanel } from '../ui/Panels';
 import { Spotlight, TourBox } from '../ui/Tour';
@@ -98,6 +99,21 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     }
   }, [status, accountId, onSignedOut, send]);
 
+  // first entry to this farm: the tour starts on its own for a player who has never done it, and
+  // the server hears when it is finished or skipped
+  const farmId = farm?.farmId ?? null;
+  const tourDone = farm?.tourDone ?? false;
+  useEffect(() => {
+    if (farmId) startTourFor(farmId, tourDone);
+    // only the first state of a farm decides
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [farmId]);
+  const wasTouring = useRef(false);
+  useEffect(() => {
+    if (wasTouring.current && !touring && !tourDone) void send({ t: 'tourDone' });
+    wasTouring.current = touring;
+  }, [touring, tourDone, send]);
+
   // the world
   useEffect(() => {
     if (!farm || scene.current) return;
@@ -124,6 +140,20 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
   useEffect(() => {
     if (farm) scene.current?.sync(farm);
   }, [farm]);
+
+  // the rival farms' signs at the farm's edge: one per rival, the open farm if there is one
+  useEffect(() => {
+    if (!market) return;
+    const byKind = new Map<string, { sign: string; name: string; bust: boolean }>();
+    for (const r of market.ranking) {
+      if (r.kind === 'player') continue;
+      const sign = LOOK[r.kind].sign;
+      if (!sign) continue;
+      const have = byKind.get(r.kind);
+      if (!have || (have.bust && !r.bust)) byKind.set(r.kind, { sign, name: r.name, bust: r.bust });
+    }
+    scene.current?.setRivals([...byKind.values()]);
+  }, [market, farm]);
 
   // the market board swaps the canvas to the town square (on a phone the farm stays behind it);
   // the farm keeps running either way
@@ -207,6 +237,20 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
           case 'henMinted':
             certificates.current.push({ henId: e.henId, txHash: e.txHash, day: e.day });
             break;
+          case 'milestoneRoll': {
+            const what = MILESTONE_TEXT[e.milestone];
+            const next = e.next ? ` NEXT: ${MILESTONE_TEXT[e.next]}.` : '';
+            if (e.won) {
+              audio.play('19-haggle-win', { volume: 0.7 });
+              uiFx.emit({ kind: 'toast', tone: 'good', text: `MILESTONE: ${what}! YOU WON A FOUNDING HEN. THE NEXT DAY CLOSE RECORDS HER ON NEAR. ${e.remaining} OF ${ECONOMY.founding.maxSupply} LEFT.` });
+            } else {
+              uiFx.emit({
+                kind: 'toast',
+                text: `MILESTONE: ${what}. NO FOUNDING HEN THIS TIME (A ${Math.round(e.odds * 100)}% CHANCE), BUT WELL FARMED.${next}`,
+              });
+            }
+            break;
+          }
           case 'contractDelivered':
             uiFx.emit({ kind: 'coins', from: worldToUi({ x: 444, y: 280 }), count: 4 });
             if (e.auto) uiFx.emit({ kind: 'toast', text: `THE CART DELIVERED ${e.qty} EGGS` });
@@ -268,6 +312,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         onSettings={() => openModal({ kind: 'settings' })}
         onMarket={() => openModal({ kind: 'market', tab: 'board' })}
         onLedger={() => openModal({ kind: 'ledger' })}
+        onHelp={() => openModal({ kind: 'guide' })}
       />
       {!(v.portrait && modal) && <SidePanel farm={farm} market={market} rect={z.side} send={send} onOpen={openCard} />}
       {touring ? (
@@ -290,7 +335,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       )}
       {modal?.kind === 'ledger' && <LedgerPanel farm={farm} send={send} onClose={closeModal} />}
       {modal?.kind === 'sell' && <SellPanel farm={farm} market={market} send={send} onClose={closeModal} />}
-      {modal?.kind === 'machine' && <MachinePanel unlock={modal.unlock} farm={farm} onShop={() => openModal({ kind: 'shop', tab: 'machines' })} onClose={closeModal} />}
+      {modal?.kind === 'machine' && <MachinePanel unlock={modal.unlock} farm={farm} send={send} onShop={() => openModal({ kind: 'shop', tab: 'machines' })} onClose={closeModal} />}
       {modal?.kind === 'hen' && hen && <HenPanel hen={hen} market={market} onClose={closeModal} />}
       {modal?.kind === 'certificate' && hen && (
         <CertificatePanel hen={hen} txHash={modal.txHash} day={modal.day} market={market} onLedger={() => openModal({ kind: 'ledger' })} onClose={closeModal} />
@@ -309,10 +354,11 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         />
       )}
       {modal?.kind === 'settings' && (
-        <Modal title="SETTINGS" onClose={closeModal} w={300} h={200}>
-          <SettingsBody onClose={closeModal} />
+        <Modal title="SETTINGS" onClose={closeModal} w={400} h={420}>
+          <SettingsBody onClose={closeModal} onGuide={() => openModal({ kind: 'guide' })} />
         </Modal>
       )}
+      {modal?.kind === 'guide' && <HowToPlay onClose={closeModal} />}
       {touring && <Spotlight ctx={ctx} />}
       <FxLayer />
     </div>

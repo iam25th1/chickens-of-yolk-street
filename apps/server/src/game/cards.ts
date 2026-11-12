@@ -38,6 +38,7 @@ import {
   type Farm,
 } from './ctx';
 import { markGoal, takePractice } from './goals';
+import { logMachine } from './machines';
 import { emit, executeFill, liveMultiplier, loadOrderById, recordTrade, streetSell } from './market';
 
 export interface Candidate {
@@ -252,6 +253,7 @@ export async function arriveCards(ctx: Ctx): Promise<void> {
       if (clerk && card.offerMilli >= live * farm.clerkFloor) {
         try {
           await acceptCard(ctx, farm, card, card.offerMilli, 'accepted', true);
+          await logMachine(ctx.q, farm.id, ctx.day, 'clerk', { units: 1 });
         } catch (err) {
           if (!(err instanceof ActionError)) throw err;
         }
@@ -277,7 +279,10 @@ async function resolve(ctx: Ctx, farm: Farm, card: CardRow, status: CardView['st
   await ctx.q.query('UPDATE cards SET status = $2, outcome_milli = $3 WHERE id = $1', [card.id, status, totalMilli]);
   card.status = status;
   emit(ctx, farm, { kind: 'cardResolved', card: await cardView(ctx, card), outcome, totalMilli, auto });
-  if (outcome === 'won' && !auto) await markGoal(ctx.q, farm.id, 'haggle');
+  if (outcome === 'won' && !auto) {
+    await markGoal(ctx.q, farm.id, 'haggle');
+    await ctx.q.query('UPDATE farms SET haggles_won = haggles_won + 1 WHERE id = $1', [farm.id]);
+  }
   ctx.touched.add(farm.id);
 }
 
@@ -320,7 +325,7 @@ export async function sellToAgent(ctx: Ctx, farm: Farm, agent: AgentRow, grade: 
 }
 
 /** Buys bags from a supplier agent at a unit price per bag. */
-export async function buyBagsFrom(ctx: Ctx, farm: Farm, supplier: AgentRow, tier: FeedTier, bags: number, unit: number, credit: boolean): Promise<number> {
+export async function buyBagsFrom(ctx: Ctx, farm: Farm, supplier: AgentRow, tier: FeedTier, bags: number, unit: number, credit: boolean, auto = false): Promise<number> {
   const have = supplier.stock[tier] ?? 0;
   if (have < bags) throw new ActionError('insufficient_stock', `${supplier.name} has only ${have} ${tier} bags`);
   const total = unit * bags;
@@ -339,7 +344,7 @@ export async function buyBagsFrom(ctx: Ctx, farm: Farm, supplier: AgentRow, tier
   await setAgentStock(ctx, supplier.id, stock);
   await ctx.q.query(`UPDATE farms SET feed_${tier}_g = feed_${tier}_g + $2 WHERE id = $1`, [farm.id, bags * ECONOMY.feed.bagKg * 1000]);
   await remember(ctx, supplier.id, farm.id, { deals: 1, value_milli: total });
-  emit(ctx, farm, { kind: 'feedBought', tier, bags, costMilli: credit ? 0 : total, supplier: supplier.name });
+  emit(ctx, farm, { kind: 'feedBought', tier, bags, costMilli: credit ? 0 : total, supplier: supplier.name, ...(auto ? { auto: true } : {}) });
   return total;
 }
 

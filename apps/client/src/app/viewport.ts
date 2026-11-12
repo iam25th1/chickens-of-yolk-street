@@ -11,7 +11,7 @@
 // so its composition fits whole inside the world zone and the tracker and toasts sit only over its
 // ground (see pixi/farm/layout.ts). A modal opens in the modal rect (inside the world zone, above
 // the toasts); in portrait it takes the side panel's place under the farm.
-import { COMP, SAFE_X, SAFE_Y } from '../pixi/farm/layout';
+import { MIN_H, MIN_W } from '../pixi/farm/layout';
 import { createStore } from '../state/store';
 
 /** Whole zooms the UI and the world use; painted atlases exist at the densities that divide them. */
@@ -21,10 +21,10 @@ export const PORTRAIT_TOP_H = 38;
 export const SIDE_W = 136;
 export const TRACK_H = 20;
 export const MARGIN = 6;
-/** Tracker, one toast line and gaps: the least room the guide needs under the farm's safe line. */
-const GUIDE_MIN = TRACK_H + 4 + 16 + MARGIN;
-/** Room for two toast lines, when the window has it. */
-const GUIDE_WANT = TRACK_H + 4 + 34 + MARGIN;
+/** Two toast lines above the tracker. */
+const TOASTS_H = 34;
+/** The guide band at the bottom left: margin, tracker, gap, toasts. */
+const GUIDE_H = MARGIN + TRACK_H + 4 + TOASTS_H + 2;
 const TRACK_W = 300;
 export const PLATE_W = 640;
 export const PLATE_H = 360;
@@ -43,6 +43,13 @@ export interface WorldView {
   offY: number;
 }
 
+/** The farm's view: its area (world pixels, from the origin) and the bottom-left band the guide covers. */
+export interface FarmView extends WorldView {
+  w: number;
+  h: number;
+  guide: { w: number; h: number };
+}
+
 export interface Viewport {
   cssW: number;
   cssH: number;
@@ -55,15 +62,12 @@ export interface Viewport {
   uiW: number;
   uiH: number;
   /** The farm's view (world origin = farm origin) and the 640x360 plates' view (title, loading, town). */
-  farm: WorldView;
+  farm: FarmView;
   plate: WorldView;
   zones: { top: Rect; side: Rect; tracker: Rect; toasts: Rect; world: Rect; modal: Rect };
 }
 
 const pick = (ok: (s: number) => boolean): number => SCALES.find(ok) ?? 1;
-const COMP_W = COMP.right - COMP.left;
-const COMP_H = COMP.bottom - COMP.top;
-const ABOVE_SAFE = SAFE_Y - COMP.top;
 
 export function measure(cssW = window.innerWidth, cssH = window.innerHeight, dpr = window.devicePixelRatio || 1): Viewport {
   cssW = Math.max(1, cssW);
@@ -87,18 +91,18 @@ export function measure(cssW = window.innerWidth, cssH = window.innerHeight, dpr
     const uiW = devW / p;
     const uiH = devH / p;
     const top: Rect = { x: 0, y: 0, w: uiW, h: PORTRAIT_TOP_H };
-    const k = pick((s) => COMP_W * s <= devW && COMP_H * s <= devH * 0.45);
-    const offX = Math.round((devW - COMP_W * k) / 2) - COMP.left * k;
-    const offY = PORTRAIT_TOP_H * p - COMP.top * k;
-    // in portrait the guide spans the width: it starts below the whole farm
-    const below = (offY + COMP.bottom * k) / p + 2;
+    // the farm across the width, under the top bar; the guide and the side panel below it
+    const farmH = MIN_H + 40;
+    const k = pick((s) => MIN_W * s <= devW && farmH * s <= devH * 0.5);
+    const farm: FarmView = { k, offX: 0, offY: PORTRAIT_TOP_H * p, w: Math.floor(devW / k), h: farmH, guide: { w: 0, h: 0 } };
+    const below = (farm.offY + farmH * k) / p + 2;
     const toasts: Rect = { x: MARGIN, y: below, w: uiW - 2 * MARGIN, h: 36 };
     const tracker: Rect = { x: MARGIN, y: toasts.y + toasts.h + 4, w: uiW - 2 * MARGIN, h: TRACK_H };
     const sideY = tracker.y + TRACK_H + MARGIN;
     const side: Rect = { x: 0, y: sideY, w: uiW, h: uiH - sideY };
     const world: Rect = { x: 0, y: top.h, w: uiW, h: tracker.y + TRACK_H - top.h };
     const modal: Rect = { x: MARGIN, y: sideY, w: uiW - 2 * MARGIN, h: uiH - sideY - MARGIN };
-    return { cssW, cssH, dpr, devW, devH, portrait, p, uiW, uiH, farm: { k, offX, offY }, plate, zones: { top, side, tracker, toasts, world, modal } };
+    return { cssW, cssH, dpr, devW, devH, portrait, p, uiW, uiH, farm, plate, zones: { top, side, tracker, toasts, world, modal } };
   }
 
   const p = pick((s) => devW / s >= 560 && devH / s >= 330);
@@ -109,19 +113,21 @@ export function measure(cssW = window.innerWidth, cssH = window.innerHeight, dpr
   const world: Rect = { x: 0, y: TOP_H, w: uiW - SIDE_W, h: uiH - TOP_H };
   const zw = world.w * p;
   const zh = world.h * p;
-  const k = pick((s) => COMP_W * s <= zw && COMP_H * s <= zh && ABOVE_SAFE * s + GUIDE_MIN * p <= zh);
-  // centred, unless that leaves the guide less than two toast lines under the farm's safe line
-  const free = zh - COMP_H * k;
-  const top0 = Math.max(0, Math.min(free / 2, zh - ABOVE_SAFE * k - GUIDE_WANT * p));
-  const offX = Math.round(world.x * p + (zw - COMP_W * k) / 2) - COMP.left * k;
-  const offY = Math.round(world.y * p + top0) - COMP.top * k;
-  // as wide as the ground under the farm's left part allows (wider when the farm sits further right)
-  const trackW = Math.min(world.w - 2 * MARGIN, Math.max(TRACK_W, Math.floor((offX + SAFE_X * k) / p) - MARGIN));
-  const tracker: Rect = { x: MARGIN, y: uiH - MARGIN - TRACK_H, w: trackW, h: TRACK_H };
-  const safe = Math.max(TOP_H + MARGIN, (offY + SAFE_Y * k) / p + 2);
-  const toasts: Rect = { x: MARGIN, y: safe, w: tracker.w, h: Math.max(0, tracker.y - 4 - safe) };
+  // the farm fills the whole world zone; the zoom is the largest whose smallest layout still fits
+  // above the guide band
+  const k = pick((s) => MIN_W * s <= zw && MIN_H * s + GUIDE_H * p <= zh);
+  const tracker: Rect = { x: MARGIN, y: uiH - MARGIN - TRACK_H, w: Math.min(TRACK_W, world.w - 2 * MARGIN), h: TRACK_H };
+  const toasts: Rect = { x: MARGIN, y: uiH - GUIDE_H + 2, w: tracker.w, h: TOASTS_H };
+  const farm: FarmView = {
+    k,
+    offX: 0,
+    offY: TOP_H * p,
+    w: Math.floor(zw / k),
+    h: Math.floor(zh / k),
+    guide: { w: Math.ceil(((MARGIN + tracker.w + 4) * p) / k), h: Math.ceil((GUIDE_H * p) / k) },
+  };
   const modal: Rect = { x: MARGIN, y: TOP_H + MARGIN, w: world.w - 2 * MARGIN, h: Math.max(120, toasts.y - 4 - (TOP_H + MARGIN)) };
-  return { cssW, cssH, dpr, devW, devH, portrait, p, uiW, uiH, farm: { k, offX, offY }, plate, zones: { top, side, tracker, toasts, world, modal } };
+  return { cssW, cssH, dpr, devW, devH, portrait, p, uiW, uiH, farm, plate, zones: { top, side, tracker, toasts, world, modal } };
 }
 
 export const viewport = createStore<Viewport>(typeof window === 'undefined' ? measure(1280, 720, 1) : measure());

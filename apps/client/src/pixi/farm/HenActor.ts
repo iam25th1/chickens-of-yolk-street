@@ -4,7 +4,7 @@ import { animate } from 'animejs';
 import type { HenView } from '@coys/shared';
 import type { AssetStore } from '../../assets/store';
 import { FrameSprite } from '../FrameSprite';
-import { YARD, randomIn, type Point } from './layout';
+import type { Point } from './layout';
 
 type HenState = 'idle' | 'walk' | 'eat' | 'lay' | 'sleep' | 'happy' | 'sad';
 
@@ -13,6 +13,10 @@ export interface HenWorld {
   fed: boolean;
   troughSpot(): Point;
   roost(): Point;
+  /** A free spot in the yard, away from the other hens. */
+  spot(): Point;
+  /** A hen reached (or left) her roost by a coop: the coop's door swings once. */
+  door(at: Point): void;
 }
 
 /** Layer sheets for a hen's traits, in stack order: body, eyes, comb, accessory. */
@@ -96,9 +100,8 @@ export class HenActor {
     if (world.night && this.state !== 'sleep' && this.afterWalk !== 'sleep') {
       this.walkTo(world.roost(), 'sleep');
     } else if (!world.night && this.state === 'sleep') {
-      this.state = 'idle';
-      this.timer = 300 + Math.random() * 1500;
-      this.sprite.play('idle');
+      world.door(this.position);
+      this.walkTo(world.spot());
     }
 
     if (this.state === 'walk' && this.target) {
@@ -110,6 +113,7 @@ export class HenActor {
       if (dist <= step) {
         this.sprite.position.set(Math.round(this.target.x), Math.round(this.target.y));
         this.target = null;
+        if (this.afterWalk === 'sleep') world.door(this.position);
         this.enter(this.afterWalk);
       } else {
         this.sprite.x += (dx / dist) * step;
@@ -124,7 +128,7 @@ export class HenActor {
     const roll = Math.random();
     if (!world.fed && roll < 0.25) this.enter('sad');
     else if (world.fed && roll < 0.28) this.walkTo(world.troughSpot(), 'eat');
-    else if (roll < 0.8) this.walkTo(randomIn(YARD));
+    else if (roll < 0.8) this.walkTo(world.spot());
     else this.enter('idle');
   }
 

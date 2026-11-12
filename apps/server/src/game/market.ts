@@ -58,7 +58,7 @@ export async function recordTrade(ctx: Ctx, t: TradeInput): Promise<void> {
   await ctx.q.query('UPDATE market_days SET supply = supply + $2 WHERE day = $1', [ctx.day, t.qty]);
   if (t.sellerFarm) {
     const share = t.grade === 'brown' || t.grade === 'golden' ? 1 : 0;
-    await ctx.q.query('UPDATE farms SET quality = quality * 0.85 + $2 * 0.15 WHERE id = $1', [t.sellerFarm, share]);
+    await ctx.q.query('UPDATE farms SET quality = quality * 0.85 + $2 * 0.15, eggs_sold = eggs_sold + $3 WHERE id = $1', [t.sellerFarm, share, t.qty]);
   }
   ctx.marketChanged = true;
   if (total >= BIG_TRADE_MILLI) {

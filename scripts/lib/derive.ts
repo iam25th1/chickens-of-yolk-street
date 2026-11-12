@@ -62,10 +62,14 @@ export const PAINTED: Record<string, PaintedSpec> = {
   '15-coop-deluxe': { group: 'farm', ratio: 4, use: 'world' },
   '16-farmhouse': { group: 'farm', ratio: 4, use: 'world' },
   '17-sign-farm': { group: 'farm', ratio: 8, use: 'world' },
-  '19-egg-grader': { group: 'farm', ratio: 8, use: 'world' },
-  '20-delivery-cart': { group: 'farm', ratio: 8, use: 'world' },
-  '21-feed-hopper': { group: 'farm', ratio: 8, use: 'world' },
-  '22-sales-clerk': { group: 'farm', ratio: 8, use: 'world' },
+  // machines drawn half again a hen's scale, so each reads clearly beside her
+  '19-egg-grader': { group: 'farm', ratio: 16 / 3, use: 'world' },
+  '20-delivery-cart': { group: 'farm', ratio: 16 / 3, use: 'world' },
+  '21-feed-hopper': { group: 'farm', ratio: 16 / 3, use: 'world' },
+  '22-sales-clerk': { group: 'farm', ratio: 16 / 3, use: 'world' },
+  // the rival farms' signs at the farm's edge (and on the market board)
+  '17-sign-upstart': { group: 'farm', ratio: 8, use: 'world' },
+  '17-sign-old-money': { group: 'farm', ratio: 8, use: 'world' },
   '04-upstart': { group: 'cards', ratio: 4, use: 'ui' },
   '05-old-money': { group: 'cards', ratio: 4, use: 'ui' },
   '06-squeezer': { group: 'cards', ratio: 4, use: 'ui' },
@@ -73,6 +77,8 @@ export const PAINTED: Record<string, PaintedSpec> = {
   '08-bakery-buyer': { group: 'cards', ratio: 4, use: 'ui' },
   '09-market-trader': { group: 'cards', ratio: 4, use: 'ui' },
   '10-wholesaler': { group: 'cards', ratio: 4, use: 'ui' },
+  // the farm's own hen, who walks the player through the tour
+  'x-hen-portrait': { group: 'title', ratio: 8, use: 'ui' },
 };
 
 /** Sheets drawn on an exact grid (the packer measured it): shipped whole at their factor. */
@@ -105,7 +111,7 @@ export const EXACT_GROUP: Record<string, Group> = {
 };
 
 /** In the packed set but not drawn by the game (measured for the report only). */
-export const UNUSED = ['01-hen-base', '01-hen-anims', '03-chick', '19b-egg-sorter', '17-sign-upstart', '17-sign-old-money', 'x-hen-portrait'];
+export const UNUSED = ['01-hen-base', '01-hen-anims', '03-chick', '19b-egg-sorter'];
 
 /** The grid the previous pass downscaled each painted sheet to (for the report's "detail lost" column). */
 export const PREVIOUS_GRID: Record<string, number> = {

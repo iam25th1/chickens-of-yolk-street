@@ -147,6 +147,7 @@ export function TopBar({
   onSettings,
   onMarket,
   onLedger,
+  onHelp,
 }: {
   farm: FarmState;
   rect: Rect;
@@ -154,6 +155,7 @@ export function TopBar({
   onSettings: () => void;
   onMarket: () => void;
   onLedger: () => void;
+  onHelp: () => void;
 }) {
   const { audio } = useServices();
   const capacity = coopCapacity(farm.coops.map((c) => c.kind));
@@ -191,10 +193,28 @@ export function TopBar({
         <span className={days < 2 ? 'down' : ''}>{days.toFixed(1)}D</span>
       </Stat>
       <div className="spacer" style={{ flex: 1 }} />
+      <span className="beta" data-ui="beta" title="Beta: still being built, on NEAR's test network" data-tip="BETA: STILL BEING BUILT. EVERYTHING ON NEAR IS ON THE TEST NETWORK." tabIndex={0}>
+        BETA
+      </span>
       <DayClock />
       {button('market', 'Market board: prices and rivals', onMarket, 'market')}
       {button('ledger', 'Ledger: your days in coins', onLedger, 'ledger')}
       {button('shop', 'Shop: hens, feed, coops, machines', onShop, 'shop')}
+      <button
+        className="btn"
+        style={{ height: 16, width: 18, padding: 0 }}
+        data-tour="help"
+        aria-label="How to play"
+        title="How to play"
+        data-tip="HOW TO PLAY"
+        onMouseEnter={() => uiSound(audio, 'hover')}
+        onClick={() => {
+          uiSound(audio, 'click');
+          onHelp();
+        }}
+      >
+        ?
+      </button>
       {button('settings', 'Settings', onSettings, 'settings')}
     </div>
   );

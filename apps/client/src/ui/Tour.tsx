@@ -14,6 +14,7 @@ import { finishTour, tour, tourStep } from '../state/tour';
 import { closeModal, openModal, ui, uiEvents, type ModalState, type UiEvent } from '../state/ui';
 import { uiFx } from './FxLayer';
 import { waitingCards } from './Desk';
+import { SheetSprite } from './SheetSprite';
 
 export interface TourCtx {
   modal: ModalState | null;
@@ -35,6 +36,8 @@ export interface TourStep {
   enter?(send: (a: Action) => Promise<boolean>, c: TourCtx): void;
   /** True when the step cannot happen right now (the player may move on). */
   blocked?(c: TourCtx): boolean;
+  /** The farm's own hen tells this step (her portrait beside the text). */
+  hen?: boolean;
 }
 
 const close: TourTarget = { dom: 'close', tag: 'CLOSE THIS FIRST' };
@@ -100,13 +103,12 @@ export const TOUR: TourStep[] = [
     blocked: (c) => !c.modal && waitingCards(c.farm).length === 0,
   },
   {
-    title: 'EVERY HEN IS YOURS',
+    title: 'EVERY HEN IS ONE OF A KIND',
+    hen: true,
     text: (c) =>
-      c.market.minting === 'live'
-        ? 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND, AND AT A DAY CLOSE SHE IS RECORDED ON NEAR AS YOURS FOR GOOD.'
-        : c.market.minting === 'paused'
-          ? 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND. RECORDING HENS ON NEAR AS YOURS FOR GOOD IS PAUSED FOR NOW: HERS WAITS.'
-          : 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND: HER LOOKS AND HER LAYING ARE HERS ALONE.',
+      c.market.minting === 'off'
+        ? 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND: HER LOOKS AND HER LAYING ARE HERS ALONE.'
+        : `BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND. MILESTONES CAN ALSO WIN YOU A FOUNDING HEN, RECORDED ON NEAR AS YOURS FOR GOOD: ONLY ${c.market.founding.max} WILL EVER EXIST.`,
     target: (c) => {
       if (c.modal?.kind === 'shop') return c.modal.tab === 'hens' ? { dom: 'buy-hen', tag: 'BUY HER' } : { dom: 'shop-hens' };
       return c.modal ? close : { dom: 'shop', tag: 'THE SHOP' };
@@ -218,6 +220,7 @@ export function Spotlight({ ctx }: { ctx: TourCtx }) {
 /** The step box in the guide zone, and the logic that moves the tour on when the player acts. */
 export function TourBox({ ctx, rect, send }: { ctx: TourCtx; rect: Rect; send: (a: Action) => Promise<boolean> }) {
   const { audio } = useServices();
+  const v = useViewport();
   const t = useStore(tour, (s) => s);
   const ctxRef = useRef(ctx);
   ctxRef.current = ctx;
@@ -311,7 +314,10 @@ export function TourBox({ ctx, rect, send }: { ctx: TourCtx; rect: Rect; send: (
           SKIP
         </button>
       </div>
-      <span style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>{typeof step.text === 'function' ? step.text(ctx) : step.text}</span>
+      <span className="row" style={{ flex: 1, minHeight: 0, overflow: 'hidden', alignItems: 'flex-start', gap: 6 }}>
+        {step.hen && <SheetSprite id="x-hen-portrait" row="talk" play="loop" size={v.p} box={{ w: 32, h: 32 }} />}
+        <span>{typeof step.text === 'function' ? step.text(ctx) : step.text}</span>
+      </span>
     </div>
   );
 }
