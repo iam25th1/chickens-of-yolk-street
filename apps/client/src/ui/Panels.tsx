@@ -27,6 +27,7 @@ import { useStore } from '../state/store';
 import { replayTour } from '../state/tour';
 import { uiEvents, type ShopTab } from '../state/ui';
 import { Modal } from './Modal';
+import { Paged } from './Paged';
 import { SheetSprite } from './SheetSprite';
 
 export type { ShopTab };
@@ -149,12 +150,18 @@ export function ShopPanel({
       {tab === 'hens' && (
         <div className="col" style={{ gap: 6 }}>
           <span style={{ lineHeight: '10px' }}>EVERY HEN IS ONE OF A KIND: HER LOOKS AND HOW WELL SHE LAYS ARE HERS ALONE.</span>
-          <div className="row" style={{ gap: 4, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            {farm.shop.map((h, i) => (
-              <HenTile key={h.id} hen={h} cash={cash} tour={i === 0 ? 'buy-hen' : undefined} onBuy={click(() => void send({ t: 'buyHen', henId: h.id }))} />
-            ))}
-            {farm.shop.length === 0 && <span>THE BREEDER IS OUT. MORE AT DAWN.</span>}
-          </div>
+          {farm.shop.length === 0 ? (
+            <span>THE BREEDER IS OUT. MORE AT DAWN.</span>
+          ) : (
+            <Paged
+              cell="auto"
+              gap={4}
+              ui="shop-hen-grid"
+              items={farm.shop.map((h, i) => (
+                <HenTile key={h.id} hen={h} cash={cash} tour={i === 0 ? 'buy-hen' : undefined} onBuy={click(() => void send({ t: 'buyHen', henId: h.id }))} />
+              ))}
+            />
+          )}
           <div className="row" style={{ gap: 6 }}>
             <span>OR RANDOM HENS:</span>
             <button className="btn" onClick={click(() => setCount(Math.max(1, count - 1)))} aria-label="Fewer hens">
@@ -218,42 +225,45 @@ export function ShopPanel({
         </div>
       )}
       {tab === 'coops' && (
-        <div className="col">
-          {farm.coops.map((c) => {
-            const next = nextCoopKind(c.kind);
-            return (
-              <div key={c.id} className="row spread">
+        <Paged
+          items={[
+            ...farm.coops.map((c) => {
+              const next = nextCoopKind(c.kind);
+              return (
+                <div key={c.id} className="row spread">
+                  <span>
+                    PLOT {c.plot + 1}: {c.kind.toUpperCase()} ({ECONOMY.coops.kinds[c.kind].capacity} HENS)
+                  </span>
+                  {next ? (
+                    <button className="btn" disabled={cash < coopUpgradeCost(c.kind, next)} onClick={click(() => void send({ t: 'upgradeCoop', coopId: c.id }))}>
+                      TO {next.toUpperCase()} {coopUpgradeCost(c.kind, next)}
+                    </button>
+                  ) : (
+                    <span>BIGGEST</span>
+                  )}
+                </div>
+              );
+            }),
+            ...(['red', 'deluxe'] as const).map((k) => (
+              <div key={k} className="row spread">
                 <span>
-                  PLOT {c.plot + 1}: {c.kind.toUpperCase()} ({ECONOMY.coops.kinds[c.kind].capacity} HENS)
+                  NEW {k.toUpperCase()} COOP: {ECONOMY.coops.kinds[k].capacity} HENS
                 </span>
-                {next ? (
-                  <button className="btn" disabled={cash < coopUpgradeCost(c.kind, next)} onClick={click(() => void send({ t: 'upgradeCoop', coopId: c.id }))}>
-                    TO {next.toUpperCase()} {coopUpgradeCost(c.kind, next)}
-                  </button>
-                ) : (
-                  <span>BIGGEST</span>
-                )}
+                <button className="btn red" disabled={freePlots <= 0 || cash < ECONOMY.coops.kinds[k].price} onClick={click(() => void send({ t: 'buildCoop', kind: k }))}>
+                  BUILD {ECONOMY.coops.kinds[k].price}
+                </button>
               </div>
-            );
-          })}
-          {(['red', 'deluxe'] as const).map((k) => (
-            <div key={k} className="row spread">
-              <span>
-                NEW {k.toUpperCase()} COOP: {ECONOMY.coops.kinds[k].capacity} HENS
-              </span>
-              <button className="btn red" disabled={freePlots <= 0 || cash < ECONOMY.coops.kinds[k].price} onClick={click(() => void send({ t: 'buildCoop', kind: k }))}>
-                BUILD {ECONOMY.coops.kinds[k].price}
-              </button>
-            </div>
-          ))}
-          <span>
-            {freePlots} FREE PLOT{freePlots === 1 ? '' : 'S'}
-          </span>
-        </div>
+            )),
+            <span key="free">
+              {freePlots} FREE PLOT{freePlots === 1 ? '' : 'S'}
+            </span>,
+          ]}
+        />
       )}
       {tab === 'machines' && (
-        <div className="col" style={{ gap: 2 }}>
-          {UNLOCK_IDS.map((u) => {
+        <Paged
+          gap={2}
+          items={UNLOCK_IDS.map((u) => {
             const owned = farm.unlocks.includes(u);
             const t = UNLOCK_TEXT[u];
             return (
@@ -282,7 +292,7 @@ export function ShopPanel({
               </div>
             );
           })}
-        </div>
+        />
       )}
     </Modal>
   );
@@ -298,38 +308,44 @@ export function SettingsBody({ onClose, onGuide }: { onClose: () => void; onGuid
   const SAMPLE: Partial<Record<SoundCategory, string>> = { hens: '01-cluck', eggs: '08-egg-pop', cards: '18-stamp', haggling: '19-haggle-win', machines: '24-machine', market: '23-sign-creak', voices: '40-loyalist', ui: '35-click', stings: '45-new-day' };
   return (
     <div className="col" style={{ gap: 8 }}>
-      <div className="col" style={{ gap: 3 }} data-ui="sound-settings">
-        {SOUND_CATEGORIES.map((c) => (
-          <div key={c} className="row" style={{ gap: 4 }}>
-            <span style={{ width: 128, flex: 'none', color: c === 'master' ? '#b8321f' : undefined }}>{CATEGORY_LABEL[c]}</span>
-            <input
-              className="slider"
-              type="range"
-              min={0}
-              max={100}
-              aria-label={`${CATEGORY_LABEL[c]} volume`}
-              value={Math.round(s.sound[c].volume * 100)}
-              onChange={(e) => set(c, { volume: Number(e.target.value) / 100 })}
-              onMouseUp={() => {
-                const id = SAMPLE[c];
-                if (id) audio.play(id);
-              }}
-            />
-            <span style={{ width: 28, flex: 'none', textAlign: 'right' }}>{s.sound[c].muted ? 'OFF' : `${Math.round(s.sound[c].volume * 100)}%`}</span>
-            <button className="toggle" role="switch" aria-checked={!s.sound[c].muted} aria-label={`${CATEGORY_LABEL[c]} on`} onClick={() => set(c, { muted: !s.sound[c].muted })} />
-          </div>
-        ))}
-        <button
-          className="btn"
-          style={{ alignSelf: 'flex-start' }}
-          onClick={() => {
-            uiSound(audio, 'click');
-            settings.set({ sound: DEFAULT_SETTINGS.sound });
-          }}
-        >
-          RESET SOUND TO DEFAULT
-        </button>
-      </div>
+      <Paged
+        gap={3}
+        ui="sound-settings"
+        items={[
+          ...SOUND_CATEGORIES.map((c) => (
+            <div key={c} className="row" style={{ gap: 4 }}>
+              <span style={{ width: 128, flex: 'none', color: c === 'master' ? '#b8321f' : undefined }}>{CATEGORY_LABEL[c]}</span>
+              <input
+                className="slider"
+                style={{ flex: 1, minWidth: 0, width: 'auto' }}
+                type="range"
+                min={0}
+                max={100}
+                aria-label={`${CATEGORY_LABEL[c]} volume`}
+                value={Math.round(s.sound[c].volume * 100)}
+                onChange={(e) => set(c, { volume: Number(e.target.value) / 100 })}
+                onMouseUp={() => {
+                  const id = SAMPLE[c];
+                  if (id) audio.play(id);
+                }}
+              />
+              <span style={{ width: 28, flex: 'none', textAlign: 'right' }}>{s.sound[c].muted ? 'OFF' : `${Math.round(s.sound[c].volume * 100)}%`}</span>
+              <button className="toggle" role="switch" aria-checked={!s.sound[c].muted} aria-label={`${CATEGORY_LABEL[c]} on`} onClick={() => set(c, { muted: !s.sound[c].muted })} />
+            </div>
+          )),
+          <button
+            key="reset"
+            className="btn"
+            style={{ alignSelf: 'flex-start' }}
+            onClick={() => {
+              uiSound(audio, 'click');
+              settings.set({ sound: DEFAULT_SETTINGS.sound });
+            }}
+          >
+            RESET SOUND TO DEFAULT
+          </button>,
+        ]}
+      />
       <div className="row spread">
         <span>REDUCE MOTION (NO SHAKE OR HITSTOP)</span>
         <button
@@ -375,7 +391,7 @@ export function SettingsBody({ onClose, onGuide }: { onClose: () => void; onGuid
 export function SettingsPanel({ onClose, onGuide }: { onClose: () => void; onGuide?: () => void }) {
   return (
     <Panel title="SETTINGS" x={140} y={24} w={360} h={312} onClose={onClose}>
-      <div style={{ height: 268, overflowY: 'auto' }}>
+      <div style={{ maxHeight: 268, overflow: 'hidden' }} data-room={268}>
         <SettingsBody onClose={onClose} onGuide={onGuide} />
       </div>
     </Panel>
