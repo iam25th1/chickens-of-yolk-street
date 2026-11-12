@@ -194,10 +194,12 @@ export const ECONOMY = {
     feed: { tier: 'standard' as FeedTier, kg: 25 },
   },
   unlocks: {
-    conveyor: { price: 40, breakage: 0.02 },
+    /** Eggs ride the belt into the crate carryMs after they are laid. */
+    conveyor: { price: 40, breakage: 0.02, carryMs: 5000 },
     grader: { price: 80, eggPriceBonus: 0.1 },
     cart: { price: 120 },
-    hopper: { price: 100, feedCostDiscount: 0.1 },
+    /** Pours feed in at day close when the trough holds less than refillBelowDays, up to fillToDays. */
+    hopper: { price: 100, feedCostDiscount: 0.1, refillBelowDays: 1.5, fillToDays: 3 },
     clerk: { price: 160, revenueBonus: 0.05 },
   } satisfies Record<UnlockId, { price: number; [effect: string]: number }>,
   limits: {

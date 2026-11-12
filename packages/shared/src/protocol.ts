@@ -41,6 +41,8 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
     })
     .strict(),
   z.object({ t: z.literal('setFeedTier'), rid, tier: z.enum(FEED_TIERS) }).strict(),
+  /** The feed hopper buys only at or under this price per bag (0: the list price). */
+  z.object({ t: z.literal('setHopperCap'), rid, cap: z.number().min(0).max(1000) }).strict(),
   z.object({ t: z.literal('buildCoop'), rid, kind: z.enum(COOP_KINDS).exclude(['starter']) }).strict(),
   z.object({ t: z.literal('upgradeCoop'), rid, coopId: id }).strict(),
   z.object({ t: z.literal('buyUnlock'), rid, unlock: z.enum(UNLOCK_IDS) }).strict(),
@@ -238,6 +240,10 @@ export interface FarmState {
   shop: ShopHenView[];
   /** The goal chain: claimed ones, the one that is ready to claim, and the ones still open. */
   goals: GoalView[];
+  /** What each machine did today. */
+  machines: Partial<Record<UnlockId, MachineTally>>;
+  /** The feed hopper's price cap per bag in milli-coins (0: the list price). */
+  hopperCapMilli: number;
 }
 
 export interface GoalView {
@@ -313,6 +319,13 @@ export interface DaySummary {
   missed: number;
 }
 
+/** What a machine did on a day: eggs carried, graded or delivered, bags poured, offers taken; eggs saved; coins it added or saved. */
+export interface MachineTally {
+  units: number;
+  saved: number;
+  milli: number;
+}
+
 export interface LedgerDay {
   day: number;
   incomeMilli: number;
@@ -320,6 +333,8 @@ export interface LedgerDay {
   netMilli: number;
   byKind: Record<string, number>;
   settlement: Settlement | null;
+  /** Each machine's work that day. */
+  machines?: Partial<Record<UnlockId, MachineTally>>;
 }
 
 export type CardOutcome = 'accepted' | 'declined' | 'won' | 'failed' | 'expired';
@@ -328,12 +343,12 @@ export type GameEvent =
   | { kind: 'hensBought'; count: number; fromAuction: number; costMilli: number; henIds?: string[] }
   /** A day close recorded one of the player's hens on NEAR testnet as her own NFT. */
   | { kind: 'henMinted'; henId: string; token: string; owner: string; txHash: string; day: number }
-  | { kind: 'feedBought'; tier: FeedTier; bags: number; costMilli: number; supplier: string }
+  | { kind: 'feedBought'; tier: FeedTier; bags: number; costMilli: number; supplier: string; /** Poured in by the feed hopper. */ auto?: boolean }
   | { kind: 'coopBuilt'; coopId: string; coopKind: CoopKind; plot: number; costMilli: number }
   | { kind: 'coopUpgraded'; coopId: string; coopKind: CoopKind; costMilli: number }
   | { kind: 'unlockBought'; unlock: UnlockId; costMilli: number }
   | { kind: 'sold'; items: EggStock; totalMilli: number; multiplier: number }
-  | { kind: 'collected'; eggId: string; grade: EggGrade }
+  | { kind: 'collected'; eggId: string; grade: EggGrade; /** Carried in by the conveyor, not picked up by hand. */ auto?: boolean }
   | { kind: 'dayEnded'; summary: DaySummary }
   | { kind: 'rivalBust'; name: string; agentKind: AgentKind; hens: number }
   | { kind: 'agentOpened'; name: string; agentKind: AgentKind }

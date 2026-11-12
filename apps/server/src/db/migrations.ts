@@ -320,6 +320,27 @@ ALTER TABLE hens ADD COLUMN mint_tx text;
 ALTER TABLE hens ADD COLUMN mint_day integer;
 `,
   },
+  {
+    id: 7,
+    name: 'machines at work',
+    sql: `
+-- What each machine did each day (eggs carried and saved, eggs graded, deliveries, bags poured,
+-- offers taken), for the machine cards and the ledger. Eggs a conveyor kept from cracking are
+-- flagged when the day is planned. The feed hopper buys only at or under the farm's price cap
+-- (0: the list price).
+CREATE TABLE machine_days (
+  farm_id text NOT NULL REFERENCES farms(id),
+  day integer NOT NULL,
+  machine text NOT NULL,
+  units integer NOT NULL DEFAULT 0,
+  saved integer NOT NULL DEFAULT 0,
+  milli bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (farm_id, day, machine)
+);
+ALTER TABLE lay_events ADD COLUMN saved boolean NOT NULL DEFAULT false;
+ALTER TABLE farms ADD COLUMN hopper_cap_milli bigint NOT NULL DEFAULT 0;
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */
