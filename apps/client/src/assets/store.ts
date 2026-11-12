@@ -16,6 +16,8 @@ interface DerivedSprite {
   scale: number;
   ratio: number;
   levels: number[];
+  /** Painted: the atlas name its density pages carry (`<atlas>@<density>`). */
+  atlas?: string;
   sheet?: Rect7;
   rows: Record<string, { mode: 'loop' | 'once'; ms: number[] }>;
   frames: Record<string, Record<string, Rect7[]>>;
@@ -106,21 +108,25 @@ export class AssetStore {
     return p;
   }
 
-  /** Painted atlas keys a group needs at density d (each sprite takes its own best level). */
-  private paintedKeys(group: Group, d: number): string[] {
+  /**
+   * Painted atlas keys a group needs at density d: each sprite takes the sharpest of its levels
+   * that divides d, or with first the smallest (the quick first look, drawn several pixels a texel).
+   */
+  private paintedKeys(group: Group, d: number, first = false): string[] {
     const keys = new Set<string>();
     for (const s of Object.values(derived.sprites)) {
       if (s.group !== group || s.kind !== 'painted') continue;
-      const l = levelFor(s.levels, d);
-      if (l !== null) keys.add(`${group}@${l}`);
+      const fits = s.levels.filter((l) => d % l === 0);
+      const l = fits.length ? (first ? Math.min(...fits) : Math.max(...fits)) : null;
+      if (l !== null) keys.add(`${s.atlas ?? group}@${l}`);
     }
     return [...keys];
   }
 
   /**
    * Loads screen groups at a density: the exact atlas of each group and the painted atlases cut
-   * for that density. With quick, a group whose density is 4, 6 or 8 first loads the half density
-   * (drawn two device pixels a texel) and resolves; the full density follows in the background.
+   * for that density. With quick, a group first loads its smallest density that divides the
+   * screen's (drawn several device pixels a texel) and resolves; the full one follows behind.
    * onEach fires once per finished group (progress bars).
    */
   async loadGroups(groups: Group[], d: number, opts: { quick?: boolean; onEach?: () => void } = {}): Promise<void> {
@@ -129,9 +135,9 @@ export class AssetStore {
         this.density.set(g, d);
         const exact = derived.atlases[g] ? [this.loadAtlas(g)] : [];
         const full = this.paintedKeys(g, d);
-        const half = opts.quick && d >= 4 && d % 2 === 0 ? this.paintedKeys(g, d / 2) : null;
-        if (half && !full.every((k) => this.pages.has(k))) {
-          await Promise.all([...exact, ...half.map((k) => this.loadAtlas(k))]);
+        const quick = opts.quick ? this.paintedKeys(g, d, true) : null;
+        if (quick && quick.join() !== full.join() && !full.every((k) => this.pages.has(k))) {
+          await Promise.all([...exact, ...quick.map((k) => this.loadAtlas(k))]);
           void Promise.all(full.map((k) => this.loadAtlas(k))).catch(() => undefined);
         } else await Promise.all([...exact, ...full.map((k) => this.loadAtlas(k))]);
         opts.onEach?.();
@@ -150,11 +156,12 @@ export class AssetStore {
     if (s.kind === 'exact') return this.pages.has(s.group) ? 1 : null;
     const d = this.density.get(s.group) ?? 2;
     // the sharpest loaded level that divides the screen's density
+    const name = s.atlas ?? s.group;
     let best: number | null = null;
-    for (const l of s.levels) if (d % l === 0 && this.pages.has(`${s.group}@${l}`) && (best === null || l > best)) best = l;
+    for (const l of s.levels) if (d % l === 0 && this.pages.has(`${name}@${l}`) && (best === null || l > best)) best = l;
     if (best !== null) return best;
     // the window changed density and its atlas is still on its way: draw what is here meanwhile
-    for (const l of s.levels) if (this.pages.has(`${s.group}@${l}`) && (best === null || l > best)) best = l;
+    for (const l of s.levels) if (this.pages.has(`${name}@${l}`) && (best === null || l > best)) best = l;
     return best;
   }
 
@@ -187,7 +194,7 @@ export class AssetStore {
     const s = this.sprite(id);
     if (s.kind === 'exact') return s.group;
     const l = this.level(id);
-    return l === null ? null : `${s.group}@${l}`;
+    return l === null ? null : `${s.atlas ?? s.group}@${l}`;
   }
 
   /** CSS url of an exact sprite's atlas page (DOM backgrounds). */

@@ -66,8 +66,6 @@ export const PAINTED: Record<string, PaintedSpec> = {
   '20-delivery-cart': { group: 'farm', ratio: 8, use: 'world' },
   '21-feed-hopper': { group: 'farm', ratio: 8, use: 'world' },
   '22-sales-clerk': { group: 'farm', ratio: 8, use: 'world' },
-  '17-sign-upstart': { group: 'market', ratio: 8, use: 'ui' },
-  '17-sign-old-money': { group: 'market', ratio: 8, use: 'ui' },
   '04-upstart': { group: 'cards', ratio: 4, use: 'ui' },
   '05-old-money': { group: 'cards', ratio: 4, use: 'ui' },
   '06-squeezer': { group: 'cards', ratio: 4, use: 'ui' },
@@ -75,7 +73,6 @@ export const PAINTED: Record<string, PaintedSpec> = {
   '08-bakery-buyer': { group: 'cards', ratio: 4, use: 'ui' },
   '09-market-trader': { group: 'cards', ratio: 4, use: 'ui' },
   '10-wholesaler': { group: 'cards', ratio: 4, use: 'ui' },
-  'x-hen-portrait': { group: 'title', ratio: 8, use: 'ui' },
 };
 
 /** Sheets drawn on an exact grid (the packer measured it): shipped whole at their factor. */
@@ -108,7 +105,7 @@ export const EXACT_GROUP: Record<string, Group> = {
 };
 
 /** In the packed set but not drawn by the game (measured for the report only). */
-export const UNUSED = ['01-hen-base', '01-hen-anims', '03-chick', '19b-egg-sorter'];
+export const UNUSED = ['01-hen-base', '01-hen-anims', '03-chick', '19b-egg-sorter', '17-sign-upstart', '17-sign-old-money', 'x-hen-portrait'];
 
 /** The grid the previous pass downscaled each painted sheet to (for the report's "detail lost" column). */
 export const PREVIOUS_GRID: Record<string, number> = {
@@ -196,6 +193,8 @@ export interface DerivedSprite {
   ratio: number;
   /** Densities this sprite has frames at ([1] for exact sheets). */
   levels: number[];
+  /** Painted: the atlas its frames live in at each density (key `<atlas>@<density>`). */
+  atlas?: string;
   /** Exact sheets: the whole sheet's rect, for tile and glyph lookups. */
   sheet?: DerivedRect;
   rows: Record<string, { mode: 'loop' | 'once'; ms: number[] }>;
@@ -898,11 +897,14 @@ export function derive(input: DeriveInput): DeriveOutput {
       if (!cells.has(cell)) cells.set(cell, cutCell(layers, byCell.get(cell) ?? [], { ax: c.ax, ay: c.ay }));
     }
     const levels = LEVELS.filter((d) => d <= spec.ratio / factor);
+    // art drawn at fewer source pixels per design pixel (coops, the farmhouse, portraits) has fewer
+    // densities: it gets its own atlases, so a screen never loads a whole density for two sprites
+    const atlasName = spec.ratio < 8 ? `${spec.group}.wide` : spec.group;
     layerIds.forEach((id, li) => {
       const base = src(id.split('@')[0] as string);
       const frames: Record<string, { atlas: string; rows: Record<string, PendingFrame[]> }> = {};
       for (const d of levels) {
-        const atlas = `${spec.group}@${d}`;
+        const atlas = `${atlasName}@${d}`;
         const s = d / spec.ratio;
         const rows: Record<string, PendingFrame[]> = {};
         const done = new Map<number, PendingFrame>();
@@ -921,7 +923,7 @@ export function derive(input: DeriveInput): DeriveOutput {
           });
         frames[String(d)] = { atlas, rows };
       }
-      pending[id] = { group: spec.group, kind: 'painted', factor, scale: 1, ratio: spec.ratio, levels: [...levels], rows: rowsOf(base), frames };
+      pending[id] = { group: spec.group, kind: 'painted', factor, scale: 1, ratio: spec.ratio, levels: [...levels], atlas: atlasName, rows: rowsOf(base), frames };
     });
     log.push(`${ids.join(', ')}: painted, factor ${factor}, ratio ${spec.ratio}, levels ${levels.join('/')}`);
   }
@@ -939,9 +941,9 @@ export function derive(input: DeriveInput): DeriveOutput {
   const atlases: DerivedManifest['atlases'] = {};
   const rects = new Map<string, Placed>();
   const keys = [...atlasItems.keys()].sort((a, b) => {
-    const [ga, la] = a.split('@');
-    const [gb, lb] = b.split('@');
-    return GROUPS.indexOf(ga as Group) - GROUPS.indexOf(gb as Group) || Number(la ?? 0) - Number(lb ?? 0);
+    const [ga = '', la] = a.split('@');
+    const [gb = '', lb] = b.split('@');
+    return GROUPS.indexOf(ga.split('.')[0] as Group) - GROUPS.indexOf(gb.split('.')[0] as Group) || ga.localeCompare(gb) || Number(la ?? 0) - Number(lb ?? 0);
   });
   for (const atlas of keys) {
     const items = atlasItems.get(atlas) ?? [];
@@ -977,6 +979,7 @@ export function derive(input: DeriveInput): DeriveOutput {
       scale: s.scale,
       ratio: s.ratio,
       levels: s.levels,
+      ...(s.atlas ? { atlas: s.atlas } : {}),
       ...(sheet ? { sheet: [sheet.x, sheet.y, sheet.w, sheet.h, 0, 0, sheet.page] as DerivedRect } : {}),
       rows: s.rows,
       frames,

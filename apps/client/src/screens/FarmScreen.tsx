@@ -140,10 +140,22 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     }
   }, [marketOpen, assets, audio, pixi]);
 
+  // the farm's music starts once its sharp art is in (the stream would otherwise share the line)
   const crashed = market ? isCrash(market.multiplier) : false;
+  const [artIn, setArtIn] = useState(false);
   useEffect(() => {
-    audio.playMusic(crashed ? '43-market-tension' : '42-farm-day', 1200);
-  }, [audio, crashed]);
+    let live = true;
+    void assets
+      .loadGroups(['farm'], v.farm.k)
+      .catch(() => undefined)
+      .then(() => live && setArtIn(true));
+    return () => {
+      live = false;
+    };
+  }, [assets, v.farm.k]);
+  useEffect(() => {
+    if (artIn) audio.playMusic(crashed ? '43-market-tension' : '42-farm-day', 1200);
+  }, [audio, crashed, artIn]);
 
   // a hen's certificate waits until no other modal is open
   useEffect(() => {
