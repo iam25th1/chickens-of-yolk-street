@@ -11,7 +11,7 @@ Run an egg farm in **one shared live market** where every rival, supplier and bu
 | **Play loop** | Hens lay on a schedule; you collect, sell, buy hens, feed, coops and machines. One in-game day is 3 real minutes, and each day brings 2 to 4 decision cards from the agents. Everything on the farm is clickable; a first-run tour walks the loop by doing it, then a chain of goals pays coins for learning the rest. |
 | **Market** | One price multiplier for everyone, set by the whole market's daily supply against demand that grows with the number of farms. Instant street sales, a real order book with limit orders, and player-to-player trades. |
 | **Agents** | Seven: two rival farms, two feed suppliers, three egg buyers. Each decides once a day on NEAR AI Cloud (structured JSON output) or its rule policy, pays for its thinking, remembers every deal, haggles in character, borrows, and can go bust. |
-| **Chain** | Hens are NEP-171 NFTs, eggs are NEP-245 tokens, and each day settles in one call on NEAR testnet, keyed by season and day. Agents hold sub-account wallets. Players sign in with email; their wallet is made silently. No crypto words in the game: one "on-chain receipt" link in the ledger. |
+| **Chain** | Only **777 Founding Hens** will ever exist: NEP-171 NFTs won at milestones, capped on chain. Eggs are NEP-245 tokens, and each day settles in one call on NEAR testnet, keyed by season and day. Agents hold sub-account wallets. Players sign in with email; their wallet is made silently. No crypto words in the game: one "on-chain receipt" link in the ledger. |
 | **Feel** | Squash and stretch, hitstop, screen shake, particles and layered sound on every action, portraits that talk with voice babble, and a reduce-motion switch. |
 
 ## The problem
@@ -26,7 +26,7 @@ NEAR tools used: **Privy social login** (email, with a silent NEAR wallet), **NE
 
 | NEAR piece | What it does here | Status in this build |
 |---|---|---|
-| **Game contract on testnet** (`near-sdk` 5.30.1) | One contract on the game account: hen NFTs (NEP-171, `near-contract-standards` 5.30.1), egg tokens (NEP-245, `near-sdk-contract-tools` 4.0.0 from the near org), and `settle_day`, owner only, once per in-game day of a season. | **Live** on `coys-game.testnet`, upgraded in place to the season-aware version (tx [`HXYRgKDn...`](https://testnet.nearblocks.io/txns/HXYRgKDnKS7TveYSwDHQp31nsNtzx2jnw64F2hUA39Cf)). Wasm built in CI with `cargo near`, sha256 `fc7645dc...`. Production gets its own account ([deploy/testnet.md](deploy/testnet.md)). |
+| **Game contract on testnet** (`near-sdk` 5.30.1) | One contract on the game account: Founding Hen NFTs (NEP-171, `near-contract-standards` 5.30.1, 777 ever, capped on chain from version 3), egg tokens (NEP-245, `near-sdk-contract-tools` 4.0.0 from the near org), and `settle_day`, owner only, once per in-game day of a season. | **Live** on `coys-game.testnet`, upgraded in place to the season-aware version (tx [`HXYRgKDn...`](https://testnet.nearblocks.io/txns/HXYRgKDnKS7TveYSwDHQp31nsNtzx2jnw64F2hUA39Cf)). Wasm built in CI with `cargo near`, sha256 `fc7645dc...`. Production gets its own account ([deploy/testnet.md](deploy/testnet.md)). Version 3 (the Founding Hens, sha256 `9bc8bfba...`) is built and tested and waits for a top-up to be deployed (Build log, brief 6). |
 | **Agent wallets** (near-api-js 7.5.3) | Each agent gets a testnet sub-account of the game account (`bakery1.coys-game.testnet` and so on), funded from it; its eggs and hens settle to it. A contract delivery moves egg tokens from the player's wallet to the Bakery's. | **Live**: seven wallets, and a delivery proven on chain (below). |
 | **Privy social login** (docs.near.org social login) | Email sign-in; a NEAR testnet wallet is created silently with Privy's extended-chains API; the server verifies the ES256 access token with `jose`. That wallet holds the player's hens and eggs. | Wired. Needs `PRIVY_APP_ID` and the live domain in Privy's allowed domains. |
 | **NEAR AI Cloud** (OpenAI-compatible) | Every agent's daily decision, as structured JSON output (`json_schema`, strict) checked against a zod schema; anything unusable falls back to rules and is logged. Hard daily spend cap. | Wired. Needs `NEARAI_API_KEY` and account credits; default model `Qwen/Qwen3.6-35B-A3B-FP8`, cheaper `z-ai/glm-5.3-flash` for struggling agents. |
@@ -70,10 +70,11 @@ Checked on 11 November 2026 at about 20:06 UTC:
 
 Also checked live: the title page, `/build/index-BL-i4f2Y.js` and `/assets/sprites/12-crate.png` answer 200, a
 WebSocket on `wss://yolkstreet.25th.dev/ws` upgrades (101) and answers a ping, and `/api/market` serves the market
-state. Waiting on a top-up: after the contract's storage, the seven wallets and two days of settlements,
-`play.coys-game.testnet` held 1.301 NEAR available on 12 November (after the second pass), 0.749 short of the 2.05 NEAR
-the server needs before it mints hens and links the seven wallets to their agents (12 NEAR recommended). Eggs settle
-meanwhile, the market state reports hen certificates as `paused`, and every hen's card says so in plain words.
+state. Waiting on a top-up: on 12 November at 15:59 UTC `play.coys-game.testnet` held 0.658 NEAR available, and
+its own settlements cost about 1.06 NEAR a real day (179 bytes and 0.0004 NEAR of gas per 3-minute day). Until it is
+topped up, the Founding Hens contract upgrade waits (0.614 NEAR short of the reserve, Build log brief 6), won Founding
+Hens wait to be minted, the seven agent wallets wait to be linked, and the market state reports minting as `paused`
+with honest wording on every hen's card.
 
 ## Try it
 
@@ -83,7 +84,7 @@ Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what 
 2. **Test.** Run `npm test`. On a fresh clone you see **253 tests pass and 3 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it), and the asset re-pack check needs a coys-assets checkout beside the repo. Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
 3. **Play.** Run `npm run dev` and open http://localhost:5173. You see an egg fill up over the loading plate, then the title: the logo stamps in and the price ticker scrolls.
 4. **Sign in.** Press **PLAY**. With `PRIVY_APP_ID` set you sign in with email; without it a red **LOCAL DEV LOGIN** label asks for a name. You see your farm: 10 hens, a starter coop, **50.00** coins, **DAY001**.
-5. **Take the tour.** On a first visit your hen walks you through the loop by doing it: collect an egg, sell, buy feed, answer a card. Each step ends when you do the thing; **SKIP** ends the tour, and **SETTINGS** replays it. After it, the goal in the corner shows what to aim for next, with a **CLAIM** button and coins when you reach it.
+5. **Take the tour.** The first time you enter your farm the tour starts on its own: your hen walks you through the loop by doing it (collect an egg, sell, the market, feed, an offer, a hen, machines, rivals, the ledger). Each step ends when you do the thing; **SKIP** ends it, and it never comes back unless you press **REPLAY THE TOUR** in **SETTINGS**. After it, the goal in the corner shows what to aim for next, with a **CLAIM** button and coins when you reach it. The **?** in the top bar opens **HOW TO PLAY**, the guide to everything.
 6. **Collect and sell.** Click an egg a hen just laid: you see it pop into the crate, **COLLECT** in the top bar drops by one and **SELL** rises by one. Click the crate (or press **SELL N EGGS** on the card): a **SOLD** stamp slams and coins arc to the counter. Click anything else on the farm (a hen, the trough, a coop, the farmhouse, the sign, a machine) to open its card.
 7. **Meet the agents.** From day 2 cards slide in: a portrait talks in its own voice while its line types out (the Bakery offering a standing contract, the Wholesaler a bulk order, the Squeezer a feed deal). Press **ACCEPT**: you see the right stamp slam.
 8. **Win a haggle.** On a buyer's card, press **-** a few times so **YOUR PRICE** sits just above the offer, then **COUNTER**. You see the card flip to gold with confetti and the win chime (inside the agent's walk-away price).
@@ -92,8 +93,9 @@ Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what 
 11. **Watch a rival bust.** The Upstart borrows feed from the Loyalist to grow on good weeks. When a glut meets its debt, it goes below zero: you see its sign tip over, a price wave cross the ticker, feathers fall, and its hens appear in the shop as **AUCTION** hens at half price; a new rival opens three days later. At 30-second days this usually happens 8 to 14 minutes into a season.
 12. **Deliver a contract.** Accept the Bakery's contract, then press **DELIVER** on the desk each day (or buy the delivery cart: it delivers at dusk). You see coins arrive; with testnet credentials the day's batch moves those egg tokens to the Bakery's wallet. Miss one and you pay a penalty and the Bakery remembers.
 13. **Read the ledger.** Open the **ledger** (top bar): you see the season, day-by-day income, costs and net, contracts and debts, and an **ON-CHAIN RECEIPT** link per settled day that opens the testnet explorer.
-14. **Comfort.** **SETTINGS**: music and sound volumes and **REDUCE MOTION** are kept per browser. With reduce motion, stamps still slam and chime, but nothing shakes or freezes.
-15. **Production build.** `npm run build`, then start it as production would (PowerShell):
+14. **Comfort.** **SETTINGS**: a volume and a mute for each of twelve sound groups (master, music, ambience, hens, eggs and money, cards and stamps, haggling, machines, market and rivals, agent voices, buttons, new day and stings), a reset button, and **REDUCE MOTION**, kept per browser. Each change applies at once and plays a sample. With reduce motion, stamps still slam and chime, but nothing shakes or freezes.
+15. **Win a Founding Hen.** Reach a milestone in good standing (fill your coops, sell 500 eggs, win 10 haggles...). At the day close you get one roll at 30%: a win puts a Founding Hen on your farm, and the next day close records her on NEAR with a certificate. A miss says so kindly and names the next milestone. The ledger lists them all.
+16. **Production build.** `npm run build`, then start it as production would (PowerShell):
     `$env:NODE_ENV = "production"; $env:GAME_SEASON = "local"; $env:SESSION_SECRET = "a-long-random-string"; $env:DATABASE_URL = "postgres://..."; node apps/server/dist/main.js`.
     Open http://localhost:8787/healthz: you see `{"ok":true,"version":"0.1.0","commit":"...","season":"local",...,"db":{"kind":"postgres","ok":true,...}}`. Without a Postgres at hand, `ALLOW_PGLITE_IN_PRODUCTION=1` with `DATABASE_URL=memory://` checks the build on PGlite (never for players).
 
@@ -144,6 +146,72 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 </details>
 
 **Video:** _slot for a direct upload (drag the gameplay video into this section on GitHub)._
+
+## Founding Hens, machines at work, sound and a guide (12 November 2026)
+
+**Founding Hens.** Regular hens are no longer minted. Only **777 Founding Hens** will ever exist, a cap the contract
+itself enforces. A farm in good standing gets one roll at each of seven milestones, once; a win puts a Founding Hen on
+the farm and the next day close mints her on NEAR with her portrait, traits, milestone, season, day and her number of 777.
+Everything about it, including how to audit a roll, is in [docs/founding-hens.md](docs/founding-hens.md); the mainnet
+path is a written checklist, [docs/mainnet-checklist.md](docs/mainnet-checklist.md), with no mainnet action taken.
+
+| Milestone | Reached when |
+|---|---|
+| First full coop | the coops are full for the first time |
+| A good week | 7 day closes in a row in good standing |
+| 500 eggs sold | street, orders, cards and contracts all count |
+| 10 haggles won | countered by hand and won |
+| All five machines | conveyor, grader, cart, hopper and clerk |
+| Outlast a rival | a rival farm goes bust after yours opened |
+| Top three | a day ends with the farm in the board's top 3 |
+
+Good standing: never bust this season, no feed credit unpaid past its due day lately, no contract delivery missed in the
+last 3 days. Each roll is made on the server from a seed fixed by a public record written before it:
+
+$$
+\text{roll} = \frac{\big\lfloor \mathrm{SHA256}(\texttt{coys-founding}\,|\,\text{season}\,|\,\text{day}\,|\,\text{farm}\,|\,\text{milestone}\,|\,\text{previous settlement tx}) \,/\, 2^{204} \big\rfloor}{2^{52}}, \qquad \text{won} \iff \text{roll} < 0.3
+$$
+
+Every roll is stored with its inputs and logged, at most one hen per milestone, and rolls stop at 777 (minted plus
+waiting). A missed roll gets a kind message naming the next milestone. The market board shows how many of the 777 are
+left; the ledger lists certificates, milestones and good standing.
+
+**Contract version 3** (`contracts/coys-game`): `settle_day` takes `founding_mints` and refuses ordinary `hen_mints`;
+`FOUNDING_MAX = 777` is a `require!` on chain; `founding_supply()` reports minted, max and remaining; `migrate()`
+upgrades version 2 in place. 11 unit tests and 6 sandbox tests on the CI-built wasm, among them **mint 777 then refuse
+the 778th**, and an upgrade of the exact code running on `play.coys-game.testnet` (read with `view_code`). The testnet
+upgrade waits for funds: see the Build log, brief 6.
+
+**The farm.** Coop doors stay shut at rest, swing once when a hen goes in or out, and creak now and then. The world draws
+in a fixed layer order (ground, animated ground, floor, things sorted by their feet, labels, effects), which ended the
+straw tile that cut the belt and the doors that flapped with the idle loop. The farm fills the whole free window: the
+yard takes at least half its width, hens spread out, one unbroken conveyor runs along the bottom into the crate, and one
+fence runs the full width with a gate where the path leaves.
+
+| Machine | Size (world px) | Spot | What it does now, every day |
+|---|---|---|---|
+| Conveyor | 16 px belt tiles, one continuous run | along the bottom of the yard into the crate | carries each egg to the crate 5 s after it is laid; 2% breakage instead of 5%; counts the eggs it saved |
+| Egg grader | 48x48 | beside the crate, at the belt's end | flashes as it sorts; +10% on every egg, shown in the sell panel |
+| Delivery cart | 48x48 | parked by the crate on the path | drives down the path through the gate and back when it delivers a contract |
+| Feed hopper | 48x72 | beside the trough | refills the trough at day close below 1.5 days of feed, up to a price cap you set; 10% cheaper, in the ledger |
+| Sales clerk | 48x48 | at a desk on the strip right of the path | stamps the offers it takes on its own; +5% on sales |
+
+Each machine has a name plate and a pad, rises in with a ring when bought, and its card says what it did today. The rival
+signs are back on the board and at the farm's edge: they sway, and tip over when a rival busts. The tour's hen talks
+again in the hen step.
+
+**Sound settings.** Twelve sliders, each with a mute: master, music, ambience, hens, eggs and money, cards and stamps,
+haggling, machines, market and rivals, agent voices, buttons, and new day and stings. Every one of the game's 59 sounds
+belongs to exactly one (a test checks it). Changes apply at once, a sample plays on release, settings persist per
+browser, and a reset button restores the defaults.
+
+**How to play.** A guide in eleven sections, each with a picture from the game's own art: the goal, your day, eggs and the
+crate, the shared market, feed and laying, offers and haggling and contracts, machines, rivals and busts, Founding Hens,
+milestones, and a glossary. It opens from Settings and from the **?** in the top bar.
+
+**Beta.** A BETA tag on the title logo, in the top bar and in the page title. The first-run tour now starts for every new
+player on their first farm entry with no click, and never again unless replayed: the server remembers it per player
+(`tourDone`), and the browser remembers it too.
 
 ## Visual quality and the tour (12 November 2026)
 
@@ -441,12 +509,13 @@ Each agent has its own cash, stock and **memory of every farm** (deals, value, r
 - `settle_day(batch)`: owner only; within a season, days strictly in order and each once. It mints, transfers and burns egg tokens, mints hens with their metadata, moves hens that changed hands, stores the day's summary and digest under (season, day), and emits a `day_settled` event with the season.
 - **Seasons**: a season is one game world from day 1, and one database holds one season (`GAME_SEASON`). A new season starts again at day 1 on the same contract while repeats within a season are refused; a server pointed at another season's database refuses to start. Version 1 settled days without seasons; `migrate` upgrades it in place and files those days under `legacy` (done on `coys-game.testnet`).
 - The batch (`apps/server/src/chain/batch.ts`): the day's trades between holders become egg transfers; then every account is reconciled to what it really holds (crate plus open sell orders, or a buyer's stock) with mints and burns, starting from the balances last confirmed on chain. A failed day is caught up by the next, and no burn exceeds a balance. Every farm's net result travels in the call with a SHA-256 digest.
-- **Hen images**: the stacked trait layers are rendered once at mint into a 32x32 PNG (about 1 KB) and stored in the token metadata as a data URI with its `media_hash`. Why: it is the simplest correct storage. The token is self-contained and verifiable from the chain alone, with no image host, pinning service or URL to keep alive, and a 1 KB portrait costs about 0.01 NEAR of storage. Mints are capped per day (`CHAIN_HEN_MINTS_PER_DAY`, default 12) and wait when the game account runs low.
+- **Founding Hens only** (version 3): ordinary hens are not minted; `settle_day` refuses them and mints Founding Hens up to a hard cap of 777, numbering each ([docs/founding-hens.md](docs/founding-hens.md)).
+- **Hen images**: the stacked trait layers are rendered once at mint into a 32x32 PNG (1.3 to 1.8 KB as a data URI) and stored in the token metadata with its `media_hash`. Why: it is the simplest correct storage. The token is self-contained and verifiable from the chain alone, with no image host, pinning service or URL to keep alive. A Founding Hen costs 2,647 bytes of state (measured in the sandbox with a full-size portrait), about 0.026 NEAR. At most 20 mint in one day close, and only as many as the game account's free balance stores above its margin (`CHAIN_MINT_NEAR`, default 0.03 each; `CHAIN_MIN_BALANCE_NEAR`, default 1.25); the rest wait.
 - **Agent wallets**: sub-accounts of the game account, funded from it (`AGENT_ACCOUNT_FUNDING_NEAR`, default 0.05), with keys derived from the game key by HMAC so no extra secret is stored.
 - **Players**: the Privy wallet holds their hens and eggs. Minting and transfers happen only in the day batch, never per click.
 - Testnet only, enforced in code before any key is used: accounts must be `.testnet` (or implicit), RPC hosts must be testnet, and the RPC's `chain_id` must say `testnet` before anything is signed. Without credentials, every day's batch is built the same way and logged as a NO-OP.
 - **Deliveries on chain**: a contract delivery is a trade from the player's wallet to the Bakery's sub-account, so the day's batch moves the eggs as NEP-245 tokens between them (then burns them when the Bakery bakes). Proven on testnet (receipt above), in a dedicated test, and in every seed of the simulation.
-- Tests: 8 contract unit tests and 5 **sandbox tests** (`contracts/sandbox-tests`, near-workspaces 0.24): a full day settlement, holder transfers, only the game can settle or mint, a new season settling day 1 after an old season ended at day 3, and the version 1 wasm (kept in `contracts/sandbox-tests/res`) upgrading in place. They run in CI (Linux); the wasm CI builds is what gets deployed (`npm run deploy-contract` checks its sha256, testnet only, see [deploy/testnet.md](deploy/testnet.md)).
+- Tests: 11 contract unit tests and 6 **sandbox tests** (`contracts/sandbox-tests`, near-workspaces 0.24): a full day settlement, holder transfers, only the game can settle or mint, a new season settling day 1 after an old season ended at day 3, 777 Founding Hens minted then the 778th refused, and the version 2 wasm running on `play.coys-game.testnet` (kept in `contracts/sandbox-tests/res`) upgrading in place. They run in CI (Linux); the wasm CI builds is what gets deployed (`npm run deploy-contract` checks its sha256, testnet only, see [deploy/testnet.md](deploy/testnet.md)).
 
 </details>
 
@@ -530,7 +599,7 @@ All optional for local play. Copy `.env.example` to `.env` at the repo root. Pro
 | `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY` | server, client (via `/api/config`) | labelled local dev login |
 | `NEAR_TESTNET_ACCOUNT_ID`, `NEAR_TESTNET_PRIVATE_KEY` | server, deploy script | daily settlement is a recorded NO-OP |
 | `NEAR_TESTNET_RPC_URL`, `NEAR_GAME_CONTRACT_ID` | server | `https://test.rpc.fastnear.com`; the signing account |
-| `CHAIN_HEN_MINTS_PER_DAY`, `CHAIN_MIN_BALANCE_NEAR`, `AGENT_ACCOUNT_FUNDING_NEAR` | server | 12; 2; 0.05 |
+| `CHAIN_MINT_NEAR`, `CHAIN_MIN_BALANCE_NEAR`, `AGENT_ACCOUNT_FUNDING_NEAR` | server | 0.03 kept free per Founding Hen mint; 1.25 margin (about a real day of settlements) under which mints and agent wallet links wait; 0.05 |
 | `NEARAI_API_KEY`, `NEARAI_BASE_URL`, `NEARAI_MODEL`, `NEARAI_CHEAP_MODEL` | server | agents use their rule policies |
 | `NEARAI_DAILY_SPEND_CAP_USD` | server | 1.00 |
 | `ASSETS_DIR` | `npm run pack-assets` | required to re-pack |
@@ -586,6 +655,53 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
 **Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
+
+### Brief 6: Founding Hens, machines at work, sound, a guide and BETA (12 November 2026)
+
+- **Coops and layering.** The doors looped because the coop played its idle row, which is the door swinging; it now
+  holds the first frame and swings once when a hen passes (and creaks every 25 to 75 s). Animated ground tiles were
+  inserted above the sorted layer (`addChildAt(1)`), so a straw tile cut the belt; the world now draws in a fixed order
+  (ground, animated ground, floor, things sorted by their feet, labels, effects) with a test.
+- **Composition.** `farmLayout(w, h)` places everything for the whole free area: the yard at least half the width,
+  hens spread out, one belt along the bottom, one fence the full width with a gate on the path. Tested at four sizes.
+- **Machines** at fixed, labelled spots (grader, cart and clerk 48x48, hopper 48x72 world px, the belt in 16 px tiles),
+  each arriving with a ring and doing its job on screen and on the server: the belt carries eggs to the crate in 5 s
+  and saves breakage (2% for 5%), the grader sorts (+10%, in the sell panel), the cart drives the delivery, the hopper
+  refills under a price cap (-10%, in the ledger), the clerk stamps offers (+5%). A daily tally per machine
+  (`machine_days`, migration 7) feeds each machine's card and the ledger; a three-day test runs all five.
+- **Rival signs** on the board and at the farm's edge (sway, tip over on a bust); the tour's hen talks again.
+- **Sound settings**: twelve groups with volume and mute, every sound in exactly one (tested), instant, per browser,
+  with a reset.
+- **How to play**: eleven sections with pictures, from Settings and the **?** in the top bar.
+- **BETA** on the title, the top bar and the page title. The first-run tour starts for every new player on first farm
+  entry, once per player (server flag plus browser flag).
+- **Founding Hens.** Ordinary hens are no longer minted; 777 Founding Hens, capped on chain by contract version 3, are
+  won at seven milestones by farms in good standing, 30% per roll, one roll each, seeded from the previous day's
+  settlement tx and logged ([docs/founding-hens.md](docs/founding-hens.md)). Migration 8 adds the founding fields, the
+  roll log and the counters. Mints are gated on the real reserve (0.03 NEAR each above a 1.25 NEAR margin) instead of a
+  flat 2 NEAR, and agent wallets that exist are linked without the old 2.05 NEAR gate once the margin is there.
+- **The testnet upgrade waits for funds.** Measured on 12 November at 15:59 UTC, `play.coys-game.testnet` held 4.8103
+  NEAR with 415,245 bytes of state (4.1524 NEAR locked), so **0.6579 NEAR available**. Its own settlements cost 179 bytes
+  and 0.0004 NEAR of gas per 3-minute day (measured on chain over 69 minutes), about **1.06 NEAR a real day**. The
+  reserve for this brief's chain steps:
+
+  | Step | NEAR |
+  |---|---|
+  | Upgrade to version 3 in place: +9,384 bytes (sandbox, exact v2 code) and about 27 Tgas | 0.097 |
+  | Link the 7 agent wallets: their egg balances, 28 entries of about 106 bytes | 0.030 |
+  | Mint 3 Founding Hens in a test season: 3 x 2,647 bytes, two day records, gas | 0.085 |
+  | Keep one real day of `s1` settlements free | 1.060 |
+  | **Needed** | **1.272** |
+  | Available | 0.658 |
+  | **Short** | **0.614** |
+
+  So nothing was signed: the contract is built (wasm sha256 `9bc8bfba...`, committed in `contracts/coys-game/res`) and
+  tested (11 unit, 6 sandbox), and the server already speaks version 3. The shortfall grows by about 0.044 NEAR an hour
+  while `s1` settles, and at that rate the account's free balance runs out around 07:00 UTC on 13 November, after which
+  day settlements fail (and catch up once topped up). Topping up about 10 NEAR covers the steps above and a week of
+  settlements; then the owner runs the upgrade in [deploy/testnet.md](deploy/testnet.md), and the server links the
+  wallets and mints waiting Founding Hens at the next day close on its own.
+- [Mainnet checklist](docs/mainnet-checklist.md) written; nothing touched mainnet.
 
 ### Brief 5: visual quality, layout and the tour (12 November 2026)
 
