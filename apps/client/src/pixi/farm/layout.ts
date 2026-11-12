@@ -190,7 +190,7 @@ export function farmLayout(w: number, h: number, guide: { w: number; h: number }
   const beltTo = Math.round(crateIn.x);
   const beltFrom = beltTo - TILE * Math.floor((beltTo - (yardLeft + TILE)) / TILE);
   objects.conveyor = {
-    sprite: '18-conveyor',
+    sprite: '18b-conveyor-clean',
     row: 'horizontal',
     at: { x: Math.round((beltFrom + beltTo) / 2), y: beltY },
     box: { left: beltFrom, top: beltY - 8, right: beltTo, bottom: beltY + 8 },

@@ -34,7 +34,7 @@ export const SIZE_TABLE = {
     rel: 16 / HEN_PX,
     brief: 0.4,
     by: 'height',
-    sprites: ['18-conveyor'],
+    sprites: ['18b-conveyor-clean'],
     row: 'horizontal',
     note: 'the belt is exact pixel art on the 16 px tile grid it shares with the ground; one tile (0.59) keeps every pixel whole, 0.4 would need new art',
   },

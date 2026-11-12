@@ -536,7 +536,7 @@ export class FarmScene implements Scene {
     const c = this.layout.conveyor;
     for (let x = c.from; x < c.to; x += TILE) {
       const row = x === c.from ? 'start' : x + TILE >= c.to ? 'end' : 'horizontal';
-      const s = new FrameSprite(this.assets, ['18-conveyor'], row);
+      const s = new FrameSprite(this.assets, ['18b-conveyor-clean'], row);
       s.position.set(x + TILE / 2, c.y);
       s.label = 'conveyor';
       this.clickable(s, () => ({ kind: 'machine', unlock: 'conveyor' }));

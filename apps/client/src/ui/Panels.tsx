@@ -62,7 +62,7 @@ export function Panel({ title, x, y, w, h, onClose, children }: { title: string;
 }
 
 export const UNLOCK_TEXT: Record<UnlockId, { name: string; effect: string; saves: string; sprite: string; row: string }> = {
-  conveyor: { name: 'CONVEYOR', effect: 'BREAKAGE 5% TO 2%', saves: 'FEWER EGGS CRACK ON THE WAY TO THE CRATE: 3 MORE OF EVERY 100 SURVIVE', sprite: '18-conveyor', row: 'horizontal' },
+  conveyor: { name: 'CONVEYOR', effect: 'BREAKAGE 5% TO 2%', saves: 'FEWER EGGS CRACK ON THE WAY TO THE CRATE: 3 MORE OF EVERY 100 SURVIVE', sprite: '18b-conveyor-clean', row: 'horizontal' },
   grader: { name: 'EGG GRADER', effect: '+10% EGG PRICE', saves: 'SORTS YOUR EGGS SO EVERY ONE SELLS FOR 10% MORE', sprite: '19-egg-grader', row: 'idle' },
   cart: { name: 'DELIVERY CART', effect: 'DELIVERS CONTRACTS AT DUSK', saves: 'NEVER MISS A CONTRACT DELIVERY: THE CART TAKES THEM AT DUSK', sprite: '20-delivery-cart', row: 'idle' },
   hopper: { name: 'FEED HOPPER', effect: '-10% FEED COST', saves: 'BUYS FEED IN BULK: EVERY BAG COSTS 10% LESS', sprite: '21-feed-hopper', row: 'idle' },

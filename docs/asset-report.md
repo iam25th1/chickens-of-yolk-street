@@ -44,7 +44,8 @@ Factor 1 means no downscale passes: the art keeps its original resolution, and t
 | 17-sign-farm | painted | 1536x512 | 2: 9.49% | 1 | 0.00% | 8 | 24.23% |
 | 17-sign-old-money | painted | 1536x512 | 2: 14.23% | 1 | 0.00% | 6 | 31.08% |
 | 17-sign-upstart | painted | 1536x512 | 2: 18.10% | 1 | 0.00% | 6 | 38.00% |
-| 18-conveyor | exact | 512x640 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 43.04% | 8 | 0.00% | 8 | 0.00% |
+| 18-conveyor | unused | 512x640 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 37.85% | 8 | 0.00% | 8 | 0.00% |
+| 18b-conveyor-clean | exact | 512x640 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 42.73% | 8 | 0.00% | 8 | 0.00% |
 | 19-egg-grader | painted | 1024x768 | 2: 20.88% | 1 | 0.00% | 4 | 33.29% |
 | 19b-egg-sorter | unused | 1024x1024 | 2: 21.34% | 1 | 0.00% | 4 | n/a |
 | 20-delivery-cart | painted | 1024x768 | 2: 24.07% | 1 | 0.00% | 4 | 37.27% |
@@ -98,7 +99,7 @@ Painted pages are WebP (quality 90, alpha lossless); exact pages are lossless PN
 | title@4 | 2683x127 | 142.9 KB |
 | title@6 | 4008x189 | 257.7 KB |
 | title@8 | 4029x479 | 391.0 KB |
-| farm | 260x130 | 6.0 KB |
+| farm | 260x130 | 5.6 KB |
 | farm@2 | 4091x228 | 337.5 KB |
 | farm@3 | 4095x456 | 602.0 KB |
 | farm@4 | 4091x775 | 877.6 KB |
