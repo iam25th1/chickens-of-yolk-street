@@ -17,7 +17,7 @@ import { Fx } from '../Fx';
 import type { Scene } from '../host';
 import { HenActor } from './HenActor';
 import { WorldLayers } from './layers';
-import { MIN_H, MIN_W, farmLayout, randomIn, spreadSpot, troughSpots, type FarmLayout, type MachineSpot, type Point } from './layout';
+import { MIN_H, MIN_W, connectionGaps, farmLayout, randomIn, specPoint, spreadSpot, troughSpots, type FarmLayout, type MachineSpot, type Point } from './layout';
 
 const MAX_VISIBLE_HENS = 40;
 const TILE = 16;
@@ -104,6 +104,8 @@ export class FarmScene implements Scene {
   private groundKey = '';
   private k = 2;
   private readonly targetsList = new Map<FrameSprite, () => WorldTarget>();
+  /** The layout debug overlay (?debug=layout): anchors, art bounds, footprints and connections. */
+  private readonly debugLayer: Graphics | null = typeof location !== 'undefined' && new URLSearchParams(location.search).get('debug') === 'layout' ? new Graphics() : null;
   private readonly loose = new Set<FrameSprite>();
 
   constructor(
@@ -278,6 +280,7 @@ export class FarmScene implements Scene {
       if (at) this.moveTo(r.s, at);
     });
     this.labelPads();
+    this.drawLayoutDebug();
     // a smaller window: hens outside the new yard step back into it
     for (const a of this.hens.values()) {
       const p = a.position;
@@ -285,6 +288,37 @@ export class FarmScene implements Scene {
         const to = spreadSpot(l.yard, []);
         a.sprite.position.set(to.x, to.y);
       }
+    }
+  }
+
+  /**
+   * The layout debug overlay: each object's art bounds (thin box), footprint (filled strip) and
+   * anchor (white cross), its connection points (cyan), and every connection as a line, green when
+   * it lines up within one world pixel and red when it does not. Shown only with ?debug=layout.
+   */
+  private drawLayoutDebug(): void {
+    const g = this.debugLayer;
+    if (!g) return;
+    if (!g.parent) this.layers.by.fx.addChild(g);
+    const l = this.layout;
+    g.clear();
+    g.rect(l.yard.left, l.yard.top, l.yard.right - l.yard.left, l.yard.bottom - l.yard.top).stroke({ color: 0xffe066, width: 0.5, alpha: 0.8 });
+    if (l.guide.right > 0) g.rect(l.guide.left, l.guide.top, l.guide.right - l.guide.left, l.guide.bottom - l.guide.top).fill({ color: 0x000000, alpha: 0.12 });
+    for (const o of Object.values(l.spec.objects)) {
+      g.rect(o.box.left, o.box.top, o.box.right - o.box.left, o.box.bottom - o.box.top).stroke({ color: 0xff7ad9, width: 0.5, alpha: 0.9 });
+      g.rect(o.footprint.left, o.footprint.top, o.footprint.right - o.footprint.left, o.footprint.bottom - o.footprint.top).fill({ color: 0xff7ad9, alpha: 0.45 });
+      g.moveTo(o.at.x - 2, o.at.y).lineTo(o.at.x + 2, o.at.y).moveTo(o.at.x, o.at.y - 2).lineTo(o.at.x, o.at.y + 2).stroke({ color: 0xffffff, width: 1 });
+      for (const p of Object.values(o.points)) g.rect(p.x - 1, p.y - 1, 2, 2).fill({ color: 0x3ff0ff });
+    }
+    for (const { c, gap } of connectionGaps(l)) {
+      const color = gap <= 1 ? 0x37d65b : 0xff3030;
+      const a = specPoint(l, c.kind === 'meet' ? c.a : c.point);
+      const b = c.kind === 'meet' ? specPoint(l, c.b) : specPoint(l, c.span[0]);
+      const b2 = c.kind === 'over' ? specPoint(l, c.span[1]) : null;
+      if (!a || !b) continue;
+      if (b2) g.moveTo(b.x, b.y).lineTo(b2.x, b2.y).stroke({ color, width: 1, alpha: 0.9 });
+      g.moveTo(a.x, a.y).lineTo(b2 ? Math.max(Math.min(a.x, Math.max(b.x, b2.x)), Math.min(b.x, b2.x)) : b.x, b.y).stroke({ color, width: 1 });
+      g.circle(a.x, a.y, 2.5).stroke({ color, width: 1 });
     }
   }
 
@@ -477,13 +511,13 @@ export class FarmScene implements Scene {
     return this.farm?.unlocks.includes('conveyor') ?? false;
   }
 
-  /** The belt: one continuous run of tiles from the yard to the grader, an end piece at each end. */
+  /** The belt: one continuous run of whole tiles from the field, under the grader, to the crate's side. */
   private layBelt(boot: boolean): void {
     for (const s of this.belt) s.destroy();
     this.belt = [];
     const c = this.layout.conveyor;
-    for (let x = c.from; x <= c.to; x += TILE) {
-      const row = x === c.from ? 'start' : x + TILE > c.to ? 'end' : 'horizontal';
+    for (let x = c.from; x < c.to; x += TILE) {
+      const row = x === c.from ? 'start' : x + TILE >= c.to ? 'end' : 'horizontal';
       const s = new FrameSprite(this.assets, ['18-conveyor'], row);
       s.position.set(x + TILE / 2, c.y);
       s.label = 'conveyor';
@@ -746,7 +780,7 @@ export class FarmScene implements Scene {
     const grader = this.machines.get('grader');
     createTimeline({ delay: 500 })
       .add(box, { x: startX, y: beltY, duration: 700, ease: 'inQuad', onUpdate: () => !s.destroyed && this.moveTo(s, box) })
-      .add(box, { x: l.conveyor.to + 6, duration: Math.min(RIDE_MS - 1800, beltMs), ease: 'linear', onUpdate: () => !s.destroyed && this.moveTo(s, box) })
+      .add(box, { x: l.conveyor.to - 3, duration: Math.min(RIDE_MS - 1800, beltMs), ease: 'linear', onUpdate: () => !s.destroyed && this.moveTo(s, box) })
       .then(() => {
         if (grader) grader.play('sort-flash', { loop: false, restart: true, onDone: () => grader.play('idle') });
         this.audio.play('13-tray', { volume: 0.3, minGapMs: 200 });

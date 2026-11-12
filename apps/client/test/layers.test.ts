@@ -51,10 +51,11 @@ describe('farm layout', () => {
     // the yard spreads across the area: at least half its width and a third of its height
     expect(l.yard.right - l.yard.left).toBeGreaterThan(w * 0.5);
     expect(l.yard.bottom - l.yard.top).toBeGreaterThan(Math.min(90, h / 3));
-    // the conveyor runs on whole tiles up to the grader, and the fence's gate is on the path
-    expect(l.conveyor.from % 16).toBe(0);
-    expect(l.conveyor.to % 16).toBe(0);
-    expect(l.conveyor.to).toBeLessThan(l.machines.grader.x);
+    // the conveyor runs on whole tiles under the grader to the crate, and the fence's gate is on the path
+    expect((l.conveyor.to - l.conveyor.from) % 16).toBe(0);
+    expect(l.machines.grader.x).toBeGreaterThan(l.conveyor.from);
+    expect(l.machines.grader.x).toBeLessThan(l.conveyor.to);
+    expect(l.conveyor.to).toBeLessThan(l.crate.x);
     expect(l.fence.gate).toBe(l.path.x);
   });
 });
