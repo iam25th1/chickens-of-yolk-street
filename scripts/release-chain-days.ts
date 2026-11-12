@@ -55,15 +55,25 @@ const sha = (text: string): string => createHash('sha256').update(text).digest('
 const provider = new JsonRpcProvider({ url: rpcUrl });
 const status = await provider.viewNodeStatus();
 if (status.chain_id !== 'testnet') fail(`RPC reports chain ${status.chain_id}; refusing anything but testnet`);
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** A view call, paced and retried: public RPCs answer 429 to a burst of reads. */
 const view = async (method: string, args: object): Promise<string> => {
-  const r = await provider.query<{ result: number[] }>({
-    request_type: 'call_function',
-    account_id: target,
-    method_name: method,
-    args_base64: Buffer.from(JSON.stringify(args)).toString('base64'),
-    finality: 'final',
-  });
-  return Buffer.from(r.result).toString('utf8');
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await pause(120);
+      const r = await provider.query<{ result: number[] }>({
+        request_type: 'call_function',
+        account_id: target,
+        method_name: method,
+        args_base64: Buffer.from(JSON.stringify(args)).toString('base64'),
+        finality: 'final',
+      });
+      return Buffer.from(r.result).toString('utf8');
+    } catch (err) {
+      if (attempt >= 6) throw err;
+      await pause(1000 * 2 ** attempt);
+    }
+  }
 };
 const head = JSON.parse(await view('season_head', { season })) as Head;
 console.log(`${target} season ${season}: version 2 recorded days 1 to ${head.v2_through}, released through ${head.pruned_through}`);
@@ -102,7 +112,10 @@ while (through < head.v2_through) {
     if (text !== undefined) archive = sha(`${archive}|${d}|${text}`);
   }
   const out = await account.callFunctionRaw({ contractId: target, methodName: 'prune_days', args: { season, through: upTo, limit: chunk }, gas: teraToGas('300'), deposit: 0n });
-  const after = JSON.parse(await view('season_head', { season })) as Head;
+  // the head prune_days returns (a view right after can still show the block before)
+  const status = out.status as { SuccessValue?: string; Failure?: unknown };
+  if (status.SuccessValue === undefined) fail(`prune_days failed: ${JSON.stringify(status.Failure ?? status).slice(0, 300)} (tx ${out.transaction_outcome.id})`);
+  const after = JSON.parse(Buffer.from(status.SuccessValue ?? '', 'base64').toString('utf8')) as Head;
   if (after.pruned_through !== upTo) fail(`released through ${after.pruned_through}, expected ${upTo} (tx ${out.transaction_outcome.id})`);
   if (after.archive !== archive) fail(`archive hash ${after.archive} on chain, ${archive} from the copied records (tx ${out.transaction_outcome.id})`);
   console.log(`released days ${through + 1} to ${upTo}: tx ${out.transaction_outcome.id}, archive ${archive}`);
