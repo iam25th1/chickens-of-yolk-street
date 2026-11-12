@@ -71,15 +71,16 @@ Checked on 11 November 2026 at about 20:06 UTC:
 Also checked live: the title page, `/build/index-BL-i4f2Y.js` and `/assets/sprites/12-crate.png` answer 200, a
 WebSocket on `wss://yolkstreet.25th.dev/ws` upgrades (101) and answers a ping, and `/api/market` serves the market
 state. Waiting on a top-up: after the contract's storage, the seven wallets and two days of settlements,
-`play.coys-game.testnet` held 1.403 NEAR available on 12 November, 0.647 short of the 2.05 NEAR the server needs
-before it mints hens and links the seven wallets to their agents (12 NEAR recommended). Eggs settle meanwhile.
+`play.coys-game.testnet` held 1.301 NEAR available on 12 November (after the second pass), 0.749 short of the 2.05 NEAR
+the server needs before it mints hens and links the seven wallets to their agents (12 NEAR recommended). Eggs settle
+meanwhile, the market state reports hen certificates as `paused`, and every hen's card says so in plain words.
 
 ## Try it
 
 Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what to do and what you should see. Commands are the same in PowerShell and a POSIX shell unless shown otherwise.
 
 1. **Install.** Run `npm ci --ignore-scripts`. You see the lockfile install with no package install scripts (`.npmrc` also sets `ignore-scripts=true`).
-2. **Test.** Run `npm test`. On a fresh clone you see **224 tests pass and 3 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it), and the asset re-pack check needs a coys-assets checkout beside the repo. Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
+2. **Test.** Run `npm test`. On a fresh clone you see **253 tests pass and 3 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it), and the asset re-pack check needs a coys-assets checkout beside the repo. Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
 3. **Play.** Run `npm run dev` and open http://localhost:5173. You see an egg fill up over the loading plate, then the title: the logo stamps in and the price ticker scrolls.
 4. **Sign in.** Press **PLAY**. With `PRIVY_APP_ID` set you sign in with email; without it a red **LOCAL DEV LOGIN** label asks for a name. You see your farm: 10 hens, a starter coop, **50.00** coins, **DAY001**.
 5. **Take the tour.** On a first visit your hen walks you through the loop by doing it: collect an egg, sell, buy feed, answer a card. Each step ends when you do the thing; **SKIP** ends the tour, and **SETTINGS** replays it. After it, the goal in the corner shows what to aim for next, with a **CLAIM** button and coins when you reach it.
@@ -98,13 +99,26 @@ Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what 
 
 ## Screenshots and video
 
-The live site on 12 November 2026 (season `s1`, a verify farm), from a fresh headless browser through the tunnel:
+The live site on 12 November 2026 after the visual-quality pass (season `s1`), from fresh headless browsers through the
+tunnel. The farm at every listed size, UI drawn at whole device pixels:
 
 | 1280x720 | 1920x1080 |
 |---|---|
-| ![The farm filling a 1280x720 window: top bar with coins, eggs to collect and to sell, hens and feed; the farm, the sell card and the cards on the desk](docs/screenshots/live-1280x720.png) | ![The same farm at 1920x1080, three screen pixels per art pixel, with a crate-filling hint and the first goal ready to claim](docs/screenshots/live-1920x1080.png) |
-| **2560x1440** | **390x844 (phone)** |
-| ![The farm at 2560x1440, four screen pixels per art pixel](docs/screenshots/live-2560x1440.png) | ![The phone layout: the top bar on two rows, the farm across the width, the sell card and the desk below](docs/screenshots/live-390x844.png) |
+| ![The farm at 1280x720: top bar, the whole farm in the free area, the crate's sell card and waiting cards in the side panel, a hint above the goal tracker bottom left](docs/screenshots/live-1280x720.png) | ![The farm at 1920x1080: three device pixels per world pixel, a crate hint above the goal tracker, one card waiting](docs/screenshots/live-1920x1080.png) |
+| **2560x1440 at 2x (5120x2880 device pixels)** | **390x844 (phone)** |
+| ![The farm at 2560x1440 on a 2x screen: eight device pixels per UI pixel and full-detail painted hens](docs/screenshots/live-2560x1440@2x.png) | ![The phone layout: the top bar on two rows, the farm across the width, the goal tracker under it, the sell card and the card list below](docs/screenshots/live-390x844.png) |
+
+The tour and the modals, at 1280x720. The market board shows the temporary check farms the verification used (removed afterwards):
+
+| Tour step 1: collect | Tour step 4: gluts |
+|---|---|
+| ![The spotlight dims everything but an egg on the ground, tagged TAP THE EGG; the step box reads 1/10 COLLECT AN EGG with progress dots, BACK and SKIP](docs/screenshots/live-tour-collect.png) | ![The market board open, the supply meter spotlit with TAP THE METER; the step box explains gluts and shortages](docs/screenshots/live-tour-glut.png) |
+| **A card, composed** | **Market board** |
+| ![The Wholesaler's bulk order as one panel: portrait and line on top, what accepting means, the card art upright beside it, the answers in one row](docs/screenshots/live-card.png) | ![Today's price per grade on split flaps, the street's sales against what it needs, and the farms ranked with the bust ones](docs/screenshots/live-board.png) |
+| **Shop** | **A hen's card** |
+| ![The shop's hens: each one of a kind, drawn from her trait layers at full detail, with how she lays and her price](docs/screenshots/live-shop.png) | ![A hen's portrait at twice her farm size, her traits in words, and her certificate: pending while recording on NEAR is paused](docs/screenshots/live-hen.png) |
+| **Feed** | **Ledger** |
+| ![Feed tiers with how each changes laying, buy now or on the Loyalist's credit, and the supplier switch](docs/screenshots/live-feed.png) | ![The ledger: each day's coins in and out with its record on NEAR, contracts and debts, and hen certificates](docs/screenshots/live-ledger.png) |
 
 <details>
 <summary><b>The earlier build (11 November): title, tour, sale, haggles, glut, bust, ledger, market, shop</b></summary>
@@ -130,6 +144,112 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 </details>
 
 **Video:** _slot for a direct upload (drag the gameplay video into this section on GitHub)._
+
+## Visual quality and the tour (12 November 2026)
+
+A recording of the live game at 2560x1284 on a 2x Mac showed assets that looked like 240p, soft top bar and card text,
+jagged text on tilted cards, panels piling onto the farm and each other, and a tour that taught only collecting. Causes
+and fixes:
+
+| What was seen | Cause | Fix |
+|---|---|---|
+| Mushy portraits, card art, hens | the previous pass cut every painted sheet down to the grid measured from its outlines (8 source pixels for a hen), throwing away the painting inside: 20% to 67% of visible pixels changed (round trip at that grid, [asset report](docs/asset-report.md)) | each sheet keeps the largest factor whose nearest round trip is near pixel-identical; painted sheets pass at no factor, so they keep their full resolution, cut per screen density |
+| Soft top bar, cards and shop | the UI was laid out at 640x360 and scaled by a fraction (1.78 on that screen) | the UI is drawn at a whole number of device pixels per UI pixel through CSS zoom, pixel fonts at whole multiples |
+| Jagged "96.00 / BAG" | the card came to rest tilted 2 degrees, stamps at 8 | nothing that carries text rotates; motion is translate and scale in whole-pixel steps |
+| Uneven pixels in the world | the world zoom was window height / 360 (3.57 device pixels a world pixel) | the world is drawn at a whole number of device pixels per world pixel, placed on whole device pixels |
+| Panels, card art and hints over the farm and each other | free-floating panels with no backdrop; the card was three loose pieces | fixed zones that never overlap; one modal at a time over a dimmed backdrop; a card is one composed panel |
+| A tour that taught one thing | four corner messages ended by events, nothing pointed at | ten spotlight steps that move on only when the player does the thing |
+
+**Art at its own detail.** `npm run derive-assets` tries factors 2, 3, 4, 6, 8, 12 and 16 and keeps the largest whose
+nearest round trip changes at most 0.5% of visible pixels by more than 24 of 255. The 25 exact sheets pass at their
+grid with 0.00% error and ship whole as lossless PNG. Every painted sheet fails even at 2 (6.5% to 31.7%), so it keeps
+its original resolution. The hen and its trait layers are judged together and share that factor, so they still stack
+pixel for pixel. Painted art ships as WebP pages (alpha lossless) cut by exact area coverage at 2, 3, 4, 6 and 8 texels
+per design pixel, on a grid that starts at each sprite's pivot. A screen loads the density that divides its zoom, so a
+texel is one device pixel (or a whole square of them). [docs/asset-report.md](docs/asset-report.md) lists every sheet:
+factors tried, the factor chosen and its round-trip error, and the previous grid's error.
+
+**Whole pixels everywhere.** With a window of $W \times H$ device pixels, the UI zoom and the farm's zoom are
+
+$$
+p = \max\{\, s \in \{2,3,4,6,8\} : W/s \ge 560,\ H/s \ge 330 \,\}, \qquad k = \max\{\, s : 502\,s \le W_{\text{world}},\ 312\,s \le H_{\text{world}} \,\}
+$$
+
+where $W_{\text{world}} \times H_{\text{world}}$ is the free area left by the top bar and the side panel, with room for the
+guide under the farm's ground line. 1280x720 gets $p = k = 2$, 1920x1080 and a 2x 1280x642 window $3$, 2560x1440 $4$,
+a 2x 2560x1440 screen $8$.
+
+**Zones.** Top bar; right side panel (the crate's sell card, waiting cards with a count, contracts and debts); a
+bottom-left goal tracker; one toast area stacked above it for hints and news; the world. Only ground lies under the
+tracker and toasts. Modals (shop, ledger, market board, a card, a hen, a machine, the crate, a certificate, settings) open
+one at a time in the world zone over a backdrop that dims the whole window; Escape and the close button dismiss them.
+
+**The tour**, each step done by doing it, with Back, Skip and progress dots, replayable from Settings:
+
+1. Collect an egg: the spotlight follows an egg on the ground.
+2. Sell from the crate at today's price.
+3. Open the market board: one market shared by every farm and trader.
+4. Tap the supply meter: everyone selling at once crashes prices (a glut), scarcity lifts them.
+5. Buy a bag of feed at the trough (on the Loyalist's credit when coins are short); the tiers show how they change laying.
+6. Answer an offer and counter it: a practice offer from a buyer, whose first counter always gets a counter back.
+7. Buy a hen: she is one of a kind, and her card opens. The sentence about NEAR is honest about whether recording is live.
+8. See what the conveyor saves.
+9. Tap the farms on the board: rivals go bust, their hens go to auction.
+10. Open the ledger: each day closes with a receipt.
+
+The goal tracker continues from there.
+
+**Hen certificates.** When a day close mints a player's hen, the server stores the settlement transaction and day on her
+and tells her owner (`henMinted`). The game then shows a certificate: her portrait and traits, a stamp, and one line, "SHE
+IS NOW PERMANENTLY YOURS ON NEAR", with the receipt in the ledger. Her card shows her token and receipt link. While
+`play.coys-game.testnet` is below its 2.05 NEAR threshold (1.301 available, 0.749 short), mints wait and the game says
+"certificate pending: recording on NEAR is paused for now".
+
+**Measured live** on 12 November 2026, from fresh headless browsers through the tunnel. Cold load with an empty cache,
+median of three runs (range in brackets), to a playable farm (top bar up and farm objects on the canvas):
+
+| Window | Before (brief 4) | After | On the wire by then (the sharp art keeps arriving) |
+|---|---|---|---|
+| 1280x720 | 7.4 s, 5.4 MB | **5.1 s** (5.0 to 6.0) | 1.6 MB |
+| 1920x1080 | | **8.2 s** (4.8 to 11.9); 6.0 to 6.9 s on three further runs | 2.4 to 5.4 MB |
+| 2560x1440 | | **5.6 s** (4.5 to 7.9) | 1.6 to 4.4 MB |
+| 2560x1440 at 2x | | **8.7 s** (7.2 to 8.8) | 1.6 to 9.5 MB |
+| 390x844 | | **8.6 s** (6.5 to 10.9) | 1.6 to 4.4 MB |
+
+The farm comes up with the smallest painted density that divides the screen's zoom (about 1 MB, drawn several device
+pixels a texel), then the sharp one; sounds wait until the sharp farm is in. The loading screen is on screen in 0.6 s.
+
+- **Tour, live, by doing:** an automated browser completed all ten steps at 1280x720, 1440x900, 1920x1080, 2560x1440 and
+  390x844, on a fresh check farm each, clicking only what the spotlight showed, in 38 to 61 seconds.
+- **No overlap:** at each of those sizes, the boxes of the top bar, side panel, tracker, toasts, tour box and modal never
+  overlapped at any tour step or with each modal open (shop hens, feed and machines, ledger, board and orders, crate,
+  conveyor, settings, a hen, a certificate). Nothing on the farm sat under a UI zone, and no page logged an error.
+  `apps/client/test/viewport.test.ts` asserts the same layout rules for eight window sizes.
+- **Whole pixels:** in device-pixel crops at 2x 2560x1440, the share of aligned blocks whose pixels are all one colour
+  (a fractionally scaled image scores about 73%):
+
+| Crop | Block | Uniform |
+|---|---|---|
+| top bar (icons, labels, counters) | 8x8 | 100% |
+| card art with its terms (a card modal) | 8x8 | 100% |
+| the crate's sell card in the side panel | 8x8 | 99.4% (its centred title sits half a UI pixel over: 4 whole device pixels) |
+| a hen's portrait (painted, full detail at 2x) | 2x2 | 100% |
+| an agent's portrait (painted, full detail at 2x) | 2x2 | 100% |
+
+<details>
+<summary><b>The crops</b> (device pixels, 2x 2560x1440)</summary>
+
+<br>
+
+| Top bar | Card art | Hen | Agent |
+|---|---|---|---|
+| ![Top bar crop: icons and pixel text in 8x8 device-pixel blocks](docs/screenshots/crop-topbar-5k.png) | ![Card art crop: the bulk order card, upright, its pixel text crisp](docs/screenshots/crop-card-5k.png) | ![A hen's portrait at full painted detail](docs/screenshots/crop-hen-5k.png) | ![The Wholesaler's portrait at full painted detail](docs/screenshots/crop-agent-5k.png) |
+
+</details>
+
+The Verify Bot farm from the rescue's checks is gone from season `s1` entirely (`scripts/remove-player.ts`: its hens,
+coop, machine, cards and ledger, out of the market, the rankings, demand and the ticker), and so are the five check farms
+this pass used.
 
 ## Playability rescue (12 November 2026)
 
@@ -162,7 +282,7 @@ saw its card open each time, and collected a ground egg: **COLLECT** went down b
 up by one. Before the fix the farm canvas took no clicks at all.
 
 <details>
-<summary><b>True sprite sizes</b> (one art pixel = one world pixel unless noted)</summary>
+<summary><b>True sprite sizes</b> of that pass (superseded the same day: painted art now keeps its full detail, see the asset report)</summary>
 
 <br>
 
@@ -346,13 +466,13 @@ Each agent has its own cash, stock and **memory of every farm** (deals, value, r
 <details>
 <summary><b>Client</b>: screens, juice and sound</summary>
 
-- 640x360, scaled by a whole number, nearest-neighbour everywhere. PixiJS draws the farm and the town square; anime.js drives every UI motion.
-- **Card overlay**: slides in with an overshoot and a paper swoosh; the portrait talks with its voice babble while the line types out; outcomes play the agent's expression and slam a stamp; a haggle win flips the card to gold with a hitstop, shake, confetti and the win chime; a fail sends the agent walking with the fail sound.
+- Whole device pixels everywhere: the UI is laid out in UI pixels drawn at $p$ device pixels each (CSS zoom), the world at $k$ device pixels per world pixel, painted art from the atlas cut for that density (see [Visual quality](#visual-quality-and-the-tour-12-november-2026)). PixiJS draws the farm and the town square; anime.js drives every UI motion, in whole-pixel steps, never rotating text.
+- **Card overlay**: one composed modal (portrait and line, the card art upright beside them, answers in one row); the card slides in with an overshoot and a paper swoosh; the portrait talks with its voice babble while the line types out; outcomes play the agent's expression and slam a stamp; a haggle win flips the card to gold with a hitstop, shake, confetti and the win chime; a fail sends the agent walking with the fail sound.
 - **Market board**: town square plate with animated bunting and a milling crowd (market murmur loop), split-flap ticker board by grade, farms ranked with their signs, the cast, big trades, the order book.
 - **Ledger**: day-by-day profit, contracts, debts, and the on-chain receipt link per day.
 - **Shop**: listed hens drawn from their trait layers with laying trait and price (auction hens marked), feed with supplier switching, coops, machines.
 - **Rival bust**: the sign tips over, a price wave crosses the ticker, medium shake, falling feathers, the collapse crash and the bust sting. **Glut**: the ticker drops red and the market tension music plays until prices recover.
-- **First-run tour**: three cards told by the farm's own hen (collecting, selling, decision cards), with the offer cards' art and swing-in; skippable and shown once per browser. Offer cards wait until it closes, and an unanswered card closes with its day.
+- **Tour**: ten spotlight steps covering the whole game, each moving on only when the player does it; Back, Skip, progress dots, replayable from Settings. Waiting cards queue in the side panel with a count; an unanswered card closes with its day.
 - **Page**: descriptive title and meta description, a favicon and a 1200x630 share image cut from the sprites by `scripts/make-share-images.ts`.
 - Everything from brief 1 stays: lays, hand collect, big haul, deal stamp, coop builds, unlocks, crash, new day.
 
@@ -459,11 +579,23 @@ On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and buil
 
 The live Pier deploy and its tunnel were checked end to end on 11 November 2026 (receipts under [How NEAR fits in](#how-near-fits-in)).
 
+The visual-quality pass was checked live on 12 November 2026: cold load at five sizes, the whole tour completed by an automated browser at five sizes, the no-overlap check with every modal and tour step open, and device-pixel crops (numbers under [Visual quality](#visual-quality-and-the-tour-12-november-2026)).
+
 The playability rescue was checked live on 12 November 2026: cold load, the four window sizes, every world object's card, an egg collected, and a 20-second flicker capture (numbers under [Playability rescue](#playability-rescue-12-november-2026)).
 
-**Not verifiable headlessly:** a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
+**Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
+
+### Brief 5: visual quality, layout and the tour (12 November 2026)
+
+- Every asset at the detail its round trip allows ([asset report](docs/asset-report.md)): exact sheets at their grid, painted art at full resolution, cut per screen density as WebP pages.
+- UI at the screen's own resolution (whole device pixels per UI pixel), the world at whole device pixels per world pixel, no rotated text, whole-pixel motion; plates cover the window or mirror their edges.
+- Fixed zones that never overlap, one modal at a time over a backdrop, a composed card panel, waiting cards queued with a count; a layout test at eight sizes.
+- A ten-step spotlight tour of the whole game, done by doing; a practice offer to haggle on; feed on credit for players.
+- Hen certificates: mint receipts on each hen, a `henMinted` event and a certificate moment; honest wording while minting is paused.
+- The smallest density first, then sharp, then sound: a playable farm in 5 to 9 seconds cold through the tunnel.
+- The Verify Bot farm removed from season `s1` (`scripts/remove-player.ts`).
 
 ### Brief 4: playability rescue (12 November 2026)
 
