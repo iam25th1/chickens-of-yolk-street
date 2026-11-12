@@ -18,6 +18,8 @@ import { createStore } from '../state/store';
 export const SCALES = [8, 6, 4, 3, 2] as const;
 export const TOP_H = 20;
 export const PORTRAIT_TOP_H = 38;
+/** The width (UI pixels) the top bar needs on one row. */
+export const TOP_ONE_ROW_W = 640;
 export const SIDE_W = 136;
 export const TRACK_H = 20;
 export const MARGIN = 6;
@@ -113,9 +115,11 @@ export function measure(cssW = window.innerWidth, cssH = window.innerHeight, dpr
   const p = pick((s) => devW / s >= 560 && devH / s >= 330);
   const uiW = devW / p;
   const uiH = devH / p;
-  const top: Rect = { x: 0, y: 0, w: uiW, h: TOP_H };
-  const side: Rect = { x: uiW - SIDE_W, y: TOP_H, w: SIDE_W, h: uiH - TOP_H };
-  const world: Rect = { x: 0, y: TOP_H, w: uiW - SIDE_W, h: uiH - TOP_H };
+  // the top bar's one row needs 640 UI pixels; a narrower window gets it on two rows, as a phone does
+  const topH = uiW < TOP_ONE_ROW_W ? PORTRAIT_TOP_H : TOP_H;
+  const top: Rect = { x: 0, y: 0, w: uiW, h: topH };
+  const side: Rect = { x: uiW - SIDE_W, y: topH, w: SIDE_W, h: uiH - topH };
+  const world: Rect = { x: 0, y: topH, w: uiW - SIDE_W, h: uiH - topH };
   const zw = world.w * p;
   const zh = world.h * p;
   // the farm fills the whole world zone; the zoom is the largest whose smallest layout still fits
@@ -126,12 +130,12 @@ export function measure(cssW = window.innerWidth, cssH = window.innerHeight, dpr
   const farm: FarmView = {
     k,
     offX: 0,
-    offY: TOP_H * p,
+    offY: topH * p,
     w: Math.floor(zw / k),
     h: Math.floor(zh / k),
     guide: { w: Math.ceil(((MARGIN + tracker.w + 4) * p) / k), h: Math.ceil((GUIDE_H * p) / k) },
   };
-  const modal: Rect = { x: MARGIN, y: TOP_H + MARGIN, w: world.w - 2 * MARGIN, h: Math.max(120, toasts.y - 4 - (TOP_H + MARGIN)) };
+  const modal: Rect = { x: MARGIN, y: topH + MARGIN, w: world.w - 2 * MARGIN, h: Math.max(120, toasts.y - 4 - (topH + MARGIN)) };
   return { cssW, cssH, dpr, devW, devH, portrait, p, uiW, uiH, farm, plate, zones: { top, side, tracker, toasts, world, modal } };
 }
 
