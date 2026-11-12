@@ -1,36 +1,35 @@
-// The farm: the world on the canvas, the HUD, the card tray and desk, the card overlay, the shop,
-// the ledger, and the market board over the town square. Server state flows in through the
+// The farm: the world on the canvas and the UI in fixed zones that never overlap (app/viewport.ts):
+// the top bar, the side panel (crate, waiting cards, desk), the goal tracker with the toast area
+// above it, and one modal at a time over a dimmed backdrop (shop, ledger, market board, a card, a
+// hen, a machine, the crate, a hen's certificate, settings). Server state flows in through the
 // socket; player choices go out as actions and come back as events with juice.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isCrash, type CardView, type UnlockId } from '@coys/shared';
+import { isCrash, type CardView } from '@coys/shared';
 import { useServices } from '../app/services';
+import { useViewport } from '../app/Stage';
 import { worldToUi } from '../app/viewport';
 import { GameSocket, type Action } from '../net/socket';
 import { FarmScene, type WorldTarget } from '../pixi/farm/FarmScene';
 import { TownScene } from '../pixi/TownScene';
 import { events, game } from '../state/game';
 import { useStore } from '../state/store';
+import { tour } from '../state/tour';
+import { closeModal, openModal, ui, type ModalState } from '../state/ui';
 import { CardOverlay, type OverlayResult } from '../ui/CardOverlay';
-import { GlutCard, SellCard } from '../ui/Cards';
 import { LOOK } from '../ui/cast';
-import { Desk } from '../ui/Desk';
+import { SidePanel } from '../ui/Desk';
 import { FxLayer, uiFx } from '../ui/FxLayer';
-import { Ticker, TopBar } from '../ui/Hud';
+import { ToastArea, Tracker } from '../ui/Guide';
+import { TopBar } from '../ui/Hud';
 import { LedgerPanel } from '../ui/Ledger';
 import { MarketBoard } from '../ui/MarketBoard';
-import { Guide } from '../ui/Guide';
-import { ShopPanel, type ShopTab } from '../ui/Panels';
-import { HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
-
-type OpenPanel =
-  | { kind: 'shop'; tab: ShopTab }
-  | { kind: 'ledger' }
-  | { kind: 'hen'; henId: string }
-  | { kind: 'sell' }
-  | { kind: 'machine'; unlock: UnlockId };
+import { Modal } from '../ui/Modal';
+import { SettingsBody, ShopPanel } from '../ui/Panels';
+import { Spotlight, TourBox } from '../ui/Tour';
+import { CertificatePanel, HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
 
 /** What clicking each thing on the farm opens. */
-function panelFor(t: WorldTarget): OpenPanel | 'market' {
+function modalFor(t: WorldTarget): ModalState {
   switch (t.kind) {
     case 'hen':
       return { kind: 'hen', henId: t.hen.id };
@@ -43,7 +42,7 @@ function panelFor(t: WorldTarget): OpenPanel | 'market' {
     case 'farmhouse':
       return { kind: 'ledger' };
     case 'sign':
-      return 'market';
+      return { kind: 'market', tab: 'board' };
     case 'machine':
       return { kind: 'machine', unlock: t.unlock };
   }
@@ -58,16 +57,17 @@ const REFUSALS: Record<string, string> = {
   farm_bust: 'THIS FARM IS BUST',
 };
 
-export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { session: string; accountId: string | null; onSignedOut: () => void; onSettings: () => void }) {
+export function FarmScreen({ session, accountId, onSignedOut }: { session: string; accountId: string | null; onSignedOut: () => void }) {
   const { assets, audio, pixi } = useServices();
+  const v = useViewport();
   const farm = useStore(game, (s) => s.farm);
   const market = useStore(game, (s) => s.market);
   const status = useStore(game, (s) => s.status);
-  const [panel, setPanel] = useState<OpenPanel | null>(null);
-  const [view, setView] = useState<'farm' | 'market'>('farm');
-  // first run on this browser: three cards on collecting, selling and decision cards
-  const [overlay, setOverlay] = useState<{ card: CardView; result: OverlayResult | null; mood: 'warm' | 'firm' | 'cross' | null } | null>(null);
-  const queue = useRef<CardView[]>([]);
+  const modal = useStore(ui, (s) => s.modal);
+  const touring = useStore(tour, (s) => s.active);
+  // the open card's live state: haggle mood and outcome arrive as events
+  const [cardState, setCardState] = useState<{ card: CardView; result: OverlayResult | null; mood: 'warm' | 'firm' | 'cross' | null } | null>(null);
+  const certificates = useRef<{ henId: string; txHash: string; day: number }[]>([]);
   const socket = useRef<GameSocket | null>(null);
   const scene = useRef<FarmScene | null>(null);
   const town = useRef<TownScene | null>(null);
@@ -85,6 +85,7 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
     return () => {
       s.close();
       socket.current = null;
+      closeModal();
       game.set({ status: 'idle', farm: null, ledger: null });
     };
   }, [session]);
@@ -103,14 +104,12 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
     const s = new FarmScene(assets, audio, pixi.app.renderer, {
       collect: (eggId) => send({ t: 'collect', eggId }),
       coins: (from, count) => uiFx.emit({ kind: 'coins', from: worldToUi(from), count }),
-      open: (target) => {
-        const p = panelFor(target);
-        if (p === 'market') setView('market');
-        else setPanel(p);
-      },
+      open: (target) => openModal(modalFor(target)),
     });
     scene.current = s;
-    (window as unknown as { __coysFarm?: unknown }).__coysFarm = { targets: () => s.targets() };
+    // read-only hooks for automated checks: where things are on the farm, and opening a modal as a click would
+    (window as unknown as { __coysFarm?: unknown }).__coysFarm = { targets: () => s.targets(), yard: () => s.yardBox() };
+    (window as unknown as { __coysUi?: unknown }).__coysUi = { open: openModal, close: closeModal };
     s.sync(farm);
     pixi.setScene(s);
   }, [farm, assets, audio, pixi, send]);
@@ -126,31 +125,36 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
     if (farm) scene.current?.sync(farm);
   }, [farm]);
 
-  // the market board swaps the canvas to the town square; the farm keeps running behind it
+  // the market board swaps the canvas to the town square (on a phone the farm stays behind it);
+  // the farm keeps running either way
+  const marketOpen = modal?.kind === 'market' && !v.portrait;
   useEffect(() => {
     if (!scene.current) return;
-    if (view === 'market') {
+    if (marketOpen && !town.current) {
       town.current = new TownScene(assets, audio);
       pixi.setScene(town.current, { keep: true });
       audio.play('16-ticker', { volume: 0.4 });
-    } else if (town.current) {
+    } else if (!marketOpen && town.current) {
       pixi.setScene(scene.current);
       town.current = null;
     }
-  }, [view, assets, audio, pixi]);
+  }, [marketOpen, assets, audio, pixi]);
 
   const crashed = market ? isCrash(market.multiplier) : false;
   useEffect(() => {
     audio.playMusic(crashed ? '43-market-tension' : '42-farm-day', 1200);
   }, [audio, crashed]);
 
-  // cards: queue arrivals, show one at a time
-  const showNext = useCallback(() => {
-    const next = queue.current.shift();
-    setOverlay(next ? { card: next, result: null, mood: null } : null);
-  }, []);
+  // a hen's certificate waits until no other modal is open
+  useEffect(() => {
+    if (modal || !certificates.current.length) return;
+    const next = certificates.current.shift();
+    if (next) openModal({ kind: 'certificate', ...next });
+  }, [modal, farm]);
+
   const openCard = useCallback((card: CardView) => {
-    setOverlay((cur) => (cur ? cur : { card, result: null, mood: null }));
+    setCardState({ card, result: null, mood: null });
+    openModal({ kind: 'card', cardId: card.id });
   }, []);
 
   useEffect(
@@ -159,21 +163,15 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
         scene.current?.onEvent(e);
         switch (e.kind) {
           case 'cardArrived':
-            setOverlay((cur) => {
-              if (!cur) return { card: e.card, result: null, mood: null };
-              if (!queue.current.some((c) => c.id === e.card.id) && cur.card.id !== e.card.id) queue.current.push(e.card);
-              return cur;
-            });
+            uiFx.emit({ kind: 'toast', text: `NEW OFFER FROM ${e.card.from.toUpperCase()}: OPEN IT FROM THE CARD LIST` });
+            audio.play('17-card', { volume: 0.5 });
             break;
           case 'haggle':
-            setOverlay((cur) => (cur && cur.card.id === e.card.id ? { card: e.card, result: null, mood: e.mood } : cur));
+            setCardState((cur) => (cur && cur.card.id === e.card.id ? { card: e.card, result: null, mood: e.mood } : cur));
             break;
           case 'cardResolved':
-            if (e.auto) {
-              uiFx.emit({ kind: 'toast', text: `THE CLERK TOOK ${e.card.from.toUpperCase()}'S OFFER: +${(e.totalMilli / 1000).toFixed(2)}` });
-              queue.current = queue.current.filter((c) => c.id !== e.card.id);
-              setOverlay((cur) => (cur && cur.card.id === e.card.id ? null : cur));
-            } else setOverlay((cur) => (cur && cur.card.id === e.card.id ? { card: e.card, result: { outcome: e.outcome, totalMilli: e.totalMilli }, mood: null } : cur));
+            if (e.auto) uiFx.emit({ kind: 'toast', text: `THE CLERK TOOK ${e.card.from.toUpperCase()}'S OFFER: +${(e.totalMilli / 1000).toFixed(2)}` });
+            setCardState((cur) => (cur && cur.card.id === e.card.id ? { card: e.card, result: { outcome: e.outcome, totalMilli: e.totalMilli }, mood: null } : cur));
             break;
           case 'sold':
             uiFx.emit({ kind: 'stamp', row: 'sold', coins: e.totalMilli / 1000 });
@@ -183,19 +181,22 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
             audio.play('35-back', { volume: 0.6 });
             break;
           case 'dayEnded': {
-            // every card closes with its day: drop queued ones and any card still waiting for an answer
-            queue.current = [];
-            setOverlay((cur) => (cur && !cur.result ? null : cur));
+            // every card closes with its day
+            const m = ui.get().modal;
+            if (m?.kind === 'card') closeModal();
             const s = e.summary;
-            uiFx.emit({ kind: 'toast', text: `DAY ${s.day}: ${s.laid} LAID. PRICES TOMORROW ${Math.round(s.nextMultiplier * 100)}%${s.missed ? `. ${s.missed} DELIVERY MISSED` : ''}` });
+            uiFx.emit({ kind: 'toast', text: `DAY ${s.day} CLOSED: ${s.laid} LAID. PRICES TOMORROW ${Math.round(s.nextMultiplier * 100)}%${s.missed ? `. ${s.missed} DELIVERY MISSED` : ''}` });
             if (s.fedMultiplier === 0) {
               audio.play('29-alarm-bell', { delayMs: 800 });
               uiFx.emit({ kind: 'toast', text: 'THE TROUGH IS EMPTY: NO EGGS TOMORROW', tone: 'bad' });
             }
             break;
           }
+          case 'henMinted':
+            certificates.current.push({ henId: e.henId, txHash: e.txHash, day: e.day });
+            break;
           case 'contractDelivered':
-            uiFx.emit({ kind: 'coins', from: { x: 444, y: 280 }, count: 4 });
+            uiFx.emit({ kind: 'coins', from: worldToUi({ x: 444, y: 280 }), count: 4 });
             if (e.auto) uiFx.emit({ kind: 'toast', text: `THE CART DELIVERED ${e.qty} EGGS` });
             break;
           case 'contractMissed':
@@ -233,61 +234,76 @@ export function FarmScreen({ session, accountId, onSignedOut, onSettings }: { se
   if (!farm || !market) {
     return (
       <div className="stage640">
-        <div className="toast" style={{ position: 'absolute', left: 320, top: 170, transform: 'translateX(-50%)' }}>
+        <div className="toast" style={{ position: 'absolute', left: 220, top: 170, width: 200, textAlign: 'center' }}>
           {status === 'offline' ? 'RECONNECTING TO THE MARKET' : 'WALKING TO THE FARM'}
         </div>
       </div>
     );
   }
 
+  const z = v.zones;
+  const guideBox = { x: z.tracker.x, y: z.toasts.y, w: z.tracker.w, h: z.tracker.y + z.tracker.h - z.toasts.y };
+  const ctx = { modal, farm, market };
+  const card = modal?.kind === 'card' ? (cardState?.card.id === modal.cardId ? cardState.card : farm.cards.find((c) => c.id === modal.cardId)) : null;
+  const hen = modal?.kind === 'hen' || modal?.kind === 'certificate' ? farm.hens.find((h) => h.id === modal.henId) : null;
+
   return (
     <div className="layer">
       <TopBar
         farm={farm}
-        onShop={() => setPanel({ kind: 'shop', tab: 'hens' })}
-        onSettings={onSettings}
-        onMarket={() => setView(view === 'market' ? 'farm' : 'market')}
-        onLedger={() => setPanel({ kind: 'ledger' })}
+        rect={z.top}
+        onShop={() => openModal({ kind: 'shop', tab: 'hens' })}
+        onSettings={() => openModal({ kind: 'settings' })}
+        onMarket={() => openModal({ kind: 'market', tab: 'board' })}
+        onLedger={() => openModal({ kind: 'ledger' })}
       />
-      {view === 'market' ? (
-        <div className="stage640">
-          <MarketBoard farm={farm} market={market} send={send} onBack={() => setView('farm')} />
-        </div>
+      {!(v.portrait && modal) && <SidePanel farm={farm} market={market} rect={z.side} send={send} onOpen={openCard} />}
+      {touring ? (
+        <TourBox ctx={ctx} rect={guideBox} send={send} />
       ) : (
-        <div className="tray">
-          <SellCard farm={farm} market={market} send={send} />
-          <Desk farm={farm} send={send} onOpen={openCard} />
-          {market.crash && <GlutCard market={market} />}
-        </div>
+        <>
+          <ToastArea farm={farm} rect={z.toasts} offline={status === 'offline'} />
+          <Tracker farm={farm} rect={z.tracker} send={send} />
+        </>
       )}
-      <Ticker extra={[farm.name.toUpperCase()]} />
-      {status === 'offline' && (
-        <div className="stage640">
-          <div className="toast" style={{ position: 'absolute', left: 320, top: 300, transform: 'translateX(-50%)' }}>
-            RECONNECTING TO THE MARKET
-          </div>
-        </div>
+      {modal?.kind === 'shop' && (
+        <ShopPanel
+          farm={farm}
+          send={send}
+          tab={modal.tab}
+          onTab={(tab) => ui.set({ modal: { kind: 'shop', tab } })}
+          onMachine={(unlock) => openModal({ kind: 'machine', unlock })}
+          onClose={closeModal}
+        />
       )}
-      {panel && (
-        <div className="stage640" style={{ zIndex: 20 }}>
-          {panel.kind === 'shop' && <ShopPanel key={panel.tab} tab={panel.tab} farm={farm} send={send} onClose={() => setPanel(null)} />}
-          {panel.kind === 'ledger' && <LedgerPanel farm={farm} send={send} onClose={() => setPanel(null)} />}
-          {panel.kind === 'sell' && <SellPanel farm={farm} market={market} send={send} onClose={() => setPanel(null)} />}
-          {panel.kind === 'machine' && (
-            <MachinePanel unlock={panel.unlock} farm={farm} onShop={() => setPanel({ kind: 'shop', tab: 'machines' })} onClose={() => setPanel(null)} />
-          )}
-          {panel.kind === 'hen' &&
-            (() => {
-              const hen = farm.hens.find((h) => h.id === panel.henId);
-              return hen ? <HenPanel hen={hen} onClose={() => setPanel(null)} /> : null;
-            })()}
-        </div>
+      {modal?.kind === 'ledger' && <LedgerPanel farm={farm} send={send} onClose={closeModal} />}
+      {modal?.kind === 'sell' && <SellPanel farm={farm} market={market} send={send} onClose={closeModal} />}
+      {modal?.kind === 'machine' && <MachinePanel unlock={modal.unlock} farm={farm} onShop={() => openModal({ kind: 'shop', tab: 'machines' })} onClose={closeModal} />}
+      {modal?.kind === 'hen' && hen && <HenPanel hen={hen} market={market} onClose={closeModal} />}
+      {modal?.kind === 'certificate' && hen && (
+        <CertificatePanel hen={hen} txHash={modal.txHash} day={modal.day} market={market} onLedger={() => openModal({ kind: 'ledger' })} onClose={closeModal} />
       )}
-      {view === 'farm' && <Guide farm={farm} send={send} />}
-      {overlay && view === 'farm' && (
-        <CardOverlay key={overlay.card.id} card={overlay.card} result={overlay.result} haggleMood={overlay.mood} send={send} onClose={showNext} />
+      {modal?.kind === 'market' && (
+        <MarketBoard farm={farm} market={market} send={send} tab={modal.tab} onTab={(tab) => ui.set({ modal: { kind: 'market', tab } })} onClose={closeModal} />
       )}
+      {modal?.kind === 'card' && card && (
+        <CardOverlay
+          key={card.id}
+          card={card}
+          result={cardState?.card.id === card.id ? cardState.result : null}
+          haggleMood={cardState?.card.id === card.id ? cardState.mood : null}
+          send={send}
+          onClose={closeModal}
+        />
+      )}
+      {modal?.kind === 'settings' && (
+        <Modal title="SETTINGS" onClose={closeModal} w={300} h={200}>
+          <SettingsBody onClose={closeModal} />
+        </Modal>
+      )}
+      {touring && <Spotlight ctx={ctx} />}
       <FxLayer />
     </div>
   );
 }
+

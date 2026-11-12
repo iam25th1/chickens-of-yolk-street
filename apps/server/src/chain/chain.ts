@@ -14,12 +14,16 @@ export interface SettleResult {
   status: 'sent' | 'noop' | 'failed';
   txHash: string | null;
   error?: string;
+  /** Hens this settlement minted. */
+  minted?: string[];
 }
 
 export interface ChainWriter {
   readonly mode: 'noop' | 'near-testnet';
   /** Explorer base for transaction receipts, or null. */
   readonly explorer: string | null;
+  /** Whether day closes mint hen certificates: live, paused while the game account is low, or off. */
+  readonly minting: 'live' | 'paused' | 'off';
   /** Settles one closed day of a season. */
   settleDay(db: Db, season: string, day: number): Promise<SettleResult>;
 }
@@ -55,6 +59,7 @@ export const agentAccountName = (kind: string, generation: number, game: string)
 export class NoopChain implements ChainWriter {
   readonly mode = 'noop' as const;
   readonly explorer = null;
+  readonly minting = 'off' as const;
   constructor(
     private readonly reason: string,
     private readonly log: (line: string) => void,
@@ -76,6 +81,8 @@ export class TestnetChain implements ChainWriter {
   private readonly provider: JsonRpcProvider;
   private readonly account: Account;
   private checked = false;
+  /** Last known: was the game account below the mint threshold? Null until first read. */
+  private low: boolean | null = null;
 
   constructor(
     private readonly cfg: TestnetConfig,
@@ -85,6 +92,17 @@ export class TestnetChain implements ChainWriter {
     assertTestnetConfig(cfg);
     this.provider = new JsonRpcProvider({ url: cfg.rpcUrl });
     this.account = new Account(cfg.accountId, this.provider, KeyPairSigner.fromSecretKey(cfg.privateKey as KeyPairString));
+    // the first status read happens at boot, so the game can tell players the truth before a day closes
+    this.balanceNear().then(
+      (b) => {
+        this.low = b < cfg.minBalanceNear;
+      },
+      () => undefined,
+    );
+  }
+
+  get minting(): 'live' | 'paused' {
+    return this.low ? 'paused' : 'live';
   }
 
   private async preflight(): Promise<string | null> {
@@ -141,6 +159,7 @@ export class TestnetChain implements ChainWriter {
       }
       await this.ensureAgentAccounts(db);
       const lowBalance = (await this.balanceNear()) < this.cfg.minBalanceNear;
+      this.low = lowBalance;
       const built = await buildDayBatch(db, season, day, { henMintCap: lowBalance ? 0 : this.cfg.henMintCap, renderer: this.renderer });
       if (lowBalance) this.log('[chain] game account balance is low; hen mints wait for a top-up');
       const outcome = await this.account.callFunctionRaw({
@@ -151,11 +170,11 @@ export class TestnetChain implements ChainWriter {
         deposit: 0n,
       });
       const txHash = outcome.transaction_outcome.id;
-      await commitBatch(db, built);
+      await commitBatch(db, built, txHash);
       this.log(
         `[chain] season ${season} day ${day} settled on NEAR testnet: ${txHash} (${built.batch.eggs.length} egg moves, ${built.batch.hen_mints.length} hens minted, ${built.batch.hen_moves.length} moved)`,
       );
-      return { status: 'sent', txHash };
+      return { status: 'sent', txHash, minted: built.minted };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       this.log(`[chain] season ${season} day ${day} FAILED on NEAR testnet: ${error.slice(0, 300)}`);

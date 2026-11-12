@@ -1,4 +1,4 @@
-// The first-run tour: on until the player finishes or skips it, and back on from Settings.
+// The how-to-play tour: on until the player finishes or skips it, and back on from Settings.
 import { createStore } from './store';
 
 const KEY = 'coys.onboarded';
@@ -29,4 +29,8 @@ export function replayTour(): void {
     // storage blocked
   }
   tour.set({ active: true, step: 0 });
+}
+
+export function tourStep(step: number): void {
+  tour.set({ step });
 }

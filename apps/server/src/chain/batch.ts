@@ -52,6 +52,8 @@ export interface BuiltBatch {
   balances: Map<string, number>;
   /** Hens whose chain owner changes once this batch lands. */
   henOwners: Map<string, string>;
+  /** Hens this batch mints (a subset of henOwners). */
+  minted: string[];
 }
 
 const key = (account: string, grade: EggGrade): string => `${account}|${grade}`;
@@ -133,6 +135,7 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
   const henOwners = new Map<string, string>();
   const hen_mints: HenMint[] = [];
   const hen_moves: { token_id: string; to: string }[] = [];
+  const minted: string[] = [];
   const hens = await db.query(
     `SELECT h.id, h.farm_id, h.body, h.eyes, h.comb, h.accessory, h.laying_trait, h.born_day, h.chain_owner, f.owner_kind
      FROM hens h JOIN farms f ON f.id = h.farm_id WHERE h.status = 'alive' ORDER BY (f.owner_kind = 'player') DESC, h.born_day DESC`,
@@ -154,6 +157,7 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
         extra: JSON.stringify(Object.fromEntries(Object.entries(traits).map(([k, v]) => [k, String(v)]))),
       });
       henOwners.set(id, account);
+      minted.push(id);
     } else if (h.chain_owner !== account) {
       hen_moves.push({ token_id: `hen-${id}`, to: account });
       henOwners.set(id, account);
@@ -181,11 +185,12 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
     },
     balances,
     henOwners,
+    minted,
   };
 }
 
 /** Stores the balances and hen owners a landed batch produced. */
-export async function commitBatch(db: Db, built: BuiltBatch): Promise<void> {
+export async function commitBatch(db: Db, built: BuiltBatch, txHash: string | null = null): Promise<void> {
   await db.tx(async (q) => {
     for (const [k, amount] of built.balances) {
       const [account, grade] = k.split('|');
@@ -196,5 +201,6 @@ export async function commitBatch(db: Db, built: BuiltBatch): Promise<void> {
       );
     }
     for (const [henId, owner] of built.henOwners) await q.query('UPDATE hens SET chain_owner = $2 WHERE id = $1', [henId, owner]);
+    for (const henId of built.minted) await q.query('UPDATE hens SET mint_tx = $2, mint_day = $3 WHERE id = $1', [henId, txHash, built.batch.day]);
   });
 }

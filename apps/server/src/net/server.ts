@@ -59,6 +59,7 @@ const MIME: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.png': 'image/png',
+  '.webp': 'image/webp',
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg',
   '.ttf': 'font/ttf',

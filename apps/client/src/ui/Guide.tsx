@@ -1,23 +1,16 @@
-// The guide in the farm's corner. On a first run it walks the core loop by doing it: collect an
-// egg, sell, buy feed, answer a card; each step ends when the player does the thing. After that it
-// tracks the goal chain (each goal pays coins) and offers a hint when the farm needs something.
+// The guide zone, bottom left: the goal tracker on one line (each goal pays coins when claimed) and,
+// stacked above it, the toast area: the one hint the farm needs most right now, then the news. While
+// the tour runs, its step box takes the whole zone instead.
 import { useEffect, useRef, useState } from 'react';
 import { coopCapacity, feedGramsPerHenDay, type FarmState, type GoalId } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
+import type { Rect } from '../app/viewport';
 import type { Action } from '../net/socket';
 import { dayElapsed, events } from '../state/game';
 import { useStore } from '../state/store';
-import { finishTour, tour } from '../state/tour';
-import { uiFx } from './FxLayer';
+import { tour } from '../state/tour';
+import { toasts, uiFx } from './FxLayer';
 import { groundEggs } from './Hud';
-import { SheetSprite } from './SheetSprite';
-
-const STEPS: { title: string; text: string; done: (e: { kind: string; auto?: boolean }) => boolean }[] = [
-  { title: 'COLLECT AN EGG', text: 'YOUR HENS LAY THROUGH THE DAY. CLICK AN EGG ON THE GROUND TO PUT IT IN YOUR CRATE.', done: (e) => e.kind === 'collected' },
-  { title: 'SELL YOUR EGGS', text: 'CLICK THE CRATE BY THE PATH, OR USE THE SELL CARD. PRICES MOVE WITH HOW MANY EGGS THE WHOLE STREET SELLS.', done: (e) => e.kind === 'sold' },
-  { title: 'BUY FEED', text: 'CLICK THE TROUGH. YOUR HENS EAT AT DAWN: NO FEED MEANS NO EGGS TOMORROW.', done: (e) => e.kind === 'feedBought' },
-  { title: 'ANSWER A CARD', text: 'RIVALS, SUPPLIERS AND BUYERS SEND CARDS TO YOUR DESK. OPEN ONE AND ACCEPT, COUNTER OR DECLINE.', done: (e) => e.kind === 'cardResolved' && !e.auto },
-];
 
 export const GOAL_TEXT: Record<GoalId, string> = {
   collect: 'COLLECT YOUR FIRST EGGS',
@@ -29,120 +22,95 @@ export const GOAL_TEXT: Record<GoalId, string> = {
 };
 
 /** The one thing the farm needs most right now, if anything. */
-function hint(farm: FarmState): string | null {
+export function hint(farm: FarmState): string | null {
   const feed = farm.feedGrams.cheap + farm.feedGrams.standard + farm.feedGrams.premium;
   const days = farm.hens.length ? feed / (farm.hens.length * feedGramsPerHenDay()) : 99;
-  if (days < 1) return 'THE FEED IS RUNNING OUT: CLICK THE TROUGH TO BUY MORE.';
+  if (days < 1) return 'FEED IS RUNNING OUT: TAP THE TROUGH TO BUY MORE.';
   const crate = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
-  if (crate >= 30) return 'YOUR CRATE IS FILLING UP: CLICK THE CRATE TO SELL.';
+  if (crate >= 30) return 'YOUR CRATE IS FILLING UP: SELL IT FROM THE CRATE CARD.';
   const now = dayElapsed();
-  if (farm.cards.some((c) => c.status === 'open' && c.arriveAtMs <= now - 20_000)) return 'A CARD IS WAITING ON YOUR DESK: CLICK IT TO ANSWER.';
-  if (groundEggs(farm) >= 6) return 'EGGS ARE PILING UP ON THE GROUND: CLICK THEM TO COLLECT.';
-  if (farm.hens.length > coopCapacity(farm.coops.map((c) => c.kind))) return 'TOO MANY HENS FOR YOUR COOPS: CLICK A COOP TO BUILD OR UPGRADE.';
+  if (farm.cards.some((c) => c.status === 'open' && c.arriveAtMs <= now - 20_000)) return 'A CARD IS WAITING: OPEN IT FROM THE CARD LIST.';
+  if (groundEggs(farm) >= 6) return 'EGGS ARE PILING UP: TAP THEM TO COLLECT.';
+  if (farm.hens.length > coopCapacity(farm.coops.map((c) => c.kind))) return 'TOO MANY HENS FOR YOUR COOPS: TAP A COOP TO BUILD MORE ROOM.';
   return null;
 }
 
-export function Guide({ farm, send }: { farm: FarmState; send: (a: Action) => Promise<boolean> }) {
-  const { audio } = useServices();
-  const t = useStore(tour, (s) => s);
-  const box = useRef<HTMLDivElement>(null);
+/** Hints and news, newest nearest the tracker. */
+export function ToastArea({ farm, rect, offline = false }: { farm: FarmState; rect: Rect; offline?: boolean }) {
+  const list = useStore(toasts, (s) => s.list);
   const [, tick] = useState(0);
-  const [busy, setBusy] = useState(false);
-
-  // tour steps end when the player does the thing; goals pay with a burst of coins
-  useEffect(
-    () =>
-      events.on((e) => {
-        const cur = tour.get();
-        if (cur.active && STEPS[cur.step]?.done(e as { kind: string; auto?: boolean })) {
-          audio.play('19-haggle-win', { volume: 0.5 });
-          if (cur.step + 1 >= STEPS.length) {
-            finishTour();
-            uiFx.emit({ kind: 'toast', text: 'YOU KNOW THE LOOP. FOLLOW THE GOALS FOR COINS.' });
-          } else tour.set({ step: cur.step + 1 });
-        }
-        if (e.kind === 'goalClaimed') {
-          const r = box.current?.getBoundingClientRect();
-          const scale = box.current ? box.current.getBoundingClientRect().width / box.current.offsetWidth : 1;
-          const ui = box.current?.closest('.ui')?.getBoundingClientRect();
-          if (r && ui) uiFx.emit({ kind: 'coins', from: { x: (r.left - ui.left) / scale + 40, y: (r.top - ui.top) / scale }, count: 6 });
-          uiFx.emit({ kind: 'toast', text: `GOAL DONE: +${(e.rewardMilli / 1000).toFixed(0)} COINS` });
-          audio.play('15-kaching');
-        }
-      }),
-    [audio],
-  );
-
-  // hints and the egg count change with the clock, not only with server updates
+  // hints change with the clock, not only with server updates
   useEffect(() => {
     const id = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(id);
   }, []);
-
-  if (t.active) {
-    const step = STEPS[t.step] ?? STEPS[0];
-    if (!step) return null;
-    return (
-      <div ref={box} className="guide panel" role="status" aria-label="How to play">
-        <div className="row" style={{ gap: 6, alignItems: 'flex-start' }}>
-          <SheetSprite id="x-hen-portrait" row="talk" play="loop" zoom={1} />
-          <div className="col" style={{ gap: 3, flex: 1 }}>
-            <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
-              {t.step + 1} OF {STEPS.length}: {step.title}
-            </span>
-            <span style={{ lineHeight: '10px' }}>{step.text}</span>
-          </div>
-          <button
-            className="btn"
-            onClick={() => {
-              uiSound(audio, 'back');
-              finishTour();
-            }}
-          >
-            SKIP
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const goal = farm.goals.find((g) => g.state !== 'claimed');
-  const h = hint(farm);
-  if (!goal && !h) return null;
-  const index = goal ? farm.goals.indexOf(goal) : -1;
+  const h = offline ? 'RECONNECTING TO THE MARKET' : hint(farm);
+  const lines = Math.max(1, Math.floor((rect.h + 2) / 16));
+  const shown = list.slice(-Math.max(0, lines - (h ? 1 : 0)));
   return (
-    <div ref={box} className="guide" role="status" aria-label="Goals and hints">
+    <div className="toasts zone" data-ui="toasts" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
+      {[...shown].reverse().map((t) => (
+        <div key={t.id} className={`toast ${t.tone === 'bad' ? 'bad' : ''}`} role="status" data-ui="toast" title={t.text}>
+          {t.text}
+        </div>
+      ))}
       {h && (
-        <div className="hint" data-tip={h}>
+        <div className="hint" data-ui="toast" title={h}>
           ! {h}
         </div>
       )}
-      {goal && (
-        <div className="goal panel">
-          <div className="row spread" style={{ gap: 6 }}>
-            <div className="col" style={{ gap: 3 }}>
-              <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
-                GOAL {index + 1} OF {farm.goals.length}
-              </span>
-              <span>{GOAL_TEXT[goal.id]}</span>
-            </div>
-            {goal.state === 'ready' ? (
-              <button
-                className="btn red"
-                disabled={busy}
-                onClick={() => {
-                  uiSound(audio, 'click');
-                  setBusy(true);
-                  void send({ t: 'claimGoal', goal: goal.id }).finally(() => setBusy(false));
-                }}
-              >
-                CLAIM +{(goal.rewardMilli / 1000).toFixed(0)}
-              </button>
-            ) : (
-              <span className="chip">+{(goal.rewardMilli / 1000).toFixed(0)} COINS</span>
-            )}
-          </div>
-        </div>
+    </div>
+  );
+}
+
+export function Tracker({ farm, rect, send }: { farm: FarmState; rect: Rect; send: (a: Action) => Promise<boolean> }) {
+  const { audio } = useServices();
+  const box = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState(false);
+  const active = useStore(tour, (s) => s.active);
+
+  useEffect(
+    () =>
+      events.on((e) => {
+        if (e.kind !== 'goalClaimed') return;
+        uiFx.emit({ kind: 'coins', from: { x: rect.x + 60, y: rect.y }, count: 6 });
+        uiFx.emit({ kind: 'toast', text: `GOAL DONE: +${(e.rewardMilli / 1000).toFixed(0)} COINS` });
+        audio.play('15-kaching');
+      }),
+    [audio, rect.x, rect.y],
+  );
+
+  if (active) return null;
+  const goal = farm.goals.find((g) => g.state !== 'claimed');
+  const index = goal ? farm.goals.indexOf(goal) : -1;
+  return (
+    <div ref={box} className="tracker zone" data-ui="tracker" role="status" aria-label="Goal" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
+      {goal ? (
+        <>
+          <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
+            GOAL {index + 1}/{farm.goals.length}
+          </span>
+          <span className="goal-text" title={GOAL_TEXT[goal.id]}>
+            {GOAL_TEXT[goal.id]}
+          </span>
+          {goal.state === 'ready' ? (
+            <button
+              className="btn red"
+              disabled={busy}
+              onClick={() => {
+                uiSound(audio, 'click');
+                setBusy(true);
+                void send({ t: 'claimGoal', goal: goal.id }).finally(() => setBusy(false));
+              }}
+            >
+              CLAIM +{(goal.rewardMilli / 1000).toFixed(0)}
+            </button>
+          ) : (
+            <span className="chip">+{(goal.rewardMilli / 1000).toFixed(0)}</span>
+          )}
+        </>
+      ) : (
+        <span className="goal-text">EVERY GOAL DONE. KEEP YOUR FARM ON TOP OF THE STREET.</span>
       )}
     </div>
   );

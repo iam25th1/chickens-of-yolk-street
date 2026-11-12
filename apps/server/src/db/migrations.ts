@@ -310,6 +310,16 @@ ALTER TABLE ledger ADD COLUMN season text NOT NULL DEFAULT 'legacy';
 ALTER TABLE farms ADD COLUMN goals text NOT NULL DEFAULT '{}';
 `,
   },
+  {
+    id: 6,
+    name: 'hen certificates',
+    sql: `
+-- The settlement transaction that minted each hen as an NFT, and the day it closed, so a hen's
+-- card can link to her receipt.
+ALTER TABLE hens ADD COLUMN mint_tx text;
+ALTER TABLE hens ADD COLUMN mint_day integer;
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

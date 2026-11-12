@@ -31,6 +31,15 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
       bags: z.number().int().min(1).max(ECONOMY.limits.maxBagsPerPurchase),
     })
     .strict(),
+  /** Feed from the Loyalist now, paid with interest in a few days (within the Loyalist's credit limit). */
+  z
+    .object({
+      t: z.literal('buyFeedOnCredit'),
+      rid,
+      tier: z.enum(FEED_TIERS),
+      bags: z.number().int().min(1).max(ECONOMY.limits.maxBagsPerPurchase),
+    })
+    .strict(),
   z.object({ t: z.literal('setFeedTier'), rid, tier: z.enum(FEED_TIERS) }).strict(),
   z.object({ t: z.literal('buildCoop'), rid, kind: z.enum(COOP_KINDS).exclude(['starter']) }).strict(),
   z.object({ t: z.literal('upgradeCoop'), rid, coopId: id }).strict(),
@@ -46,6 +55,8 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
     .strict(),
   z.object({ t: z.literal('collect'), rid, eggId: id }).strict(),
   z.object({ t: z.literal('claimGoal'), rid, goal: z.enum(GOAL_IDS) }).strict(),
+  /** The tour's practice offer: one buyer's card, sent once per farm, to learn haggling on. */
+  z.object({ t: z.literal('practiceCard'), rid }).strict(),
   z
     .object({ t: z.literal('linkWallet'), rid, accountId: z.string().regex(/^([0-9a-f]{64}|[a-z0-9_-]{2,48}\.testnet)$/) })
     .strict(),
@@ -88,6 +99,9 @@ export interface HenView {
   ageDays: number;
   /** The NEAR testnet account holding her NFT (token hen-<id>), or null until a day close mints her. */
   chainOwner?: string | null;
+  /** The settlement transaction that minted her, and the day it closed (null until she is minted). */
+  mintTx?: string | null;
+  mintDay?: number | null;
 }
 
 /** A hen in the shop: fresh from the breeder or from a bust farm's auction. */
@@ -282,6 +296,8 @@ export interface MarketState {
   ranking: RivalRank[];
   /** Testnet explorer base for receipts, or null when settlement is off. */
   explorer: string | null;
+  /** Hen certificates: minted at day close (live), waiting for the game account to be topped up (paused), or no chain (off). */
+  minting: 'live' | 'paused' | 'off';
 }
 
 export interface DaySummary {
@@ -309,7 +325,9 @@ export interface LedgerDay {
 export type CardOutcome = 'accepted' | 'declined' | 'won' | 'failed' | 'expired';
 
 export type GameEvent =
-  | { kind: 'hensBought'; count: number; fromAuction: number; costMilli: number }
+  | { kind: 'hensBought'; count: number; fromAuction: number; costMilli: number; henIds?: string[] }
+  /** A day close recorded one of the player's hens on NEAR testnet as her own NFT. */
+  | { kind: 'henMinted'; henId: string; token: string; owner: string; txHash: string; day: number }
   | { kind: 'feedBought'; tier: FeedTier; bags: number; costMilli: number; supplier: string }
   | { kind: 'coopBuilt'; coopId: string; coopKind: CoopKind; plot: number; costMilli: number }
   | { kind: 'coopUpgraded'; coopId: string; coopKind: CoopKind; costMilli: number }

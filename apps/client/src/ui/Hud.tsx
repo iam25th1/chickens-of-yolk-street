@@ -5,6 +5,7 @@ import { uiSound, useServices } from '../app/services';
 import { motion } from '../motion/ui';
 import { dayElapsed, events, game, gameTime, sameDay } from '../state/game';
 import { useStore } from '../state/store';
+import type { Rect } from '../app/viewport';
 import { SheetSprite, flapRect } from './SheetSprite';
 
 /** A number that counts to its new value and pops when it goes up. */
@@ -57,6 +58,7 @@ function FlapChar({ ch }: { ch: string }) {
   const url = assets.url('33-split-flap');
   const atlas = assets.atlasSize('33-split-flap');
   const size = `${atlas.w}px ${atlas.h}px`;
+  // one art pixel per UI pixel: the cell is 8x12
   const src = flip >= 0 ? { x: flip * 64, y: 288 } : flapRect(shown);
   const rect = src ? assets.regionRect('33-split-flap', src.x, src.y, 64, 96) : null;
   if (!rect) return <span style={{ width: 8, height: 12, display: 'inline-block', background: '#3a1f10' }} />;
@@ -138,15 +140,30 @@ function DayClock() {
 
 export const coins = (milli: number): string => (milli / 1000).toFixed(2);
 
-export function TopBar({ farm, onShop, onSettings, onMarket, onLedger }: { farm: FarmState; onShop: () => void; onSettings: () => void; onMarket: () => void; onLedger: () => void }) {
+export function TopBar({
+  farm,
+  rect,
+  onShop,
+  onSettings,
+  onMarket,
+  onLedger,
+}: {
+  farm: FarmState;
+  rect: Rect;
+  onShop: () => void;
+  onSettings: () => void;
+  onMarket: () => void;
+  onLedger: () => void;
+}) {
   const { audio } = useServices();
   const capacity = coopCapacity(farm.coops.map((c) => c.kind));
   const feed = farm.feedGrams.cheap + farm.feedGrams.standard + farm.feedGrams.premium;
   const days = farm.hens.length ? feed / (farm.hens.length * feedGramsPerHenDay()) : 0;
-  const button = (row: string, label: string, onClick: () => void) => (
+  const button = (row: string, label: string, onClick: () => void, tour: string) => (
     <button
       className="btn"
-      style={{ height: 18, padding: '0 2px' }}
+      style={{ height: 16, padding: '0 1px' }}
+      data-tour={tour}
       aria-label={label}
       title={label}
       data-tip={label.toUpperCase()}
@@ -160,7 +177,7 @@ export function TopBar({ farm, onShop, onSettings, onMarket, onLedger }: { farm:
     </button>
   );
   return (
-    <div className="topbar">
+    <div className="topbar zone" data-ui="topbar" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, flexWrap: rect.h > 24 ? 'wrap' : 'nowrap', alignContent: 'center' }}>
       <Stat icon="cash" title="Coins to spend">
         <Counter id="cash-counter" value={farm.cashMilli} format={(v) => coins(Math.round(v))} />
       </Stat>
@@ -175,10 +192,10 @@ export function TopBar({ farm, onShop, onSettings, onMarket, onLedger }: { farm:
       </Stat>
       <div className="spacer" style={{ flex: 1 }} />
       <DayClock />
-      {button('market', 'Market board: prices and rivals', onMarket)}
-      {button('ledger', 'Ledger: your days in coins', onLedger)}
-      {button('shop', 'Shop: hens, feed, coops, machines', onShop)}
-      {button('settings', 'Settings', onSettings)}
+      {button('market', 'Market board: prices and rivals', onMarket, 'market')}
+      {button('ledger', 'Ledger: your days in coins', onLedger, 'ledger')}
+      {button('shop', 'Shop: hens, feed, coops, machines', onShop, 'shop')}
+      {button('settings', 'Settings', onSettings, 'settings')}
     </div>
   );
 }

@@ -46,7 +46,7 @@ import { migrate } from '../db/migrations';
 import { decide, type BrainOptions, type DecisionResult } from '../agents/brain';
 import type { FarmAction } from '../agents/decision';
 import type { ChainWriter } from '../chain/chain';
-import { arriveCards, buyBagsFrom, createCards, expireCards, farmCards, respondCard, type Candidate } from './cards';
+import { arriveCards, buyBagsFrom, createCards, expireCards, farmCards, practiceCard, respondCard, type Candidate } from './cards';
 import {
   applyDecision,
   bustIfBroke,
@@ -317,16 +317,19 @@ export class Game {
     return farmId;
   }
 
-  private async insertHens(ctx: Ctx, farmId: string | null, count: number): Promise<void> {
-    if (count <= 0) return;
+  private async insertHens(ctx: Ctx, farmId: string | null, count: number): Promise<string[]> {
+    if (count <= 0) return [];
+    const ids: string[] = [];
     const { min, max } = ECONOMY.hen.trait;
     const values: unknown[] = [];
     const rows: string[] = [];
     for (let i = 0; i < count; i++) {
       const b = values.length;
       rows.push(`($${b + 1}, $${b + 2}, $${b + 3}, $${b + 4}, $${b + 5}, $${b + 6}, $${b + 7}, $${b + 8}, $${b + 9}, $${b + 10})`);
+      const henId = newId();
+      ids.push(henId);
       values.push(
-        newId(),
+        henId,
         farmId,
         farmId ? 'alive' : 'forsale',
         pick(this.rng, BODY_COLOURS),
@@ -343,6 +346,7 @@ export class Game {
       `INSERT INTO hens (id, farm_id, status, body, eyes, comb, accessory, laying_trait, born_day, lay_progress) VALUES ${rows.join(', ')}`,
       values,
     );
+    return ids;
   }
 
   /** Each morning the breeder lists a fresh handful of hens beside any auction hens. */
@@ -369,8 +373,12 @@ export class Game {
       layingTrait: num(h.laying_trait),
       ageDays: day - num(h.born_day),
       ...(h.chain_owner === undefined ? {} : { chainOwner: h.chain_owner ? String(h.chain_owner) : null }),
+      ...(h.mint_tx === undefined ? {} : { mintTx: h.mint_tx ? String(h.mint_tx) : null, mintDay: h.mint_day === null ? null : num(h.mint_day) }),
     });
-    const hens = await q.query('SELECT id, body, eyes, comb, accessory, laying_trait, born_day, chain_owner FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id', [farmId, 'alive']);
+    const hens = await q.query(
+      'SELECT id, body, eyes, comb, accessory, laying_trait, born_day, chain_owner, mint_tx, mint_day FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id',
+      [farmId, 'alive'],
+    );
     const coops = await q.query('SELECT id, kind, plot FROM coops WHERE farm_id = $1 ORDER BY plot', [farmId]);
     const unlocks = await this.loadUnlocks(q, farmId);
     const eggs = await q.query('SELECT id, hen_id, at_ms, grade, broken, collected FROM lay_events WHERE farm_id = $1 AND day = $2 ORDER BY at_ms', [farmId, day]);
@@ -510,6 +518,7 @@ export class Game {
         bust: r.bust_day !== null,
       })),
       explorer: this.chain.explorer,
+      minting: this.chain.minting,
     };
   }
 
@@ -592,6 +601,8 @@ export class Game {
         return;
       case 'buyHen':
         return this.buyHen(ctx, farm, action.henId);
+      case 'practiceCard':
+        return practiceCard(ctx, farm);
       default:
         return this.applyFarmAction(ctx, farm, action);
     }
@@ -603,7 +614,7 @@ export class Game {
     const cost = toMilli(ECONOMY.hen.price * (h.status === 'auction' ? ECONOMY.agents.auctionPriceFactor : 1));
     await spend(ctx, farm, 'hens', cost, `hen ${henId.slice(0, 8)}`);
     await ctx.q.query(`UPDATE hens SET status = 'alive', farm_id = $1, lay_progress = 0 WHERE id = $2`, [farm.id, henId]);
-    emit(ctx, farm, { kind: 'hensBought', count: 1, fromAuction: h.status === 'auction' ? 1 : 0, costMilli: cost });
+    emit(ctx, farm, { kind: 'hensBought', count: 1, fromAuction: h.status === 'auction' ? 1 : 0, costMilli: cost, henIds: [henId] });
   }
 
   /** Farm actions shared by players and rival agents. */
@@ -622,8 +633,8 @@ export class Game {
           await ctx.q.query(`UPDATE hens SET status = 'alive', farm_id = $1, lay_progress = 0 WHERE id = ANY($2::text[])`, [farm.id, auction.map((h) => h.id)]);
           ctx.marketChanged = true;
         }
-        await this.insertHens(ctx, farm.id, fresh);
-        emit(ctx, farm, { kind: 'hensBought', count: action.count, fromAuction: auction.length, costMilli: cost });
+        const born = await this.insertHens(ctx, farm.id, fresh);
+        emit(ctx, farm, { kind: 'hensBought', count: action.count, fromAuction: auction.length, costMilli: cost, henIds: [...auction.map((h) => h.id), ...born] });
         return;
       }
       case 'buyFeed': {
@@ -912,7 +923,23 @@ export class Game {
       result.txHash,
       result.error ?? null,
     ]);
+    if (result.status === 'sent' && result.txHash && result.minted?.length) await this.announceMints(result.minted, result.txHash, closedDay);
     this.emit(null, { t: 'market', market: await this.getMarketState() });
+  }
+
+  /** Each minted hen's owner hears about it (the certificate moment) and gets the hen's new card. */
+  private async announceMints(henIds: string[], txHash: string, day: number): Promise<void> {
+    const rows = await this.db.query<{ id: string; chain_owner: string; farm_id: string; player_id: string | null }>(
+      `SELECT h.id, h.chain_owner, h.farm_id, f.player_id FROM hens h JOIN farms f ON f.id = h.farm_id WHERE h.id = ANY($1::text[]) AND f.owner_kind = 'player'`,
+      [henIds],
+    );
+    const farms = new Map<string, string>();
+    for (const r of rows) {
+      if (!r.player_id) continue;
+      farms.set(String(r.farm_id), String(r.player_id));
+      this.emit(String(r.player_id), { t: 'event', event: { kind: 'henMinted', henId: String(r.id), token: `hen-${String(r.id)}`, owner: String(r.chain_owner), txHash, day } });
+    }
+    for (const [farmId, playerId] of farms) this.emit(playerId, { t: 'farm', farm: await this.getFarmState(farmId) });
   }
 
   /** Ledger total for a farm, for audits and tests: always equals the farm's cash. */

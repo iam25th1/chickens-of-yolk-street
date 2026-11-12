@@ -12,9 +12,11 @@ import { LoadingScreen } from '../screens/LoadingScreen';
 import { LoginScreen, type SignedIn } from '../screens/LoginScreen';
 import { TitleScreen } from '../screens/TitleScreen';
 import { settings } from '../state/settings';
+import { Ticker } from '../ui/Hud';
 import { SettingsPanel } from '../ui/Panels';
 import { ServicesContext, type Services } from './services';
 import { Stage, useViewport } from './Stage';
+import { viewport } from './viewport';
 
 type Screen = 'boot' | 'title' | 'login' | 'loadingFarm' | 'farm';
 
@@ -22,7 +24,6 @@ const FONTS = ['16px "Pixelify Sans"', '8px Silkscreen', 'bold 8px Silkscreen'];
 
 export function App() {
   const vp = useViewport();
-  const scale = vp.zoom;
   const [services, setServices] = useState<Services | null>(null);
   const [screen, setScreen] = useState<Screen>('boot');
   const [progress, setProgress] = useState(0);
@@ -42,8 +43,9 @@ export function App() {
         setConfig(cfg);
         const audio = new AudioEngine(assets.index);
         audio.setVolumes(settings.get().music, settings.get().sfx);
+        const v0 = viewport.get();
         // stage 1: the loading screen's own art (a few KB), on screen at once
-        await assets.loadGroups([...BOOT_GROUPS]);
+        await assets.loadGroups([...BOOT_GROUPS], v0.p);
         pixi.setScene(new BackdropScene(assets, 'loading'));
         // the page's own loading screen (index.html) hands over to the game's
         document.getElementById('boot')?.remove();
@@ -53,26 +55,34 @@ export function App() {
         let done = 0;
         const tick = () => setProgress(++done / total);
         await Promise.all([
-          assets.loadGroups([...TITLE_GROUPS], tick),
+          assets.loadGroups([...TITLE_GROUPS], v0.p, { onEach: tick }),
           audio.load(BOOT_SOUNDS, () => undefined).then(tick, tick),
           ...FONTS.map((f) => document.fonts.load(f).then(tick, tick)),
         ]);
         setScreen('title');
         // stage 3 starts now: the farm's art downloads while the player reads the title
-        void assets.loadGroups([...FARM_GROUPS]).catch(() => undefined);
+        void assets.loadGroups([...FARM_GROUPS], viewport.get().farm.k, { quick: true }).catch(() => undefined);
       } catch (e) {
         setFatal(e instanceof Error ? e.message : String(e));
       }
     })();
   }, []);
 
-  // pixel cursor from 34-cursor, drawn at the stage scale
+  // a new window density brings the matching atlases (sprites keep drawing meanwhile)
+  useEffect(() => {
+    if (!services || screen === 'boot') return;
+    void services.assets.loadGroups([...TITLE_GROUPS, ...LATER_GROUPS], vp.p).catch(() => undefined);
+    void services.assets.loadGroups([...FARM_GROUPS], vp.farm.k, { quick: true }).catch(() => undefined);
+  }, [services, screen, vp.p, vp.farm.k]);
+
+  // pixel cursor from 34-cursor: each art pixel p device pixels
+  const cursorPx = Math.min(128, Math.max(16, Math.round((16 * vp.p) / vp.dpr)));
   useEffect(() => {
     if (!services) return;
     const img = new Image();
     img.onload = () => {
       const c = document.createElement('canvas');
-      const size = Math.min(128, Math.round(16 * scale));
+      const size = cursorPx;
       c.width = size;
       c.height = size;
       const ctx = c.getContext('2d');
@@ -84,7 +94,7 @@ export function App() {
       setCursor(`url(${c.toDataURL()}) ${Math.round(size * 0.2)} ${Math.round(size * 0.12)}, auto`);
     };
     img.src = services.assets.url('34-cursor');
-  }, [services, scale]);
+  }, [services, cursorPx]);
 
   useEffect(() => {
     if (screenEl.current) motion.slideIn(screenEl.current, 'up');
@@ -114,13 +124,14 @@ export function App() {
     setProgress(0);
     let done = 0;
     const tick = () => setProgress(++done / FARM_GROUPS.length);
+    const v = viewport.get();
     void assets
-      .loadGroups([...FARM_GROUPS], tick)
+      .loadGroups([...FARM_GROUPS], v.farm.k, { quick: true, onEach: tick })
       .then(() => {
         setTimeout(() => setScreen('farm'), 250);
         // sounds and the other screens' art arrive in the background; nothing waits for them
         void audio.load(FARM_SOUNDS).catch(() => undefined);
-        void assets.loadGroups([...LATER_GROUPS]).catch(() => undefined);
+        void assets.loadGroups([...LATER_GROUPS], v.p).catch(() => undefined);
       })
       .catch((e: unknown) => setFatal(e instanceof Error ? e.message : String(e)));
   }, [screen, services]);
@@ -151,8 +162,10 @@ export function App() {
                 {screen === 'loadingFarm' && <LoadingScreen progress={progress} label="LOADING THE FARM" />}
               </div>
             )}
+            {/* the title's live prices run along the whole window's foot */}
+            {screen === 'title' && <Ticker />}
             {screen === 'farm' && signedIn && (
-              <FarmScreen session={signedIn.session} accountId={signedIn.accountId} onSignedOut={signOut} onSettings={() => setSettingsOpen(true)} />
+              <FarmScreen session={signedIn.session} accountId={signedIn.accountId} onSignedOut={signOut} />
             )}
           </div>
           {settingsOpen && (
