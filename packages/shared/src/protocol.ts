@@ -31,6 +31,15 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
       bags: z.number().int().min(1).max(ECONOMY.limits.maxBagsPerPurchase),
     })
     .strict(),
+  /** Feed from the Loyalist now, paid with interest in a few days (within the Loyalist's credit limit). */
+  z
+    .object({
+      t: z.literal('buyFeedOnCredit'),
+      rid,
+      tier: z.enum(FEED_TIERS),
+      bags: z.number().int().min(1).max(ECONOMY.limits.maxBagsPerPurchase),
+    })
+    .strict(),
   z.object({ t: z.literal('setFeedTier'), rid, tier: z.enum(FEED_TIERS) }).strict(),
   z.object({ t: z.literal('buildCoop'), rid, kind: z.enum(COOP_KINDS).exclude(['starter']) }).strict(),
   z.object({ t: z.literal('upgradeCoop'), rid, coopId: id }).strict(),

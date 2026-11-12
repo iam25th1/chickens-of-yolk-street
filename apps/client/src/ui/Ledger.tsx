@@ -1,11 +1,12 @@
-// The ledger: day-by-day profit, contracts and debts, and the on-chain receipt for each settled day.
+// The ledger: day-by-day profit, contracts and debts, the on-chain receipt for each settled day, and
+// each hen's certificate receipt.
 import { useEffect } from 'react';
 import type { FarmState } from '@coys/shared';
 import { useServices } from '../app/services';
 import type { Action } from '../net/socket';
 import { game } from '../state/game';
 import { useStore } from '../state/store';
-import { Panel } from './Panels';
+import { Modal } from './Modal';
 
 const coins = (milli: number): string => (milli / 1000).toFixed(2);
 
@@ -19,7 +20,10 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
     audio.play('13-tray', { volume: 0.5 });
   }, [send, audio]);
   return (
-    <Panel title={season ? `LEDGER, SEASON ${season.toUpperCase()}` : 'LEDGER'} x={60} y={40} w={384} h={286} onClose={onClose}>
+    <Modal title={season ? `LEDGER, SEASON ${season.toUpperCase()}` : 'LEDGER'} onClose={onClose} w={400} h={300}>
+      <span style={{ lineHeight: '10px', color: '#8b5a2b', display: 'block', marginBottom: 4 }} data-tour="ledger-days">
+        EACH DAY CLOSES WITH A RECEIPT: WHAT CAME IN, WHAT WENT OUT, AND THE DAY&apos;S RECORD ON NEAR.
+      </span>
       <div className="row spread" style={{ color: '#8b5a2b', marginBottom: 4 }}>
         <span style={{ width: 40 }}>DAY</span>
         <span style={{ width: 60, textAlign: 'right' }}>IN</span>
@@ -27,7 +31,7 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
         <span style={{ width: 60, textAlign: 'right' }}>NET</span>
         <span style={{ width: 90, textAlign: 'right' }}>RECEIPT</span>
       </div>
-      <div className="col" style={{ gap: 3, height: 150, overflowY: 'auto' }}>
+      <div className="col" style={{ gap: 3, maxHeight: 120, overflowY: 'auto' }}>
         {!days && <span>OPENING THE BOOKS</span>}
         {days?.map((d) => (
           <div key={d.day} className="row spread">
@@ -64,7 +68,25 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
             {d.agentName.toUpperCase()}: {coins(d.dueMilli)} DUE DAY {d.dueDay} ({d.status.toUpperCase()})
           </span>
         ))}
+        <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: '4px 0 0' }}>
+          HEN CERTIFICATES
+        </span>
+        {farm.hens.filter((h) => h.mintTx).length === 0 && <span>NONE RECORDED YET</span>}
+        {farm.hens
+          .filter((h) => h.mintTx)
+          .map((h) => (
+            <span key={h.id} className="row spread">
+              <span>
+                HEN-{h.id.slice(0, 8).toUpperCase()} DAY {h.mintDay ?? '?'}
+              </span>
+              {explorer && h.mintTx ? (
+                <a href={`${explorer}${h.mintTx}`} target="_blank" rel="noreferrer" style={{ color: '#2f6f9e' }}>
+                  RECEIPT
+                </a>
+              ) : null}
+            </span>
+          ))}
       </div>
-    </Panel>
+    </Modal>
   );
 }

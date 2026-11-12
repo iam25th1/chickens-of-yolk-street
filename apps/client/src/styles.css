@@ -87,15 +87,17 @@ body {
   image-rendering: crisp-edges;
 }
 
+/* The UI is laid out in UI pixels; CSS zoom draws each at p whole device pixels (Stage.tsx), so text
+   is rasterised at the screen's own resolution and pixel art lands on whole pixels. */
 .ui {
   position: absolute;
   left: 0;
   top: 0;
-  transform-origin: 0 0;
   font-size: 8px;
   line-height: 8px;
   image-rendering: pixelated;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .ui > * {
@@ -118,14 +120,13 @@ body {
   pointer-events: none;
 }
 
-/* Screens drawn for 640x360 (title, login, cards, panels) sit centred, shrunk to fit if needed. */
+/* Screens drawn for 640x360 (title, login, loading) sit centred on whole device pixels. */
 .stage640 {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  left: var(--c640x, 0);
+  top: var(--c640y, 0);
   width: 640px;
   height: 360px;
-  transform: translate(-50%, -50%) scale(var(--fit, 1));
   pointer-events: none;
 }
 
@@ -133,18 +134,46 @@ body {
   pointer-events: auto;
 }
 
-/* The world dims behind a card or the tour (not the HUD). */
-.dim {
+/* Fixed zones: they never overlap (app/viewport.ts places them). */
+.zone {
   position: absolute;
-  left: 0;
-  top: 24px;
-  right: 132px;
-  bottom: 16px;
-  background: rgba(42, 22, 12, 0.6);
 }
 
-.portrait .dim {
-  right: 0;
+/* One modal at a time, over a dimmed backdrop that covers the whole window. */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(42, 22, 12, 0.62);
+  pointer-events: auto;
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex: none;
+}
+
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+  flex: none;
 }
 
 .sprite {
@@ -152,6 +181,10 @@ body {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   flex: none;
+}
+
+canvas.sprite {
+  display: block;
 }
 
 /* ---- type ------------------------------------------------------------------------------------- */
@@ -387,20 +420,14 @@ input[type='range'].slider::-moz-range-thumb {
 /* ---- HUD -------------------------------------------------------------------------------------- */
 
 .topbar {
-  position: absolute;
-  left: 0;
-  top: 0;
-  right: 0;
-  height: 24px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 6px;
+  gap: 4px;
+  padding: 0 4px;
   background: var(--wood);
   box-shadow:
     inset 0 -2px 0 var(--ink),
-    inset 0 1px 0 var(--wood-light),
-    0 1px 0 var(--terracotta-deep);
+    inset 0 1px 0 var(--wood-light);
   color: var(--cream);
 }
 
@@ -408,11 +435,12 @@ input[type='range'].slider::-moz-range-thumb {
   display: flex;
   align-items: center;
   gap: 2px;
-  height: 18px;
-  padding: 0 4px 0 1px;
+  height: 16px;
+  padding: 0 4px 0 0;
   background: var(--ink);
   box-shadow: inset 0 0 0 1px var(--terracotta-deep);
   color: var(--cream);
+  white-space: nowrap;
 }
 
 .stat-label {
@@ -420,7 +448,13 @@ input[type='range'].slider::-moz-range-thumb {
   margin-right: 2px;
 }
 
-/* Pixel tooltips under every HUD stat and button (hover, or focus on a keyboard). */
+.stat .value {
+  min-width: 16px;
+  text-align: right;
+  display: inline-block;
+}
+
+/* Tooltips under HUD stats and buttons (hover, or focus on a keyboard). */
 [data-tip] {
   position: relative;
 }
@@ -446,15 +480,10 @@ input[type='range'].slider::-moz-range-thumb {
   pointer-events: none;
 }
 
-.topbar > :nth-last-child(-n + 4)[data-tip]:hover::after {
+.topbar > :nth-last-child(-n + 5)[data-tip]:hover::after,
+.topbar > :nth-last-child(-n + 5)[data-tip]:focus-visible::after {
   left: auto;
   right: 0;
-}
-
-.stat .value {
-  min-width: 24px;
-  text-align: right;
-  display: inline-block;
 }
 
 .ticker {
@@ -497,65 +526,56 @@ input[type='range'].slider::-moz-range-thumb {
   color: #ff8a6a;
 }
 
-.tray {
-  position: absolute;
-  right: 0;
-  top: 24px;
-  width: 132px;
-  bottom: 16px;
+/* The side panel: the crate's sell card, waiting cards, the desk. */
+.side {
   background: var(--terracotta-deep);
   box-shadow:
     inset 2px 0 0 var(--ink),
     inset 3px 0 0 var(--terracotta);
+  padding: 4px 4px 4px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--cream);
 }
 
-.desk {
-  position: absolute;
-  left: 6px;
-  top: 186px;
-  width: 122px;
-  height: 130px;
-  overflow-y: auto;
-}
-
-/* Portrait: the top bar wraps, the tray becomes a panel under the farm. */
-.portrait .topbar {
+.portrait .side {
+  flex-direction: row;
   flex-wrap: wrap;
-  height: auto;
-  min-height: 24px;
-  padding: 3px 4px;
-  row-gap: 3px;
-  justify-content: space-between;
-}
-
-.portrait .topbar .spacer {
-  display: none;
-}
-
-.portrait .tray {
-  left: 0;
-  right: 0;
-  width: auto;
-  top: var(--farm-bottom);
+  align-content: flex-start;
   box-shadow:
     inset 0 2px 0 var(--ink),
     inset 0 3px 0 var(--terracotta);
+  padding: 6px;
 }
 
-.portrait .desk {
-  left: 136px;
-  top: 8px;
-  right: 6px;
-  width: auto;
-  height: auto;
-  bottom: 6px;
+.side-section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 0;
+}
+
+.side-title {
+  font-family: var(--font-body);
+  font-weight: 700;
+  color: var(--straw);
+  display: flex;
+  justify-content: space-between;
+}
+
+.desk {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .card {
-  position: absolute;
-  left: 2px;
+  position: relative;
   width: 128px;
   height: 176px;
+  flex: none;
   cursor: inherit;
 }
 
@@ -576,12 +596,18 @@ input[type='range'].slider::-moz-range-thumb {
   top: 57px;
   width: 128px;
   text-align: center;
-  /* Pixelify Sans closes up below 16px (C reads as O, 2 as 8); Silkscreen is drawn for 8px.
-     Regular weight: STANDING CONTRACT is 97px wide in it, inside the card (113px in bold) */
   font-family: var(--font-body);
   font-weight: 400;
   font-size: 8px;
   color: var(--barn);
+}
+
+.glut {
+  padding: 4px;
+  background: var(--barn-deep);
+  color: var(--cream);
+  box-shadow: 0 0 0 1px var(--ink);
+  line-height: 10px;
 }
 
 .row {
@@ -601,13 +627,19 @@ input[type='range'].slider::-moz-range-thumb {
 }
 
 .toast {
-  padding: 4px 8px;
+  padding: 3px 6px;
   background: var(--ink);
   color: var(--cream);
-  box-shadow:
-    0 0 0 1px var(--straw),
-    2px 2px 0 1px var(--ink);
+  box-shadow: 0 0 0 1px var(--straw);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 8px;
+  flex: none;
+}
+
+.toast.bad {
+  background: var(--barn-deep);
 }
 
 .devlabel {
@@ -624,43 +656,120 @@ input[type='range'].slider::-moz-range-thumb {
 
 /* What saying yes to a card means, in one plain line. */
 .meaning {
-  margin: 6px 0 2px;
+  margin: 0;
   padding: 3px 4px;
   background: #e3cc96;
   color: var(--ink);
   line-height: 10px;
 }
 
-/* The guide: tour steps, then goals and hints, in the farm's bottom-left corner. */
-.guide {
-  position: absolute;
-  left: 6px;
-  bottom: 22px;
-  width: 260px;
-  z-index: 15;
+/* The guide: the toast stack (hints and news) above the goal tracker. */
+.toasts {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: column-reverse;
+  gap: 2px;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-.guide.panel {
-  padding: 6px;
-}
-
-.guide .goal {
-  position: relative;
-  padding: 6px;
+.toasts > * {
+  pointer-events: auto;
 }
 
 .hint {
-  padding: 3px 5px;
+  padding: 3px 6px;
   background: var(--barn-deep);
   color: var(--cream);
-  line-height: 10px;
+  line-height: 8px;
   box-shadow: 0 0 0 1px var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: none;
 }
 
-.portrait .guide {
-  right: 6px;
-  width: auto;
+.tracker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 6px;
+  background: var(--cream);
+  box-shadow:
+    0 0 0 1px var(--ink),
+    inset 0 0 0 1px var(--wood-light);
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.tracker .goal-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The tour: a step box in the guide zone, and a spotlight on the thing to do. */
+.tour-box {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 6px;
+  background: var(--cream);
+  box-shadow:
+    0 0 0 1px var(--ink),
+    inset 0 0 0 1px var(--straw-deep);
+  color: var(--ink);
+  line-height: 9px;
+  overflow: hidden;
+}
+
+.tour-dots {
+  display: flex;
+  gap: 2px;
+}
+
+.tour-dots i {
+  width: 4px;
+  height: 4px;
+  background: var(--cream-deep);
+  box-shadow: 0 0 0 1px var(--wood);
+}
+
+.tour-dots i.on {
+  background: var(--barn);
+}
+
+.tour-dots i.done {
+  background: var(--straw-deep);
+}
+
+.spot-shade {
+  position: absolute;
+  background: rgba(42, 22, 12, 0.6);
+  pointer-events: auto;
+}
+
+.spot-ring {
+  position: absolute;
+  box-shadow:
+    0 0 0 1px var(--ink),
+    0 0 0 3px var(--straw),
+    0 0 0 4px var(--ink);
+  pointer-events: none;
+}
+
+.spot-tag {
+  position: absolute;
+  padding: 2px 4px;
+  background: var(--straw);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.certificate {
+  align-items: center;
+  text-align: center;
 }
