@@ -18,14 +18,16 @@
     "build": "npm run build -w @coys/server && npm run build -w @coys/client && node scripts/compress-dist.mjs",
     "start": "node apps/server/dist/main.js",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json && npm run typecheck --workspaces --if-present",
+    "test:e2e": "vitest run -c vitest.e2e.config.ts",
+    "typecheck": "tsc -p tsconfig.json && tsc -p e2e/tsconfig.json && npm run typecheck --workspaces --if-present",
     "lint": "eslint . && tsx scripts/check-text.ts",
     "pack-assets": "tsx scripts/pack-assets.ts",
     "deploy-contract": "tsx scripts/deploy-testnet-contract.ts",
     "derive-assets": "tsx scripts/derive-assets.ts",
     "generate-founders": "tsx scripts/generate-founders.ts",
     "commit-provenance": "tsx scripts/commit-provenance.ts",
-    "release-chain-days": "tsx scripts/release-chain-days.ts"
+    "release-chain-days": "tsx scripts/release-chain-days.ts",
+    "settle-late-days": "tsx scripts/settle-late-days.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -35,6 +37,7 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.14.0",
     "near-api-js": "7.5.3",
+    "playwright-core": "1.64.1",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.2",
