@@ -125,7 +125,7 @@ export function MarketBoard({
                 {market.feathers.left} OF {market.feathers.max} LEFT TO MINT
               </span>
               <span style={{ lineHeight: '10px', color: '#8b5a2b' }}>
-                {market.feathers.minted} MINTED ON NEAR TESTNET{market.feathers.tickets ? `, ${market.feathers.tickets} TICKETS WAITING` : ''}. WON AT MILESTONES.
+                {market.feathers.minted} MINTED ON NEAR TESTNET{market.feathers.tickets ? `, ${market.feathers.tickets} TICKET${market.feathers.tickets === 1 ? '' : 'S'} WAITING` : ''}. WON AT MILESTONES.
               </span>
               <span style={{ color: '#2f6f9e' }}>OPEN THE MINT PAGE</span>
             </button>
