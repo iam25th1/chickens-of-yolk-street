@@ -120,7 +120,8 @@ export function App() {
     if (screen !== 'loadingFarm' || !services) return;
     const { assets, audio, pixi } = services;
     pixi.setScene(new BackdropScene(assets, 'loading'));
-    audio.playMusic('44-jingle', 300);
+    // quiet while the farm downloads: music would take the line the farm's art needs
+    audio.playMusic(null, 300);
     setProgress(0);
     let done = 0;
     const tick = () => setProgress(++done / FARM_GROUPS.length);
@@ -129,9 +130,14 @@ export function App() {
       .loadGroups([...FARM_GROUPS], v.farm.k, { quick: true, onEach: tick })
       .then(() => {
         setTimeout(() => setScreen('farm'), 250);
-        // sounds and the other screens' art arrive in the background; nothing waits for them
-        void audio.load(FARM_SOUNDS).catch(() => undefined);
-        void assets.loadGroups([...LATER_GROUPS], v.p).catch(() => undefined);
+        // the sharp farm first, then sounds and the other screens' art; nothing waits for them
+        void assets
+          .loadGroups([...FARM_GROUPS], v.farm.k)
+          .catch(() => undefined)
+          .then(() => {
+            void audio.load(FARM_SOUNDS).catch(() => undefined);
+            void assets.loadGroups([...LATER_GROUPS], v.p).catch(() => undefined);
+          });
       })
       .catch((e: unknown) => setFatal(e instanceof Error ? e.message : String(e)));
   }, [screen, services]);

@@ -92,7 +92,7 @@ describe('derived sprites', () => {
           if (s.kind === 'painted') {
             expect(Number.isInteger(px) && Number.isInteger(py), `${key} pivots between texels`).toBe(true);
           }
-          const img = page(s.kind === 'painted' ? `${s.group}@${level}` : s.group, n);
+          const img = page(s.kind === 'painted' ? `${s.atlas ?? s.group}@${level}` : s.group, n);
           let mass = 0;
           let sx = 0;
           let sy = 0;
