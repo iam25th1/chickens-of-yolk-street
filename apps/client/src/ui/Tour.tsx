@@ -103,14 +103,12 @@ export const TOUR: TourStep[] = [
     blocked: (c) => !c.modal && waitingCards(c.farm).length === 0,
   },
   {
-    title: 'EVERY HEN IS YOURS',
+    title: 'EVERY HEN IS ONE OF A KIND',
     hen: true,
     text: (c) =>
-      c.market.minting === 'live'
-        ? 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND, AND AT A DAY CLOSE SHE IS RECORDED ON NEAR AS YOURS FOR GOOD.'
-        : c.market.minting === 'paused'
-          ? 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND. RECORDING HENS ON NEAR AS YOURS FOR GOOD IS PAUSED FOR NOW: HERS WAITS.'
-          : 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND: HER LOOKS AND HER LAYING ARE HERS ALONE.',
+      c.market.minting === 'off'
+        ? 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND: HER LOOKS AND HER LAYING ARE HERS ALONE.'
+        : `BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND. MILESTONES CAN ALSO WIN YOU A FOUNDING HEN, RECORDED ON NEAR AS YOURS FOR GOOD: ONLY ${c.market.founding.max} WILL EVER EXIST.`,
     target: (c) => {
       if (c.modal?.kind === 'shop') return c.modal.tab === 'hens' ? { dom: 'buy-hen', tag: 'BUY HER' } : { dom: 'shop-hens' };
       return c.modal ? close : { dom: 'shop', tag: 'THE SHOP' };

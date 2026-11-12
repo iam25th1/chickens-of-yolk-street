@@ -7,6 +7,7 @@ import type { Action } from '../net/socket';
 import { game } from '../state/game';
 import { useStore } from '../state/store';
 import { Modal } from './Modal';
+import { MILESTONE_TEXT } from './HowToPlay';
 
 const coins = (milli: number): string => (milli / 1000).toFixed(2);
 
@@ -85,15 +86,15 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
           </span>
         ))}
         <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: '4px 0 0' }}>
-          HEN CERTIFICATES
+          FOUNDING HEN CERTIFICATES
         </span>
-        {farm.hens.filter((h) => h.mintTx).length === 0 && <span>NONE RECORDED YET</span>}
+        {farm.hens.filter((h) => h.mintTx).length === 0 && <span>NONE YET: FOUNDING HENS ARE WON AT MILESTONES</span>}
         {farm.hens
           .filter((h) => h.mintTx)
           .map((h) => (
             <span key={h.id} className="row spread">
               <span>
-                HEN-{h.id.slice(0, 8).toUpperCase()} DAY {h.mintDay ?? '?'}
+                {h.founding?.number ? `FOUNDING HEN #${h.founding.number}` : `HEN-${h.id.slice(0, 8).toUpperCase()}`} DAY {h.mintDay ?? '?'}
               </span>
               {explorer && h.mintTx ? (
                 <a href={`${explorer}${h.mintTx}`} target="_blank" rel="noreferrer" style={{ color: '#2f6f9e' }}>
@@ -102,6 +103,18 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
               ) : null}
             </span>
           ))}
+        <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: '4px 0 0' }} data-ui="milestones">
+          MILESTONES
+        </span>
+        <span style={{ lineHeight: '10px', color: farm.standing.good ? '#2f6f9e' : '#b8321f' }}>
+          {farm.standing.good ? 'IN GOOD STANDING: EACH MILESTONE GIVES ONE CHANCE AT A FOUNDING HEN.' : `NOT IN GOOD STANDING (${farm.standing.reasons.join(', ').toUpperCase()}): MILESTONES WAIT.`}
+        </span>
+        {farm.milestones.map((m) => (
+          <span key={m.id} className="row spread">
+            <span>{MILESTONE_TEXT[m.id]}</span>
+            <span>{m.state === 'open' ? 'TO DO' : m.state === 'won' ? `WON DAY ${m.day}` : `TRIED DAY ${m.day}`}</span>
+          </span>
+        ))}
       </div>
     </Modal>
   );

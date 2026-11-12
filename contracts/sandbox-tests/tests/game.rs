@@ -23,7 +23,8 @@ fn founding(id: &str, owner: &Account, season: &str, day: u32) -> Value {
     json!({
         "token_id": id,
         "owner_id": owner.id(),
-        "media": format!("data:image/png;base64,{}", "iVBORw0KGgo".repeat(40)),
+        // as long as the largest real portrait (1,810 characters), so gas and storage are measured true
+        "media": format!("data:image/png;base64,{}", "iVBORw0KGgo".repeat(162)),
         "media_hash": "AQID",
         "traits": "{\"body\":\"brown\",\"comb\":\"spiky\",\"eyes\":\"bright\",\"accessory\":\"none\",\"laying\":\"steady\"}",
         "milestone": "full-coop",

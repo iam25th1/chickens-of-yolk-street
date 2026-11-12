@@ -110,6 +110,17 @@ export function MarketBoard({
                 {share > 1 ? 'TOO MANY EGGS: A GLUT. PRICES FALL TOMORROW.' : 'EGGS ARE SCARCE: PRICES RISE TOMORROW.'} PAST THE LINE IS A GLUT.
               </span>
             </button>
+            <span className="col" style={{ gap: 2, marginTop: 4 }} data-ui="founding-left">
+              <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
+                FOUNDING HENS
+              </span>
+              <span>
+                {market.founding.remaining} OF {market.founding.max} LEFT TO WIN
+              </span>
+              <span style={{ lineHeight: '10px', color: '#8b5a2b' }}>
+                {market.founding.minted} RECORDED ON NEAR{market.founding.pending ? `, ${market.founding.pending} WAITING` : ''}. WON AT MILESTONES.
+              </span>
+            </span>
           </div>
           <button
             className="col"

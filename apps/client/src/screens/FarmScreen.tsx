@@ -4,7 +4,7 @@
 // hen, a machine, the crate, a hen's certificate, settings). Server state flows in through the
 // socket; player choices go out as actions and come back as events with juice.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isCrash, type CardView } from '@coys/shared';
+import { ECONOMY, isCrash, type CardView } from '@coys/shared';
 import { useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { worldToUi } from '../app/viewport';
@@ -23,7 +23,7 @@ import { ToastArea, Tracker } from '../ui/Guide';
 import { TopBar } from '../ui/Hud';
 import { LedgerPanel } from '../ui/Ledger';
 import { MarketBoard } from '../ui/MarketBoard';
-import { HowToPlay } from '../ui/HowToPlay';
+import { HowToPlay, MILESTONE_TEXT } from '../ui/HowToPlay';
 import { Modal } from '../ui/Modal';
 import { SettingsBody, ShopPanel } from '../ui/Panels';
 import { Spotlight, TourBox } from '../ui/Tour';
@@ -237,6 +237,20 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
           case 'henMinted':
             certificates.current.push({ henId: e.henId, txHash: e.txHash, day: e.day });
             break;
+          case 'milestoneRoll': {
+            const what = MILESTONE_TEXT[e.milestone];
+            const next = e.next ? ` NEXT: ${MILESTONE_TEXT[e.next]}.` : '';
+            if (e.won) {
+              audio.play('19-haggle-win', { volume: 0.7 });
+              uiFx.emit({ kind: 'toast', tone: 'good', text: `MILESTONE: ${what}! YOU WON A FOUNDING HEN. THE NEXT DAY CLOSE RECORDS HER ON NEAR. ${e.remaining} OF ${ECONOMY.founding.maxSupply} LEFT.` });
+            } else {
+              uiFx.emit({
+                kind: 'toast',
+                text: `MILESTONE: ${what}. NO FOUNDING HEN THIS TIME (A ${Math.round(e.odds * 100)}% CHANCE), BUT WELL FARMED.${next}`,
+              });
+            }
+            break;
+          }
           case 'contractDelivered':
             uiFx.emit({ kind: 'coins', from: worldToUi({ x: 444, y: 280 }), count: 4 });
             if (e.auto) uiFx.emit({ kind: 'toast', text: `THE CART DELIVERED ${e.qty} EGGS` });
