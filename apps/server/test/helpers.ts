@@ -21,17 +21,24 @@ export interface TestGame {
 export class RecordingChain implements ChainWriter {
   readonly mode = 'near-testnet' as const;
   readonly explorer = 'https://testnet.nearblocks.io/txns/';
+  readonly minting = 'live' as const;
   readonly batches: DayBatch[] = [];
-  constructor(readonly gameAccount = 'game.testnet') {}
+  constructor(
+    readonly gameAccount = 'game.testnet',
+    /** Hens minted per day (0: none). Minting uses a stand-in portrait, not the packed art. */
+    readonly mintCap = 0,
+  ) {}
 
   async settleDay(db: Db, season: string, day: number): Promise<SettleResult> {
     for (const a of await db.query('SELECT id, kind, generation FROM agents WHERE near_account_id IS NULL')) {
       await db.query('UPDATE agents SET near_account_id = $2 WHERE id = $1', [a.id, agentAccountName(String(a.kind), Number(a.generation), this.gameAccount)]);
     }
-    const built = await buildDayBatch(db, season, day, { henMintCap: 0, renderer: null });
+    const renderer = this.mintCap ? { render: () => ({ dataUri: 'data:image/png;base64,', sha256Base64: 'stand-in' }) } : null;
+    const built = await buildDayBatch(db, season, day, { henMintCap: this.mintCap, renderer: renderer as never });
     this.batches.push(built.batch);
-    await commitBatch(db, built);
-    return { status: 'sent', txHash: `recorded-${season}-${day}` };
+    const txHash = `recorded-${season}-${day}`;
+    await commitBatch(db, built, txHash);
+    return { status: 'sent', txHash, minted: built.minted };
   }
 }
 

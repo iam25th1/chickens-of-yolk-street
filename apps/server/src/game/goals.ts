@@ -10,6 +10,8 @@ import { emit } from './market';
 interface GoalRecord {
   done: GoalId[];
   claimed: GoalId[];
+  /** The tour's practice offer has been sent (once per farm). */
+  practice?: boolean;
 }
 
 async function read(q: Queryable, farmId: string): Promise<{ goals: GoalRecord; createdDay: number }> {
@@ -17,7 +19,11 @@ async function read(q: Queryable, farmId: string): Promise<{ goals: GoalRecord; 
   let goals: GoalRecord = { done: [], claimed: [] };
   try {
     const parsed = JSON.parse(String(row?.goals ?? '{}')) as Partial<GoalRecord>;
-    goals = { done: (parsed.done ?? []).filter((g) => GOAL_IDS.includes(g)), claimed: (parsed.claimed ?? []).filter((g) => GOAL_IDS.includes(g)) };
+    goals = {
+      done: (parsed.done ?? []).filter((g) => GOAL_IDS.includes(g)),
+      claimed: (parsed.claimed ?? []).filter((g) => GOAL_IDS.includes(g)),
+      ...(parsed.practice ? { practice: true } : {}),
+    };
   } catch {
     // a bad value reads as a fresh chain
   }
@@ -26,6 +32,14 @@ async function read(q: Queryable, farmId: string): Promise<{ goals: GoalRecord; 
 
 async function write(q: Queryable, farmId: string, goals: GoalRecord): Promise<void> {
   await q.query('UPDATE farms SET goals = $2 WHERE id = $1', [farmId, JSON.stringify(goals)]);
+}
+
+/** Marks the tour's practice offer as sent; false when it already was. */
+export async function takePractice(q: Queryable, farmId: string): Promise<boolean> {
+  const { goals } = await read(q, farmId);
+  if (goals.practice) return false;
+  await write(q, farmId, { ...goals, practice: true });
+  return true;
 }
 
 /** Records that something the chain asks for has happened (collect, sell, haggle). */

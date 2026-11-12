@@ -37,7 +37,7 @@ import {
   type Ctx,
   type Farm,
 } from './ctx';
-import { markGoal } from './goals';
+import { markGoal, takePractice } from './goals';
 import { emit, executeFill, liveMultiplier, loadOrderById, recordTrade, streetSell } from './market';
 
 export interface Candidate {
@@ -460,6 +460,35 @@ export async function respondCard(ctx: Ctx, farm: Farm, cardId: string, choice: 
       return resolve(ctx, farm, card, 'failed', 'failed', 0, false);
     }
   }
+}
+
+/**
+ * The tour's practice offer: a buyer asks for a few eggs at a little under today's white price,
+ * arriving at once. Its walk-away price sits just above the offer, so a first counter always gets a
+ * counter back: the player sees a haggle happen. Sent once per farm, beside the day's own cards.
+ */
+export async function practiceCard(ctx: Ctx, farm: Farm): Promise<void> {
+  const [row] = await ctx.q.query(
+    `SELECT ${AGENT_COLUMNS} FROM agents WHERE status = 'open' AND role = 'buyer' ORDER BY (kind = 'wholesaler') DESC, (kind = 'trader') DESC, kind LIMIT 1`,
+  );
+  if (!row) throw new ActionError('not_found', 'no buyer is open');
+  if (!(await takePractice(ctx.q, farm.id))) throw new ActionError('invalid_action', 'the practice offer was already sent');
+  const agent = toAgent(row);
+  const kind = agent.kind as AgentKind;
+  const m = await liveMultiplier(ctx);
+  const unit = Math.max(10, Math.round((toMilli(eggPrice('white', m, [])) * 0.95) / 10) * 10);
+  const stock = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
+  const qty = Math.max(1, Math.min(4, stock));
+  const id = newId();
+  const line = lineFor(kind, 'bulk-order', { qty, price: coins(unit), grade: 'any' });
+  await ctx.q.query(
+    `INSERT INTO cards (id, farm_id, agent_id, kind, day, arrive_at_ms, offer_milli, reserve_milli, side, qty, grade, line, notified)
+     VALUES ($1, $2, $3, 'bulk-order', $4, $5, $6, $7, 'agent_buys', $8, 'any', $9, true)`,
+    [id, farm.id, agent.id, ctx.day, Math.max(0, ctx.elapsed - 1), unit, Math.round(unit * 1.05), qty, line],
+  );
+  const [r] = await ctx.q.query('SELECT * FROM cards WHERE id = $1', [id]);
+  emit(ctx, farm, { kind: 'cardArrived', card: await cardView(ctx, toCard(r as Record<string, unknown>)) });
+  ctx.touched.add(farm.id);
 }
 
 /** When a player holds against an undercut, the rival sells its own eggs to the trader instead. */
