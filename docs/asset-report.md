@@ -42,8 +42,8 @@ Factor 1 means no downscale passes: the art keeps its original resolution, and t
 | 15-coop-starter | painted | 1536x1152 | 2: 8.69%, 3: 10.91% | 1 | 0.00% | 8 | 25.72% |
 | 16-farmhouse | painted | 1536x768 | 2: 11.79%, 3: 15.08% | 1 | 0.00% | 4 | 20.00% |
 | 17-sign-farm | painted | 1536x512 | 2: 9.49% | 1 | 0.00% | 8 | 24.23% |
-| 17-sign-old-money | unused | 1536x512 | 2: 14.23% | 1 | 0.00% | 6 | n/a |
-| 17-sign-upstart | unused | 1536x512 | 2: 18.10% | 1 | 0.00% | 6 | n/a |
+| 17-sign-old-money | painted | 1536x512 | 2: 14.23% | 1 | 0.00% | 6 | 31.08% |
+| 17-sign-upstart | painted | 1536x512 | 2: 18.10% | 1 | 0.00% | 6 | 38.00% |
 | 18-conveyor | exact | 512x640 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 43.04% | 8 | 0.00% | 8 | 0.00% |
 | 19-egg-grader | painted | 1024x768 | 2: 20.88% | 1 | 0.00% | 4 | 33.29% |
 | 19b-egg-sorter | unused | 1024x1024 | 2: 21.34% | 1 | 0.00% | 4 | n/a |
@@ -74,7 +74,7 @@ Factor 1 means no downscale passes: the art keeps its original resolution, and t
 | 33-split-flap | exact | 832x384 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 49.89% | 8 | 0.00% | 8 | 0.00% |
 | 34-cursor | exact | 512x384 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 55.96% | 8 | 0.00% | 8 | 0.00% |
 | 35-particles | exact | 768x1024 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 57.23% | 8 | 0.00% | 8 | 0.00% |
-| x-hen-portrait | unused | 1024x1536 | 2: 11.43% | 1 | 0.00% | 8 | n/a |
+| x-hen-portrait | painted | 1024x1536 | 2: 11.43% | 1 | 0.00% | 8 | 28.45% |
 
 ## Atlases
 
@@ -84,15 +84,20 @@ Painted pages are WebP (quality 90, alpha lossless); exact pages are lossless PN
 |---|---|---|
 | boot | 964x362 | 39.4 KB |
 | title | 1026x684 | 48.5 KB |
+| title@2 | 1369x65 | 51.3 KB |
+| title@3 | 2029x96 | 93.6 KB |
+| title@4 | 2683x127 | 142.9 KB |
+| title@6 | 4008x189 | 257.7 KB |
+| title@8 | 4029x479 | 391.0 KB |
 | farm | 260x130 | 6.0 KB |
-| farm@2 | 4092x306 | 540.8 KB |
-| farm@3 | 4087x622 | 974.0 KB |
-| farm@4 | 4083x1077 | 1464.1 KB |
-| farm@6 | 4085x2302 | 2697.6 KB |
-| farm@8 | 4096x4047 | 3960.7 KB |
-| farm.wide@2 | 3952x367 | 489.2 KB |
-| farm.wide@3 | 4005x806 | 895.3 KB |
-| farm.wide@4 | 4026x1320 | 1429.8 KB |
+| farm@2 | 4079x284 | 468.2 KB |
+| farm@3 | 4082x589 | 853.6 KB |
+| farm@4 | 4090x969 | 1300.9 KB |
+| farm@6 | 4092x2099 | 2273.0 KB |
+| farm@8 | 4096x3626 | 3329.2 KB |
+| farm.wide@2 | 4018x449 | 700.2 KB |
+| farm.wide@3 | 4022x1011 | 1287.4 KB |
+| farm.wide@4 | 4034x1657 | 2037.8 KB |
 | market | 899x362 | 10.9 KB |
 | cards | 514x3178 | 31.9 KB |
 | cards.wide@2 | 4096x485 | 911.9 KB |

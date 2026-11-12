@@ -122,6 +122,16 @@ export class FrameSprite extends Container {
     this.scale.set(this.size * this.sx * this.facing, this.size * this.sy);
   }
 
+  /** Shows one frame of a row and holds it (a coop at rest: the door shut, nothing moving). */
+  still(row: string, frame = 0): this {
+    this.base = null;
+    this.play(row, { loop: false, restart: true });
+    this.i = Math.min(frame, Math.max(0, (this.frames[0]?.length ?? 1) - 1));
+    this.ended = true;
+    this.apply();
+    return this;
+  }
+
   /** Random start frame, so a flock does not move in lockstep. */
   desync(): this {
     const n = this.frames[0]?.length ?? 1;

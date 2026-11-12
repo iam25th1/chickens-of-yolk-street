@@ -125,6 +125,20 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     if (farm) scene.current?.sync(farm);
   }, [farm]);
 
+  // the rival farms' signs at the farm's edge: one per rival, the open farm if there is one
+  useEffect(() => {
+    if (!market) return;
+    const byKind = new Map<string, { sign: string; name: string; bust: boolean }>();
+    for (const r of market.ranking) {
+      if (r.kind === 'player') continue;
+      const sign = LOOK[r.kind].sign;
+      if (!sign) continue;
+      const have = byKind.get(r.kind);
+      if (!have || (have.bust && !r.bust)) byKind.set(r.kind, { sign, name: r.name, bust: r.bust });
+    }
+    scene.current?.setRivals([...byKind.values()]);
+  }, [market, farm]);
+
   // the market board swaps the canvas to the town square (on a phone the farm stays behind it);
   // the farm keeps running either way
   const marketOpen = modal?.kind === 'market' && !v.portrait;
