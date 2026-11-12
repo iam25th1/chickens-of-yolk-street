@@ -24,6 +24,8 @@ const pct = (v: number) => `${Math.round(v * 100)}%`;
 interface Section {
   id: string;
   title: string;
+  /** The section's name in the list, short enough to fit it. */
+  short: string;
   picture: () => ReactNode;
   body: ReactNode;
 }
@@ -42,6 +44,7 @@ const SECTIONS: Section[] = [
   {
     id: 'goal',
     title: 'GOAL OF THE GAME',
+    short: 'GOAL OF THE GAME',
     picture: () => <Hen />,
     body: (
       <>
@@ -53,6 +56,7 @@ const SECTIONS: Section[] = [
   {
     id: 'day',
     title: 'YOUR DAY',
+    short: 'YOUR DAY',
     picture: () => <SheetSprite id="32-icons" row="clock" zoom={4} />,
     body: (
       <>
@@ -64,6 +68,7 @@ const SECTIONS: Section[] = [
   {
     id: 'eggs',
     title: 'EGGS AND THE CRATE',
+    short: 'EGGS AND THE CRATE',
     picture: () => <Art id="12-crate" row="full" zoom={2} />,
     body: (
       <>
@@ -77,6 +82,7 @@ const SECTIONS: Section[] = [
   {
     id: 'market',
     title: 'THE SHARED MARKET',
+    short: 'THE SHARED MARKET',
     picture: () => <SheetSprite id="32-icons" row="market" zoom={4} />,
     body: (
       <>
@@ -88,6 +94,7 @@ const SECTIONS: Section[] = [
   {
     id: 'feed',
     title: 'FEED AND LAYING',
+    short: 'FEED AND LAYING',
     picture: () => <Art id="13-sack-standard" row="idle" zoom={2} />,
     body: (
       <>
@@ -102,6 +109,7 @@ const SECTIONS: Section[] = [
   {
     id: 'offers',
     title: 'OFFERS, HAGGLING AND CONTRACTS',
+    short: 'OFFERS AND HAGGLES',
     picture: () => <SheetSprite id="29-card-bulk-order" row="flutter" zoom={1} style={{ height: 72, overflow: 'hidden' }} />,
     body: (
       <>
@@ -113,6 +121,7 @@ const SECTIONS: Section[] = [
   {
     id: 'machines',
     title: 'MACHINES',
+    short: 'MACHINES',
     picture: () => <MachineArt unlock="grader" />,
     body: (
       <ul>
@@ -127,6 +136,7 @@ const SECTIONS: Section[] = [
   {
     id: 'rivals',
     title: 'RIVALS AND BUSTS',
+    short: 'RIVALS AND BUSTS',
     picture: () => <Art id="17-sign-upstart" row="sway" />,
     body: (
       <>
@@ -138,6 +148,7 @@ const SECTIONS: Section[] = [
   {
     id: 'founding',
     title: 'FOUNDING HENS AND CERTIFICATES',
+    short: 'FOUNDING HENS',
     picture: () => <SheetSprite id="30-stamps" row="accepted" zoom={1} />,
     body: (
       <>
@@ -152,6 +163,7 @@ const SECTIONS: Section[] = [
   {
     id: 'milestones',
     title: 'MILESTONES',
+    short: 'MILESTONES',
     picture: () => <SheetSprite id="32-icons" row="hen" zoom={4} />,
     body: (
       <>
@@ -170,6 +182,7 @@ const SECTIONS: Section[] = [
   {
     id: 'glossary',
     title: 'GLOSSARY',
+    short: 'GLOSSARY',
     picture: () => <SheetSprite id="32-icons" row="ledger" zoom={4} />,
     body: (
       <ul>
@@ -200,20 +213,21 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
             <button
               key={x.id}
               className={`btn ${i === at ? 'red' : ''}`}
-              style={{ justifyContent: 'flex-start', width: '100%' }}
+              style={{ justifyContent: 'flex-start', width: '100%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'clip' }}
+              title={x.title}
               data-tour={`guide-${x.id}`}
               onClick={() => {
                 uiSound(audio, 'click');
                 setAt(i);
               }}
             >
-              {x.title}
+              {x.short}
             </button>
           ))}
         </nav>
         <article className="col" style={{ flex: 1, minWidth: 0, gap: 6 }}>
           <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
-            <div style={{ width: 72, height: 72, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e3cc96' }}>{s.picture()}</div>
+            <div style={{ width: 72, height: 72, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e3cc96', overflow: 'hidden' }}>{s.picture()}</div>
             <h3 className="panel-title" style={{ margin: 0 }}>
               {s.title}
             </h3>
