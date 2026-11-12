@@ -26,6 +26,8 @@ const TOASTS_H = 34;
 /** The guide band at the bottom left: margin, tracker, gap, toasts. */
 const GUIDE_H = MARGIN + TRACK_H + 4 + TOASTS_H + 2;
 const TRACK_W = 300;
+/** In portrait, the room kept under the farm for the side panel and for a modal (UI px). */
+const PORTRAIT_BELOW_MIN = 360;
 export const PLATE_W = 640;
 export const PLATE_H = 360;
 
@@ -91,9 +93,12 @@ export function measure(cssW = window.innerWidth, cssH = window.innerHeight, dpr
     const uiW = devW / p;
     const uiH = devH / p;
     const top: Rect = { x: 0, y: 0, w: uiW, h: PORTRAIT_TOP_H };
-    // the farm across the width, under the top bar; the guide and the side panel below it
-    const farmH = MIN_H + 40;
-    const k = pick((s) => MIN_W * s <= devW && farmH * s <= devH * 0.5);
+    // the farm across the width, under the top bar, as tall as the screen allows while the side
+    // panel (and a modal, which opens in its place) keeps PORTRAIT_BELOW_MIN under it; then the guide
+    const k = pick((s) => MIN_W * s <= devW && (MIN_H + 40) * s <= devH * 0.5);
+    const stack = 2 + 36 + 4 + TRACK_H + MARGIN;
+    const room = Math.floor(((uiH - PORTRAIT_TOP_H - stack - PORTRAIT_BELOW_MIN) * p) / k);
+    const farmH = Math.max(MIN_H + 40, Math.min(room, Math.floor(devW / k)));
     const farm: FarmView = { k, offX: 0, offY: PORTRAIT_TOP_H * p, w: Math.floor(devW / k), h: farmH, guide: { w: 0, h: 0 } };
     const below = (farm.offY + farmH * k) / p + 2;
     const toasts: Rect = { x: MARGIN, y: below, w: uiW - 2 * MARGIN, h: 36 };

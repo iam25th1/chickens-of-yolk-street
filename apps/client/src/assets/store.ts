@@ -55,6 +55,17 @@ export function levelFor(levels: number[], d: number): number | null {
   return best;
 }
 
+/**
+ * The painted level a group loads for a screen density d: the sharpest (or, first, the smallest)
+ * level that divides d; on a screen too small for any (density 1), the smallest level, drawn down.
+ */
+export function paintedLevel(levels: number[], d: number, first = false): number | null {
+  if (!levels.length) return null;
+  const fits = levels.filter((l) => d % l === 0);
+  if (!fits.length) return Math.min(...levels);
+  return first ? Math.min(...fits) : Math.max(...fits);
+}
+
 export class AssetStore {
   private readonly pages = new Map<string, { bitmap: ImageBitmap; texture: Texture }[]>();
   private readonly pending = new Map<string, Promise<void>>();
@@ -116,8 +127,7 @@ export class AssetStore {
     const keys = new Set<string>();
     for (const s of Object.values(derived.sprites)) {
       if (s.group !== group || s.kind !== 'painted') continue;
-      const fits = s.levels.filter((l) => d % l === 0);
-      const l = fits.length ? (first ? Math.min(...fits) : Math.max(...fits)) : null;
+      const l = paintedLevel(s.levels, d, first);
       if (l !== null) keys.add(`${s.atlas ?? group}@${l}`);
     }
     return [...keys];
