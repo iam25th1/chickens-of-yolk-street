@@ -82,22 +82,28 @@ export function MarketBoard({
         ))}
       </div>
       {tab === 'board' && (
-        <div className="row" style={{ alignItems: 'flex-start', gap: 8 }}>
-          <div className="col" style={{ flex: 1, minWidth: 0, maxWidth: 320, gap: 4 }}>
-            <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
-              TODAY&apos;S PRICE, ONE EGG
-            </span>
-            {EGG_GRADES.map((g) => (
-              <div key={g} className="row spread" data-tour={g === 'white' ? 'prices' : undefined}>
-                <span>{g.toUpperCase()}</span>
-                <span className="row" style={{ gap: 3 }}>
-                  <SplitFlap text={coins(market.pricesMilli[g]).padStart(5, '0')} />
-                  <span className={up ? 'up' : 'down'}>{up ? '^' : 'v'}</span>
-                </span>
-              </div>
-            ))}
-            <span>PRICES AT {Math.round(market.multiplier * 100)}% OF NORMAL</span>
+        <Paged
+          gap={4}
+          ui="board"
+          style={{ maxWidth: 320 }}
+          items={[
+            <div key="prices" className="col" style={{ gap: 4 }}>
+              <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
+                TODAY&apos;S PRICE, ONE EGG
+              </span>
+              {EGG_GRADES.map((g) => (
+                <div key={g} className="row spread" data-tour={g === 'white' ? 'prices' : undefined}>
+                  <span>{g.toUpperCase()}</span>
+                  <span className="row" style={{ gap: 3 }}>
+                    <SplitFlap text={coins(market.pricesMilli[g]).padStart(5, '0')} />
+                    <span className={up ? 'up' : 'down'}>{up ? '^' : 'v'}</span>
+                  </span>
+                </div>
+              ))}
+              <span>PRICES AT {Math.round(market.multiplier * 100)}% OF NORMAL</span>
+            </div>,
             <button
+              key="supply"
               className="col"
               data-tour="supply"
               style={{ gap: 3, border: 0, padding: 4, background: '#e3cc96', font: 'inherit', textAlign: 'left', color: 'inherit', cursor: 'inherit' }}
@@ -113,10 +119,11 @@ export function MarketBoard({
               <span style={{ lineHeight: '10px', color: '#7f2215' }}>
                 {share > 1 ? 'TOO MANY EGGS: A GLUT. PRICES FALL TOMORROW.' : 'EGGS ARE SCARCE: PRICES RISE TOMORROW.'} PAST THE LINE IS A GLUT.
               </span>
-            </button>
+            </button>,
             <button
+              key="feathers"
               className="col"
-              style={{ gap: 2, marginTop: 4, border: 0, padding: 0, background: 'transparent', font: 'inherit', textAlign: 'left', color: 'inherit', cursor: 'pointer' }}
+              style={{ gap: 2, border: 0, padding: 0, background: 'transparent', font: 'inherit', textAlign: 'left', color: 'inherit', cursor: 'pointer' }}
               data-ui="feathers-left"
               onClick={onFeathers}
             >
@@ -130,9 +137,9 @@ export function MarketBoard({
                 {market.feathers.minted} MINTED ON NEAR TESTNET{market.feathers.tickets ? `, ${market.feathers.tickets} TICKET${market.feathers.tickets === 1 ? '' : 'S'} WAITING` : ''}. WON AT MILESTONES.
               </span>
               <span style={{ color: '#2f6f9e' }}>OPEN THE MINT PAGE</span>
-            </button>
-          </div>
-        </div>
+            </button>,
+          ]}
+        />
       )}
       {tab === 'farms' && (
         <div className="col" style={{ gap: 2 }}>

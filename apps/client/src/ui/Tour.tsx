@@ -147,16 +147,26 @@ export const TOUR: TourStep[] = [
   },
 ];
 
-/** A spotlight target's box in UI pixels, read from the page or the farm. */
-function measure(t: TourTarget, v: ReturnType<typeof useViewport>, ui: HTMLElement | null): Rect | null {
+/** The element the tour points at: never a pager's hidden measuring copy; on a later page, the pager's NEXT. */
+function domTarget(id: string): { el: Element; next: boolean } | null {
+  const el = [...document.querySelectorAll(`[data-tour="${id}"]`)].find((e) => !e.closest('.paged-measure'));
+  if (el) return { el, next: false };
+  const hidden = document.querySelector(`.paged-measure [data-tour="${id}"]`);
+  const next = hidden?.closest('.paged')?.querySelector('[data-ui="page-next"]:not([disabled])');
+  return next ? { el: next, next: true } : null;
+}
+
+/** A spotlight target's box in UI pixels, read from the page or the farm (next: it is the pager's NEXT). */
+function measure(t: TourTarget, v: ReturnType<typeof useViewport>, ui: HTMLElement | null): (Rect & { next?: boolean }) | null {
   const s = v.p / v.dpr;
   if ('dom' in t) {
-    const el = document.querySelector(`[data-tour="${t.dom}"]`);
-    if (!el || !ui) return null;
+    const found = domTarget(t.dom);
+    if (!found || !ui) return null;
+    const el = found.el;
     const r = el.getBoundingClientRect();
     const u = ui.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) return null;
-    return { x: (r.left - u.left) / s, y: (r.top - u.top) / s, w: r.width / s, h: r.height / s };
+    return { x: (r.left - u.left) / s, y: (r.top - u.top) / s, w: r.width / s, h: r.height / s, next: found.next };
   }
   const farm = (window as unknown as { __coysFarm?: { targets(): { kind: string; x: number; y: number; w: number; h: number }[]; yard(): { x: number; y: number; w: number; h: number } } }).__coysFarm;
   if (!farm) return null;
@@ -194,7 +204,7 @@ export function Spotlight({ ctx }: { ctx: TourCtx }) {
       let r = target ? measure(target, v, ui) : null;
       if (target && 'world' in target && target.world === 'egg' && r && !(window as unknown as { __coysFarm?: { targets(): { kind: string }[] } }).__coysFarm?.targets().some((x) => x.kind === 'egg')) {
         setTag('WAIT FOR A HEN TO LAY');
-      } else setTag(target?.tag ?? '');
+      } else setTag(r?.next ? 'NEXT PAGE' : (target?.tag ?? ''));
       if (r) r = { x: Math.round(r.x) - 3, y: Math.round(r.y) - 3, w: Math.round(r.w) + 6, h: Math.round(r.h) + 6 };
       setRect((old) => (old && r && old.x === r.x && old.y === r.y && old.w === r.w && old.h === r.h ? old : r));
       raf = requestAnimationFrame(loop);

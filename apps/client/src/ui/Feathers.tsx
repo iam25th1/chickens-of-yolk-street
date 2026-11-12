@@ -317,43 +317,49 @@ export function MintPage({ farm, market, send, onClose }: { farm: FarmState; mar
         )}
 
         {view === 'odds' && data && (
-          <>
-            <h3 className="panel-title small" style={{ margin: 0 }}>
-              EACH GRADE&apos;S ODDS OF A HEN (ESTIMATE)
-            </h3>
-            <table className="mint-table" data-ui="mint-estimates">
-              <thead>
-                <tr>
-                  <th />
-                  {RARITIES.map((r) => (
-                    <th key={r}>
-                      {RARITY_LABEL[r]} ({data.rarityCounts[r]})
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {FEATHER_GRADES.map((g) => (
-                  <tr key={g}>
-                    <td>{GRADE_LABEL[g]}</td>
-                    {RARITIES.map((r) => (
-                      <td key={r}>{pct(data.estimates[g][r])}</td>
+          <Paged
+            gap={6}
+            ui="mint-odds"
+            items={[
+              <div key="table" className="col" style={{ gap: 6 }}>
+                <h3 className="panel-title small" style={{ margin: 0 }}>
+                  EACH GRADE&apos;S ODDS OF A HEN (ESTIMATE)
+                </h3>
+                <table className="mint-table" data-ui="mint-estimates">
+                  <thead>
+                    <tr>
+                      <th />
+                      {RARITIES.map((r) => (
+                        <th key={r}>
+                          {RARITY_LABEL[r]} ({data.rarityCounts[r]})
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {FEATHER_GRADES.map((g) => (
+                      <tr key={g}>
+                        <td>{GRADE_LABEL[g]}</td>
+                        {RARITIES.map((r) => (
+                          <td key={r}>{pct(data.estimates[g][r])}</td>
+                        ))}
+                      </tr>
                     ))}
-                  </tr>
+                  </tbody>
+                </table>
+              </div>,
+              <span key="note" style={{ lineHeight: '9px' }}>
+                AN ESTIMATE FROM THE {data.minted} FEATHERS MINTED SO FAR (NUMBERS NOT MINTED COUNT AS FLUFF), UNDER THE GRADE WEIGHTS. IT LOCKS AT THE PLANNED REVEAL, WHEN A SEED FROM A PUBLIC EVENT CHOSEN IN ADVANCE DRAWS EXACTLY 7 LEGENDARY, 70 EPIC, 200 RARE AND 500 COMMON HENS.
+              </span>,
+              <div key="by-grade" className="row" style={{ gap: 12, flexWrap: 'wrap' }} data-ui="mint-by-grade">
+                {FEATHER_GRADES.map((g) => (
+                  <span key={g}>
+                    {GRADE_LABEL[g]} {data.byGrade[g]}
+                  </span>
                 ))}
-              </tbody>
-            </table>
-            <span style={{ lineHeight: '9px' }}>
-              AN ESTIMATE FROM THE {data.minted} FEATHERS MINTED SO FAR (NUMBERS NOT MINTED COUNT AS FLUFF), UNDER THE GRADE WEIGHTS. IT LOCKS AT THE PLANNED REVEAL, WHEN A SEED FROM A PUBLIC EVENT CHOSEN IN ADVANCE DRAWS EXACTLY 7 LEGENDARY, 70 EPIC, 200 RARE AND 500 COMMON HENS.
-            </span>
-            <div className="row" style={{ gap: 12, flexWrap: 'wrap' }} data-ui="mint-by-grade">
-              {FEATHER_GRADES.map((g) => (
-                <span key={g}>
-                  {GRADE_LABEL[g]} {data.byGrade[g]}
-                </span>
-              ))}
-            </div>
-          </>
+              </div>,
+            ]}
+          />
         )}
 
         {view === 'about' && (
