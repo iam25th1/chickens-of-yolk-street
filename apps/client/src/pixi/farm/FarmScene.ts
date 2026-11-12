@@ -306,7 +306,7 @@ export class FarmScene implements Scene {
       const bg = new Graphics().rect(0, 0, w, 11).fill({ color: 0x2a160c, alpha: 0.85 });
       text.position.set(3, 1);
       plate.addChild(bg, text);
-      const x = u === 'conveyor' ? pad.left + 4 : Math.round((pad.left + pad.right) / 2 - w / 2);
+      const x = Math.max(2, Math.min(this.layout.w - w - 2, u === 'conveyor' ? pad.left + 4 : Math.round((pad.left + pad.right) / 2 - w / 2)));
       plate.position.set(Math.round(x), Math.round(pad.bottom + 2));
       plate.label = `plate:${u}`;
       this.layers.by.labels.addChild(plate);
