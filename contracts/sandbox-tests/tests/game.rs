@@ -192,10 +192,11 @@ async fn version_2_upgrades_in_place_and_releases_its_day_records() -> anyhow::R
     let before = v2.view_account().await?;
     let v2_per_day = (before.storage_usage - v2_first.storage_usage) / 39;
     println!("version 2: {} bytes a settled day", v2_per_day);
-    let mut records = Vec::new();
+    // each record exactly as day_record returns it: the archive hash folds this text
+    let mut records: Vec<String> = Vec::new();
     for day in 1..=40 {
-        let r: Value = v2.view("day_record").args_json(json!({ "season": "s1", "day": day })).await?.json()?;
-        records.push(r);
+        let view = v2.view("day_record").args_json(json!({ "season": "s1", "day": day })).await?;
+        records.push(String::from_utf8(view.result)?);
     }
 
     let v4 = v2.as_account().deploy(&wasm()?).await?.into_result()?;
@@ -213,7 +214,7 @@ async fn version_2_upgrades_in_place_and_releases_its_day_records() -> anyhow::R
 
     // everything from version 2 stays: days, egg balances, the owner
     assert_eq!(last_day(&v4, "s1").await?, 40);
-    let day2: Value = v4.view("day_record").args_json(json!({ "season": "s1", "day": 2 })).await?.json()?;
+    let day2 = String::from_utf8(v4.view("day_record").args_json(json!({ "season": "s1", "day": 2 })).await?.result)?;
     assert_eq!(day2, records[1]);
     let p: String = v4.view("mt_balance_of").args_json(json!({ "account_id": player.id(), "token_id": "egg-brown" })).await?.json()?;
     assert_eq!(p, "160");
@@ -257,7 +258,7 @@ async fn version_2_upgrades_in_place_and_releases_its_day_records() -> anyhow::R
     assert_eq!(head["pruned_through"], 40);
     let mut archive = ZERO.to_string();
     for (i, r) in records.iter().enumerate() {
-        archive = sha256_hex(&format!("{archive}|{}|{}", i + 1, serde_json::to_string(r)?));
+        archive = sha256_hex(&format!("{archive}|{}|{r}", i + 1));
     }
     assert_eq!(head["archive"], archive, "the archive hash does not match the records read before the release");
     let gone: Value = v4.view("day_record").args_json(json!({ "season": "s1", "day": 2 })).await?.json()?;
