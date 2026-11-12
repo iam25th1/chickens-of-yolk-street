@@ -78,7 +78,7 @@ body {
   touch-action: manipulation;
 }
 
-.viewport canvas {
+.viewport > canvas {
   position: absolute;
   inset: 0;
   width: 100%;

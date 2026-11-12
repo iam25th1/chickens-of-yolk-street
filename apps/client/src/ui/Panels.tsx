@@ -114,7 +114,8 @@ export function ShopPanel({
 }) {
   const { audio } = useServices();
   const [count, setCount] = useState(1);
-  const [tier, setTier] = useState<FeedTier>(farm.feedTier);
+  // the farm's own feed, or the cheapest when a bag of it is more than the farm has
+  const [tier, setTier] = useState<FeedTier>(() => (farm.cashMilli / 1000 >= ECONOMY.feed.tiers[farm.feedTier].bagPrice ? farm.feedTier : 'cheap'));
   const [bags, setBags] = useState(1);
   const cash = farm.cashMilli / 1000;
   const click = (fn: () => void) => () => {

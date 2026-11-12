@@ -28,7 +28,7 @@ type Signal = { from: 'server'; e: GameEvent } | { from: 'ui'; e: UiEvent };
 
 export interface TourStep {
   title: string;
-  text: string;
+  text: string | ((c: TourCtx) => string);
   target(c: TourCtx): TourTarget | null;
   done(s: Signal): boolean;
   /** Runs when the step starts. */
@@ -57,7 +57,7 @@ export const TOUR: TourStep[] = [
     done: (s) => server(s, 'collected'),
   },
   {
-    title: 'SELL FROM THE CRATE',
+    title: 'SELL THE CRATE',
     text: "EGGS WAIT IN THE CRATE. SELL THEM AT TODAY'S PRICE WITH THE SELL BUTTON ON THE CRATE'S CARD.",
     target: (c) => (c.modal?.kind === 'sell' ? { dom: 'sell-modal', tag: 'SELL' } : c.modal ? close : { dom: 'sell', tag: 'SELL' }),
     done: (s) => server(s, 'sold'),
@@ -69,14 +69,14 @@ export const TOUR: TourStep[] = [
     done: (s) => opened(s, 'market'),
   },
   {
-    title: 'GLUTS AND SHORTAGES',
+    title: 'GLUT OR SHORTAGE',
     text: 'WHEN EVERYONE SELLS AT ONCE, PRICES CRASH (A GLUT). WHEN EGGS ARE SCARCE, THEY RISE. TAP THE SUPPLY METER.',
     target: (c) =>
       c.modal?.kind === 'market' ? (c.modal.tab === 'board' ? { dom: 'supply', tag: 'TAP THE METER' } : { dom: 'market-board' }) : c.modal ? close : { dom: 'market', tag: 'THE BOARD' },
     done: (s) => tapped(s, 'supply'),
   },
   {
-    title: 'FEED KEEPS THEM LAYING',
+    title: 'FEED THE HENS',
     text: 'NO FEED, NO EGGS. BETTER FEED MEANS MORE AND BETTER EGGS. TAP THE TROUGH AND BUY A BAG.',
     target: (c) => {
       if (c.modal?.kind === 'shop') {
@@ -101,7 +101,12 @@ export const TOUR: TourStep[] = [
   },
   {
     title: 'EVERY HEN IS YOURS',
-    text: 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND, AND AT A DAY CLOSE SHE IS RECORDED ON NEAR AS YOURS FOR GOOD.',
+    text: (c) =>
+      c.market.minting === 'live'
+        ? 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND, AND AT A DAY CLOSE SHE IS RECORDED ON NEAR AS YOURS FOR GOOD.'
+        : c.market.minting === 'paused'
+          ? 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND. RECORDING HENS ON NEAR AS YOURS FOR GOOD IS PAUSED FOR NOW: HERS WAITS.'
+          : 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND: HER LOOKS AND HER LAYING ARE HERS ALONE.',
     target: (c) => {
       if (c.modal?.kind === 'shop') return c.modal.tab === 'hens' ? { dom: 'buy-hen', tag: 'BUY HER' } : { dom: 'shop-hens' };
       return c.modal ? close : { dom: 'shop', tag: 'THE SHOP' };
@@ -218,6 +223,15 @@ export function TourBox({ ctx, rect, send }: { ctx: TourCtx; rect: Rect; send: (
   ctxRef.current = ctx;
   const entered = useRef(-1);
   const step = TOUR[t.step];
+  // the server turned the step's action down (no stock, no coins): the player may move on
+  const [refusedAt, setRefusedAt] = useState(-1);
+  useEffect(
+    () =>
+      events.on((e) => {
+        if (e.kind === 'refused' && tour.get().active) setRefusedAt(tour.get().step);
+      }),
+    [],
+  );
 
   // the step starts: run its opener once
   useEffect(() => {
@@ -252,7 +266,7 @@ export function TourBox({ ctx, rect, send }: { ctx: TourCtx; rect: Rect; send: (
   }, [t.active, audio]);
 
   if (!t.active || !step) return null;
-  const blocked = step.blocked?.(ctx) ?? false;
+  const blocked = (step.blocked?.(ctx) ?? false) || refusedAt === t.step;
   return (
     <div className="tour-box zone" data-ui="tour" role="status" aria-label="How to play" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, zIndex: 41 }}>
       <div className="row" style={{ gap: 4 }}>
@@ -297,7 +311,7 @@ export function TourBox({ ctx, rect, send }: { ctx: TourCtx; rect: Rect; send: (
           SKIP
         </button>
       </div>
-      <span style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>{step.text}</span>
+      <span style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>{typeof step.text === 'function' ? step.text(ctx) : step.text}</span>
     </div>
   );
 }

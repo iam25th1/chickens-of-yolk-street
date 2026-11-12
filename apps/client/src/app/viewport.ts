@@ -11,7 +11,7 @@
 // so its composition fits whole inside the world zone and the tracker and toasts sit only over its
 // ground (see pixi/farm/layout.ts). A modal opens in the modal rect (inside the world zone, above
 // the toasts); in portrait it takes the side panel's place under the farm.
-import { COMP, SAFE_Y } from '../pixi/farm/layout';
+import { COMP, SAFE_X, SAFE_Y } from '../pixi/farm/layout';
 import { createStore } from '../state/store';
 
 /** Whole zooms the UI and the world use; painted atlases exist at the densities that divide them. */
@@ -71,7 +71,15 @@ export function measure(cssW = window.innerWidth, cssH = window.innerHeight, dpr
   const devW = Math.round(cssW * dpr);
   const devH = Math.round(cssH * dpr);
   const portrait = devH > devW;
-  const kp = pick((s) => PLATE_W * s <= devW && PLATE_H * s <= devH);
+  // plates fit the window; on a phone they may lose their sides (never the 256-pixel logo in the middle)
+  // in landscape a plate covers the window when that crops at most a sixteenth of it a side, else it fits
+  const cover = [...SCALES].reverse().find((s) => PLATE_W * s >= devW && PLATE_H * s >= devH);
+  const coverOk = cover !== undefined && (PLATE_W * cover - devW) / 2 <= (PLATE_W * cover) / 16 && (PLATE_H * cover - devH) / 2 <= (PLATE_H * cover) / 16;
+  const kp = portrait
+    ? pick((s) => 256 * s <= devW && PLATE_H * s <= devH * 0.6)
+    : coverOk && cover !== undefined
+      ? cover
+      : pick((s) => PLATE_W * s <= devW && PLATE_H * s <= devH);
   const plate: WorldView = { k: kp, offX: Math.round((devW - PLATE_W * kp) / 2), offY: Math.round((devH - PLATE_H * kp) / 2) };
 
   if (portrait) {
@@ -82,8 +90,9 @@ export function measure(cssW = window.innerWidth, cssH = window.innerHeight, dpr
     const k = pick((s) => COMP_W * s <= devW && COMP_H * s <= devH * 0.45);
     const offX = Math.round((devW - COMP_W * k) / 2) - COMP.left * k;
     const offY = PORTRAIT_TOP_H * p - COMP.top * k;
-    const safe = (offY + SAFE_Y * k) / p;
-    const toasts: Rect = { x: MARGIN, y: safe, w: uiW - 2 * MARGIN, h: 36 };
+    // in portrait the guide spans the width: it starts below the whole farm
+    const below = (offY + COMP.bottom * k) / p + 2;
+    const toasts: Rect = { x: MARGIN, y: below, w: uiW - 2 * MARGIN, h: 36 };
     const tracker: Rect = { x: MARGIN, y: toasts.y + toasts.h + 4, w: uiW - 2 * MARGIN, h: TRACK_H };
     const sideY = tracker.y + TRACK_H + MARGIN;
     const side: Rect = { x: 0, y: sideY, w: uiW, h: uiH - sideY };
@@ -106,14 +115,16 @@ export function measure(cssW = window.innerWidth, cssH = window.innerHeight, dpr
   const top0 = Math.max(0, Math.min(free / 2, zh - ABOVE_SAFE * k - GUIDE_WANT * p));
   const offX = Math.round(world.x * p + (zw - COMP_W * k) / 2) - COMP.left * k;
   const offY = Math.round(world.y * p + top0) - COMP.top * k;
-  const tracker: Rect = { x: MARGIN, y: uiH - MARGIN - TRACK_H, w: Math.min(TRACK_W, world.w - 2 * MARGIN), h: TRACK_H };
+  // as wide as the ground under the farm's left part allows (wider when the farm sits further right)
+  const trackW = Math.min(world.w - 2 * MARGIN, Math.max(TRACK_W, Math.floor((offX + SAFE_X * k) / p) - MARGIN));
+  const tracker: Rect = { x: MARGIN, y: uiH - MARGIN - TRACK_H, w: trackW, h: TRACK_H };
   const safe = Math.max(TOP_H + MARGIN, (offY + SAFE_Y * k) / p + 2);
   const toasts: Rect = { x: MARGIN, y: safe, w: tracker.w, h: Math.max(0, tracker.y - 4 - safe) };
   const modal: Rect = { x: MARGIN, y: TOP_H + MARGIN, w: world.w - 2 * MARGIN, h: Math.max(120, toasts.y - 4 - (TOP_H + MARGIN)) };
   return { cssW, cssH, dpr, devW, devH, portrait, p, uiW, uiH, farm: { k, offX, offY }, plate, zones: { top, side, tracker, toasts, world, modal } };
 }
 
-export const viewport = createStore<Viewport>(measure());
+export const viewport = createStore<Viewport>(typeof window === 'undefined' ? measure(1280, 720, 1) : measure());
 
 let installed = false;
 export function watchViewport(): void {

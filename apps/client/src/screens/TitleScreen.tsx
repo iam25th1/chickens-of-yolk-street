@@ -8,7 +8,6 @@ import { motion } from '../motion/ui';
 import { api } from '../net/api';
 import { BackdropScene } from '../pixi/BackdropScene';
 import { game } from '../state/game';
-import { Ticker } from '../ui/Hud';
 
 export function TitleScreen({ onPlay, onSettings, audioReady }: { onPlay: () => void; onSettings: () => void; audioReady: boolean }) {
   const { assets, audio, pixi } = useServices();
@@ -83,7 +82,6 @@ export function TitleScreen({ onPlay, onSettings, audioReady }: { onPlay: () => 
           CLICK ANYWHERE TO WAKE THE FARM
         </div>
       )}
-      <Ticker />
     </div>
   );
 }

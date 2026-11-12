@@ -107,7 +107,9 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       open: (target) => openModal(modalFor(target)),
     });
     scene.current = s;
+    // read-only hooks for automated checks: where things are on the farm, and opening a modal as a click would
     (window as unknown as { __coysFarm?: unknown }).__coysFarm = { targets: () => s.targets(), yard: () => s.yardBox() };
+    (window as unknown as { __coysUi?: unknown }).__coysUi = { open: openModal, close: closeModal };
     s.sync(farm);
     pixi.setScene(s);
   }, [farm, assets, audio, pixi, send]);
@@ -123,8 +125,9 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     if (farm) scene.current?.sync(farm);
   }, [farm]);
 
-  // the market board swaps the canvas to the town square; the farm keeps running behind it
-  const marketOpen = modal?.kind === 'market';
+  // the market board swaps the canvas to the town square (on a phone the farm stays behind it);
+  // the farm keeps running either way
+  const marketOpen = modal?.kind === 'market' && !v.portrait;
   useEffect(() => {
     if (!scene.current) return;
     if (marketOpen && !town.current) {

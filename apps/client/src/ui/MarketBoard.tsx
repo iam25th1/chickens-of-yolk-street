@@ -105,8 +105,8 @@ export function MarketBoard({
             </span>
             {market.ranking.map((r, i) => (
               <span key={`${r.name}-${i}`} className="row spread" style={{ opacity: r.bust ? 0.6 : 1, width: '100%' }}>
-                <span>
-                  {i + 1}. {r.name.toUpperCase().slice(0, 18)}
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {i + 1}. {r.name.toUpperCase()}
                 </span>
                 <span>{r.bust ? 'BUST' : `${r.hens} HENS`}</span>
               </span>

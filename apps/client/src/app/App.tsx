@@ -12,6 +12,7 @@ import { LoadingScreen } from '../screens/LoadingScreen';
 import { LoginScreen, type SignedIn } from '../screens/LoginScreen';
 import { TitleScreen } from '../screens/TitleScreen';
 import { settings } from '../state/settings';
+import { Ticker } from '../ui/Hud';
 import { SettingsPanel } from '../ui/Panels';
 import { ServicesContext, type Services } from './services';
 import { Stage, useViewport } from './Stage';
@@ -161,6 +162,8 @@ export function App() {
                 {screen === 'loadingFarm' && <LoadingScreen progress={progress} label="LOADING THE FARM" />}
               </div>
             )}
+            {/* the title's live prices run along the whole window's foot */}
+            {screen === 'title' && <Ticker />}
             {screen === 'farm' && signedIn && (
               <FarmScreen session={signedIn.session} accountId={signedIn.accountId} onSignedOut={signOut} />
             )}
