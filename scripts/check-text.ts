@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 const EM_DASH = String.fromCharCode(0x2014);
-const BINARY = /\.(png|mp3|ogg|ttf|woff2?|wasm|ico)$/i;
+const BINARY = /\.(png|webp|mp3|ogg|ttf|woff2?|wasm|ico)$/i;
 
 const files = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], { encoding: 'utf8' })
   .split('\n')

@@ -1,74 +1,84 @@
-// Derives true-pixel sprite atlases from the packed sheets in apps/client/public/assets.
+// Derives the sprite atlases the game draws from the packed sheets in apps/client/public/assets.
 //
-// The packed sheets are big: painted pixel art drawn several screen pixels per art pixel, with soft
-// halos. Each sheet is brought down to its true pixel grid (the size of one art pixel, measured from
-// outline thickness and listed in GRIDS), one majority colour per block, so the game ships and draws
-// the art at its real size. Frames are cut by connected blobs, so art that pokes out of its cell (a
-// comb, a flapping wing) stays whole and never brings a neighbour's pixels along. The hen and its
-// trait layers are labelled together so they still stack pixel for pixel.
+// Every asset keeps as much detail as it really has. For each sheet the build tries downscale
+// factors and keeps the largest one whose nearest-neighbour round trip (downscale, upscale back,
+// compare) reproduces the original almost pixel for pixel (ROUND_TRIP). Sheets drawn on an exact
+// pixel grid pass at their grid; painted sheets (soft shading, no grid) pass at no factor and keep
+// their original resolution. The hen and its trait layers share one factor, chosen over all of
+// them together, so they still stack pixel for pixel.
+//
+// Exact sheets ship whole at their factor: the screen draws each of their pixels as a whole number
+// of device pixels. Painted sheets ship as per-density atlases cut from the original: at density d
+// a sprite has d texels per design pixel (a world pixel for the farm, a UI pixel for portraits), so
+// a screen at d device pixels per design pixel draws one texel per device pixel, with nothing scaled
+// at run time. Frames are cut by connected blobs at full resolution, so art that pokes out of its
+// cell (a comb, a flapping wing) stays whole and never brings a neighbour's pixels along.
 import { createHash } from 'node:crypto';
 import { alphaCut, recolourBody } from '../../packages/shared/src/pixels';
-import { encodePng, type Rgba } from './png';
+import type { Rgba } from './png';
 
-/** Screen groups, loaded in this order: each is one atlas page (or a few, when large). */
+/** Screen groups, loaded in this order. */
 export const GROUPS = ['boot', 'title', 'farm', 'market', 'cards', 'ui', 'fx'] as const;
 export type Group = (typeof GROUPS)[number];
 
-export interface GridSpec {
-  /** Source pixels per art pixel. */
-  grid: number;
-  /** World pixels per derived pixel: 1 for true size; other values are reported (see README). */
-  scale: number;
+/** Densities (texels per design pixel) the painted atlases are cut at. A screen picks one that divides its zoom. */
+export const LEVELS = [2, 3, 4, 6, 8] as const;
+
+/** Near pixel-identical: at most 0.5% of visible pixels may move by more than 24 of 255 in any channel. */
+export const ROUND_TRIP = { channel: 24, share: 0.005 } as const;
+/** Downscale factors tried, smallest first; a factor is skipped once one of its divisors has failed. */
+export const FACTORS = [2, 3, 4, 6, 8, 12, 16] as const;
+
+export interface PaintedSpec {
   group: Group;
+  /** Source pixels per design pixel: world pixels for the farm, UI pixels for portraits and signs. */
+  ratio: number;
+  use: 'world' | 'ui';
 }
 
-/** Painted sheets (soft edges, no exact grid): their true grid, measured from outline thickness. */
-export const PAINTED: Record<string, GridSpec> = {
-  '01-hen-anims': { grid: 8, scale: 1, group: 'farm' },
-  '02-body': { grid: 8, scale: 1, group: 'farm' },
-  '02-eyes-sleepy': { grid: 8, scale: 1, group: 'farm' },
-  '02-eyes-wild': { grid: 8, scale: 1, group: 'farm' },
-  '02-comb-default': { grid: 8, scale: 1, group: 'farm' },
-  '02-comb-spiky': { grid: 8, scale: 1, group: 'farm' },
-  '02-comb-mohawk': { grid: 8, scale: 1, group: 'farm' },
-  '02-comb-nub': { grid: 8, scale: 1, group: 'farm' },
-  '02-acc-tophat': { grid: 8, scale: 1, group: 'farm' },
-  '02-acc-bowtie': { grid: 8, scale: 1, group: 'farm' },
-  '02-acc-shades': { grid: 8, scale: 1, group: 'farm' },
-  '11-egg-white': { grid: 12, scale: 1, group: 'farm' },
-  '11-egg-cream': { grid: 12, scale: 1, group: 'farm' },
-  '11-egg-brown': { grid: 12, scale: 1, group: 'farm' },
-  '11-egg-golden': { grid: 12, scale: 1, group: 'farm' },
-  '12-crate': { grid: 8, scale: 1, group: 'farm' },
-  '13-sack-cheap': { grid: 8, scale: 1, group: 'farm' },
-  '13-sack-standard': { grid: 8, scale: 1, group: 'farm' },
-  '13-sack-premium': { grid: 8, scale: 1, group: 'farm' },
-  '14-trough': { grid: 8, scale: 1, group: 'farm' },
-  // coops are drawn coarser (8) than the composition wants (4): shown at 2 world pixels per art pixel
-  '15-coop-starter': { grid: 8, scale: 2, group: 'farm' },
-  '15-coop-red': { grid: 8, scale: 2, group: 'farm' },
-  '15-coop-deluxe': { grid: 8, scale: 2, group: 'farm' },
-  '16-farmhouse': { grid: 4, scale: 1, group: 'farm' },
-  '17-sign-farm': { grid: 8, scale: 1, group: 'farm' },
-  '17-sign-upstart': { grid: 6, scale: 1, group: 'market' },
-  '17-sign-old-money': { grid: 6, scale: 1, group: 'market' },
-  // machines are drawn finer (4) than the hen's grid: kept fine, shown at half a world pixel each
-  '19-egg-grader': { grid: 4, scale: 0.5, group: 'farm' },
-  '19b-egg-sorter': { grid: 4, scale: 0.5, group: 'farm' },
-  '20-delivery-cart': { grid: 4, scale: 0.5, group: 'farm' },
-  '21-feed-hopper': { grid: 4, scale: 0.5, group: 'farm' },
-  '22-sales-clerk': { grid: 4, scale: 0.5, group: 'farm' },
-  '04-upstart': { grid: 4, scale: 1, group: 'cards' },
-  '05-old-money': { grid: 4, scale: 1, group: 'cards' },
-  '06-squeezer': { grid: 4, scale: 1, group: 'cards' },
-  '07-loyalist': { grid: 4, scale: 1, group: 'cards' },
-  '08-bakery-buyer': { grid: 4, scale: 1, group: 'cards' },
-  '09-market-trader': { grid: 4, scale: 1, group: 'cards' },
-  '10-wholesaler': { grid: 4, scale: 1, group: 'cards' },
-  'x-hen-portrait': { grid: 8, scale: 1, group: 'title' },
+/** Painted sheets the game draws, and how big each is drawn (the design's size relationships). */
+export const PAINTED: Record<string, PaintedSpec> = {
+  '02-body': { group: 'farm', ratio: 8, use: 'world' },
+  '02-eyes-sleepy': { group: 'farm', ratio: 8, use: 'world' },
+  '02-eyes-wild': { group: 'farm', ratio: 8, use: 'world' },
+  '02-comb-default': { group: 'farm', ratio: 8, use: 'world' },
+  '02-comb-spiky': { group: 'farm', ratio: 8, use: 'world' },
+  '02-comb-mohawk': { group: 'farm', ratio: 8, use: 'world' },
+  '02-comb-nub': { group: 'farm', ratio: 8, use: 'world' },
+  '02-acc-tophat': { group: 'farm', ratio: 8, use: 'world' },
+  '02-acc-bowtie': { group: 'farm', ratio: 8, use: 'world' },
+  '02-acc-shades': { group: 'farm', ratio: 8, use: 'world' },
+  '11-egg-white': { group: 'farm', ratio: 12, use: 'world' },
+  '11-egg-cream': { group: 'farm', ratio: 12, use: 'world' },
+  '11-egg-brown': { group: 'farm', ratio: 12, use: 'world' },
+  '11-egg-golden': { group: 'farm', ratio: 12, use: 'world' },
+  '12-crate': { group: 'farm', ratio: 8, use: 'world' },
+  '13-sack-cheap': { group: 'farm', ratio: 8, use: 'world' },
+  '13-sack-standard': { group: 'farm', ratio: 8, use: 'world' },
+  '13-sack-premium': { group: 'farm', ratio: 8, use: 'world' },
+  '14-trough': { group: 'farm', ratio: 8, use: 'world' },
+  '15-coop-starter': { group: 'farm', ratio: 4, use: 'world' },
+  '15-coop-red': { group: 'farm', ratio: 4, use: 'world' },
+  '15-coop-deluxe': { group: 'farm', ratio: 4, use: 'world' },
+  '16-farmhouse': { group: 'farm', ratio: 4, use: 'world' },
+  '17-sign-farm': { group: 'farm', ratio: 8, use: 'world' },
+  '19-egg-grader': { group: 'farm', ratio: 8, use: 'world' },
+  '20-delivery-cart': { group: 'farm', ratio: 8, use: 'world' },
+  '21-feed-hopper': { group: 'farm', ratio: 8, use: 'world' },
+  '22-sales-clerk': { group: 'farm', ratio: 8, use: 'world' },
+  '17-sign-upstart': { group: 'market', ratio: 8, use: 'ui' },
+  '17-sign-old-money': { group: 'market', ratio: 8, use: 'ui' },
+  '04-upstart': { group: 'cards', ratio: 4, use: 'ui' },
+  '05-old-money': { group: 'cards', ratio: 4, use: 'ui' },
+  '06-squeezer': { group: 'cards', ratio: 4, use: 'ui' },
+  '07-loyalist': { group: 'cards', ratio: 4, use: 'ui' },
+  '08-bakery-buyer': { group: 'cards', ratio: 4, use: 'ui' },
+  '09-market-trader': { group: 'cards', ratio: 4, use: 'ui' },
+  '10-wholesaler': { group: 'cards', ratio: 4, use: 'ui' },
+  'x-hen-portrait': { group: 'title', ratio: 8, use: 'ui' },
 };
 
-/** Sheets already drawn on an exact grid (the packer measured it): downscaled whole. */
+/** Sheets drawn on an exact grid (the packer measured it): shipped whole at their factor. */
 export const EXACT_GROUP: Record<string, Group> = {
   '25-loading-plate': 'boot',
   '25-loading-anim': 'boot',
@@ -97,7 +107,54 @@ export const EXACT_GROUP: Record<string, Group> = {
   '29-card-player-trade': 'cards',
 };
 
-/** The base hen and its trait layers share one cell layout and one blob labelling. */
+/** In the packed set but not drawn by the game (measured for the report only). */
+export const UNUSED = ['01-hen-base', '01-hen-anims', '03-chick', '19b-egg-sorter'];
+
+/** The grid the previous pass downscaled each painted sheet to (for the report's "detail lost" column). */
+export const PREVIOUS_GRID: Record<string, number> = {
+  '01-hen-anims': 8,
+  '02-body': 8,
+  '02-eyes-sleepy': 8,
+  '02-eyes-wild': 8,
+  '02-comb-default': 8,
+  '02-comb-spiky': 8,
+  '02-comb-mohawk': 8,
+  '02-comb-nub': 8,
+  '02-acc-tophat': 8,
+  '02-acc-bowtie': 8,
+  '02-acc-shades': 8,
+  '11-egg-white': 12,
+  '11-egg-cream': 12,
+  '11-egg-brown': 12,
+  '11-egg-golden': 12,
+  '12-crate': 8,
+  '13-sack-cheap': 8,
+  '13-sack-standard': 8,
+  '13-sack-premium': 8,
+  '14-trough': 8,
+  '15-coop-starter': 8,
+  '15-coop-red': 8,
+  '15-coop-deluxe': 8,
+  '16-farmhouse': 4,
+  '17-sign-farm': 8,
+  '17-sign-upstart': 6,
+  '17-sign-old-money': 6,
+  '19-egg-grader': 4,
+  '19b-egg-sorter': 4,
+  '20-delivery-cart': 4,
+  '21-feed-hopper': 4,
+  '22-sales-clerk': 4,
+  '04-upstart': 4,
+  '05-old-money': 4,
+  '06-squeezer': 4,
+  '07-loyalist': 4,
+  '08-bakery-buyer': 4,
+  '09-market-trader': 4,
+  '10-wholesaler': 4,
+  'x-hen-portrait': 8,
+};
+
+/** The base hen and its trait layers share one cell layout, one factor and one blob labelling. */
 export const HEN_LAYERS = [
   '02-body',
   '02-eyes-sleepy',
@@ -111,6 +168,8 @@ export const HEN_LAYERS = [
   '02-acc-shades',
 ];
 const HEN_CELL = 256;
+/** Largest atlas page side: within every WebGL2 GPU's texture limit. */
+const PAGE = 4096;
 
 export interface SheetFrameJson {
   frame: { x: number; y: number; w: number; h: number };
@@ -123,24 +182,56 @@ export interface SheetJson {
   meta: { size: { w: number; h: number }; grid: number };
 }
 
-/** One frame in an atlas: rect, pivot (anchor point, from the rect's top left) and duration. */
-export type DerivedFrame = [x: number, y: number, w: number, h: number, px: number, py: number, ms: number];
+/** One frame in an atlas page: rect, pivot (from the rect's top left) and page. */
+export type DerivedRect = [x: number, y: number, w: number, h: number, px: number, py: number, page: number];
 
 export interface DerivedSprite {
   group: Group;
-  /** World pixels per atlas pixel. */
+  kind: 'exact' | 'painted';
+  /** Source pixels per stored pixel: the factor the round trip chose. */
+  factor: number;
+  /** Exact: design pixels per atlas pixel. Painted: 1 (density decides the size). */
   scale: number;
-  /** Source pixels per atlas pixel (the art's true grid). */
-  grid: number;
-  /** Exact sheets: where the whole downscaled sheet sits in its atlas, for tile lookups. */
-  sheet?: { x: number; y: number; w: number; h: number };
-  rows: Record<string, { mode: 'loop' | 'once'; frames: DerivedFrame[] }>;
+  /** Source pixels per design pixel. */
+  ratio: number;
+  /** Densities this sprite has frames at ([1] for exact sheets). */
+  levels: number[];
+  /** Exact sheets: the whole sheet's rect, for tile and glyph lookups. */
+  sheet?: DerivedRect;
+  rows: Record<string, { mode: 'loop' | 'once'; ms: number[] }>;
+  /** Frame rects by density, then row. */
+  frames: Record<string, Record<string, DerivedRect[]>>;
 }
 
+export interface AtlasPage {
+  /** Named by the hash of the page's pixels, so a check never depends on an encoder's bytes. */
+  file: string;
+  w: number;
+  h: number;
+}
+
+/** Painted pages ship as WebP (lossy colour, lossless alpha); exact pages as lossless PNG. */
+export const WEBP = { quality: 90, method: 4, use_sharp_yuv: 1, alpha_quality: 100 } as const;
+
 export interface DerivedManifest {
-  version: 1;
-  atlases: Record<string, { file: string; w: number; h: number; bytes: number }>;
+  version: 2;
+  levels: number[];
+  /** Atlas pages by key: the group for exact sheets, group@density for painted ones. */
+  atlases: Record<string, AtlasPage[]>;
   sprites: Record<string, DerivedSprite>;
+}
+
+export interface AssetReportRow {
+  id: string;
+  kind: 'exact' | 'painted' | 'unused';
+  size: string;
+  /** Round-trip error (share of visible pixels) at each factor tried. */
+  tried: Record<string, number>;
+  factor: number;
+  /** Error at the chosen factor (0 at factor 1: nothing is resampled). */
+  error: number;
+  previousGrid: number;
+  previousError: number | null;
 }
 
 // ---- pixels -------------------------------------------------------------------------------------
@@ -157,7 +248,7 @@ function edges(len: number, n: number, phase: number): number[] {
 }
 
 /** One block's colour: transparent unless most of it is opaque, else the mean of its most common colour. */
-function blockColour(img: Rgba, x0: number, x1: number, y0: number, y1: number, out: Uint8Array, o: number): number {
+function blockColour(img: Rgba, x0: number, x1: number, y0: number, y1: number, out: Uint8Array, o: number): void {
   const { width, data } = img;
   const votes = new Map<number, [number, number, number, number]>();
   let opaque = 0;
@@ -179,54 +270,94 @@ function blockColour(img: Rgba, x0: number, x1: number, y0: number, y1: number, 
         v[3]++;
       } else votes.set(key, [r, g, b, 1]);
     }
-  if (opaque * 2 < area) return area - opaque;
+  if (opaque * 2 < area) return;
   let best: [number, number, number, number] = [0, 0, 0, 0];
   for (const v of votes.values()) if (v[3] > best[3]) best = v;
   out[o] = Math.round(best[0] / best[3]);
   out[o + 1] = Math.round(best[1] / best[3]);
   out[o + 2] = Math.round(best[2] / best[3]);
   out[o + 3] = 255;
-  return opaque - best[3] + (area - opaque);
+}
+
+/** Downscales a whole exact sheet by an integer factor, one majority colour per block. */
+export function downscale(img: Rgba, f: number): Rgba {
+  const w = Math.round(img.width / f);
+  const h = Math.round(img.height / f);
+  const out = blank(w, h);
+  const ex = edges(img.width, w, 0);
+  const ey = edges(img.height, h, 0);
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) blockColour(img, ex[i] ?? 0, ex[i + 1] ?? 0, ey[j] ?? 0, ey[j + 1] ?? 0, out.data, (j * w + i) * 4);
+  return out;
 }
 
 /**
- * Downscales a sheet to n x m pixels per cell (cells of cw x ch source pixels), one majority colour
- * per block. Returns the image and its disagreement (pixels that differ from their block's colour).
+ * Nearest round trip at factor f: every pixel is compared with the pixel at its block's centre
+ * (what a nearest downscale keeps and a nearest upscale puts back). Returns the share of visible
+ * pixels that move by more than ROUND_TRIP.channel in any channel. step samples every step-th row.
  */
-export function downscale(img: Rgba, cw: number, ch: number, nx: number, ny: number, phase = { x: 0, y: 0 }): { img: Rgba; cost: number } {
-  const cols = Math.round(img.width / cw);
-  const rows = Math.round(img.height / ch);
-  const out = blank(cols * nx, rows * ny);
-  let cost = 0;
-  for (let cy = 0; cy < rows; cy++)
-    for (let cx = 0; cx < cols; cx++) {
-      const ex = edges(cw, nx, phase.x).map((e) => Math.min(img.width, cx * cw + e));
-      const ey = edges(ch, ny, phase.y).map((e) => Math.min(img.height, cy * ch + e));
-      for (let j = 0; j < ny; j++)
-        for (let i = 0; i < nx; i++) {
-          const o = ((cy * ny + j) * out.width + cx * nx + i) * 4;
-          cost += blockColour(img, ex[i] ?? 0, ex[i + 1] ?? 0, ey[j] ?? 0, ey[j + 1] ?? 0, out.data, o);
-        }
+export function roundTrip(img: Rgba, f: number, phase = { x: 0, y: 0 }, step = 1): number {
+  const { width: w, height: h, data: d } = img;
+  let diff = 0;
+  let seen = 0;
+  const half = Math.floor(f / 2);
+  const col = new Int32Array(w);
+  for (let x = 0; x < w; x++) col[x] = Math.min(w - 1, Math.max(0, Math.floor((x - phase.x) / f) * f + phase.x + half));
+  for (let y = 0; y < h; y += step) {
+    const sy = Math.min(h - 1, Math.max(0, Math.floor((y - phase.y) / f) * f + phase.y + half));
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const j = (sy * w + (col[x] ?? 0)) * 4;
+      const a1 = d[i + 3] ?? 0;
+      const a2 = d[j + 3] ?? 0;
+      if (a1 < 8 && a2 < 8) continue;
+      seen++;
+      const m = Math.max(
+        Math.abs((d[i] ?? 0) - (d[j] ?? 0)),
+        Math.abs((d[i + 1] ?? 0) - (d[j + 1] ?? 0)),
+        Math.abs((d[i + 2] ?? 0) - (d[j + 2] ?? 0)),
+        Math.abs(a1 - a2),
+      );
+      if (m > ROUND_TRIP.channel) diff++;
     }
-  return { img: out, cost };
+  }
+  return seen ? diff / seen : 0;
 }
 
-/** The block phase that best fits the art's own grid (least disagreement), searched on a few offsets. */
-export function bestPhase(img: Rgba, cw: number, ch: number, nx: number, ny: number): { x: number; y: number } {
-  const bx = cw / nx;
-  const by = ch / ny;
-  const steps = (b: number) => [...new Set([0, 0.25, 0.5, 0.75].map((f) => Math.floor(b * f)))];
+/** The round trip at the block phase that fits the art best (painted art may sit off the origin). */
+export function bestRoundTrip(img: Rgba, f: number, anyPhase: boolean): number {
+  if (!anyPhase) return roundTrip(img, f);
+  const phases = f <= 4 ? [...Array(f).keys()] : [...new Set([0, 1, 2, 3, 4, 5, 6, 7].map((k) => Math.floor((k * f) / 8)))];
   let best = { x: 0, y: 0 };
-  let bestCost = Infinity;
-  for (const x of steps(bx))
-    for (const y of steps(by)) {
-      const { cost } = downscale(img, cw, ch, nx, ny, { x, y });
-      if (cost < bestCost) {
-        bestCost = cost;
+  let bestErr = Infinity;
+  for (const x of phases)
+    for (const y of phases) {
+      const e = roundTrip(img, f, { x, y }, 4);
+      if (e < bestErr) {
+        bestErr = e;
         best = { x, y };
       }
     }
-  return best;
+  return roundTrip(img, f, best);
+}
+
+/**
+ * The largest factor whose round trip passes for every image (images that must share one grid are
+ * judged together). A factor is only tried when the sheet and its frame rects divide by it, and is
+ * skipped once a divisor of it failed. Exact sheets are judged on the grid at the origin.
+ */
+export function chooseFactor(imgs: Rgba[], opts: { anyPhase: boolean; divides: number[] }): { factor: number; tried: Record<string, number> } {
+  const tried: Record<string, number> = {};
+  const failed: number[] = [];
+  let factor = 1;
+  for (const f of FACTORS) {
+    if (failed.some((d) => f % d === 0)) continue;
+    if (opts.divides.some((n) => n % f !== 0)) continue;
+    const err = Math.max(...imgs.map((img) => bestRoundTrip(img, f, opts.anyPhase)));
+    tried[f] = round4(err);
+    if (err <= ROUND_TRIP.share) factor = Math.max(factor, f);
+    else failed.push(f);
+  }
+  return { factor, tried };
 }
 
 /** 4-connected blobs of opaque pixels. Returns a label per pixel (-1 when empty) and the blob count. */
@@ -253,6 +384,36 @@ export function label(mask: Uint8Array, width: number, height: number): { labels
     count++;
   }
   return { labels, count };
+}
+
+/** Breadth-first spread of owners over all pixels: nearest owned pixel's owner and its distance. */
+function spread(owner: Int32Array, width: number, height: number, maxDist = Infinity): { near: Int32Array; dist: Int32Array } {
+  const n = width * height;
+  const near = new Int32Array(n).fill(-1);
+  const dist = new Int32Array(n).fill(-1);
+  const queue = new Int32Array(n);
+  let head = 0;
+  let tail = 0;
+  for (let p = 0; p < n; p++)
+    if ((owner[p] ?? -1) >= 0) {
+      near[p] = owner[p] ?? -1;
+      dist[p] = 0;
+      queue[tail++] = p;
+    }
+  while (head < tail) {
+    const p = queue[head++] ?? 0;
+    const d = dist[p] ?? 0;
+    if (d >= maxDist) continue;
+    const y = (p / width) | 0;
+    const x = p - y * width;
+    for (const q of [x > 0 ? p - 1 : -1, x < width - 1 ? p + 1 : -1, y > 0 ? p - width : -1, y < height - 1 ? p + width : -1]) {
+      if (q < 0 || dist[q] !== -1) continue;
+      dist[q] = d + 1;
+      near[q] = near[p] ?? -1;
+      queue[tail++] = q;
+    }
+  }
+  return { near, dist };
 }
 
 /**
@@ -291,7 +452,6 @@ export function cellOwners(mask: Uint8Array, width: number, height: number, cw: 
       }
     return bestN >= 0.85 * (total[l] ?? 1) ? best : -1;
   });
-  // main body per cell
   const main = new Map<number, number>();
   for (let l = 0; l < count; l++) {
     const c = dominant[l] ?? -1;
@@ -300,31 +460,12 @@ export function cellOwners(mask: Uint8Array, width: number, height: number, cw: 
     if (cur === undefined || (total[l] ?? 0) > (total[cur] ?? 0)) main.set(c, l);
   }
   const isMain = new Set(main.values());
-  // nearest main body for every pixel (breadth first from all main bodies at once)
-  const near = new Int32Array(labels.length).fill(-1);
-  const dist = new Int32Array(labels.length).fill(-1);
-  const queue = new Int32Array(labels.length);
-  let head = 0;
-  let tail = 0;
+  const seed = new Int32Array(labels.length).fill(-1);
   for (let p = 0; p < labels.length; p++) {
     const l = labels[p] ?? -1;
-    if (l >= 0 && isMain.has(l)) {
-      near[p] = dominant[l] ?? -1;
-      dist[p] = 0;
-      queue[tail++] = p;
-    }
+    if (l >= 0 && isMain.has(l)) seed[p] = dominant[l] ?? -1;
   }
-  while (head < tail) {
-    const p = queue[head++] ?? 0;
-    const y = (p / width) | 0;
-    const x = p - y * width;
-    for (const q of [x > 0 ? p - 1 : -1, x < width - 1 ? p + 1 : -1, y > 0 ? p - width : -1, y < height - 1 ? p + width : -1]) {
-      if (q < 0 || dist[q] !== -1) continue;
-      dist[q] = (dist[p] ?? 0) + 1;
-      near[q] = near[p] ?? -1;
-      queue[tail++] = q;
-    }
-  }
+  const { near, dist } = spread(seed, width, height);
   const attach = new Array<number>(count).fill(-1);
   const closest = new Array<number>(count).fill(Infinity);
   for (let p = 0; p < labels.length; p++) {
@@ -350,112 +491,65 @@ export function cellOwners(mask: Uint8Array, width: number, height: number, cw: 
 
 /**
  * Cell ownership for stacked layers: cells are decided on the first layer (the body) alone, so tall
- * trait art (a mohawk, a top hat) can never bridge two hens; every other layer's blobs then join
- * the nearest body pixel's cell.
+ * trait art (a mohawk, a top hat) can never bridge two hens; every other layer's blobs then join the
+ * body they touch along the most pixels (far blobs join the nearest body). Soft edge pixels (below
+ * half alpha) join the owner of the nearest solid pixel within three pixels; fainter specks are dropped.
  */
 export function layerOwners(layers: Rgba[], width: number, height: number, cw: number, ch: number): Int32Array {
   const n = width * height;
-  const primary = opaqueMask(layers[0] as Rgba);
-  const owner = cellOwners(primary, width, height, cw, ch);
-  if (layers.length === 1) return owner;
-  // nearest body cell for every pixel
-  const near = new Int32Array(n).fill(-1);
-  const dist = new Int32Array(n).fill(-1);
-  const queue = new Int32Array(n);
-  let head = 0;
-  let tail = 0;
-  for (let p = 0; p < n; p++)
-    if ((owner[p] ?? -1) >= 0) {
-      near[p] = owner[p] ?? -1;
-      dist[p] = 0;
-      queue[tail++] = p;
-    }
-  while (head < tail) {
-    const p = queue[head++] ?? 0;
-    const y = (p / width) | 0;
-    const x = p - y * width;
-    for (const q of [x > 0 ? p - 1 : -1, x < width - 1 ? p + 1 : -1, y > 0 ? p - width : -1, y < height - 1 ? p + width : -1]) {
-      if (q < 0 || dist[q] !== -1) continue;
-      dist[q] = (dist[p] ?? 0) + 1;
-      near[q] = near[p] ?? -1;
-      queue[tail++] = q;
-    }
-  }
-  const rest = new Uint8Array(n);
-  for (const l of layers.slice(1)) for (let p = 0; p < n; p++) if ((l.data[p * 4 + 3] ?? 0) > 0 && !primary[p]) rest[p] = 1;
-  const { labels, count } = label(rest, width, height);
-  // a trait blob joins the body it touches along the most pixels (a comb sits on its own head's
-  // whole width; the feet of the hen above only graze its tips); far blobs join the nearest body
-  const best = new Array<number>(count).fill(Infinity);
-  const cell = new Array<number>(count).fill(-1);
-  const contact: Map<number, number>[] = Array.from({ length: count }, () => new Map());
-  for (let p = 0; p < n; p++) {
-    const l = labels[p] ?? -1;
-    if (l < 0) continue;
-    const d = dist[p] ?? -1;
-    const c = near[p] ?? -1;
-    if (d >= 0 && d <= 2 && c >= 0) {
-      const m = contact[l] as Map<number, number>;
-      m.set(c, (m.get(c) ?? 0) + 1);
-    }
-    if (d >= 0 && d < (best[l] ?? Infinity)) {
-      best[l] = d;
-      cell[l] = c;
-    }
-  }
-  contact.forEach((m, l) => {
-    let top = -1;
-    let topN = 0;
-    for (const [c, k] of m)
-      if (k > topN) {
-        topN = k;
-        top = c;
-      }
-    if (top >= 0) cell[l] = top;
+  const solid = layers.map((l) => {
+    const d = new Uint8Array(l.data);
+    alphaCut(d);
+    return d;
   });
+  const primary = new Uint8Array(n);
+  for (let p = 0; p < n; p++) primary[p] = (solid[0]?.[p * 4 + 3] ?? 0) > 0 ? 1 : 0;
+  const owner = cellOwners(primary, width, height, cw, ch);
+  if (layers.length > 1) {
+    const { near, dist } = spread(owner, width, height);
+    const rest = new Uint8Array(n);
+    for (const l of solid.slice(1)) for (let p = 0; p < n; p++) if ((l[p * 4 + 3] ?? 0) > 0 && !primary[p]) rest[p] = 1;
+    const { labels, count } = label(rest, width, height);
+    const best = new Array<number>(count).fill(Infinity);
+    const cell = new Array<number>(count).fill(-1);
+    const contact: Map<number, number>[] = Array.from({ length: count }, () => new Map());
+    for (let p = 0; p < n; p++) {
+      const l = labels[p] ?? -1;
+      if (l < 0) continue;
+      const d = dist[p] ?? -1;
+      const c = near[p] ?? -1;
+      if (d >= 0 && d <= 2 && c >= 0) {
+        const m = contact[l] as Map<number, number>;
+        m.set(c, (m.get(c) ?? 0) + 1);
+      }
+      if (d >= 0 && d < (best[l] ?? Infinity)) {
+        best[l] = d;
+        cell[l] = c;
+      }
+    }
+    contact.forEach((m, l) => {
+      let top = -1;
+      let topN = 0;
+      for (const [c, k] of m)
+        if (k > topN) {
+          topN = k;
+          top = c;
+        }
+      if (top >= 0) cell[l] = top;
+    });
+    for (let p = 0; p < n; p++) {
+      const l = labels[p] ?? -1;
+      if (l >= 0) owner[p] = cell[l] ?? -1;
+    }
+  }
+  // soft edges: anything visible in any layer joins the nearest solid owner, three pixels at most
+  const soft = spread(owner, width, height, 3);
   for (let p = 0; p < n; p++) {
-    const l = labels[p] ?? -1;
-    if (l >= 0) owner[p] = cell[l] ?? -1;
+    if ((owner[p] ?? -1) >= 0) continue;
+    if (!layers.some((l) => (l.data[p * 4 + 3] ?? 0) >= 8)) continue;
+    owner[p] = soft.near[p] ?? -1;
   }
   return owner;
-}
-
-/** Carries a source-resolution owner map down to the derived grid: each block takes its most common owner. */
-export function downscaleOwner(owner: Int32Array, width: number, height: number, cw: number, ch: number, nx: number, ny: number, phase: { x: number; y: number }): Int32Array {
-  const cols = Math.round(width / cw);
-  const rows = Math.round(height / ch);
-  const outW = cols * nx;
-  const out = new Int32Array(outW * rows * ny).fill(-1);
-  const votes = new Map<number, number>();
-  for (let cy = 0; cy < rows; cy++)
-    for (let cx = 0; cx < cols; cx++) {
-      const ex = edges(cw, nx, phase.x).map((e) => Math.min(width, cx * cw + e));
-      const ey = edges(ch, ny, phase.y).map((e) => Math.min(height, cy * ch + e));
-      for (let j = 0; j < ny; j++)
-        for (let i = 0; i < nx; i++) {
-          votes.clear();
-          for (let y = ey[j] ?? 0; y < (ey[j + 1] ?? 0); y++)
-            for (let x = ex[i] ?? 0; x < (ex[i + 1] ?? 0); x++) {
-              const o = owner[y * width + x] ?? -1;
-              if (o >= 0) votes.set(o, (votes.get(o) ?? 0) + 1);
-            }
-          let best = -1;
-          let bestN = 0;
-          for (const [o, n] of votes)
-            if (n > bestN) {
-              bestN = n;
-              best = o;
-            }
-          out[(cy * ny + j) * outW + cx * nx + i] = best;
-        }
-    }
-  return out;
-}
-
-export function opaqueMask(img: Rgba): Uint8Array {
-  const m = new Uint8Array(img.width * img.height);
-  for (let i = 0; i < m.length; i++) m[i] = (img.data[i * 4 + 3] ?? 0) > 0 ? 1 : 0;
-  return m;
 }
 
 // ---- slicing ------------------------------------------------------------------------------------
@@ -482,68 +576,142 @@ export function cutsFor(json: SheetJson, cw: number, ch: number): Record<string,
   return out;
 }
 
+/** A frame at full resolution: the owned pixels of one layer in one cell, with its anchor. */
 export interface Piece {
   img: Rgba;
-  /** Pivot in the piece, in derived pixels. */
-  px: number;
-  py: number;
-  /** The cell this piece came from. */
-  cell: number;
+  /** Where the piece's top left sits in the sheet, and the anchor in sheet pixels. */
+  x: number;
+  y: number;
+  ax: number;
+  ay: number;
 }
 
-/**
- * Cuts one piece per cell from downscaled layers that share a cell layout: each piece is the
- * union bounding box of the cell's own pixels across layers, so stacked layers line up exactly.
- */
-export function cutCells(
-  layers: Rgba[],
-  owner: Int32Array,
-  cols: number,
-  rows: number,
-  nx: number,
-  ny: number,
-  anchors: Map<number, { ax: number; ay: number }>,
-): Map<number, Piece[]> {
-  const first = layers[0] as Rgba;
-  const { width } = first;
-  const boxes = new Map<number, { x0: number; y0: number; x1: number; y1: number }>();
+/** Pixel indices owned by each cell, in scan order. */
+export function pixelsByCell(owner: Int32Array): Map<number, number[]> {
+  const out = new Map<number, number[]>();
   for (let p = 0; p < owner.length; p++) {
     const c = owner[p] ?? -1;
     if (c < 0) continue;
-    const y = (p / width) | 0;
-    const x = p - y * width;
-    const b = boxes.get(c);
-    if (!b) boxes.set(c, { x0: x, y0: y, x1: x + 1, y1: y + 1 });
-    else {
-      b.x0 = Math.min(b.x0, x);
-      b.y0 = Math.min(b.y0, y);
-      b.x1 = Math.max(b.x1, x + 1);
-      b.y1 = Math.max(b.y1, y + 1);
-    }
-  }
-  const out = new Map<number, Piece[]>();
-  for (let cell = 0; cell < cols * rows; cell++) {
-    const box = boxes.get(cell);
-    const a = anchors.get(cell);
-    const cx = (cell % cols) * nx;
-    const cy = Math.floor(cell / cols) * ny;
-    const pieces = layers.map((layer): Piece => {
-      if (!box) return { img: blank(1, 1), px: a ? a.ax - cx : 0, py: a ? a.ay - cy : 0, cell };
-      const img = blank(box.x1 - box.x0, box.y1 - box.y0);
-      for (let y = box.y0; y < box.y1; y++)
-        for (let x = box.x0; x < box.x1; x++) {
-          const p = y * width + x;
-          if (owner[p] !== cell) continue;
-          const s = p * 4;
-          if ((layer.data[s + 3] ?? 0) === 0) continue;
-          const o = ((y - box.y0) * img.width + (x - box.x0)) * 4;
-          img.data.set(layer.data.subarray(s, s + 4), o);
-        }
-      return { img, px: (a ? a.ax : cx + nx / 2) - box.x0, py: (a ? a.ay : cy + ny) - box.y0, cell };
-    });
-    out.set(cell, pieces);
+    const list = out.get(c);
+    if (list) list.push(p);
+    else out.set(c, [p]);
   }
   return out;
+}
+
+/** Cuts every layer's own pixels for one cell (each layer its own box; one shared anchor). */
+export function cutCell(layers: Rgba[], pixels: number[], anchor: { ax: number; ay: number }): Piece[] {
+  const width = (layers[0] as Rgba).width;
+  return layers.map((layer) => {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const p of pixels) {
+      if ((layer.data[p * 4 + 3] ?? 0) === 0) continue;
+      const y = (p / width) | 0;
+      const x = p - y * width;
+      if (x < x0) x0 = x;
+      if (x >= x1) x1 = x + 1;
+      if (y < y0) y0 = y;
+      if (y >= y1) y1 = y + 1;
+    }
+    if (x0 === Infinity) return { img: blank(0, 0), x: Math.round(anchor.ax), y: Math.round(anchor.ay), ax: anchor.ax, ay: anchor.ay };
+    const img = blank(x1 - x0, y1 - y0);
+    for (const p of pixels) {
+      const s = p * 4;
+      if ((layer.data[s + 3] ?? 0) === 0) continue;
+      const y = (p / width) | 0;
+      const x = p - y * width;
+      img.data.set(layer.data.subarray(s, s + 4), ((y - y0) * img.width + (x - x0)) * 4);
+    }
+    return { img, x: x0, y: y0, ax: anchor.ax, ay: anchor.ay };
+  });
+}
+
+/** Overlap weights of destination texels over source pixels along one axis (texel grid starts at origin). */
+function weights(srcStart: number, srcLen: number, origin: number, s: number, i0: number, n: number): { first: number; w: number[] }[] {
+  const out: { first: number; w: number[] }[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = origin + (i0 + i) / s - srcStart;
+    const b = origin + (i0 + i + 1) / s - srcStart;
+    const first = Math.max(0, Math.floor(a));
+    const last = Math.min(srcLen - 1, Math.ceil(b) - 1);
+    const w: number[] = [];
+    for (let k = first; k <= last; k++) w.push(Math.max(0, Math.min(b, k + 1) - Math.max(a, k)));
+    out.push({ first, w });
+  }
+  return out;
+}
+
+/**
+ * Resamples a piece to s texels per source pixel by exact area coverage (premultiplied alpha), on a
+ * texel grid that starts at the anchor: the pivot lands on a whole texel, so stacked layers resampled
+ * on their own still line up, and a mirrored sprite stays in place. Integer scale-ups replicate pixels.
+ */
+export function resample(piece: Piece, s: number): { img: Rgba; px: number; py: number } {
+  const { img, x, y, ax, ay } = piece;
+  if (!img.width || !img.height) return { img: blank(0, 0), px: 0, py: 0 };
+  const i0 = Math.floor((x - ax) * s + 1e-9);
+  const i1 = Math.ceil((x + img.width - ax) * s - 1e-9);
+  const j0 = Math.floor((y - ay) * s + 1e-9);
+  const j1 = Math.ceil((y + img.height - ay) * s - 1e-9);
+  const w = i1 - i0;
+  const h = j1 - j0;
+  const wx = weights(x, img.width, ax, s, i0, w);
+  const wy = weights(y, img.height, ay, s, j0, h);
+  // horizontal pass, premultiplied
+  const tmp = new Float64Array(w * img.height * 4);
+  const src = img.data;
+  for (let r = 0; r < img.height; r++)
+    for (let i = 0; i < w; i++) {
+      const { first, w: ws } = wx[i] as { first: number; w: number[] };
+      let R = 0;
+      let G = 0;
+      let B = 0;
+      let A = 0;
+      for (let k = 0; k < ws.length; k++) {
+        const o = (r * img.width + first + k) * 4;
+        const a = ((src[o + 3] ?? 0) / 255) * (ws[k] ?? 0);
+        R += (src[o] ?? 0) * a;
+        G += (src[o + 1] ?? 0) * a;
+        B += (src[o + 2] ?? 0) * a;
+        A += a;
+      }
+      const t = (r * w + i) * 4;
+      tmp[t] = R;
+      tmp[t + 1] = G;
+      tmp[t + 2] = B;
+      tmp[t + 3] = A;
+    }
+  const out = blank(w, h);
+  const area = 1 / (s * s);
+  for (let j = 0; j < h; j++) {
+    const { first, w: ws } = wy[j] as { first: number; w: number[] };
+    for (let i = 0; i < w; i++) {
+      let R = 0;
+      let G = 0;
+      let B = 0;
+      let A = 0;
+      for (let k = 0; k < ws.length; k++) {
+        const t = ((first + k) * w + i) * 4;
+        const wk = ws[k] ?? 0;
+        R += (tmp[t] ?? 0) * wk;
+        G += (tmp[t + 1] ?? 0) * wk;
+        B += (tmp[t + 2] ?? 0) * wk;
+        A += (tmp[t + 3] ?? 0) * wk;
+      }
+      const alpha = Math.min(1, A / area);
+      const o = (j * w + i) * 4;
+      const a8 = Math.round(alpha * 255);
+      if (a8 === 0) continue;
+      out.data[o] = Math.min(255, Math.round(R / A));
+      out.data[o + 1] = Math.min(255, Math.round(G / A));
+      out.data[o + 2] = Math.min(255, Math.round(B / A));
+      out.data[o + 3] = a8;
+    }
+  }
+  return { img: out, px: -i0, py: -j0 };
 }
 
 // ---- atlas --------------------------------------------------------------------------------------
@@ -554,10 +722,11 @@ export interface Placed {
   y: number;
   w: number;
   h: number;
+  page: number;
 }
 
-/** Shelf packing, tallest first, 1 px gutters; identical images share one rect. */
-export function pack(items: { key: string; img: Rgba }[], maxWidth = 1024): { placed: Map<string, Placed>; width: number; height: number; image: Rgba } {
+/** Shelf packing, tallest first, 1 px gutters, into pages of at most PAGE x PAGE; identical images share one rect. */
+export function pack(items: { key: string; img: Rgba }[], maxWidth = 1024): { placed: Map<string, Placed>; pages: Rgba[] } {
   const unique = new Map<string, { img: Rgba; keys: string[] }>();
   for (const it of items) {
     const h = createHash('sha1').update(it.img.data).update(`${it.img.width}x${it.img.height}`).digest('hex');
@@ -567,33 +736,45 @@ export function pack(items: { key: string; img: Rgba }[], maxWidth = 1024): { pl
   }
   const list = [...unique.values()].sort((a, b) => b.img.height - a.img.height || b.img.width - a.img.width || (a.keys[0] ?? '').localeCompare(b.keys[0] ?? ''));
   const widest = Math.max(1, ...list.map((u) => u.img.width + 2));
-  const width = Math.max(maxWidth, widest);
+  const width = Math.min(PAGE, Math.max(maxWidth, widest));
+  const spots: { u: (typeof list)[number]; x: number; y: number; page: number }[] = [];
+  let page = 0;
   let x = 1;
   let y = 1;
   let shelf = 0;
-  const spots: { u: (typeof list)[number]; x: number; y: number }[] = [];
   for (const u of list) {
     if (x + u.img.width + 1 > width) {
       x = 1;
       y += shelf + 1;
       shelf = 0;
     }
-    spots.push({ u, x, y });
+    if (y + u.img.height + 1 > PAGE) {
+      page++;
+      x = 1;
+      y = 1;
+      shelf = 0;
+    }
+    spots.push({ u, x, y, page });
     x += u.img.width + 1;
     shelf = Math.max(shelf, u.img.height);
   }
-  const height = y + shelf + 1;
-  const used = Math.max(...spots.map((s) => s.x + s.u.img.width + 1), 2);
-  const image = blank(used, height);
+  const pages: Rgba[] = [];
+  for (let p = 0; p <= page; p++) {
+    const mine = spots.filter((s) => s.page === p);
+    const w = Math.max(2, ...mine.map((s) => s.x + s.u.img.width + 1));
+    const h = Math.max(2, ...mine.map((s) => s.y + s.u.img.height + 1));
+    pages.push(blank(w, h));
+  }
   const placed = new Map<string, Placed>();
   for (const s of spots) {
+    const image = pages[s.page] as Rgba;
     for (let r = 0; r < s.u.img.height; r++) {
       const src = s.u.img.data.subarray(r * s.u.img.width * 4, (r + 1) * s.u.img.width * 4);
       image.data.set(src, ((s.y + r) * image.width + s.x) * 4);
     }
-    for (const key of s.u.keys) placed.set(key, { key, x: s.x, y: s.y, w: s.u.img.width, h: s.u.img.height });
+    for (const key of s.u.keys) placed.set(key, { key, x: s.x, y: s.y, w: s.u.img.width, h: s.u.img.height, page: s.page });
   }
-  return { placed, width: used, height, image };
+  return { placed, pages };
 }
 
 // ---- the whole step -----------------------------------------------------------------------------
@@ -613,149 +794,230 @@ export interface DeriveInput {
 
 export interface DeriveOutput {
   manifest: DerivedManifest;
-  /** Atlas files by name (content-hashed). */
-  files: Map<string, Uint8Array>;
-  report: string[];
+  /** Atlas pages by file name, still as pixels (derive-assets encodes them). */
+  pages: Map<string, { image: Rgba; format: 'png' | 'webp' }>;
+  /** One row per asset: factors tried, the one chosen and its round-trip error. */
+  assets: AssetReportRow[];
+  log: string[];
 }
 
-function cutsByCell(json: SheetJson, cw: number, ch: number, cols: number, block: { x: number; y: number }, phase: { x: number; y: number }) {
-  const cuts = cutsFor(json, cw, ch);
-  const anchors = new Map<number, { ax: number; ay: number }>();
-  for (const c of Object.values(cuts)) anchors.set(c.row * cols + c.col, { ax: (c.ax - phase.x) / block.x, ay: (c.ay - phase.y) / block.y });
-  return { cuts, anchors };
+interface PendingFrame {
+  key: string;
+  px: number;
+  py: number;
+  sub?: { x: number; y: number; w: number; h: number };
 }
 
 export function derive(input: DeriveInput): DeriveOutput {
-  const report: string[] = [];
-  const byGroup = new Map<Group, { key: string; img: Rgba }[]>();
-  const add = (g: Group, key: string, img: Rgba) => {
-    const list = byGroup.get(g) ?? [];
+  const log: string[] = [];
+  const assets: AssetReportRow[] = [];
+  const atlasItems = new Map<string, { key: string; img: Rgba }[]>();
+  const add = (atlas: string, key: string, img: Rgba) => {
+    const list = atlasItems.get(atlas) ?? [];
     list.push({ key, img });
-    byGroup.set(g, list);
+    atlasItems.set(atlas, list);
   };
-  // sprite id -> row -> frames with a piece key (resolved to atlas rects at the end)
-  const pending: Record<string, { group: Group; scale: number; grid: number; sheetKey?: string; rows: Record<string, { mode: 'loop' | 'once'; frames: { key: string; px: number; py: number; ms: number; sub?: { x: number; y: number; w: number; h: number } }[] }> }> = {};
-
-  // exact sheets: the whole sheet at its grid, frames are sub-rects
-  for (const [id, group] of Object.entries(EXACT_GROUP)) {
+  const pending: Record<
+    string,
+    Omit<DerivedSprite, 'frames' | 'sheet'> & { sheetKey?: string; sheetAtlas?: string; frames: Record<string, { atlas: string; rows: Record<string, PendingFrame[]> }> }
+  > = {};
+  const src = (id: string): SourceSprite => {
     const s = input.sprites[id];
-    if (!s) throw new Error(`derive: missing exact sheet ${id}`);
-    const g = s.grid;
-    if (g < 2) throw new Error(`derive: ${id} has no exact grid`);
-    const { img } = downscale(s.png, s.png.width, s.png.height, s.png.width / g, s.png.height / g);
+    if (!s) throw new Error(`derive: missing sheet ${id}`);
+    return s;
+  };
+  const rowsOf = (s: SourceSprite) =>
+    Object.fromEntries(Object.entries(s.json.animations).map(([row, names]) => [row, { mode: s.rows[row]?.mode ?? 'loop', ms: names.map((n) => s.json.frames[n]?.duration || 100) }]));
+
+  // exact sheets: the whole sheet at its factor, frames are sub-rects
+  for (const [id, group] of Object.entries(EXACT_GROUP)) {
+    const s = src(id);
+    const rects = Object.values(s.json.frames).flatMap((f) => [f.frame.x, f.frame.y, f.frame.w, f.frame.h]);
+    const { factor, tried } = chooseFactor([s.png], { anyPhase: false, divides: [s.png.width, s.png.height, ...rects] });
+    if (factor < 2) throw new Error(`derive: ${id} has no exact grid`);
+    const img = downscale(s.png, factor);
     const sheetKey = `${id}#sheet`;
     add(group, sheetKey, img);
-    const rows: (typeof pending)[string]['rows'] = {};
-    for (const [row, names] of Object.entries(s.json.animations)) {
-      rows[row] = {
-        mode: s.rows[row]?.mode ?? 'loop',
-        frames: names.map((n) => {
-          const f = s.json.frames[n] as SheetFrameJson;
-          const sub = { x: f.frame.x / g, y: f.frame.y / g, w: f.frame.w / g, h: f.frame.h / g };
-          return { key: sheetKey, sub, px: f.anchor.x * sub.w, py: f.anchor.y * sub.h, ms: f.duration || 100 };
-        }),
-      };
-    }
-    pending[id] = { group, scale: 1, grid: g, sheetKey, rows };
-    report.push(`${id}: exact grid ${g}, ${img.width}x${img.height}`);
+    const rows: Record<string, PendingFrame[]> = {};
+    for (const [row, names] of Object.entries(s.json.animations))
+      rows[row] = names.map((n) => {
+        const f = s.json.frames[n] as SheetFrameJson;
+        const sub = { x: f.frame.x / factor, y: f.frame.y / factor, w: f.frame.w / factor, h: f.frame.h / factor };
+        return { key: sheetKey, sub, px: f.anchor.x * sub.w, py: f.anchor.y * sub.h };
+      });
+    pending[id] = { group, kind: 'exact', factor, scale: factor / s.grid, ratio: s.grid, levels: [1], rows: rowsOf(s), sheetKey, sheetAtlas: group, frames: { '1': { atlas: group, rows } } };
+    assets.push({ id, kind: 'exact', size: `${s.png.width}x${s.png.height}`, tried, factor, error: tried[factor] ?? 0, previousGrid: s.grid, previousError: tried[s.grid] ?? null });
+    log.push(`${id}: exact, factor ${factor}, ${img.width}x${img.height}`);
   }
 
-  // painted sheets: hen layers together, the rest one by one
-  const henIds = ['01-hen-anims', ...HEN_LAYERS];
-  const painted = Object.keys(PAINTED).filter((id) => !henIds.includes(id));
-  const groupsToCut: string[][] = [HEN_LAYERS, ['01-hen-anims'], ...painted.map((id) => [id])];
-  for (const ids of groupsToCut) {
-    const first = input.sprites[ids[0] as string];
-    if (!first) throw new Error(`derive: missing sheet ${ids[0]}`);
-    const spec = PAINTED[ids[0] as string] as GridSpec;
+  // painted sheets: the hen layers together, the rest one by one
+  const henSet = new Set(HEN_LAYERS);
+  const sets: string[][] = [HEN_LAYERS, ...Object.keys(PAINTED).filter((id) => !henSet.has(id)).map((id) => [id])];
+  for (const ids of sets) {
+    const first = src(ids[0] as string);
+    const spec = PAINTED[ids[0] as string] as PaintedSpec;
     const fr = Object.values(first.json.frames)[0] as SheetFrameJson;
     const cw = fr.frame.w;
-    const ch = ids[0]?.startsWith('02-') || ids[0] === '01-hen-anims' ? HEN_CELL : fr.frame.h;
-    const nx = Math.round(cw / spec.grid);
-    const ny = Math.round(ch / spec.grid);
+    const ch = henSet.has(ids[0] as string) ? HEN_CELL : fr.frame.h;
+    const sheets = ids.map((id) => src(id).png);
+    // each sheet is judged on its own; a set that must stack takes the largest factor all of them pass
+    const own = ids.map((id) => chooseFactor([src(id).png], { anyPhase: true, divides: [cw, ch] }));
+    const factor = Math.max(1, ...FACTORS.filter((f) => own.every((o) => (o.tried[f] ?? 1) <= ROUND_TRIP.share)));
+    ids.forEach((id, i) => {
+      const mine = own[i] as { factor: number; tried: Record<string, number> };
+      const prev = PREVIOUS_GRID[id] ?? 1;
+      assets.push({
+        id,
+        kind: 'painted',
+        size: `${src(id).png.width}x${src(id).png.height}`,
+        tried: mine.tried,
+        factor,
+        error: factor === 1 ? 0 : (mine.tried[factor] ?? 0),
+        previousGrid: prev,
+        previousError: mine.tried[prev] ?? round4(bestRoundTrip(src(id).png, prev, true)),
+      });
+    });
+    if (factor !== 1) throw new Error(`derive: ${ids.join(', ')} passes at factor ${factor}; painted sheets are expected to keep their resolution`);
     const cols = Math.round(first.png.width / cw);
-    const rowsN = Math.round(first.png.height / ch);
-    const cut = (png: Rgba) => {
-      const d = new Uint8Array(png.data);
-      alphaCut(d);
-      return { width: png.width, height: png.height, data: d };
-    };
-    const sources = ids.map((id) => cut((input.sprites[id] as SourceSprite).png));
-    const phase = bestPhase(sources[0] as Rgba, cw, ch, nx, ny);
-    let layers = sources.map((src) => downscale(src, cw, ch, nx, ny, phase).img);
-    const block = { x: cw / nx, y: ch / ny };
-    const { cuts, anchors } = cutsByCell(first.json, cw, ch, cols, block, phase);
+    const owner = layerOwners(sheets, first.png.width, first.png.height, cw, ch);
+    const cuts = cutsFor(first.json, cw, ch);
+    // the body's palette swaps come from the full-resolution body, so they share its cut
+    const layers = [...sheets];
     const layerIds = [...ids];
-    // the body's palette swaps are derived from the same downscaled body, so they share its cut
-    if (ids[0] === '02-body') {
+    if (ids[0] === '02-body')
       for (const [colour, ramp] of Object.entries(input.bodyRecolour)) {
-        const copy = { ...layers[0], data: new Uint8Array((layers[0] as Rgba).data) } as Rgba;
+        const copy = { ...first.png, data: new Uint8Array(first.png.data) };
         recolourBody(copy.data, ramp);
-        layers = [...layers, copy];
+        layers.push(copy);
         layerIds.push(`02-body@${colour}`);
       }
+    const byCell = pixelsByCell(owner);
+    const cells = new Map<number, Piece[]>();
+    for (const c of Object.values(cuts)) {
+      const cell = c.row * cols + c.col;
+      if (!cells.has(cell)) cells.set(cell, cutCell(layers, byCell.get(cell) ?? [], { ax: c.ax, ay: c.ay }));
     }
-    // who owns what is decided at full resolution, where a comb touches its own head and not the feet above
-    const srcOwner = layerOwners(sources, first.png.width, first.png.height, cw, ch);
-    const owner = downscaleOwner(srcOwner, first.png.width, first.png.height, cw, ch, nx, ny, phase);
-    const pieces = cutCells(layers, owner, cols, rowsN, nx, ny, anchors);
+    const levels = LEVELS.filter((d) => d <= spec.ratio / factor);
     layerIds.forEach((id, li) => {
-      const base = id.split('@')[0] as string;
-      const src = input.sprites[base] as SourceSprite;
-      const rows: (typeof pending)[string]['rows'] = {};
-      for (const [row, names] of Object.entries(first.json.animations)) {
-        rows[row] = {
-          mode: src.rows[row]?.mode ?? 'loop',
-          frames: names.map((n) => {
+      const base = src(id.split('@')[0] as string);
+      const frames: Record<string, { atlas: string; rows: Record<string, PendingFrame[]> }> = {};
+      for (const d of levels) {
+        const atlas = `${spec.group}@${d}`;
+        const s = d / spec.ratio;
+        const rows: Record<string, PendingFrame[]> = {};
+        const done = new Map<number, PendingFrame>();
+        for (const [row, names] of Object.entries(first.json.animations))
+          rows[row] = names.map((n) => {
             const c = cuts[n] as Cut;
             const cell = c.row * cols + c.col;
-            const piece = (pieces.get(cell) as Piece[])[li] as Piece;
-            const key = `${id}#${cell}`;
-            add(spec.group, key, piece.img);
-            return { key, px: piece.px, py: piece.py, ms: c.ms };
-          }),
-        };
+            const hit = done.get(cell);
+            if (hit) return hit;
+            const r = resample((cells.get(cell) as Piece[])[li] as Piece, s);
+            const key = `${id}#${cell}@${d}`;
+            add(atlas, key, r.img);
+            const f = { key, px: r.px, py: r.py };
+            done.set(cell, f);
+            return f;
+          });
+        frames[String(d)] = { atlas, rows };
       }
-      pending[id] = { group: spec.group, scale: spec.scale, grid: spec.grid, rows };
+      pending[id] = { group: spec.group, kind: 'painted', factor, scale: 1, ratio: spec.ratio, levels: [...levels], rows: rowsOf(base), frames };
     });
-    report.push(`${ids.join(', ')}: grid ${spec.grid}, cell ${cw}x${ch} -> ${nx}x${ny}, world scale ${spec.scale}, phase ${phase.x},${phase.y}`);
+    log.push(`${ids.join(', ')}: painted, factor ${factor}, ratio ${spec.ratio}, levels ${levels.join('/')}`);
+  }
+
+  for (const id of UNUSED) {
+    const s = input.sprites[id];
+    if (!s) continue;
+    const { factor, tried } = chooseFactor([s.png], { anyPhase: true, divides: [s.png.width, s.png.height] });
+    const prev = PREVIOUS_GRID[id] ?? s.grid;
+    assets.push({ id, kind: 'unused', size: `${s.png.width}x${s.png.height}`, tried, factor, error: factor === 1 ? 0 : (tried[factor] ?? 0), previousGrid: prev, previousError: tried[prev] ?? null });
   }
 
   // atlases
-  const files = new Map<string, Uint8Array>();
+  const files: DeriveOutput['pages'] = new Map();
   const atlases: DerivedManifest['atlases'] = {};
-  const rects = new Map<string, { group: Group; p: Placed }>();
-  for (const group of GROUPS) {
-    const items = byGroup.get(group);
-    if (!items?.length) continue;
-    const { placed, image } = pack(items);
-    const bytes = encodePng(image);
-    const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
-    const file = `${group}-${hash}.png`;
-    files.set(file, bytes);
-    atlases[group] = { file, w: image.width, h: image.height, bytes: bytes.length };
-    for (const [key, p] of placed) rects.set(key, { group, p });
-    report.push(`atlas ${file}: ${image.width}x${image.height}, ${(bytes.length / 1024).toFixed(1)} KB`);
+  const rects = new Map<string, Placed>();
+  const keys = [...atlasItems.keys()].sort((a, b) => {
+    const [ga, la] = a.split('@');
+    const [gb, lb] = b.split('@');
+    return GROUPS.indexOf(ga as Group) - GROUPS.indexOf(gb as Group) || Number(la ?? 0) - Number(lb ?? 0);
+  });
+  for (const atlas of keys) {
+    const items = atlasItems.get(atlas) ?? [];
+    const { placed, pages } = pack(items, atlas.includes('@') ? PAGE : 1024);
+    const format = atlas.includes('@') ? 'webp' : 'png';
+    atlases[atlas] = pages.map((image, i) => {
+      const hash = createHash('sha256').update(`${image.width}x${image.height}`).update(image.data).digest('hex').slice(0, 12);
+      const file = `${atlas.replace('@', '-at')}${pages.length > 1 ? `-p${i}` : ''}-${hash}.${format}`;
+      files.set(file, { image, format });
+      log.push(`atlas ${file}: ${image.width}x${image.height}`);
+      return { file, w: image.width, h: image.height };
+    });
+    for (const [key, p] of placed) rects.set(`${atlas}|${key}`, p);
   }
 
   const sprites: DerivedManifest['sprites'] = {};
   for (const [id, s] of Object.entries(pending).sort(([a], [b]) => a.localeCompare(b))) {
-    const rows: DerivedSprite['rows'] = {};
-    for (const [row, r] of Object.entries(s.rows)) {
-      rows[row] = {
-        mode: r.mode,
-        frames: r.frames.map((f) => {
-          const at = rects.get(f.key)?.p as Placed;
-          const x = at.x + (f.sub?.x ?? 0);
-          const y = at.y + (f.sub?.y ?? 0);
-          return [x, y, f.sub?.w ?? at.w, f.sub?.h ?? at.h, round2(f.px), round2(f.py), f.ms];
-        }),
-      };
+    const frames: DerivedSprite['frames'] = {};
+    for (const [level, f] of Object.entries(s.frames)) {
+      const rows: Record<string, DerivedRect[]> = {};
+      for (const [row, list] of Object.entries(f.rows))
+        rows[row] = list.map((p) => {
+          const at = rects.get(`${f.atlas}|${p.key}`) as Placed;
+          return [at.x + (p.sub?.x ?? 0), at.y + (p.sub?.y ?? 0), p.sub?.w ?? at.w, p.sub?.h ?? at.h, round2(p.px), round2(p.py), at.page];
+        });
+      frames[level] = rows;
     }
-    const sheet = s.sheetKey ? rects.get(s.sheetKey)?.p : undefined;
-    sprites[id] = { group: s.group, scale: s.scale, grid: s.grid, ...(sheet ? { sheet: { x: sheet.x, y: sheet.y, w: sheet.w, h: sheet.h } } : {}), rows };
+    const sheet = s.sheetKey ? rects.get(`${s.sheetAtlas}|${s.sheetKey}`) : undefined;
+    sprites[id] = {
+      group: s.group,
+      kind: s.kind,
+      factor: s.factor,
+      scale: s.scale,
+      ratio: s.ratio,
+      levels: s.levels,
+      ...(sheet ? { sheet: [sheet.x, sheet.y, sheet.w, sheet.h, 0, 0, sheet.page] as DerivedRect } : {}),
+      rows: s.rows,
+      frames,
+    };
   }
-  return { manifest: { version: 1, atlases, sprites }, files, report };
+  return { manifest: { version: 2, levels: [...LEVELS], atlases, sprites }, pages: files, assets: assets.sort((a, b) => a.id.localeCompare(b.id)), log };
+}
+
+/** The asset report (docs/asset-report.md): every packed sheet, its factor and its round-trip error. */
+export function assetReport(rows: AssetReportRow[], manifest: DerivedManifest, bytesOf: (file: string) => number): string {
+  const pct = (v: number | null | undefined) => (v === null || v === undefined ? 'n/a' : `${(v * 100).toFixed(2)}%`);
+  const kb = (key: string) => (manifest.atlases[key] ?? []).reduce((n, p) => n + bytesOf(p.file), 0) / 1024;
+  const lines = [
+    '# Asset report',
+    '',
+    'Generated by `npm run derive-assets` from the packed sheets (byte copies of iam25th1/coys-assets). Do not edit.',
+    '',
+    `Rule: each sheet keeps the largest downscale factor whose nearest-neighbour round trip (downscale, upscale back, compare) changes at most ${ROUND_TRIP.share * 100}% of visible pixels by more than ${ROUND_TRIP.channel} of 255 in any channel. Factors tried: ${FACTORS.join(', ')} (a factor is skipped once one of its divisors failed). The hen and its trait layers are judged together and share one factor.`,
+    '',
+    'Factor 1 means no downscale passes: the art keeps its original resolution, and the per-screen atlases are cut from it at exactly the density each screen draws (see the atlas table).',
+    '',
+    '| asset | kind | size | factors tried (error) | chosen factor | error at chosen | previous grid | error at previous grid |',
+    '|---|---|---|---|---|---|---|---|',
+    ...rows.map(
+      (r) =>
+        `| ${r.id} | ${r.kind} | ${r.size} | ${Object.entries(r.tried)
+          .map(([f, e]) => `${f}: ${pct(e)}`)
+          .join(', ')} | ${r.factor} | ${pct(r.error)} | ${r.previousGrid} | ${pct(r.previousError)} |`,
+    ),
+    '',
+    '## Atlases',
+    '',
+    `Painted pages are WebP (quality ${WEBP.quality}, alpha lossless); exact pages are lossless PNG. A screen loads the exact pages of a group and one density of its painted pages.`,
+    '',
+    '| atlas | pages | size |',
+    '|---|---|---|',
+    ...Object.entries(manifest.atlases).map(([k, pages]) => `| ${k} | ${pages.map((p) => `${p.w}x${p.h}`).join(', ')} | ${kb(k).toFixed(1)} KB |`),
+    '',
+  ];
+  return lines.join('\n');
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
+const round4 = (v: number) => Math.round(v * 10000) / 10000;
