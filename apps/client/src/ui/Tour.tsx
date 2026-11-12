@@ -108,7 +108,7 @@ export const TOUR: TourStep[] = [
     text: (c) =>
       c.market.minting === 'off'
         ? 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND: HER LOOKS AND HER LAYING ARE HERS ALONE.'
-        : `BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND. MILESTONES CAN ALSO WIN YOU A FOUNDING HEN, RECORDED ON NEAR AS YOURS FOR GOOD: ONLY ${c.market.founding.max} WILL EVER EXIST.`,
+        : `BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND: HER LOOKS AND HER LAYING ARE HERS ALONE. HENS STAY ON YOUR FARM; ONLY FEATHERS ARE MINTED.`,
     target: (c) => {
       if (c.modal?.kind === 'shop') return c.modal.tab === 'hens' ? { dom: 'buy-hen', tag: 'BUY HER' } : { dom: 'shop-hens' };
       return c.modal ? close : { dom: 'shop', tag: 'THE SHOP' };
@@ -130,6 +130,14 @@ export const TOUR: TourStep[] = [
     target: (c) =>
       c.modal?.kind === 'market' ? (c.modal.tab === 'board' ? { dom: 'farms', tag: 'THE FARMS' } : { dom: 'market-board' }) : c.modal ? close : { dom: 'market', tag: 'THE BOARD' },
     done: (s) => tapped(s, 'farms'),
+  },
+  {
+    title: 'FEATHERS (BETA)',
+    hen: true,
+    text: (c) =>
+      `MILESTONES WIN FEATHER TICKETS. REDEEM ONE ON THE MINT PAGE: ITS FEATHER IS A CLAIM TICKET FOR ONE OF ${c.market.feathers.max} FOUNDING HENS, PLANNED TO HATCH AT MAINNET LAUNCH. A BETTER-RUN FARM REDEEMS A BETTER GRADE. OPEN THE MINT PAGE.`,
+    target: (c) => (c.modal?.kind === 'feathers' ? { dom: 'mint-tickets', tag: 'YOUR TICKETS' } : c.modal ? close : { dom: 'feathers', tag: 'THE MINT PAGE' }),
+    done: (s) => opened(s, 'feathers'),
   },
   {
     title: 'THE LEDGER',

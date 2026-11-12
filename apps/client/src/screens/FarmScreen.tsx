@@ -27,7 +27,8 @@ import { HowToPlay, MILESTONE_TEXT } from '../ui/HowToPlay';
 import { Modal } from '../ui/Modal';
 import { SettingsBody, ShopPanel } from '../ui/Panels';
 import { Spotlight, TourBox } from '../ui/Tour';
-import { CertificatePanel, HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
+import { GRADE_LABEL, MintPage, RevealPanel, type RevealState } from '../ui/Feathers';
+import { HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
 
 /** What clicking each thing on the farm opens. */
 function modalFor(t: WorldTarget): ModalState {
@@ -68,7 +69,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
   const touring = useStore(tour, (s) => s.active);
   // the open card's live state: haggle mood and outcome arrive as events
   const [cardState, setCardState] = useState<{ card: CardView; result: OverlayResult | null; mood: 'warm' | 'firm' | 'cross' | null } | null>(null);
-  const certificates = useRef<{ henId: string; txHash: string; day: number }[]>([]);
+  const reveals = useRef<RevealState[]>([]);
   const socket = useRef<GameSocket | null>(null);
   const scene = useRef<FarmScene | null>(null);
   const town = useRef<TownScene | null>(null);
@@ -187,11 +188,11 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     if (artIn) audio.playMusic(crashed ? '43-market-tension' : '42-farm-day', 1200);
   }, [audio, crashed, artIn]);
 
-  // a hen's certificate waits until no other modal is open
+  // a Feather's reveal waits until no other modal is open
   useEffect(() => {
-    if (modal || !certificates.current.length) return;
-    const next = certificates.current.shift();
-    if (next) openModal({ kind: 'certificate', ...next });
+    if (modal || !reveals.current.length) return;
+    const next = reveals.current.shift();
+    if (next) openModal({ kind: 'reveal', ...next });
   }, [modal, farm]);
 
   const openCard = useCallback((card: CardView) => {
@@ -234,19 +235,23 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
             }
             break;
           }
-          case 'henMinted':
-            certificates.current.push({ henId: e.henId, txHash: e.txHash, day: e.day });
+          case 'featherMinted':
+            reveals.current.push({ ticketId: e.ticketId, number: e.number, grade: e.grade, milestone: e.milestone, txHash: e.txHash, day: e.day });
+            break;
+          case 'ticketRedeemed':
+            audio.play('18-stamp', { volume: 0.6 });
+            uiFx.emit({ kind: 'toast', tone: 'good', text: `TICKET REDEEMED AS A ${GRADE_LABEL[e.grade]} FOR ${(e.feeMilli / 1000).toFixed(0)} COINS: ITS FEATHER MINTS AT THE NEXT DAY CLOSE.` });
             break;
           case 'milestoneRoll': {
             const what = MILESTONE_TEXT[e.milestone];
             const next = e.next ? ` NEXT: ${MILESTONE_TEXT[e.next]}.` : '';
             if (e.won) {
               audio.play('19-haggle-win', { volume: 0.7 });
-              uiFx.emit({ kind: 'toast', tone: 'good', text: `MILESTONE: ${what}! YOU WON A FOUNDING HEN. THE NEXT DAY CLOSE RECORDS HER ON NEAR. ${e.remaining} OF ${ECONOMY.founding.maxSupply} LEFT.` });
+              uiFx.emit({ kind: 'toast', tone: 'good', text: `MILESTONE: ${what}! YOU WON A FEATHER TICKET. REDEEM IT ON THE MINT PAGE. ${e.left} OF ${ECONOMY.feathers.maxSupply} FEATHERS LEFT.` });
             } else {
               uiFx.emit({
                 kind: 'toast',
-                text: `MILESTONE: ${what}. NO FOUNDING HEN THIS TIME (A ${Math.round(e.odds * 100)}% CHANCE), BUT WELL FARMED.${next}`,
+                text: `MILESTONE: ${what}. NO TICKET THIS TIME (A ${Math.round(e.odds * 100)}% CHANCE), BUT WELL FARMED.${next}`,
               });
             }
             break;
@@ -301,7 +306,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
   const guideBox = { x: z.tracker.x, y: z.toasts.y, w: z.tracker.w, h: z.tracker.y + z.tracker.h - z.toasts.y };
   const ctx = { modal, farm, market };
   const card = modal?.kind === 'card' ? (cardState?.card.id === modal.cardId ? cardState.card : farm.cards.find((c) => c.id === modal.cardId)) : null;
-  const hen = modal?.kind === 'hen' || modal?.kind === 'certificate' ? farm.hens.find((h) => h.id === modal.henId) : null;
+  const hen = modal?.kind === 'hen' ? farm.hens.find((h) => h.id === modal.henId) : null;
 
   return (
     <div className="layer">
@@ -313,6 +318,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         onMarket={() => openModal({ kind: 'market', tab: 'board' })}
         onLedger={() => openModal({ kind: 'ledger' })}
         onHelp={() => openModal({ kind: 'guide' })}
+        onFeathers={() => openModal({ kind: 'feathers' })}
       />
       {!(v.portrait && modal) && <SidePanel farm={farm} market={market} rect={z.side} send={send} onOpen={openCard} />}
       {touring ? (
@@ -336,12 +342,21 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       {modal?.kind === 'ledger' && <LedgerPanel farm={farm} send={send} onClose={closeModal} />}
       {modal?.kind === 'sell' && <SellPanel farm={farm} market={market} send={send} onClose={closeModal} />}
       {modal?.kind === 'machine' && <MachinePanel unlock={modal.unlock} farm={farm} send={send} onShop={() => openModal({ kind: 'shop', tab: 'machines' })} onClose={closeModal} />}
-      {modal?.kind === 'hen' && hen && <HenPanel hen={hen} market={market} onClose={closeModal} />}
-      {modal?.kind === 'certificate' && hen && (
-        <CertificatePanel hen={hen} txHash={modal.txHash} day={modal.day} market={market} onLedger={() => openModal({ kind: 'ledger' })} onClose={closeModal} />
+      {modal?.kind === 'hen' && hen && <HenPanel hen={hen} onClose={closeModal} />}
+      {modal?.kind === 'reveal' && (
+        <RevealPanel reveal={modal} market={market} onLedger={() => openModal({ kind: 'ledger' })} onMintPage={() => openModal({ kind: 'feathers' })} onClose={closeModal} />
       )}
+      {modal?.kind === 'feathers' && <MintPage farm={farm} market={market} send={send} onClose={closeModal} />}
       {modal?.kind === 'market' && (
-        <MarketBoard farm={farm} market={market} send={send} tab={modal.tab} onTab={(tab) => ui.set({ modal: { kind: 'market', tab } })} onClose={closeModal} />
+        <MarketBoard
+          farm={farm}
+          market={market}
+          send={send}
+          tab={modal.tab}
+          onTab={(tab) => ui.set({ modal: { kind: 'market', tab } })}
+          onFeathers={() => openModal({ kind: 'feathers' })}
+          onClose={closeModal}
+        />
       )}
       {modal?.kind === 'card' && card && (
         <CardOverlay

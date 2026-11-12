@@ -148,6 +148,7 @@ export function TopBar({
   onMarket,
   onLedger,
   onHelp,
+  onFeathers,
 }: {
   farm: FarmState;
   rect: Rect;
@@ -156,6 +157,7 @@ export function TopBar({
   onMarket: () => void;
   onLedger: () => void;
   onHelp: () => void;
+  onFeathers: () => void;
 }) {
   const { audio } = useServices();
   const capacity = coopCapacity(farm.coops.map((c) => c.kind));
@@ -197,6 +199,23 @@ export function TopBar({
         BETA
       </span>
       <DayClock />
+      <button
+        className="btn"
+        style={{ height: 16, padding: '0 3px' }}
+        data-tour="feathers"
+        data-ui="feathers-button"
+        aria-label="Feathers: the mint page"
+        title="Feathers: the mint page"
+        data-tip="FEATHERS: TICKETS, THE MINT PAGE AND ALL 777"
+        onMouseEnter={() => uiSound(audio, 'hover')}
+        onClick={() => {
+          uiSound(audio, 'click');
+          onFeathers();
+        }}
+      >
+        FEATHERS
+        {farm.tickets.some((t) => t.status === 'held') && <span className="dot" aria-hidden="true" />}
+      </button>
       {button('market', 'Market board: prices and rivals', onMarket, 'market')}
       {button('ledger', 'Ledger: your days in coins', onLedger, 'ledger')}
       {button('shop', 'Shop: hens, feed, coops, machines', onShop, 'shop')}

@@ -74,6 +74,15 @@ Factor 1 means no downscale passes: the art keeps its original resolution, and t
 | 33-split-flap | exact | 832x384 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 49.89% | 8 | 0.00% | 8 | 0.00% |
 | 34-cursor | exact | 512x384 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 55.96% | 8 | 0.00% | 8 | 0.00% |
 | 35-particles | exact | 768x1024 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 57.23% | 8 | 0.00% | 8 | 0.00% |
+| x-feather-fluff | exact | 1024x768 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 39.29% | 8 | 0.00% | 8 | 0.00% |
+| x-feather-golden-quill | exact | 1024x768 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 49.79% | 8 | 0.00% | 8 | 0.00% |
+| x-feather-plume | exact | 1024x768 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 37.56% | 8 | 0.00% | 8 | 0.00% |
+| x-feather-quill | exact | 1024x768 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 48.95% | 8 | 0.00% | 8 | 0.00% |
+| x-founders-frame-common | exact | 384x544 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 37.29% | 8 | 0.00% | 8 | 0.00% |
+| x-founders-frame-epic | exact | 384x544 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 39.03% | 8 | 0.00% | 8 | 0.00% |
+| x-founders-frame-legendary | exact | 384x544 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 39.27% | 8 | 0.00% | 8 | 0.00% |
+| x-founders-frame-rare | exact | 384x544 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 37.81% | 8 | 0.00% | 8 | 0.00% |
+| x-founders-frame-unminted | exact | 384x544 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 42.06% | 8 | 0.00% | 8 | 0.00% |
 | x-hen-portrait | painted | 1024x1536 | 2: 11.43% | 1 | 0.00% | 8 | 28.45% |
 
 ## Atlases
@@ -90,16 +99,17 @@ Painted pages are WebP (quality 90, alpha lossless); exact pages are lossless PN
 | title@6 | 4008x189 | 257.7 KB |
 | title@8 | 4029x479 | 391.0 KB |
 | farm | 260x130 | 6.0 KB |
-| farm@2 | 4079x284 | 468.2 KB |
-| farm@3 | 4082x589 | 853.6 KB |
-| farm@4 | 4090x969 | 1300.9 KB |
-| farm@6 | 4092x2099 | 2273.0 KB |
-| farm@8 | 4096x3626 | 3329.2 KB |
-| farm.wide@2 | 4018x449 | 700.2 KB |
-| farm.wide@3 | 4022x1011 | 1287.4 KB |
-| farm.wide@4 | 4034x1657 | 2037.8 KB |
+| farm@2 | 4091x228 | 337.5 KB |
+| farm@3 | 4095x456 | 602.0 KB |
+| farm@4 | 4091x775 | 877.6 KB |
+| farm@6 | 4096x1646 | 1614.1 KB |
+| farm@8 | 4092x2874 | 2321.6 KB |
+| farm.wide@2 | 4076x482 | 783.7 KB |
+| farm.wide@3 | 4047x1011 | 1453.6 KB |
+| farm.wide@4 | 4094x1264 | 1643.9 KB |
+| farm.wide@6 | 4073x702 | 691.9 KB |
 | market | 899x362 | 10.9 KB |
-| cards | 514x3178 | 31.9 KB |
+| cards | 901x3275 | 40.3 KB |
 | cards.wide@2 | 4096x485 | 911.9 KB |
 | cards.wide@3 | 4089x1072 | 1626.8 KB |
 | cards.wide@4 | 4082x1896 | 2553.1 KB |

@@ -41,16 +41,17 @@ created with the same public key as `coys-game.testnet`, so the existing
 
 | Item | NEAR |
 |---|---|
-| Contract code storage (version 3: 351,309 bytes) | about 3.5 |
-| Settlements: 179 bytes of state and 0.0004 NEAR of gas per settled day (measured on `s1`), 480 days a real day at 3-minute days | about 1.06 a real day |
-| Founding Hens (2,647 bytes of state each with portrait and indexes, measured; 777 ever, at most 20 a day close) | about 0.026 each, about 20.6 for all 777 |
+| Contract code storage (version 4: 353,408 bytes) | about 3.5 |
+| Settlements with version 4: no storage (one fixed-size head per season) and about 0.0004 NEAR of gas per settled day, 480 days a real day at 3-minute days | about 0.19 a real day |
+| Settlements with version 2 (before 12 November): 179 bytes of state and 0.0004 NEAR of gas per settled day | about 1.06 a real day |
+| Feathers (3,169 bytes each with the card image, measured in the sandbox; 777 ever, at most 20 a day close) | about 0.032 each, about 24.6 for all 777 |
 | Agent wallets: 7 at first, one more per bust (`AGENT_ACCOUNT_FUNDING_NEAR`, default 0.05 each) | about 0.35 |
-| Margin under which Founding Hen mints and agent wallet links wait (`CHAIN_MIN_BALANCE_NEAR`, default 1.25) | 1.25 |
+| Margin under which Feather mints and agent wallet links wait (`CHAIN_MIN_BALANCE_NEAR`, default 0.5) | 0.5 |
 
-The settlements are the steady cost: at 3-minute days the game account spends about 1.06 NEAR a real day, so keep a
-week of it on hand. Each Founding Hen mint keeps `CHAIN_MINT_NEAR` (default 0.03) free above the margin; hens that cannot
-be minted yet wait for a later day close and nothing is lost. If the account cannot pay for a day's state, that day's
-settlement fails and the next one catches it up once topped up.
+Gas is the only steady cost now: about 0.19 NEAR a real day at 3-minute days. Each Feather mint keeps
+`CHAIN_MINT_NEAR` (default 0.035) free above the margin; redeemed tickets that cannot be minted yet wait for a later day
+close and nothing is lost. If the account cannot pay for a day's gas or a mint's storage, that day's settlement fails and
+the next one catches it up once topped up.
 
 ## Agent wallets
 
@@ -73,26 +74,51 @@ new season starts again at day 1 on the same contract while each day of a season
 - To start season 2: a fresh `DATABASE_URL` and `GAME_SEASON=s2`, same contract.
 - Egg tokens and hens from earlier seasons stay with their holders.
 
-## Upgrading version 2 to version 3 (the Founding Hens)
+## Upgrading version 2 to version 4 (the Feathers, compact settlement): done 12 November 2026
 
-Version 3 mints only Founding Hens, 777 ever, and refuses ordinary hen mints. Its `migrate` reads
-version 2 state (the code running on `play.coys-game.testnet` and `coys-game.testnet`, kept byte for
-byte in `contracts/sandbox-tests/res/coys_game_v2.wasm` and upgraded in the sandbox tests). After the
-game account is topped up:
+Version 4 settles a day by storing only a fixed-size head per season (last day, its settlement digest and a running
+hash chain), mints the Feathers (777 ever, capped on chain) and refuses ordinary hens. Its `migrate` reads version 2
+state (the code running on `play.coys-game.testnet`, kept byte for byte in
+`contracts/sandbox-tests/res/coys_game_v2.wasm` and upgraded in the sandbox tests). Version 3 (the Founding Hens) was
+never deployed. On `play.coys-game.testnet`:
 
 ```powershell
 npm run deploy-contract -- --wasm contracts/coys-game/res/coys_game.wasm --account play.coys-game.testnet --migrate
 ```
 
-Tokens, egg balances, days and the owner stay. `play.coys-game.testnet` minted no ordinary hens
-(`nft_total_supply` is 0: mints waited for funds), so every token it ever holds is a Founding Hen;
-on `coys-game.testnet` the 86 ordinary hens version 2 minted keep their `hen-<id>` tokens outside the 777. Check `founding_supply()`. The server reads it at every day close
-and starts minting waiting Founding Hens on its own. Details: [docs/founding-hens.md](../docs/founding-hens.md).
+Done on 12 November 2026 at 20:30 UTC:
+[9jsFd4EA...](https://testnet.nearblocks.io/txns/9jsFd4EAZc3nkE4v11x4poVTMhLyYzPpuZKrsCud9J4s) (wasm sha256
+`e57cda66...`). Egg balances, days and the owner stay. `migrate` refuses a version 2 contract that still holds hen
+tokens: `play.coys-game.testnet` held none, while `coys-game.testnet` keeps its 86 ordinary version 2 hens and stays on
+version 2. The running server kept settling through the upgrade (version 4 accepts version 2's batch shape).
+
+Then, once, the founders provenance (the SHA-256 of `apps/server/data/founders.json`):
+
+```powershell
+npm run commit-provenance -- --account play.coys-game.testnet
+```
+
+Done: [JBoKNVa6...](https://testnet.nearblocks.io/txns/JBoKNVa6Pi5jAb2BA4chAh8K43GGpWgw8AtHJy26b5AB), hash `bd2daafd...`.
+
+### Releasing version 2's day records
+
+Version 2 stored a record per settled day (179 bytes each). Version 4 can release them, folding each record into the
+season's archive hash so the history stays verifiable. The script copies every record exactly as `day_record` returns it
+into the game database (`chain_archive`, migration 9) and a backup file first, then releases them in chunks and checks
+the contract's archive hash after each one:
+
+```powershell
+npm run release-chain-days -- --account play.coys-game.testnet --season s1 --backup <backup file>
+```
+
+It needs `DATABASE_URL` (the live game database) as well as the signing key. To check it later: fold the rows of
+`chain_archive` for the season in day order, $a_d = \mathrm{SHA256}(a_{d-1} \,|\, d \,|\, \text{record}_d)$ from 64
+zeros, and compare with `season_head({ "season": "s1" }).archive`.
 
 ## Upgrading a version 1 contract (done, 11 November 2026)
 
 Version 1 settled days without seasons. The version 2 wasm was deployed over it with `migrate` in the
-same transaction (version 3's `migrate` reads version 2, so a version 1 contract now goes through
+same transaction (version 4's `migrate` reads version 2, so a version 1 contract now goes through
 version 2 first):
 
 ```powershell
@@ -109,7 +135,12 @@ on 11 November 2026:
 View calls on the contract account:
 
 - `last_settled_day({ "season": "s1" })`
-- `day_record({ "season": "s1", "day": 1 })`
-- `nft_total_supply()`, `nft_tokens_for_owner({ "account_id": "..." })`
-- `founding_supply()` (version 3): `{ "minted": n, "max": 777, "remaining": 777 - n }`
+- `season_head({ "season": "s1" })` (version 4): last day, its digest, the hash chain of every day settled since the
+  upgrade, and the archive hash of the released version 2 records
+- `day_record({ "season": "s1", "day": 1 })` (version 2 records, until released)
+- `feather_supply()` (version 4): `{ "minted": n, "max": 777, "remaining": 777 - n, "provenance": "..." }`
+- `nft_total_supply()`, `nft_tokens_for_owner({ "account_id": "..." })`, `nft_token({ "token_id": "001" })`
 - `mt_batch_balance_of({ "account_id": "...", "token_ids": ["egg-white", "egg-cream", "egg-brown", "egg-golden"] })`
+
+A day's digest is the SHA-256 of `market_days.settlement_json` in the game database; the hash chain is
+$c_d = \mathrm{SHA256}(c_{d-1} \,|\, \text{season} \,|\, d \,|\, \text{digest}_d)$ from 64 zeros at the first version 4 day.

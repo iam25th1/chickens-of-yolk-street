@@ -374,6 +374,63 @@ UPDATE farms SET eggs_sold = COALESCE((SELECT SUM(t.qty) FROM trades t WHERE t.s
 UPDATE farms SET haggles_won = (SELECT count(*) FROM cards c WHERE c.farm_id = farms.id AND c.status = 'won');
 `,
   },
+  {
+    id: 9,
+    name: 'feathers beta',
+    sql: `
+-- The Feathers (beta): a milestone win is a Feather Ticket, not a hen. A ticket is held until the
+-- player redeems it (grade from the management score, coin fee), then queued, then minted at a day
+-- close as Feather #n of 777.
+CREATE TABLE feather_tickets (
+  id text PRIMARY KEY,
+  farm_id text NOT NULL REFERENCES farms(id),
+  milestone text NOT NULL,
+  season text NOT NULL,
+  day integer NOT NULL,
+  status text NOT NULL DEFAULT 'held' CHECK (status IN ('held', 'queued', 'minted')),
+  grade text CHECK (grade IN ('fluff', 'plume', 'quill', 'golden-quill')),
+  score double precision,
+  fee_milli bigint,
+  redeemed_day integer,
+  -- redemption order: Feathers mint in the order their tickets were redeemed
+  redeemed_seq integer,
+  owner_account text,
+  number integer UNIQUE,
+  token_id text,
+  media_sha256 text,
+  mint_tx text,
+  mint_day integer,
+  created_at bigint NOT NULL
+);
+CREATE INDEX feather_tickets_farm ON feather_tickets (farm_id);
+CREATE INDEX feather_tickets_status ON feather_tickets (status);
+ALTER TABLE milestone_rolls ADD COLUMN ticket_id text;
+-- a Founding Hen won but never minted becomes a Feather Ticket for her farm; she stays on the farm
+-- as an ordinary hen
+INSERT INTO feather_tickets (id, farm_id, milestone, season, day, status, created_at)
+  SELECT 'ticket-' || h.id, h.farm_id, h.founding_milestone, COALESCE(r.season, 'legacy'), COALESCE(h.founding_day, 0), 'held', 0
+  FROM hens h LEFT JOIN milestone_rolls r ON r.hen_id = h.id
+  WHERE h.founding_milestone IS NOT NULL AND h.mint_tx IS NULL;
+UPDATE milestone_rolls SET ticket_id = 'ticket-' || hen_id
+  WHERE won AND hen_id IS NOT NULL AND EXISTS (SELECT 1 FROM feather_tickets t WHERE t.id = 'ticket-' || milestone_rolls.hen_id);
+UPDATE hens SET founding_milestone = NULL, founding_day = NULL, founding_no = NULL
+  WHERE founding_milestone IS NOT NULL AND mint_tx IS NULL;
+-- days in good standing (the management score), counted at each day close
+ALTER TABLE farms ADD COLUMN good_days integer NOT NULL DEFAULT 0;
+-- the day's full settlement, exactly as hashed: its SHA-256 is the digest the chain stores
+ALTER TABLE market_days ADD COLUMN settlement_json text;
+ALTER TABLE market_days ADD COLUMN settlement_digest text;
+-- version 2's per-day records, copied here before the contract released them (scripts/release-chain-days.ts)
+CREATE TABLE chain_archive (
+  season text NOT NULL,
+  day integer NOT NULL,
+  -- exactly as day_record returned it: the archive hash folds this text
+  record text NOT NULL,
+  released_at bigint NOT NULL,
+  PRIMARY KEY (season, day)
+);
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

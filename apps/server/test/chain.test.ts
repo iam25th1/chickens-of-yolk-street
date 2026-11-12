@@ -1,9 +1,9 @@
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ECONOMY } from '@coys/shared';
-import { buildDayBatch, commitBatch } from '../src/chain/batch';
+import { buildDayBatch, commitBatch, digestOf } from '../src/chain/batch';
 import { NoopChain, agentAccountName, agentPublicKey, assertTestnetConfig, mintsAffordable } from '../src/chain/chain';
-import { HenRenderer } from '../src/chain/hen-image';
+import { FeatherRenderer } from '../src/chain/feather-image';
 import { decodePng } from '../src/chain/png';
 import { openDb } from '../src/db/db';
 import { MIGRATIONS } from '../src/db/migrations';
@@ -11,21 +11,31 @@ import { RecordingChain, makeGame } from './helpers';
 
 const assets = fileURLToPath(new URL('../../client/public/assets', import.meta.url));
 
-describe('hen portraits for NFT metadata', () => {
-  it('renders the stacked trait layers to a 32x32 PNG data URI with its hash', () => {
-    const r = new HenRenderer(assets);
-    const img = r.render({ body: 'brown', eyes: 'wild', comb: 'mohawk', accessory: 'tophat' });
+describe('Feather card images for NFT metadata', () => {
+  it('composes the grade frame, its feather and the number at 2x into a PNG data URI with its hash', () => {
+    const r = new FeatherRenderer(assets);
+    const img = r.render('golden-quill', 7);
     expect(img.dataUri).toMatch(/^data:image\/png;base64,/);
     const png = decodePng(Buffer.from(img.dataUri.split(',')[1] ?? '', 'base64'));
-    expect([png.width, png.height]).toEqual([32, 32]);
-    expect(img.bytes).toBeLessThan(4096);
+    expect([png.width, png.height]).toEqual([96, 136]);
+    // every Feather card fits the room the sandbox measured gas and storage with (2,420 characters)
+    for (const g of ['fluff', 'plume', 'quill', 'golden-quill'] as const) for (const n of [1, 388, 777]) expect(r.render(g, n).dataUri.length).toBeLessThanOrEqual(2420);
     expect(Buffer.from(img.sha256Base64, 'base64')).toHaveLength(32);
-    expect(r.render({ body: 'brown', eyes: 'wild', comb: 'mohawk', accessory: 'tophat' })).toBe(img);
+    expect(img.sha256Hex).toMatch(/^[0-9a-f]{64}$/);
+    expect(r.render('golden-quill', 7)).toBe(img);
+    // the window shows the feather on the frame's paper, the plate shows the number: cards differ by grade and number
+    expect(r.render('fluff', 7).sha256Hex).not.toBe(img.sha256Hex);
+    expect(r.render('golden-quill', 8).sha256Hex).not.toBe(img.sha256Hex);
+    const card = r.card('quill', 1);
+    expect([card.width, card.height]).toEqual([48, 68]);
+    let clear = 0;
+    for (let y = 8; y < 56; y++) for (let x = 8; x < 40; x++) if ((card.data[(y * 48 + x) * 4 + 3] ?? 0) === 0) clear++;
+    expect(clear).toBe(0);
   });
 });
 
 describe('the daily batch', () => {
-  it('mints collected eggs to wallets, Founding Hens only, and reconciles from confirmed balances', async () => {
+  it('mints collected eggs to wallets, Feathers only, compact: the moving farms and the full settlement digest', async () => {
     const t = await makeGame({ cast: true });
     const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
     await t.game.act(playerId, { t: 'linkWallet', rid: 'w1', accountId: 'ada.testnet' });
@@ -34,33 +44,57 @@ describe('the daily batch', () => {
     await t.game.endDay();
     const farm = await t.game.getFarmState(farmId);
     const day = (await t.game.getMarketState()).day - 1;
-    const renderer = new HenRenderer(assets);
-    // two of Ada's hens are Founding Hens won at milestones; the rest are ordinary
-    const [a, b] = farm.hens;
-    await t.db.query(`UPDATE hens SET founding_milestone = 'full-coop', founding_day = 1 WHERE id = $1`, [a?.id]);
-    await t.db.query(`UPDATE hens SET founding_milestone = 'eggs-sold', founding_day = 1 WHERE id = $1`, [b?.id]);
-    const first = await buildDayBatch(t.db, t.game.season, day, { founding: { cap: 5, base: 40 }, renderer });
+    const renderer = new FeatherRenderer(assets);
+    // two of Ada's tickets are redeemed (queued); one more is still held
+    for (const [id, status, grade, seq] of [
+      ['t1', 'queued', 'plume', 2],
+      ['t2', 'queued', 'golden-quill', 1],
+      ['t3', 'held', null, null],
+    ] as const) {
+      await t.db.query(`INSERT INTO feather_tickets (id, farm_id, milestone, season, day, status, grade, redeemed_seq, created_at) VALUES ($1, $2, 'full-coop', $3, 1, $4, $5, $6, 0)`, [
+        id,
+        farmId,
+        t.game.season,
+        status,
+        grade,
+        seq,
+      ]);
+    }
+    const first = await buildDayBatch(t.db, t.game.season, day, { feathers: { cap: 5, base: 40 }, renderer });
     const mintsToAda = first.batch.eggs.filter((m) => m.kind === 'Mint' && m.to === 'ada.testnet');
     const crate = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
     expect(mintsToAda.reduce((s, m) => s + Number(m.amount), 0)).toBeGreaterThanOrEqual(crate);
     expect(first.batch.hen_mints).toEqual([]);
-    // every Founding Hen (these two, and any the day close's milestone rolls won), oldest win first
-    const won = await t.db.query<{ id: string }>('SELECT id FROM hens WHERE founding_milestone IS NOT NULL ORDER BY founding_day, id');
-    expect(won.map((h) => h.id)).toEqual(expect.arrayContaining([a?.id, b?.id]));
-    expect(first.batch.founding_mints?.map((m) => [m.token_id, m.owner_id, m.season])).toEqual(won.map((h) => [`founding-${h.id}`, 'ada.testnet', t.game.season]));
-    expect(JSON.parse(first.batch.founding_mints?.[0]?.traits ?? '{}')).toHaveProperty('comb');
-    expect([...first.numbers.values()]).toEqual(won.map((_, i) => 41 + i));
-    expect(first.batch.digest).toMatch(/^[0-9a-f]{64}$/);
-    await commitBatch(t.db, first);
+    expect(first.batch.hen_moves).toEqual([]);
+    expect(first.batch.feather_mints?.map((m) => [m.owner_id, m.grade, m.season])).toEqual([
+      ['ada.testnet', 'golden-quill', t.game.season],
+      ['ada.testnet', 'plume', t.game.season],
+    ]);
+    expect(first.minted.map((m) => [m.ticketId, m.number, m.token])).toEqual([
+      ['t2', 41, '041'],
+      ['t1', 42, '042'],
+    ]);
+    expect(first.batch.feather_mints?.[0]?.media).toBe(renderer.render('golden-quill', 41).dataUri);
+    expect(first.batch.digest).toBe(digestOf(first.settlement));
+    expect(first.settlement.feathers.map((f) => f.media_sha256)).toEqual([renderer.render('golden-quill', 41).sha256Hex, renderer.render('plume', 42).sha256Hex]);
+    expect(first.settlement.farms.length).toBeGreaterThanOrEqual(first.batch.farms.length);
+    await commitBatch(t.db, first, 'tx-1');
+    // (the day close's own milestone rolls may have added a ticket of their own: look at these three)
+    const minted = await t.db.query(`SELECT id, status, number, token_id, owner_account, mint_tx FROM feather_tickets WHERE id IN ('t1', 't2', 't3') ORDER BY id`);
+    expect(minted.map((m) => [m.id, m.status, m.number === null ? null : Number(m.number), m.mint_tx])).toEqual([
+      ['t1', 'minted', 42, 'tx-1'],
+      ['t2', 'minted', 41, 'tx-1'],
+      ['t3', 'held', null, null],
+    ]);
 
     // the same day again moves nothing: chain balances already match what everyone holds
-    const again = await buildDayBatch(t.db, t.game.season, day, { founding: { cap: 5, base: 42 }, renderer });
-    expect(again.batch.founding_mints).toEqual([]);
-    // a version 2 contract gets no founding field at all, and still no ordinary hens
-    const v2 = await buildDayBatch(t.db, t.game.season, day, { founding: null, renderer });
-    expect('founding_mints' in v2.batch).toBe(false);
-    expect(v2.batch.hen_mints).toEqual([]);
+    const again = await buildDayBatch(t.db, t.game.season, day, { feathers: { cap: 5, base: 42 }, renderer });
+    expect(again.batch.feather_mints).toEqual([]);
     expect(again.batch.eggs.filter((m) => m.kind !== 'Transfer' && (m.to === 'ada.testnet' || m.from === 'ada.testnet'))).toEqual([]);
+    // a contract without Feathers (version 2) gets no feather field at all, and still no hens
+    const v2 = await buildDayBatch(t.db, t.game.season, day, { feathers: null, renderer });
+    expect('feather_mints' in v2.batch).toBe(false);
+    expect(v2.batch.hen_mints).toEqual([]);
     await t.db.close();
   });
 
@@ -114,7 +148,8 @@ describe('the daily batch', () => {
     const lines: string[] = [];
     const t = await makeGame();
     const r = await new NoopChain('no keys', (l) => lines.push(l)).settleDay(t.db, t.game.season, 1);
-    expect(r).toEqual({ status: 'noop', txHash: null });
+    expect(r).toMatchObject({ status: 'noop', txHash: null });
+    expect(r.digest).toBe(digestOf(r.settlement));
     expect(lines.join('\n')).toMatch(new RegExp(`NO-OP for season ${t.game.season} day 1`));
     await t.db.close();
   });
@@ -137,13 +172,13 @@ describe('testnet only', () => {
   });
 });
 
-describe('the Founding Hen reserve', () => {
+describe('the Feather reserve', () => {
   it('mints only as many as the free balance stores above the margin, never past the batch cap', () => {
-    const cfg = { mintNear: 0.03, minBalanceNear: 1.25 };
-    expect(mintsAffordable(0.667, cfg, 20)).toBe(0);
-    expect(mintsAffordable(1.25, cfg, 20)).toBe(0);
-    expect(mintsAffordable(1.28, cfg, 20)).toBe(1);
-    expect(mintsAffordable(1.4, cfg, 20)).toBe(5);
+    const cfg = { mintNear: 0.035, minBalanceNear: 0.5 };
+    expect(mintsAffordable(0.45, cfg, 20)).toBe(0);
+    expect(mintsAffordable(0.5, cfg, 20)).toBe(0);
+    expect(mintsAffordable(0.536, cfg, 20)).toBe(1);
+    expect(mintsAffordable(0.675, cfg, 20)).toBe(5);
     expect(mintsAffordable(50, cfg, 20)).toBe(20);
   });
 });

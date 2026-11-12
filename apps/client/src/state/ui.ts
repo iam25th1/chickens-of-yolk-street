@@ -1,6 +1,6 @@
 // What the farm screen shows over the world: one modal at a time. The tour reads this to know where
 // the player is, and listens to uiEvents for the things it asks the player to do.
-import type { UnlockId } from '@coys/shared';
+import type { FeatherGrade, MilestoneId, UnlockId } from '@coys/shared';
 import { Emitter, createStore } from './store';
 
 export type ShopTab = 'hens' | 'feed' | 'coops' | 'machines';
@@ -14,7 +14,8 @@ export type ModalState =
   | { kind: 'machine'; unlock: UnlockId }
   | { kind: 'market'; tab: MarketTab }
   | { kind: 'card'; cardId: string }
-  | { kind: 'certificate'; henId: string; txHash: string; day: number }
+  | { kind: 'reveal'; ticketId: string; number: number; grade: FeatherGrade; milestone: MilestoneId; txHash: string; day: number }
+  | { kind: 'feathers' }
   | { kind: 'settings' }
   | { kind: 'guide' };
 

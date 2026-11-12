@@ -1,11 +1,7 @@
-// Cards that open when the player clicks something on the farm (a hen, the crate, a machine), and
-// the certificate moment when a day close mints one of the player's Founding Hens on NEAR.
-import { useEffect } from 'react';
+// Cards that open when the player clicks something on the farm (a hen, the crate, a machine).
 import { ECONOMY, UNLOCK_IDS, type FarmState, type HenView, type MarketState, type UnlockId } from '@coys/shared';
-import { uiSound, useServices } from '../app/services';
 import type { Action } from '../net/socket';
-import { CardStamp, SellCard } from './Cards';
-import { MILESTONE_TEXT } from './HowToPlay';
+import { SellCard } from './Cards';
 import { Modal } from './Modal';
 import { HenArt, MachineArt, UNLOCK_TEXT } from './Panels';
 
@@ -34,29 +30,12 @@ export function layingWords(trait: number): string {
   return pct > 0 ? `LAYS ${pct}% MORE THAN AN ORDINARY HEN` : `LAYS ${-pct}% LESS THAN AN ORDINARY HEN`;
 }
 
-/** A Founding Hen's name: her number of 777 once minted. */
-export const foundingName = (hen: HenView): string =>
-  hen.founding?.number ? `FOUNDING HEN #${hen.founding.number} OF ${ECONOMY.founding.maxSupply}` : 'A FOUNDING HEN';
+/** Every hen is an ordinary hen: hens are never minted. Feathers, won as tickets at milestones, are. */
+export const HEN_CHAIN_LINE = 'AN ORDINARY HEN: HENS ARE NEVER MINTED. FEATHERS ARE: WIN A TICKET AT A MILESTONE AND REDEEM IT ON THE MINT PAGE (BETA, NEAR TEST NETWORK).';
 
-/**
- * Her certificate, in plain words. Only Founding Hens (won at milestones) are recorded on NEAR:
- * minted (with the receipt), waiting for a day close, or paused. Ordinary hens are not recorded.
- */
-export function certificateWords(hen: HenView, minting: MarketState['minting']): string {
-  if (hen.founding) {
-    const won = `${foundingName(hen)}, WON AT "${MILESTONE_TEXT[hen.founding.milestone]}" ON DAY ${hen.founding.day}.`;
-    if (hen.chainOwner) return `${won} RECORDED ON NEAR ON DAY ${hen.mintDay ?? '?'}: SHE IS PERMANENTLY YOURS.`;
-    if (minting === 'paused') return `${won} HER CERTIFICATE WAITS: RECORDING ON NEAR IS PAUSED FOR NOW. SHE LAYS JUST THE SAME.`;
-    if (minting === 'off') return `${won} THIS GAME DOES NOT RECORD HENS ON NEAR.`;
-    return `${won} THE NEXT DAY CLOSE RECORDS HER ON NEAR AS YOURS FOR GOOD.`;
-  }
-  if (hen.chainOwner) return `CERTIFICATE HEN-${hen.id.slice(0, 8).toUpperCase()}: RECORDED ON NEAR ON DAY ${hen.mintDay ?? '?'}, BEFORE THE FOUNDING HENS.`;
-  return 'AN ORDINARY HEN: NOT RECORDED ON NEAR. ONLY FOUNDING HENS, WON AT MILESTONES, ARE.';
-}
-
-export function HenPanel({ hen, market, onClose }: { hen: HenView; market: MarketState; onClose: () => void }) {
+export function HenPanel({ hen, onClose }: { hen: HenView; onClose: () => void }) {
   return (
-    <Modal title={hen.founding ? 'YOUR FOUNDING HEN' : 'YOUR HEN'} onClose={onClose} w={340} h={210}>
+    <Modal title="YOUR HEN" onClose={onClose} w={340} h={210}>
       <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
         <div style={{ background: '#e3cc96', padding: 4, flex: 'none' }}>
           <HenArt hen={hen} scale={2} box={{ w: 72, h: 72 }} />
@@ -72,13 +51,8 @@ export function HenPanel({ hen, market, onClose }: { hen: HenView; market: Marke
         </div>
       </div>
       <p style={{ marginTop: 10, lineHeight: '10px', color: '#8b5a2b' }} data-tour="hen-certificate">
-        {certificateWords(hen, market.minting)}
+        {HEN_CHAIN_LINE}
       </p>
-      {hen.mintTx && market.explorer && (
-        <a href={`${market.explorer}${hen.mintTx}`} target="_blank" rel="noreferrer" style={{ color: '#2f6f9e' }}>
-          SEE HER RECEIPT
-        </a>
-      )}
     </Modal>
   );
 }
@@ -157,52 +131,6 @@ export function MachinePanel({ unlock, farm, send, onShop, onClose }: { unlock: 
           SEE MACHINES IN THE SHOP
         </button>
       )}
-    </Modal>
-  );
-}
-
-/** The certificate moment: her portrait, number, milestone and traits, a stamp, and one plain line with the receipt. */
-export function CertificatePanel({ hen, txHash, day, market, onLedger, onClose }: { hen: HenView; txHash: string; day: number; market: MarketState; onLedger: () => void; onClose: () => void }) {
-  const { audio } = useServices();
-  useEffect(() => {
-    audio.play('19-haggle-win', { volume: 0.6 });
-    audio.play('18-stamp', { delayMs: 420 });
-  }, [audio]);
-  return (
-    <Modal title="A FOUNDING HEN" onClose={onClose} w={320} h={262} className="certificate">
-      <div className="col" style={{ alignItems: 'center', gap: 6 }}>
-        <div style={{ position: 'relative', width: 128, height: 88, display: 'flex', justifyContent: 'center' }}>
-          <div style={{ background: '#e3cc96', padding: 4 }}>
-            <HenArt hen={hen} scale={2} box={{ w: 72, h: 72 }} />
-          </div>
-          <div style={{ position: 'absolute', left: 0, top: -100 }}>
-            <CardStamp row="accepted" onDone={() => undefined} />
-          </div>
-        </div>
-        <span className="panel-title small" style={{ margin: 0 }} data-ui="founding-number">
-          {foundingName(hen)}
-        </span>
-        {hen.founding && <span style={{ color: '#2f6f9e' }}>WON AT: {MILESTONE_TEXT[hen.founding.milestone]}</span>}
-        <span>{traitWords(hen).join(', ') || 'A CLASSIC HEN'}</span>
-        <span>{layingWords(hen.layingTrait)}</span>
-        <p className="meaning">SHE IS NOW PERMANENTLY YOURS ON NEAR. HER RECEIPT IS IN THE LEDGER FOR DAY {day}.</p>
-        <div className="row" style={{ gap: 6 }}>
-          <button
-            className="btn red"
-            onClick={() => {
-              uiSound(audio, 'click');
-              onLedger();
-            }}
-          >
-            OPEN THE LEDGER
-          </button>
-          {market.explorer && (
-            <a className="btn" href={`${market.explorer}${txHash}`} target="_blank" rel="noreferrer">
-              RECEIPT
-            </a>
-          )}
-        </div>
-      </div>
     </Modal>
   );
 }

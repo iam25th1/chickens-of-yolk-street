@@ -4,7 +4,7 @@
 // Schemas are strict, so unknown fields are rejected.
 import { z } from 'zod';
 import { COOP_KINDS, ECONOMY, EGG_GRADES, FEED_TIERS, GOAL_IDS, UNLOCK_IDS, type GoalId } from './economy';
-import type { BodyColour, CoopKind, EggGrade, FeedTier, MilestoneId, UnlockId } from './economy';
+import type { BodyColour, CoopKind, EggGrade, FeatherGrade, FeedTier, MilestoneId, Rarity, UnlockId } from './economy';
 import type { AgentKind, AgentRole, CardKind } from './market';
 
 export const PROTOCOL_VERSION = 2;
@@ -61,6 +61,8 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('practiceCard'), rid }).strict(),
   /** The player finished or skipped the how-to-play tour. */
   z.object({ t: z.literal('tourDone'), rid }).strict(),
+  /** Redeem a Feather Ticket on the mint page: pays the coin fee; the Feather mints at the next day close. */
+  z.object({ t: z.literal('redeemTicket'), rid, ticketId: id }).strict(),
   z
     .object({ t: z.literal('linkWallet'), rid, accountId: z.string().regex(/^([0-9a-f]{64}|[a-z0-9_-]{2,48}\.testnet)$/) })
     .strict(),
@@ -101,23 +103,80 @@ export interface HenView {
   accessory: 'none' | 'tophat' | 'bowtie' | 'shades';
   layingTrait: number;
   ageDays: number;
-  /**
-   * The NEAR testnet account holding her NFT, or null. Only Founding Hens are minted now (token
-   * founding-<id>); hens minted before the Founding Hens hold hen-<id>.
-   */
-  chainOwner?: string | null;
-  /** The settlement transaction that minted her, and the day it closed (null until she is minted). */
-  mintTx?: string | null;
-  mintDay?: number | null;
-  /** A Founding Hen: the milestone she was won at, the day, and her number of 777 once minted. */
-  founding?: { milestone: MilestoneId; day: number; number: number | null } | null;
 }
 
-/** A milestone on the way to a Founding Hen: not rolled yet, or rolled once (won or missed). */
+/** A milestone on the way to a Feather Ticket: not rolled yet, or rolled once (won or missed). */
 export interface MilestoneView {
   id: MilestoneId;
   state: 'open' | 'won' | 'missed';
   day: number | null;
+}
+
+/**
+ * A Feather Ticket, won at a milestone. Held until the player redeems it on the mint page (with the
+ * coin fee); then queued for the next day close, which mints the Feather on NEAR testnet.
+ */
+export interface FeatherTicketView {
+  id: string;
+  milestone: MilestoneId;
+  /** The day it was won. */
+  day: number;
+  status: 'held' | 'queued' | 'minted';
+  /** Set at redemption from the management score. */
+  grade: FeatherGrade | null;
+  score: number | null;
+  /** The Feather's number, 1 to 777, once minted. */
+  number: number | null;
+  /** The account it was minted to, and the settlement transaction. */
+  owner: string | null;
+  mintTx: string | null;
+  mintDay: number | null;
+}
+
+/** The farm's management score now (0 to 1), its parts (each 0 to 1) and the grade a redemption would get. */
+export interface ManagementScore {
+  score: number;
+  grade: FeatherGrade;
+  parts: { goodDays: number; delivery: number; haggles: number; profit: number };
+}
+
+/** A Feather on the mint page's grid (minted numbers only; the rest show the unminted frame). */
+export interface FeatherSlot {
+  number: number;
+  grade: FeatherGrade;
+  milestone: MilestoneId;
+  day: number;
+  owner: string;
+  farm: string;
+  mintTx: string | null;
+}
+
+/** Everything the mint page shows. Public: anyone may see the Feathers minted so far. */
+export interface MintPageData {
+  max: number;
+  minted: number;
+  /** Feathers left to mint, of 777. */
+  left: number;
+  /** Tickets won and not yet minted (held or queued). */
+  tickets: number;
+  byGrade: Record<FeatherGrade, number>;
+  /** SHA-256 of founders.json, the 777 hens the Feathers are planned to hatch into. */
+  provenance: string;
+  /** The contract and its explorer page, or null without a chain. */
+  contract: string | null;
+  contractUrl: string | null;
+  explorer: string | null;
+  minting: 'live' | 'paused' | 'off';
+  redeemFeeMilli: number;
+  /**
+   * For each grade, the estimated chance of each hen rarity (RARITIES order) given every Feather
+   * minted so far (unminted numbers counted as Fluff). An estimate: it locks at the reveal.
+   */
+  estimates: Record<FeatherGrade, Record<Rarity, number>>;
+  rarityCounts: Record<Rarity, number>;
+  gradeWeights: Record<FeatherGrade, number[]>;
+  recent: FeatherSlot[];
+  slots: FeatherSlot[];
 }
 
 /** A hen in the shop: fresh from the breeder or from a bust farm's auction. */
@@ -260,8 +319,12 @@ export interface FarmState {
   hopperCapMilli: number;
   /** The player has done the how-to-play tour (it shows once per player). */
   tourDone: boolean;
-  /** Founding Hen milestones, in order. */
+  /** Milestones, in order: each rolls once for a Feather Ticket. */
   milestones: MilestoneView[];
+  /** Feather Tickets: held, queued for the next day close, or minted. */
+  tickets: FeatherTicketView[];
+  /** The management score a redemption would grade with now. */
+  score: ManagementScore;
   /** Good standing (needed for milestone rolls) as of the last day close, and why not. */
   standing: { good: boolean; reasons: string[] };
 }
@@ -322,10 +385,10 @@ export interface MarketState {
   ranking: RivalRank[];
   /** Testnet explorer base for receipts, or null when settlement is off. */
   explorer: string | null;
-  /** Founding Hen certificates: minted at day close (live), waiting (paused: game account low or contract not upgraded), or no chain (off). */
+  /** Feathers: minted at day close (live), waiting (paused: game account low or contract not upgraded), or no chain (off). */
   minting: 'live' | 'paused' | 'off';
-  /** The Founding Hens: 777 ever; minted, won and waiting, and left. */
-  founding: { max: number; minted: number; pending: number; remaining: number };
+  /** The Feathers: 777 ever; minted, left to mint, and tickets won and not yet minted. */
+  feathers: { max: number; minted: number; left: number; tickets: number };
 }
 
 export interface DaySummary {
@@ -363,10 +426,12 @@ export type CardOutcome = 'accepted' | 'declined' | 'won' | 'failed' | 'expired'
 
 export type GameEvent =
   | { kind: 'hensBought'; count: number; fromAuction: number; costMilli: number; henIds?: string[] }
-  /** A day close minted one of the player's Founding Hens on NEAR testnet as her own NFT. */
-  | { kind: 'henMinted'; henId: string; token: string; owner: string; txHash: string; day: number; number?: number | null; milestone?: MilestoneId | null }
-  /** A milestone's one roll for a Founding Hen, at a day close. */
-  | { kind: 'milestoneRoll'; milestone: MilestoneId; won: boolean; henId: string | null; next: MilestoneId | null; remaining: number; roll: number; odds: number }
+  /** A day close minted one of the player's Feathers on NEAR testnet (the reveal moment). */
+  | { kind: 'featherMinted'; ticketId: string; number: number; grade: FeatherGrade; milestone: MilestoneId; token: string; owner: string; txHash: string; day: number }
+  /** The player redeemed a ticket: it mints at the next day close. */
+  | { kind: 'ticketRedeemed'; ticketId: string; grade: FeatherGrade; score: number; feeMilli: number }
+  /** A milestone's one roll for a Feather Ticket, at a day close. */
+  | { kind: 'milestoneRoll'; milestone: MilestoneId; won: boolean; ticketId: string | null; next: MilestoneId | null; left: number; roll: number; odds: number }
   | { kind: 'feedBought'; tier: FeedTier; bags: number; costMilli: number; supplier: string; /** Poured in by the feed hopper. */ auto?: boolean }
   | { kind: 'coopBuilt'; coopId: string; coopKind: CoopKind; plot: number; costMilli: number }
   | { kind: 'coopUpgraded'; coopId: string; coopKind: CoopKind; costMilli: number }

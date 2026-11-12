@@ -6,7 +6,9 @@ import {
   BODY_COLOURS,
   ECONOMY,
   EGG_GRADES,
+  FEATHER_GRADES,
   FEED_TIERS,
+  RARITIES,
   UNLOCK_IDS,
   breakageRate,
   coopCapacity,
@@ -30,14 +32,16 @@ import {
   type EggGrade,
   type ErrorCode,
   type FarmState,
+  type FeatherGrade,
   type FeedTier,
   type GameEvent,
   type HenView,
   type LedgerDay,
   type MarketDay,
   type MarketState,
-  type MilestoneId,
+  type MintPageData,
   type OrderView,
+  type Rarity,
   type ServerMessage,
   type ShopHenView,
   type UnlockId,
@@ -46,7 +50,7 @@ import { num, type Db, type Queryable } from '../db/db';
 import { migrate } from '../db/migrations';
 import { decide, type BrainOptions, type DecisionResult } from '../agents/brain';
 import type { FarmAction } from '../agents/decision';
-import { henToken } from '../chain/batch';
+import type { MintedFeather } from '../chain/batch';
 import type { ChainWriter } from '../chain/chain';
 import { arriveCards, buyBagsFrom, createCards, expireCards, farmCards, practiceCard, respondCard, type Candidate } from './cards';
 import {
@@ -76,7 +80,7 @@ import {
   type Outbound,
 } from './ctx';
 import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
-import { foundingCount, milestoneViews, nextMilestone, rollMilestones, standing } from './founding';
+import { featherCount, featherSlots, managementScore, milestoneViews, nextMilestone, rarityEstimates, redeemTicket, rollMilestones, standing, ticketViews } from './feathers';
 import { claimGoal, goalViews, markGoal, markToured, toured } from './goals';
 import { conveyorCarry, hopperRefill, logMachine, logSale, machineDay } from './machines';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
@@ -109,6 +113,8 @@ export interface GameOptions {
   dayLengthMs?: number;
   /** GAME_SEASON. A fresh database takes it (or makes a dev season); an existing one must match. */
   season?: string | null;
+  /** SHA-256 of founders.json (the 777 Founding Hens the Feathers are planned to hatch into). */
+  provenance?: string;
 }
 
 /** A season id for a fresh database started without GAME_SEASON: unique, so it never collides on chain. */
@@ -124,6 +130,7 @@ export class Game {
   private readonly rng: Rng;
   private readonly log: (line: string) => void;
   private readonly withCast: boolean;
+  private readonly provenance: string;
   private readonly wantSeason: string | null;
   private readonly dayMs: number;
   /** The database's season, known after init(). */
@@ -143,6 +150,7 @@ export class Game {
     this.log = opts.log ?? ((line) => console.log(line));
     this.brain = { ...opts.brain, log: this.log };
     this.withCast = opts.cast ?? true;
+    this.provenance = opts.provenance ?? '';
     this.wantSeason = opts.season ?? null;
     this.dayMs = opts.dayLengthMs ?? ECONOMY.day.lengthMs;
   }
@@ -381,14 +389,9 @@ export class Game {
       accessory: h.accessory as HenView['accessory'],
       layingTrait: num(h.laying_trait),
       ageDays: day - num(h.born_day),
-      ...(h.chain_owner === undefined ? {} : { chainOwner: h.chain_owner ? String(h.chain_owner) : null }),
-      ...(h.mint_tx === undefined ? {} : { mintTx: h.mint_tx ? String(h.mint_tx) : null, mintDay: h.mint_day === null ? null : num(h.mint_day) }),
-      ...(h.founding_milestone
-        ? { founding: { milestone: h.founding_milestone as MilestoneId, day: num(h.founding_day), number: h.founding_no === null ? null : num(h.founding_no) } }
-        : {}),
     });
     const hens = await q.query(
-      'SELECT id, body, eyes, comb, accessory, laying_trait, born_day, chain_owner, mint_tx, mint_day, founding_milestone, founding_day, founding_no FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id',
+      'SELECT id, body, eyes, comb, accessory, laying_trait, born_day FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id',
       [farmId, 'alive'],
     );
     const coops = await q.query('SELECT id, kind, plot FROM coops WHERE farm_id = $1 ORDER BY plot', [farmId]);
@@ -427,6 +430,8 @@ export class Game {
       tourDone: await toured(q, farmId),
       milestones: await milestoneViews(q, farmId),
       standing: await standing(q, farmId, Math.max(1, day - 1)),
+      tickets: await ticketViews(q, farmId),
+      score: await managementScore(q, farmId),
       machines: await machineDay(q, farmId, day),
       hopperCapMilli: farm.hopperCapMilli,
       shop: shopRows.map(
@@ -536,7 +541,36 @@ export class Game {
       })),
       explorer: this.chain.explorer,
       minting: this.chain.minting,
-      founding: await foundingCount(this.db, this.chain.foundingMinted),
+      feathers: await (async () => {
+        const c = await featherCount(this.db, this.chain.featherMinted);
+        return { max: c.max, minted: c.minted, left: c.left, tickets: c.tickets };
+      })(),
+    };
+  }
+
+  /** The mint page: the Feathers minted so far, by grade, the estimates, recent mints and all 777 slots. Public. */
+  async getMintPage(): Promise<MintPageData> {
+    const count = await featherCount(this.db, this.chain.featherMinted);
+    const slots = await featherSlots(this.db);
+    const byGrade = Object.fromEntries(FEATHER_GRADES.map((g) => [g, slots.filter((x) => x.grade === g).length])) as Record<FeatherGrade, number>;
+    const F = ECONOMY.feathers;
+    return {
+      max: count.max,
+      minted: count.minted,
+      left: count.left,
+      tickets: count.tickets,
+      byGrade,
+      provenance: this.provenance,
+      contract: this.chain.contractId,
+      contractUrl: this.chain.contractId ? `https://testnet.nearblocks.io/address/${this.chain.contractId}` : null,
+      explorer: this.chain.explorer,
+      minting: this.chain.minting,
+      redeemFeeMilli: toMilli(F.redeemFee),
+      estimates: rarityEstimates(byGrade),
+      rarityCounts: Object.fromEntries(RARITIES.map((r, i) => [r, F.rarityCounts[i] ?? 0])) as Record<Rarity, number>,
+      gradeWeights: Object.fromEntries(FEATHER_GRADES.map((g) => [g, [...F.gradeWeights[g]]])) as Record<FeatherGrade, number[]>,
+      recent: [...slots].reverse().slice(0, 8),
+      slots,
     };
   }
 
@@ -628,6 +662,12 @@ export class Game {
         return practiceCard(ctx, farm);
       case 'tourDone':
         return markToured(ctx.q, farm.id);
+      case 'redeemTicket': {
+        const r = await redeemTicket(ctx, farm.id, action.ticketId);
+        emit(ctx, farm, { kind: 'ticketRedeemed', ticketId: action.ticketId, grade: r.grade, score: r.score, feeMilli: r.feeMilli });
+        ctx.marketChanged = true;
+        return;
+      }
       default:
         return this.applyFarmAction(ctx, farm, action);
     }
@@ -912,20 +952,16 @@ export class Game {
         const reference = marketReference(await activeFarms(q));
         const nextMultiplier = marketMultiplier(supply, reference);
         await q.query('UPDATE market_days SET closed_at = $2, next_multiplier = $3, reference = $4 WHERE day = $1', [day, ctx.now, nextMultiplier, reference]);
-        // 4b. milestones: one auditable roll each, once, for player farms in good standing
-        const rolls = await rollMilestones(ctx, this.chain.foundingMinted, async (farmId) => {
-          const [henId] = await this.insertHens(ctx, farmId, 1);
-          if (!henId) throw new Error('no hen inserted');
-          return henId;
-        });
+        // 4b. milestones: one auditable roll each, once, for player farms in good standing; a win is a Feather Ticket
+        const rolls = await rollMilestones(ctx, this.chain.featherMinted);
         if (rolls.length) {
-          const { remaining } = await foundingCount(q, this.chain.foundingMinted);
+          const { left } = await featherCount(q, this.chain.featherMinted);
           for (const r of rolls) {
             if (!r.playerId) continue;
             const next = await nextMilestone(q, r.farmId);
             ctx.out.push({
               playerId: r.playerId,
-              msg: { t: 'event', event: { kind: 'milestoneRoll', milestone: r.milestone, won: r.won, henId: r.henId, next, remaining, roll: r.roll, odds: ECONOMY.founding.odds } },
+              msg: { t: 'event', event: { kind: 'milestoneRoll', milestone: r.milestone, won: r.won, ticketId: r.ticketId, next, left, roll: r.roll, odds: ECONOMY.feathers.odds } },
             });
           }
         }
@@ -990,40 +1026,29 @@ export class Game {
     });
 
     const result = await this.chain.settleDay(this.db, this.season, closedDay);
-    await this.db.query('UPDATE market_days SET settlement_status = $3, settlement_tx = $4, settlement_error = $5 WHERE season = $1 AND day = $2', [
-      this.season,
-      closedDay,
-      result.status,
-      result.txHash,
-      result.error ?? null,
-    ]);
-    if (result.status === 'sent' && result.txHash && result.minted?.length) await this.announceMints(result.minted, result.txHash, closedDay, result.numbers);
+    await this.db.query(
+      'UPDATE market_days SET settlement_status = $3, settlement_tx = $4, settlement_error = $5, settlement_json = COALESCE($6, settlement_json), settlement_digest = COALESCE($7, settlement_digest) WHERE season = $1 AND day = $2',
+      [this.season, closedDay, result.status, result.txHash, result.error ?? null, result.settlement ? JSON.stringify(result.settlement) : null, result.digest ?? null],
+    );
+    if (result.status === 'sent' && result.txHash && result.minted?.length) await this.announceMints(result.minted, result.txHash, closedDay);
     this.emit(null, { t: 'market', market: await this.getMarketState() });
   }
 
-  /** Each minted Founding Hen's owner hears about it (the certificate moment) and gets the hen's new card. */
-  private async announceMints(henIds: string[], txHash: string, day: number, numbers?: Map<string, number>): Promise<void> {
-    const rows = await this.db.query<{ id: string; chain_owner: string; farm_id: string; player_id: string | null; founding_milestone: string | null }>(
-      `SELECT h.id, h.chain_owner, h.farm_id, f.player_id, h.founding_milestone FROM hens h JOIN farms f ON f.id = h.farm_id WHERE h.id = ANY($1::text[]) AND f.owner_kind = 'player'`,
-      [henIds],
+  /** Each minted Feather's owner hears about it (the reveal moment) and gets their farm's new tickets. */
+  private async announceMints(minted: MintedFeather[], txHash: string, day: number): Promise<void> {
+    const rows = await this.db.query<{ id: string; farm_id: string; player_id: string | null }>(
+      `SELECT t.id, t.farm_id, f.player_id FROM feather_tickets t JOIN farms f ON f.id = t.farm_id WHERE t.id = ANY($1::text[])`,
+      [minted.map((m) => m.ticketId)],
     );
+    const by = new Map(rows.map((r) => [String(r.id), r]));
     const farms = new Map<string, string>();
-    for (const r of rows) {
-      if (!r.player_id) continue;
+    for (const m of minted) {
+      const r = by.get(m.ticketId);
+      if (!r?.player_id) continue;
       farms.set(String(r.farm_id), String(r.player_id));
-      const id = String(r.id);
       this.emit(String(r.player_id), {
         t: 'event',
-        event: {
-          kind: 'henMinted',
-          henId: id,
-          token: henToken(id, true),
-          owner: String(r.chain_owner),
-          txHash,
-          day,
-          number: numbers?.get(id) ?? null,
-          milestone: (r.founding_milestone as MilestoneId | null) ?? null,
-        },
+        event: { kind: 'featherMinted', ticketId: m.ticketId, number: m.number, grade: m.grade, milestone: m.milestone, token: m.token, owner: m.owner, txHash, day },
       });
     }
     for (const [farmId, playerId] of farms) this.emit(playerId, { t: 'farm', farm: await this.getFarmState(farmId) });

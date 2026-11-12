@@ -1,145 +1,171 @@
-# The Founding Hens
+# The Feathers (beta) and the 777 Founding Hens
 
-Only **777** Founding Hens will ever exist. They are the only hens recorded on NEAR: each one is a
-NEP-171 token that proves she belongs to her farm for good. Ordinary hens (bought in the shop, or
-on a farm from the start) live and lay the same, but are not recorded on chain.
+Hens on a farm are never minted. The beta mints **Feathers** only: NEAR testnet NFTs that are claim tickets for the
+**777 Founding Hens**, which are planned to be revealed and minted as hens at the mainnet launch. Only 777 Feathers will
+ever exist; the game contract enforces the cap.
 
-A farm wins a Founding Hen at a **milestone**. Each milestone gives a farm in good standing one
-roll, once. A win puts the hen on the farm at once; the next day close mints her on NEAR, and her
-owner sees the certificate moment: her portrait, her number of 777, her traits, the milestone, a
-stamp, "She is now permanently yours on NEAR", and the receipt in the ledger.
+```mermaid
+flowchart LR
+  m["Milestone reached<br/>(farm in good standing)"] --> r{"One roll, 30%<br/>seeded, logged"}
+  r -- miss --> k["Kind message<br/>and the next milestone"]
+  r -- win --> t["Feather Ticket<br/>(held, in game)"]
+  t -- "Redeem on the mint page<br/>25 coins" --> q["Queued, graded by the<br/>management score now"]
+  q -- "next day close<br/>(game pays gas and storage)" --> f["Feather #n of 777<br/>NEP-171 on testnet"]
+  f --> v["Reveal moment<br/>receipt in the ledger"]
+  f -. "planned: mainnet" .-> s["Snapshot, reveal seed,<br/>claim a Founding Hen"]
+```
 
-## Milestones
+## Tickets
 
-In the order a farm usually reaches them. Every threshold lives in `ECONOMY.founding`
-(`packages/shared/src/economy.ts`).
+A farm in good standing gets one roll at each milestone, once. A win is a **Feather Ticket** for that farm; a miss is
+final, with a kind message naming the next milestone. Tickets keep: a player redeems when they choose. Tickets are claims
+on the 777, so no roll is made once the Feathers minted plus the tickets out reach 777.
 
-| Milestone | Reached when | Config |
+| Milestone | Reached when | Config (`ECONOMY.feathers`) |
 |---|---|---|
 | `full-coop` | the farm's coops are full for the first time | coop capacity |
-| `good-week` | the farm has been in good standing for 7 day closes in a row | `goodDays: 7` |
-| `eggs-sold` | the farm has sold 500 eggs (street, orders, cards, contracts) | `eggsSold: 500` |
-| `haggles-won` | the player has won 10 haggles by hand | `hagglesWon: 10` |
-| `all-machines` | the farm owns all five machines | the five unlocks |
+| `good-week` | 7 day closes in a row in good standing | `goodDays: 7` |
+| `eggs-sold` | 500 eggs sold (street, orders, cards, contracts) | `eggsSold: 500` |
+| `haggles-won` | 10 haggles won by hand | `hagglesWon: 10` |
+| `all-machines` | all five machines owned | the five unlocks |
 | `outlast-rival` | a rival farm went bust after this farm opened | |
 | `top-three` | the farm ends a day in the board's top 3 (by coins, farms still trading) | `topRank: 3` |
 
-## Good standing
-
-Checked for every player farm at every day close. A farm is in good standing when:
-
-- it has **never gone bust** this season;
-- it has **no feed credit unpaid past its due day** (an open debt past due, or a default in the last 3 days);
-- it has **missed no contract delivery in the last 3 days** (`missWindowDays: 3`).
-
-A farm out of good standing does not roll; its reached milestones wait until it is back in good
-standing (if they still hold). Its `good-week` count starts again.
+**Good standing**, checked for every player farm at every day close: never bust this season; no feed credit unpaid past
+its due day (an open debt past due, or a default in the last 3 days); no contract delivery missed in the last 3 in-game
+days (`missWindowDays: 3`). Out of good standing a farm does not roll, and its good-week count starts again.
 
 ## The roll, and how to audit it
 
-Odds are `odds: 0.3` (30%) per milestone. The roll is made on the server at the day close from a
-seed anyone can recompute:
+Odds are `odds: 0.3` per milestone. The roll is made on the server at the day close from a seed anyone can recompute:
 
 $$
-\text{seed} = \mathrm{SHA256}\big(\texttt{coys-founding}\,|\,\text{season}\,|\,\text{day}\,|\,\text{farm}\,|\,\text{milestone}\,|\,\text{anchor}\big)
+\text{seed} = \mathrm{SHA256}\big(\texttt{coys-feather}\,|\,\text{season}\,|\,\text{day}\,|\,\text{farm}\,|\,\text{milestone}\,|\,\text{anchor}\big)
 $$
 
 $$
 \text{roll} = \frac{\text{first 52 bits of the seed}}{2^{52}} \in [0, 1), \qquad \text{won} \iff \text{roll} < \text{odds}
 $$
 
-The **anchor** is the previous day's settlement transaction hash on NEAR testnet (or `none` before
-the first settlement), so the seed is fixed by a public record written before the roll. Every roll
-is stored in the `milestone_rolls` table (farm, milestone, season, day, anchor, seed, roll, odds,
-won, hen) and logged:
+The **anchor** is the previous day's settlement transaction on NEAR testnet (`none` before the first), a public record
+written before the roll. Every roll is stored in `milestone_rolls` (farm, milestone, season, day, anchor, seed, roll, odds,
+won, ticket) and logged:
 
 ```text
-[founding] season s1 day 412 farm 6f0c... milestone eggs-sold: anchor 8WeCaoGp... seed 3be1... roll 0.214077 odds 0.3 WON hen 91aa...
+[feathers] season s1 day 512 farm 1ae7... milestone eggs-sold: anchor 8WeC... seed 3be1... roll 0.214077 odds 0.3 WON ticket 91aa...
 ```
 
-To check a roll: hash the six fields joined by `|` with SHA-256, take the first 13 hex digits as
-an integer, divide by 2^52, and compare with the odds. `rollFor` in
-`apps/server/src/game/founding.ts` is exactly that, and its tests check it against the stored rows.
+`rollFor` in `apps/server/src/game/feathers.ts` is exactly that; its tests recompute stored rows. A Founding Hen won
+before the Feathers (one, on `s1`, day 409, by the real player's farm) became a Feather Ticket for her farm in migration 9;
+she stays on the farm as an ordinary hen.
 
-At most one hen per milestone per farm; rolls stop when 777 Founding Hens are minted or won and
-waiting (the server counts the contract's own number plus those waiting).
+## Redemption and grades
 
-## The contract (version 3)
+On the mint page the player redeems a held ticket for **25 coins** (`redeemFee`). Its grade is set then, from the farm's
+**management score** (0 to 1):
 
-`contracts/coys-game` (near-sdk 5.30.1, near-contract-standards 5.30.1):
+$$
+s = 0.30\,\min\!\Big(1, \frac{g}{30}\Big) + 0.25\,d + 0.20\,\min\!\Big(1, \frac{h}{20}\Big) + 0.25\,\min\!\Big(1, \frac{p}{1000}\Big)
+$$
 
-- `settle_day(batch)`, owner only, now carries `founding_mints` and refuses any ordinary
-  `hen_mints` ("ordinary hens are not minted: only Founding Hens").
-- **Hard cap on chain:** `FOUNDING_MAX = 777`. A batch that would pass it is refused whole ("the
-  Founding Hens are all minted: 777 is the limit"). The contract numbers each hen in order.
-- Each token stores: title `Founding Hen #n of 777`, her portrait (a PNG data URI built from her
-  stacked trait layers, with its hash), and in `extra` her number, the milestone, season, day and
+where $g$ is days in good standing, $d$ the delivery record (contract eggs delivered over delivered plus missed; 0.5 with
+no contracts yet), $h$ haggles won and $p$ coins of profit over the starting 50. Weights and full marks live in
+`ECONOMY.feathers.score`.
+
+| Grade | Score from | Card frame | Weight toward Legendary, Epic, Rare, Common |
+|---|---|---|---|
+| Fluff | 0 | common | 1, 1, 1, 1 |
+| Plume | 0.35 | rare | 2, 2, 1.5, 1 |
+| Quill | 0.60 | epic | 4, 3, 2, 1 |
+| Golden Quill | 0.85 | legendary | 8, 5, 3, 1 |
+
+The redeemed ticket mints at the next day close, in redemption order, at most 20 a day, to the player's wallet; the game
+pays testnet gas and storage, so players never need testnet NEAR. A ticket whose player has no wallet linked waits.
+
+## The Feather token (contract version 4)
+
+`contracts/coys-game`, near-sdk 5.30.1 and near-contract-standards 5.30.1, on `play.coys-game.testnet`:
+
+- `settle_day(batch)`, owner only, carries `feather_mints` and refuses any `hen_mints` ("ordinary hens are never minted").
+- **Hard cap on chain:** `FEATHER_MAX = 777`. A batch that would pass it is refused whole ("the Feathers are all minted:
+  777 is the limit"). The contract numbers each Feather in mint order: token id `001` to `777`.
+- Each token stores its number, grade, milestone, season and day (`extra`), and a still image of its Feather card: the
+  grade's Spawn card frame with its feather and the number, a 96x136 PNG as a data URI with its hash (no image host).
+  Title `Feather #041 of 777: Quill`.
+- `feather_supply()` returns `{ minted, max, remaining, provenance }`; the collection is "Yolk Street Feathers (beta)"
+  (`FEATHER`).
+- `commit_provenance(sha256)`, once: the SHA-256 of `founders.json`, committed on 12 November 2026
+  ([JBoKNVa6...](https://testnet.nearblocks.io/txns/JBoKNVa6Pi5jAb2BA4chAh8K43GGpWgw8AtHJy26b5AB)), and copied into
+  every Feather's `extra`.
+
+Tests: 18 contract unit tests and 8 sandbox tests on the CI-built wasm, among them **mint 777 in 39 batches of 20 then
+refuse the 778th** (126 Tgas at most per batch, 3,169 bytes a Feather), and the upgrade of the exact version 2 code
+deployed on testnet.
+
+## The 777 Founding Hens
+
+`scripts/generate-founders.ts` (seeded: `coys-founders-2026-11-12`) writes `apps/server/data/founders.json`, which stays
+on the server and never enters the client bundle; only its hash is public (`founders.json.sha256`, the contract's
+provenance, and the mint page).
+
+- 777 hens, each with a number, an original name (Ivy Muddlebeak, Archduchess Lottie Haystacktuft...), a rarity and
   traits.
-- `founding_supply()` returns `{ minted, max, remaining }`. The collection is named
-  "Yolk Street Founding Hens" (`FOUNDING`).
-- `migrate()` upgrades the deployed version 2 in place: tokens, egg balances, days and the owner
-  stay; the founding count starts at 0. The hens version 2 minted keep their `hen-<id>` tokens,
-  outside the 777.
+- **Exactly 7 Legendary, 70 Epic, 200 Rare and 500 Common**, shuffled so a number says nothing about rarity.
+- Looks come from the existing hen layers only (body, eyes, comb, accessory), extended by code recolours:
+  `recolourBody` for 16 body palettes and `recolourComb` for 7 comb colours, giving 1,728 possible looks (576 Common, 576 Rare, 288 Epic, 288 Legendary). No
+  two hens share a look or a name.
+- Legendary and Epic palettes (gold, obsidian, opal; teal, plum, cobalt; golden, pearl, violet and cyan combs) are used
+  by no lower rarity, and every Legendary hen has a sparkle.
 
-Tests: 11 unit tests (777 then refuse, one batch past the cap, ordinary hens refused, the v2
-upgrade) and 6 sandbox tests on the built wasm, among them **mint 777 in 39 batches of 20 then
-refuse the 778th**, and **upgrade the exact code deployed on `play.coys-game.testnet`**
-(`contracts/sandbox-tests/res/coys_game_v2.wasm`, read from the chain with `view_code`).
+## The planned reveal (mainnet; sandbox-tested only)
+
+The reveal assigns each Feather number one Founding Hen. It is a pure function of a seed and the snapshot, implemented
+twice (Rust in `contracts/founding-hens/src/draw.rs`, TypeScript in `scripts/lib/reveal.ts`) and pinned to the same test
+vector:
+
+1. A stream: value $i$ is the first 8 bytes of $\mathrm{SHA256}(\text{seed}\,|\,i)$, big-endian.
+2. The 777 numbers are shuffled (Fisher-Yates from the last position).
+3. In that order each number draws a rarity $r$ with weight $w_{\text{grade},r} \cdot \text{left}_r$ (the grade weights
+   doubled to whole numbers); that rarity's count drops by one. Numbers not minted count as Fluff. Because the counts
+   start at 7/70/200/500 and there are 777 numbers, the draw always ends at exactly 7/70/200/500.
+4. Within each rarity, founders.json's hens (file order) are shuffled with the same stream and handed out in number order.
+
+The seed comes from a public event chosen and announced before the snapshot (a future NEAR mainnet block). The
+prototype contract `contracts/founding-hens` (snapshot, seal, reveal once, claim by the snapshot holder) is built and
+sandbox-tested in CI and never deployed: the reveal of 777 took 111 Tgas, gave exactly 7/70/200/500, and a second
+deployment drew the same hens from the same seed. See [mainnet-plan.md](mainnet-plan.md).
+
+## Estimates on the mint page
+
+Each grade's chance of each rarity, given the Feathers minted so far (unminted numbers as Fluff):
+
+$$
+P(r \mid g) = \frac{w_{g,r}\, x_r}{\sum_{r'} w_{g,r'}\, x_{r'}}, \qquad \text{with } x \text{ such that } \sum_g n_g\, P(r \mid g) = K_r
+$$
+
+where $n_g$ counts Feathers per grade and $K = (7, 70, 200, 500)$; $x$ is found by iterating. It is an estimate (the real
+draw is without replacement) and is labelled so; it locks at the reveal. With nothing minted every Feather has
+$7/777 \approx 0.9\%$ of a Legendary.
+
+## In the game
+
+- **Mint page** (FEATHERS in the top bar, or the board): minted and left of 777, per grade, the provenance hash and the
+  contract, the player's tickets with Redeem and the grade a redemption would get now, the estimates, recent mints, and
+  all 777 slots (minted as Feather cards, the rest as the unminted frame with a dark hen silhouette and the number), with
+  filters (grade, minted, unminted, mine) and pages.
+- **Reveal moment**: the unminted card flips to the Feather card, the feather shines, a stamp lands, and "Planned to hatch
+  into a Founding Hen at mainnet launch." shows with the receipt; Quill and Golden Quill get confetti, a sparkle and a
+  harder shake.
+- The **board** shows Feathers left of 777 and tickets waiting; the **ledger** lists tickets and Feathers with receipts,
+  every milestone and good standing; the **tour** has a Feathers step; **How to play** has Feathers, grades and odds, the
+  mint page and the reveal, and milestones.
 
 ## Costs, measured
 
 | | |
 |---|---|
-| Version 3 wasm | 351,309 bytes (version 2: 341,943) |
-| Upgrade in place | +9,384 bytes of state, about 0.094 NEAR; `migrate` 1 Tgas |
-| One Founding Hen | 2,647 bytes of state with a full-size portrait and her share of the day's record, about 0.026 NEAR (`CHAIN_MINT_NEAR`, default 0.03); all 777 about 20.6 NEAR |
-| Mints per day close | at most 20 (`mintsPerBatch`); 20 mints with full portraits burnt at most 139 Tgas of a 300 Tgas call |
-| One settled day (s1, measured on chain) | 179 bytes of state and 0.0004 NEAR of gas |
-
-The server mints only as many hens as the game account's free balance can store above its margin
-(`CHAIN_MIN_BALANCE_NEAR`, default 1.25 NEAR: about one real day of settlements at 3-minute days).
-Hens that cannot be minted yet wait for a later day close; nothing is lost.
-
-## How it flows
-
-```mermaid
-sequenceDiagram
-  participant Farm as Player farm
-  participant Server as Game server (day close)
-  participant Chain as Game contract (testnet)
-  Server->>Server: good standing? milestone reached? not rolled yet?
-  Server->>Server: seed = sha256(season|day|farm|milestone|previous tx), roll < 0.3?
-  alt won
-    Server->>Farm: a Founding Hen joins the farm, "you won" message
-  else missed
-    Server->>Farm: kind message and the next milestone
-  end
-  Server->>Chain: next day close: settle_day with founding_mints
-  Chain-->>Chain: refuse past 777, number #n, store traits, milestone, season, day, portrait
-  Chain-->>Server: receipt
-  Server->>Farm: certificate moment, receipt in the ledger
-```
-
-## In the game
-
-- The hen's card says what she is: a Founding Hen (her number, milestone and day, and whether her
-  certificate is recorded, waiting, or paused) or an ordinary hen (not recorded on NEAR).
-- The market board shows how many of the 777 are left to win.
-- The ledger lists the farm's Founding Hen certificates with receipts, every milestone (to do,
-  won, tried) and whether the farm is in good standing.
-- The How to play guide has a section on Founding Hens and one on milestones.
-
-## Upgrading the testnet contract (owner step)
-
-The game account must hold enough free balance first (see the reserve in the README's Build log).
-Then, from the repo root with `.env` signing as `play.coys-game.testnet`:
-
-```powershell
-npm run deploy-contract -- --wasm contracts/coys-game/res/coys_game.wasm --account play.coys-game.testnet --migrate
-```
-
-The script checks the wasm against its `.sha256`, refuses anything that is not testnet, deploys and
-calls `migrate` in one transaction, and prints the transaction. Check with the view call
-`founding_supply()` (`{"minted":0,"max":777,"remaining":777}`). The running server notices the
-upgrade at its next day close and starts minting waiting Founding Hens. Mainnet is a separate,
-later step: see [mainnet-checklist.md](mainnet-checklist.md).
+| Version 4 wasm | 353,408 bytes (version 2: 341,943) |
+| Upgrade in place (sandbox, exact v2 code) | +11,490 bytes, `migrate` 1 Tgas |
+| One Feather | 3,169 bytes with its card image, about 0.032 NEAR (`CHAIN_MINT_NEAR`, default 0.035); all 777 about 24.6 NEAR |
+| One settled day | 0 bytes (version 2: 179); about 0.0004 NEAR of gas |
+| Release of a version 2 day record | 179 bytes back |

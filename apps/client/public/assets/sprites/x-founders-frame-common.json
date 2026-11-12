@@ -1,0 +1,50 @@
+{
+  "frames": {
+    "plate/0": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 544
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 544
+      },
+      "sourceSize": {
+        "w": 384,
+        "h": 544
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 0
+    }
+  },
+  "animations": {
+    "plate": [
+      "plate/0"
+    ]
+  },
+  "meta": {
+    "app": "chickens-of-yolk-street/scripts/pack-assets.ts",
+    "version": "1",
+    "image": "x-founders-frame-common.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 384,
+      "h": 544
+    },
+    "scale": "1",
+    "source": {
+      "path": "art/x-founders-frame-common/x-founders-frame-common.png",
+      "sha256": "7984e66154a3090b733748c6499d9cc10a42b3cdc948763833ed292a1c786811"
+    },
+    "grid": 8
+  }
+}

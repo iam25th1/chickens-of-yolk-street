@@ -13,6 +13,7 @@
 // a screen at d device pixels per design pixel draws one texel per device pixel, with nothing scaled
 // at run time. Frames are cut by connected blobs at full resolution, so art that pokes out of its
 // cell (a comb, a flapping wing) stays whole and never brings a neighbour's pixels along.
+import { HEN_PX, SIZE_TABLE, type Thing } from '../../apps/client/src/pixi/farm/spec';
 import { createHash } from 'node:crypto';
 import { alphaCut, recolourBody } from '../../packages/shared/src/pixels';
 import type { Rgba } from './png';
@@ -36,8 +37,41 @@ export interface PaintedSpec {
   use: 'world' | 'ui';
 }
 
-/** Painted sheets the game draws, and how big each is drawn (the design's size relationships). */
+/**
+ * Each painted farm sheet's visible size in source pixels: the tallest opaque frame of the row the
+ * size table measures (the trough by width), read once from coys-assets. The art ratio is this
+ * over the size the table gives it, so the atlases are cut at exactly the table's sizes.
+ */
+export const SOURCE_EXTENT: Record<string, number> = {
+  '11-egg-white': 160,
+  '12-crate': 157,
+  '14-trough': 331,
+  '13-sack-standard': 230,
+  '15-coop-starter': 337,
+  '15-coop-red': 353,
+  '15-coop-deluxe': 378,
+  '16-farmhouse': 361,
+  '19-egg-grader': 208,
+  '20-delivery-cart': 142,
+  '21-feed-hopper': 392,
+  '22-sales-clerk': 215,
+  '17-sign-farm': 224,
+  '17-sign-upstart': 219,
+  '17-sign-old-money': 233,
+};
+
+/** Source pixels per world pixel that draw `measured` at the size table's size for `thing`. */
+export const sizedRatio = (thing: Thing, measured: string): number => {
+  const px = SOURCE_EXTENT[measured];
+  if (!px) throw new Error(`no source extent for ${measured}`);
+  return px / (SIZE_TABLE[thing].rel * HEN_PX);
+};
+
+const world = (thing: Thing, measured: string): PaintedSpec => ({ group: 'farm', ratio: sizedRatio(thing, measured), use: 'world' });
+
+/** Painted sheets the game draws, and how big each is drawn (the size table in apps/client/src/pixi/farm/spec.ts). */
 export const PAINTED: Record<string, PaintedSpec> = {
+  // the hen and her trait layers: 1.0 in the size table
   '02-body': { group: 'farm', ratio: 8, use: 'world' },
   '02-eyes-sleepy': { group: 'farm', ratio: 8, use: 'world' },
   '02-eyes-wild': { group: 'farm', ratio: 8, use: 'world' },
@@ -48,28 +82,28 @@ export const PAINTED: Record<string, PaintedSpec> = {
   '02-acc-tophat': { group: 'farm', ratio: 8, use: 'world' },
   '02-acc-bowtie': { group: 'farm', ratio: 8, use: 'world' },
   '02-acc-shades': { group: 'farm', ratio: 8, use: 'world' },
-  '11-egg-white': { group: 'farm', ratio: 12, use: 'world' },
-  '11-egg-cream': { group: 'farm', ratio: 12, use: 'world' },
-  '11-egg-brown': { group: 'farm', ratio: 12, use: 'world' },
-  '11-egg-golden': { group: 'farm', ratio: 12, use: 'world' },
-  '12-crate': { group: 'farm', ratio: 8, use: 'world' },
-  '13-sack-cheap': { group: 'farm', ratio: 8, use: 'world' },
-  '13-sack-standard': { group: 'farm', ratio: 8, use: 'world' },
-  '13-sack-premium': { group: 'farm', ratio: 8, use: 'world' },
-  '14-trough': { group: 'farm', ratio: 8, use: 'world' },
-  '15-coop-starter': { group: 'farm', ratio: 4, use: 'world' },
-  '15-coop-red': { group: 'farm', ratio: 4, use: 'world' },
-  '15-coop-deluxe': { group: 'farm', ratio: 4, use: 'world' },
-  '16-farmhouse': { group: 'farm', ratio: 4, use: 'world' },
-  '17-sign-farm': { group: 'farm', ratio: 8, use: 'world' },
-  // machines drawn half again a hen's scale, so each reads clearly beside her
-  '19-egg-grader': { group: 'farm', ratio: 16 / 3, use: 'world' },
-  '20-delivery-cart': { group: 'farm', ratio: 16 / 3, use: 'world' },
-  '21-feed-hopper': { group: 'farm', ratio: 16 / 3, use: 'world' },
-  '22-sales-clerk': { group: 'farm', ratio: 16 / 3, use: 'world' },
+  // every egg at the white egg's scale (the brown is a jumbo egg by design)
+  '11-egg-white': world('egg', '11-egg-white'),
+  '11-egg-cream': world('egg', '11-egg-white'),
+  '11-egg-brown': world('egg', '11-egg-white'),
+  '11-egg-golden': world('egg', '11-egg-white'),
+  '12-crate': world('crate', '12-crate'),
+  '13-sack-cheap': world('sack', '13-sack-standard'),
+  '13-sack-standard': world('sack', '13-sack-standard'),
+  '13-sack-premium': world('sack', '13-sack-standard'),
+  '14-trough': world('trough', '14-trough'),
+  '15-coop-starter': world('coop-starter', '15-coop-starter'),
+  '15-coop-red': world('coop-red', '15-coop-red'),
+  '15-coop-deluxe': world('coop-deluxe', '15-coop-deluxe'),
+  '16-farmhouse': world('farmhouse', '16-farmhouse'),
+  '17-sign-farm': world('sign', '17-sign-farm'),
+  '19-egg-grader': world('grader', '19-egg-grader'),
+  '20-delivery-cart': world('cart', '20-delivery-cart'),
+  '21-feed-hopper': world('hopper', '21-feed-hopper'),
+  '22-sales-clerk': world('clerk', '22-sales-clerk'),
   // the rival farms' signs at the farm's edge (and on the market board)
-  '17-sign-upstart': { group: 'farm', ratio: 8, use: 'world' },
-  '17-sign-old-money': { group: 'farm', ratio: 8, use: 'world' },
+  '17-sign-upstart': world('sign', '17-sign-upstart'),
+  '17-sign-old-money': world('sign', '17-sign-old-money'),
   '04-upstart': { group: 'cards', ratio: 4, use: 'ui' },
   '05-old-money': { group: 'cards', ratio: 4, use: 'ui' },
   '06-squeezer': { group: 'cards', ratio: 4, use: 'ui' },
@@ -99,6 +133,16 @@ export const EXACT_GROUP: Record<string, Group> = {
   '24-farm-props': 'farm',
   '27-town-square-plate': 'market',
   '27-town-square-anim': 'market',
+  // the Feathers beta: four feathers and five card frames from Spawn (mint page, reveal)
+  'x-feather-fluff': 'cards',
+  'x-feather-plume': 'cards',
+  'x-feather-quill': 'cards',
+  'x-feather-golden-quill': 'cards',
+  'x-founders-frame-common': 'cards',
+  'x-founders-frame-rare': 'cards',
+  'x-founders-frame-epic': 'cards',
+  'x-founders-frame-legendary': 'cards',
+  'x-founders-frame-unminted': 'cards',
   '29-card-bulk-order': 'cards',
   '29-card-feed-deal': 'cards',
   '29-card-glut-warning': 'cards',

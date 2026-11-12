@@ -1,0 +1,31 @@
+[package]
+name = "founding-hens"
+description = "Chickens of Yolk Street: the planned mainnet Founding Hens contract (snapshot, reveal, claim). Sandbox-tested only; not deployed."
+version = "0.1.0"
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+repository = "https://github.com/iam25th1/chickens-of-yolk-street"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = "=5.30.1"
+near-contract-standards = "=5.30.1"
+
+[dev-dependencies]
+near-sdk = { version = "=5.30.1", features = ["unit-testing"] }
+
+[profile.release]
+codegen-units = 1
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
+
+[package.metadata.near.reproducible_build]
+image = "sourcescan/cargo-near:0.23.0-rust-1.99.1"
+passed_env = []
+container_build_command = ["cargo", "near", "build", "non-reproducible-wasm", "--locked"]

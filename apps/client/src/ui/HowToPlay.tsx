@@ -10,12 +10,12 @@ import { SheetSprite } from './SheetSprite';
 
 export const MILESTONE_TEXT: Record<MilestoneId, string> = {
   'full-coop': 'FILL YOUR COOPS FOR THE FIRST TIME',
-  'good-week': `STAY IN GOOD STANDING FOR ${ECONOMY.founding.goodDays} DAYS`,
-  'eggs-sold': `SELL ${ECONOMY.founding.eggsSold} EGGS`,
-  'haggles-won': `WIN ${ECONOMY.founding.hagglesWon} HAGGLES`,
+  'good-week': `STAY IN GOOD STANDING FOR ${ECONOMY.feathers.goodDays} DAYS`,
+  'eggs-sold': `SELL ${ECONOMY.feathers.eggsSold} EGGS`,
+  'haggles-won': `WIN ${ECONOMY.feathers.hagglesWon} HAGGLES`,
   'all-machines': 'OWN ALL FIVE MACHINES',
   'outlast-rival': 'OUTLAST A RIVAL FARM THAT GOES BUST',
-  'top-three': `FINISH A DAY IN THE BOARD'S TOP ${ECONOMY.founding.topRank}`,
+  'top-three': `FINISH A DAY IN THE BOARD'S TOP ${ECONOMY.feathers.topRank}`,
 };
 
 const minutes = Math.round(ECONOMY.day.lengthMs / 60_000);
@@ -146,17 +146,56 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: 'founding',
-    title: 'FOUNDING HENS AND CERTIFICATES',
-    short: 'FOUNDING HENS',
-    picture: () => <SheetSprite id="30-stamps" row="accepted" zoom={1} />,
+    id: 'feathers',
+    title: 'FEATHERS (BETA)',
+    short: 'FEATHERS',
+    picture: () => <SheetSprite id="x-feather-golden-quill" row="float" play="loop" zoom={1} />,
     body: (
       <>
         <p>
-          ONLY {ECONOMY.founding.maxSupply} FOUNDING HENS WILL EVER EXIST. EACH IS RECORDED ON NEAR AS A CERTIFICATE THAT PROVES SHE IS YOURS FOR GOOD. ORDINARY HENS ARE NOT
-          RECORDED.
+          ONLY {ECONOMY.feathers.maxSupply} FEATHERS WILL EVER EXIST, AND THE CONTRACT ON NEAR ENFORCES IT. A FEATHER IS A CLAIM TICKET FOR ONE OF THE {ECONOMY.feathers.maxSupply} FOUNDING HENS, PLANNED TO BE
+          REVEALED AND MINTED AS HENS AT THE MAINNET LAUNCH. HENS ON YOUR FARM ARE NEVER MINTED.
         </p>
-        <p>A FOUNDING HEN IS A FULL HEN: SHE LAYS, CARRIES HER TRAITS, LIVES ON YOUR FARM AND CAN BE TRADED. THE BOARD SHOWS HOW MANY ARE LEFT.</p>
+        <p>
+          A MILESTONE CAN WIN YOU A FEATHER TICKET. OPEN THE MINT PAGE (FEATHERS, TOP BAR) AND REDEEM IT FOR {ECONOMY.feathers.redeemFee} COINS: THE NEXT DAY CLOSE MINTS ITS FEATHER TO YOUR WALLET ON
+          NEAR&apos;S TEST NETWORK. THE GAME PAYS THE NETWORK; YOU NEVER NEED TEST NEAR. TICKETS KEEP, SO YOU CAN WAIT.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: 'grades',
+    title: 'GRADES AND ODDS',
+    short: 'GRADES AND ODDS',
+    picture: () => <SheetSprite id="x-founders-frame-legendary" row="plate" zoom={1} />,
+    body: (
+      <>
+        <p>
+          WHEN YOU REDEEM, YOUR FARM&apos;S MANAGEMENT SCORE SETS THE FEATHER&apos;S GRADE: DAYS IN GOOD STANDING, YOUR DELIVERY RECORD, HAGGLES WON AND PROFIT. FLUFF, PLUME (FROM{' '}
+          {pct(ECONOMY.feathers.bands.plume)}), QUILL (FROM {pct(ECONOMY.feathers.bands.quill)}), GOLDEN QUILL (FROM {pct(ECONOMY.feathers.bands['golden-quill'])}).
+        </p>
+        <p>
+          THE GRADE SETS THE ODDS OF A HIGH-RARITY HEN, NOT THE HEN. THE 777 HENS ARE FIXED: 7 LEGENDARY, 70 EPIC, 200 RARE, 500 COMMON. A GOLDEN QUILL WEIGHS 8 TOWARD LEGENDARY TO A
+          FLUFF&apos;S 1. THE MINT PAGE SHOWS EACH GRADE&apos;S ESTIMATED CHANCES FROM THE FEATHERS MINTED SO FAR.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: 'mint-page',
+    title: 'THE MINT PAGE AND THE REVEAL',
+    short: 'MINT PAGE',
+    picture: () => <SheetSprite id="x-founders-frame-unminted" row="plate" zoom={1} />,
+    body: (
+      <>
+        <p>
+          THE MINT PAGE SHOWS ALL 777 NUMBERS: MINTED ONES AS FEATHER CARDS, THE REST AS DARK SILHOUETTES. IT LISTS YOUR TICKETS, RECENT MINTS, THE FOUNDERS HASH (COMMITTED ON NEAR BEFORE
+          THE FIRST FEATHER) AND THE CONTRACT.
+        </p>
+        <p>
+          PLANNED FOR MAINNET: A SNAPSHOT OF FEATHER HOLDERS, A REVEAL SEEDED BY A PUBLIC EVENT CHOSEN IN ADVANCE THAT ALWAYS DRAWS EXACTLY 7/70/200/500, AND A CLAIM BY LOGGING IN WITH THE
+          SAME ACCOUNT. NOTHING OF IT IS LIVE YET: THIS IS THE BETA.
+        </p>
       </>
     ),
   },
@@ -168,8 +207,8 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <p>
-          EACH MILESTONE GIVES A FARM IN GOOD STANDING ONE CHANCE ({pct(ECONOMY.founding.odds)}) AT A FOUNDING HEN, ONCE. GOOD STANDING: NEVER BUST THIS SEASON, NO CREDIT PAST
-          ITS DUE DAY, NO CONTRACT MISSED IN THE LAST {ECONOMY.founding.missWindowDays} DAYS.
+          EACH MILESTONE GIVES A FARM IN GOOD STANDING ONE CHANCE ({pct(ECONOMY.feathers.odds)}) AT A FEATHER TICKET, ONCE. A MISS IS FINAL BUT KIND: THE NEXT MILESTONE IS ANOTHER CHANCE. GOOD STANDING: NEVER BUST THIS SEASON, NO CREDIT PAST
+          ITS DUE DAY, NO CONTRACT MISSED IN THE LAST {ECONOMY.feathers.missWindowDays} DAYS.
         </p>
         <ul>
           {(Object.keys(MILESTONE_TEXT) as MilestoneId[]).map((m) => (
@@ -192,7 +231,9 @@ const SECTIONS: Section[] = [
         <li>WALK-AWAY PRICE: THE LOWEST (OR HIGHEST) A TRADER WILL TAKE.</li>
         <li>CLERK FLOOR: THE SHARE OF TODAY&apos;S PRICE THE SALES CLERK ACCEPTS ON ITS OWN.</li>
         <li>GOOD STANDING: WHAT A FARM NEEDS FOR MILESTONE CHANCES.</li>
-        <li>CERTIFICATE: A FOUNDING HEN&apos;S RECORD ON NEAR.</li>
+        <li>FEATHER TICKET: WON AT A MILESTONE; REDEEM IT ON THE MINT PAGE.</li>
+        <li>FEATHER: A TESTNET NFT, A CLAIM TICKET FOR ONE OF THE 777 FOUNDING HENS (PLANNED).</li>
+        <li>GRADE: FLUFF, PLUME, QUILL OR GOLDEN QUILL; IT SETS THE ODDS, NOT THE HEN.</li>
         <li>RECEIPT: THE DAY&apos;S RECORD ON NEAR, LINKED IN THE LEDGER.</li>
         <li>TESTNET: NEAR&apos;S PRACTICE NETWORK, WHERE THIS BETA RECORDS EVERYTHING.</li>
       </ul>

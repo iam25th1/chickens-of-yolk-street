@@ -1,5 +1,5 @@
 // Game server entry: config, database, the cast's brains, the chain writer, HTTP and WebSocket.
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ECONOMY } from '@coys/shared';
@@ -9,7 +9,7 @@ import { createPrivyVerifier } from './auth/privy';
 import { createSessionSigner } from './auth/session';
 import { BUILD } from './build-info';
 import { createChainWriter } from './chain/chain';
-import { HenRenderer } from './chain/hen-image';
+import { FeatherRenderer } from './chain/feather-image';
 import { openDb } from './db/db';
 import { describeEnv, readConfig } from './env';
 import { Game } from './game/game';
@@ -32,7 +32,11 @@ const db = await openDb(config.databaseUrl);
 log(`[db] ${db.kind}${config.databaseUrl === 'memory://' ? ' in memory' : db.kind === 'pglite' ? ` at ${config.databaseUrl.slice('pglite://'.length)}` : ''}`);
 if (config.production && db.kind === 'pglite') log('[db] !!! PGlite in production (ALLOW_PGLITE_IN_PRODUCTION=1): for checking a build only, not for players');
 
-const renderer = new HenRenderer(join(repoRoot, 'apps/client/public/assets'));
+const renderer = new FeatherRenderer(join(repoRoot, 'apps/client/public/assets'));
+// founders.json (the 777 Founding Hens) stays server side; only its SHA-256 is public
+const foundersSha = join(repoRoot, 'apps/server/data/founders.json.sha256');
+const provenance = existsSync(foundersSha) ? readFileSync(foundersSha, 'utf8').trim().split(/\s+/)[0] ?? '' : '';
+log(provenance ? `[feathers] founders.json provenance ${provenance}` : '[feathers] !!! apps/server/data/founders.json.sha256 missing: the mint page shows no provenance');
 const chain = createChainWriter(process.env, renderer, log);
 if (chain.mode === 'noop') log('[chain] !!! NEAR testnet credentials missing: every daily settlement is a recorded NO-OP, nothing is signed');
 
@@ -53,6 +57,7 @@ const game = new Game({
   log,
   season: config.season,
   dayLengthMs: config.dayLengthMs,
+  provenance,
   brain: {
     client: nearAi,
     budget: new InferenceBudget(db, capUsd),

@@ -22,12 +22,15 @@ export class RecordingChain implements ChainWriter {
   readonly mode = 'near-testnet' as const;
   readonly explorer = 'https://testnet.nearblocks.io/txns/';
   readonly minting = 'live' as const;
+  readonly provenance = null;
+  readonly contractId = 'game.testnet';
   readonly batches: DayBatch[] = [];
-  /** The contract's Founding Hen count (a version 3 contract starts at 0). */
-  foundingMinted: number | null = 0;
+  readonly settlements: SettleResult[] = [];
+  /** The contract's Feather count (a version 4 contract starts at 0; null: an older contract without Feathers). */
+  featherMinted: number | null = 0;
   constructor(
     readonly gameAccount = 'game.testnet',
-    /** Founding Hens minted per day (0: none). Minting uses a stand-in portrait, not the packed art. */
+    /** Feathers minted per day (0: none). Minting uses a stand-in card image, not the packed art. */
     readonly mintCap = 0,
   ) {}
 
@@ -35,14 +38,18 @@ export class RecordingChain implements ChainWriter {
     for (const a of await db.query('SELECT id, kind, generation FROM agents WHERE near_account_id IS NULL')) {
       await db.query('UPDATE agents SET near_account_id = $2 WHERE id = $1', [a.id, agentAccountName(String(a.kind), Number(a.generation), this.gameAccount)]);
     }
-    const renderer = this.mintCap ? { render: () => ({ dataUri: 'data:image/png;base64,', sha256Base64: 'stand-in' }) } : null;
-    const founding = this.foundingMinted === null ? null : { cap: this.mintCap, base: this.foundingMinted };
-    const built = await buildDayBatch(db, season, day, { founding, renderer: renderer as never });
+    const renderer = this.mintCap
+      ? { render: (grade: string, n: number) => ({ dataUri: `data:image/png;base64,${grade}${n}`, sha256Base64: 'stand-in', sha256Hex: `stand-in-${grade}-${n}` }) }
+      : null;
+    const feathers = this.featherMinted === null ? null : { cap: this.mintCap, base: this.featherMinted };
+    const built = await buildDayBatch(db, season, day, { feathers, renderer: renderer as never });
     this.batches.push(built.batch);
     const txHash = `recorded-${season}-${day}`;
     await commitBatch(db, built, txHash);
-    if (this.foundingMinted !== null) this.foundingMinted += built.minted.length;
-    return { status: 'sent', txHash, minted: built.minted, numbers: built.numbers };
+    if (this.featherMinted !== null) this.featherMinted += built.minted.length;
+    const result: SettleResult = { status: 'sent', txHash, minted: built.minted, settlement: built.settlement, digest: built.batch.digest };
+    this.settlements.push(result);
+    return result;
   }
 }
 

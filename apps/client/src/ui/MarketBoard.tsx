@@ -34,10 +34,12 @@ export function MarketBoard({
   send,
   tab,
   onTab,
+  onFeathers,
   onClose,
 }: {
   farm: FarmState;
   market: MarketState;
+  onFeathers: () => void;
   send: (a: Action) => Promise<boolean>;
   tab: MarketTab;
   onTab: (t: MarketTab) => void;
@@ -110,17 +112,23 @@ export function MarketBoard({
                 {share > 1 ? 'TOO MANY EGGS: A GLUT. PRICES FALL TOMORROW.' : 'EGGS ARE SCARCE: PRICES RISE TOMORROW.'} PAST THE LINE IS A GLUT.
               </span>
             </button>
-            <span className="col" style={{ gap: 2, marginTop: 4 }} data-ui="founding-left">
+            <button
+              className="col"
+              style={{ gap: 2, marginTop: 4, border: 0, padding: 0, background: 'transparent', font: 'inherit', textAlign: 'left', color: 'inherit', cursor: 'pointer' }}
+              data-ui="feathers-left"
+              onClick={onFeathers}
+            >
               <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
-                FOUNDING HENS
+                FEATHERS (BETA)
               </span>
               <span>
-                {market.founding.remaining} OF {market.founding.max} LEFT TO WIN
+                {market.feathers.left} OF {market.feathers.max} LEFT TO MINT
               </span>
               <span style={{ lineHeight: '10px', color: '#8b5a2b' }}>
-                {market.founding.minted} RECORDED ON NEAR{market.founding.pending ? `, ${market.founding.pending} WAITING` : ''}. WON AT MILESTONES.
+                {market.feathers.minted} MINTED ON NEAR TESTNET{market.feathers.tickets ? `, ${market.feathers.tickets} TICKETS WAITING` : ''}. WON AT MILESTONES.
               </span>
-            </span>
+              <span style={{ color: '#2f6f9e' }}>OPEN THE MINT PAGE</span>
+            </button>
           </div>
           <button
             className="col"
