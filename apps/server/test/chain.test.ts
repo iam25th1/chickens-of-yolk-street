@@ -25,7 +25,7 @@ describe('hen portraits for NFT metadata', () => {
 });
 
 describe('the daily batch', () => {
-  it('mints collected eggs to wallets, moves sold eggs to buyers, and reconciles from confirmed balances', async () => {
+  it('mints collected eggs to wallets, Founding Hens only, and reconciles from confirmed balances', async () => {
     const t = await makeGame({ cast: true });
     const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
     await t.game.act(playerId, { t: 'linkWallet', rid: 'w1', accountId: 'ada.testnet' });
@@ -35,17 +35,31 @@ describe('the daily batch', () => {
     const farm = await t.game.getFarmState(farmId);
     const day = (await t.game.getMarketState()).day - 1;
     const renderer = new HenRenderer(assets);
-    const first = await buildDayBatch(t.db, t.game.season, day, { henMintCap: 5, renderer });
+    // two of Ada's hens are Founding Hens won at milestones; the rest are ordinary
+    const [a, b] = farm.hens;
+    await t.db.query(`UPDATE hens SET founding_milestone = 'full-coop', founding_day = 1 WHERE id = $1`, [a?.id]);
+    await t.db.query(`UPDATE hens SET founding_milestone = 'eggs-sold', founding_day = 1 WHERE id = $1`, [b?.id]);
+    const first = await buildDayBatch(t.db, t.game.season, day, { founding: { cap: 5, base: 40 }, renderer });
     const mintsToAda = first.batch.eggs.filter((m) => m.kind === 'Mint' && m.to === 'ada.testnet');
     const crate = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
     expect(mintsToAda.reduce((s, m) => s + Number(m.amount), 0)).toBeGreaterThanOrEqual(crate);
-    expect(first.batch.hen_mints).toHaveLength(5);
-    expect(first.batch.hen_mints[0]?.owner_id).toBe('ada.testnet');
+    expect(first.batch.hen_mints).toEqual([]);
+    // every Founding Hen (these two, and any the day close's milestone rolls won), oldest win first
+    const won = await t.db.query<{ id: string }>('SELECT id FROM hens WHERE founding_milestone IS NOT NULL ORDER BY founding_day, id');
+    expect(won.map((h) => h.id)).toEqual(expect.arrayContaining([a?.id, b?.id]));
+    expect(first.batch.founding_mints?.map((m) => [m.token_id, m.owner_id, m.season])).toEqual(won.map((h) => [`founding-${h.id}`, 'ada.testnet', t.game.season]));
+    expect(JSON.parse(first.batch.founding_mints?.[0]?.traits ?? '{}')).toHaveProperty('comb');
+    expect([...first.numbers.values()]).toEqual(won.map((_, i) => 41 + i));
     expect(first.batch.digest).toMatch(/^[0-9a-f]{64}$/);
     await commitBatch(t.db, first);
 
     // the same day again moves nothing: chain balances already match what everyone holds
-    const again = await buildDayBatch(t.db, t.game.season, day, { henMintCap: 0, renderer: null });
+    const again = await buildDayBatch(t.db, t.game.season, day, { founding: { cap: 5, base: 42 }, renderer });
+    expect(again.batch.founding_mints).toEqual([]);
+    // a version 2 contract gets no founding field at all, and still no ordinary hens
+    const v2 = await buildDayBatch(t.db, t.game.season, day, { founding: null, renderer });
+    expect('founding_mints' in v2.batch).toBe(false);
+    expect(v2.batch.hen_mints).toEqual([]);
     expect(again.batch.eggs.filter((m) => m.kind !== 'Transfer' && (m.to === 'ada.testnet' || m.from === 'ada.testnet'))).toEqual([]);
     await t.db.close();
   });

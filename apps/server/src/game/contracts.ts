@@ -85,6 +85,7 @@ export async function closeContracts(ctx: Ctx): Promise<Map<string, { delivered:
         const misses = c.misses + 1;
         const cancel = misses >= ECONOMY.buyers.bakery.cancelAfterMisses;
         await ctx.q.query(`UPDATE contracts SET misses = $2, status = CASE WHEN $3 THEN 'cancelled' ELSE status END WHERE id = $1`, [c.id, misses, cancel]);
+        await ctx.q.query('UPDATE farms SET last_missed_day = $2 WHERE id = $1', [farm.id, ctx.day]);
         await remember(ctx, c.agentId, farm.id, { misses: 1 }, cancel ? ctx.day + ECONOMY.buyers.bakery.sulkDays : undefined);
         emit(ctx, farm, { kind: 'contractMissed', contractId: c.id, penaltyMilli: penalty });
       }

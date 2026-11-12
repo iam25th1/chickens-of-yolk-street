@@ -4,7 +4,7 @@
 // Schemas are strict, so unknown fields are rejected.
 import { z } from 'zod';
 import { COOP_KINDS, ECONOMY, EGG_GRADES, FEED_TIERS, GOAL_IDS, UNLOCK_IDS, type GoalId } from './economy';
-import type { BodyColour, CoopKind, EggGrade, FeedTier, UnlockId } from './economy';
+import type { BodyColour, CoopKind, EggGrade, FeedTier, MilestoneId, UnlockId } from './economy';
 import type { AgentKind, AgentRole, CardKind } from './market';
 
 export const PROTOCOL_VERSION = 2;
@@ -101,11 +101,23 @@ export interface HenView {
   accessory: 'none' | 'tophat' | 'bowtie' | 'shades';
   layingTrait: number;
   ageDays: number;
-  /** The NEAR testnet account holding her NFT (token hen-<id>), or null until a day close mints her. */
+  /**
+   * The NEAR testnet account holding her NFT, or null. Only Founding Hens are minted now (token
+   * founding-<id>); hens minted before the Founding Hens hold hen-<id>.
+   */
   chainOwner?: string | null;
   /** The settlement transaction that minted her, and the day it closed (null until she is minted). */
   mintTx?: string | null;
   mintDay?: number | null;
+  /** A Founding Hen: the milestone she was won at, the day, and her number of 777 once minted. */
+  founding?: { milestone: MilestoneId; day: number; number: number | null } | null;
+}
+
+/** A milestone on the way to a Founding Hen: not rolled yet, or rolled once (won or missed). */
+export interface MilestoneView {
+  id: MilestoneId;
+  state: 'open' | 'won' | 'missed';
+  day: number | null;
 }
 
 /** A hen in the shop: fresh from the breeder or from a bust farm's auction. */
@@ -248,6 +260,10 @@ export interface FarmState {
   hopperCapMilli: number;
   /** The player has done the how-to-play tour (it shows once per player). */
   tourDone: boolean;
+  /** Founding Hen milestones, in order. */
+  milestones: MilestoneView[];
+  /** Good standing (needed for milestone rolls) as of the last day close, and why not. */
+  standing: { good: boolean; reasons: string[] };
 }
 
 export interface GoalView {
@@ -306,8 +322,10 @@ export interface MarketState {
   ranking: RivalRank[];
   /** Testnet explorer base for receipts, or null when settlement is off. */
   explorer: string | null;
-  /** Hen certificates: minted at day close (live), waiting for the game account to be topped up (paused), or no chain (off). */
+  /** Founding Hen certificates: minted at day close (live), waiting (paused: game account low or contract not upgraded), or no chain (off). */
   minting: 'live' | 'paused' | 'off';
+  /** The Founding Hens: 777 ever; minted, won and waiting, and left. */
+  founding: { max: number; minted: number; pending: number; remaining: number };
 }
 
 export interface DaySummary {
@@ -345,8 +363,10 @@ export type CardOutcome = 'accepted' | 'declined' | 'won' | 'failed' | 'expired'
 
 export type GameEvent =
   | { kind: 'hensBought'; count: number; fromAuction: number; costMilli: number; henIds?: string[] }
-  /** A day close recorded one of the player's hens on NEAR testnet as her own NFT. */
-  | { kind: 'henMinted'; henId: string; token: string; owner: string; txHash: string; day: number }
+  /** A day close minted one of the player's Founding Hens on NEAR testnet as her own NFT. */
+  | { kind: 'henMinted'; henId: string; token: string; owner: string; txHash: string; day: number; number?: number | null; milestone?: MilestoneId | null }
+  /** A milestone's one roll for a Founding Hen, at a day close. */
+  | { kind: 'milestoneRoll'; milestone: MilestoneId; won: boolean; henId: string | null; next: MilestoneId | null; remaining: number; roll: number; odds: number }
   | { kind: 'feedBought'; tier: FeedTier; bags: number; costMilli: number; supplier: string; /** Poured in by the feed hopper. */ auto?: boolean }
   | { kind: 'coopBuilt'; coopId: string; coopKind: CoopKind; plot: number; costMilli: number }
   | { kind: 'coopUpgraded'; coopId: string; coopKind: CoopKind; costMilli: number }

@@ -23,9 +23,11 @@ export class RecordingChain implements ChainWriter {
   readonly explorer = 'https://testnet.nearblocks.io/txns/';
   readonly minting = 'live' as const;
   readonly batches: DayBatch[] = [];
+  /** The contract's Founding Hen count (a version 3 contract starts at 0). */
+  foundingMinted: number | null = 0;
   constructor(
     readonly gameAccount = 'game.testnet',
-    /** Hens minted per day (0: none). Minting uses a stand-in portrait, not the packed art. */
+    /** Founding Hens minted per day (0: none). Minting uses a stand-in portrait, not the packed art. */
     readonly mintCap = 0,
   ) {}
 
@@ -34,11 +36,13 @@ export class RecordingChain implements ChainWriter {
       await db.query('UPDATE agents SET near_account_id = $2 WHERE id = $1', [a.id, agentAccountName(String(a.kind), Number(a.generation), this.gameAccount)]);
     }
     const renderer = this.mintCap ? { render: () => ({ dataUri: 'data:image/png;base64,', sha256Base64: 'stand-in' }) } : null;
-    const built = await buildDayBatch(db, season, day, { henMintCap: this.mintCap, renderer: renderer as never });
+    const founding = this.foundingMinted === null ? null : { cap: this.mintCap, base: this.foundingMinted };
+    const built = await buildDayBatch(db, season, day, { founding, renderer: renderer as never });
     this.batches.push(built.batch);
     const txHash = `recorded-${season}-${day}`;
     await commitBatch(db, built, txHash);
-    return { status: 'sent', txHash, minted: built.minted };
+    if (this.foundingMinted !== null) this.foundingMinted += built.minted.length;
+    return { status: 'sent', txHash, minted: built.minted, numbers: built.numbers };
   }
 }
 

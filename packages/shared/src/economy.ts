@@ -225,6 +225,8 @@ export const ECONOMY = {
     eggsSold: 500,
     hagglesWon: 10,
     topRank: 3,
+    /** Founding mints in one day's settlement (keeps one settle_day call well inside its gas). */
+    mintsPerBatch: 20,
   },
   limits: {
     maxHensPerPurchase: 20,

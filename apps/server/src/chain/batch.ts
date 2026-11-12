@@ -4,8 +4,9 @@
 // account is reconciled to what it really holds (crate plus eggs in open sell orders, or a buyer's
 // stock) with mints and burns. Starting from the balances last confirmed on chain means a failed
 // day is simply caught up by the next one, and no move ever burns more than an account holds.
-// Hens: new hens are minted to their owner's account (capped per day), and hens that changed owner
-// move. Farms: every farm's net result for the day, plus a SHA-256 digest of that list.
+// Hens: only Founding Hens (won at milestones, 777 ever) are minted, to their owner's account, a
+// few per day; ordinary hens are not recorded. Hens on chain that changed owner move. Farms: every
+// farm's net result for the day, plus a SHA-256 digest of that list.
 import { createHash } from 'node:crypto';
 import { EGG_GRADES, type EggGrade, type HenView } from '@coys/shared';
 import { num, type Db } from '../db/db';
@@ -25,13 +26,17 @@ export interface EggMove {
   amount: string;
 }
 
-export interface HenMint {
+/** A Founding Hen to mint: the contract numbers her (#n of 777) and stores the rest with the token. */
+export interface FoundingMint {
   token_id: string;
   owner_id: string;
-  title: string;
   media: string;
   media_hash: string;
-  extra: string;
+  /** Her traits, as JSON. */
+  traits: string;
+  milestone: string;
+  season: string;
+  day: number;
 }
 
 export interface DayBatch {
@@ -42,8 +47,17 @@ export interface DayBatch {
   digest: string;
   farms: FarmNet[];
   eggs: EggMove[];
-  hen_mints: HenMint[];
+  /** Always empty: ordinary hens are not minted (version 2 contracts still require the field). */
+  hen_mints: [];
+  /** Present only for a contract that mints Founding Hens (version 3). */
+  founding_mints?: FoundingMint[];
   hen_moves: { token_id: string; to: string }[];
+}
+
+/** Founding mints for this batch: how many at most, and how many the contract has minted before it. */
+export interface FoundingOpts {
+  cap: number;
+  base: number;
 }
 
 export interface BuiltBatch {
@@ -52,16 +66,20 @@ export interface BuiltBatch {
   balances: Map<string, number>;
   /** Hens whose chain owner changes once this batch lands. */
   henOwners: Map<string, string>;
-  /** Hens this batch mints (a subset of henOwners). */
+  /** Founding Hens this batch mints, in order (a subset of henOwners), and the number each gets. */
   minted: string[];
+  numbers: Map<string, number>;
 }
 
 const key = (account: string, grade: EggGrade): string => `${account}|${grade}`;
 const token = (grade: EggGrade): string => `egg-${grade}`;
 
+/** A hen's NFT token id: Founding Hens are founding-<id>; hens minted by version 2 were hen-<id>. */
+export const henToken = (id: string, founding: boolean): string => (founding ? `founding-${id}` : `hen-${id}`);
+
 export const digestOf = (farms: FarmNet[]): string => createHash('sha256').update(JSON.stringify(farms)).digest('hex');
 
-export async function buildDayBatch(db: Db, season: string, day: number, opts: { henMintCap: number; renderer: HenRenderer | null }): Promise<BuiltBatch> {
+export async function buildDayBatch(db: Db, season: string, day: number, opts: { founding: FoundingOpts | null; renderer: HenRenderer | null }): Promise<BuiltBatch> {
   // who holds what, off chain
   const farmAccounts = new Map<string, string>();
   for (const r of await db.query(
@@ -131,35 +149,40 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
     }
   }
 
-  // hens: mint the newest owned hens (players first), move those that changed hands
+  // hens: mint waiting Founding Hens, oldest win first; move hens on chain that changed hands
   const henOwners = new Map<string, string>();
-  const hen_mints: HenMint[] = [];
+  const founding_mints: FoundingMint[] = [];
   const hen_moves: { token_id: string; to: string }[] = [];
   const minted: string[] = [];
+  const numbers = new Map<string, number>();
   const hens = await db.query(
-    `SELECT h.id, h.farm_id, h.body, h.eyes, h.comb, h.accessory, h.laying_trait, h.born_day, h.chain_owner, f.owner_kind
-     FROM hens h JOIN farms f ON f.id = h.farm_id WHERE h.status = 'alive' ORDER BY (f.owner_kind = 'player') DESC, h.born_day DESC`,
+    `SELECT id, farm_id, body, eyes, comb, accessory, laying_trait, born_day, chain_owner, founding_milestone, founding_day FROM hens
+     WHERE status = 'alive' AND (chain_owner IS NOT NULL OR founding_milestone IS NOT NULL) ORDER BY founding_day, id`,
   );
   for (const h of hens) {
     const account = farmAccounts.get(String(h.farm_id));
     if (!account) continue;
     const id = String(h.id);
+    const founding = h.founding_milestone !== null && h.founding_milestone !== undefined;
     if (!h.chain_owner) {
-      if (hen_mints.length >= opts.henMintCap || !opts.renderer) continue;
-      const traits = { body: h.body, eyes: h.eyes, comb: h.comb, accessory: h.accessory, laying: num(h.laying_trait), hatched: `day ${num(h.born_day)}` };
+      if (!founding || !opts.founding || !opts.renderer || founding_mints.length >= opts.founding.cap) continue;
+      const traits = { body: String(h.body), eyes: String(h.eyes), comb: String(h.comb), accessory: String(h.accessory), laying: num(h.laying_trait).toFixed(3) };
       const img = opts.renderer.render(traits as unknown as HenView);
-      hen_mints.push({
-        token_id: `hen-${id}`,
+      founding_mints.push({
+        token_id: henToken(id, true),
         owner_id: account,
-        title: `Yolk Street hen ${id.slice(0, 8)}`,
         media: img.dataUri,
         media_hash: img.sha256Base64,
-        extra: JSON.stringify(Object.fromEntries(Object.entries(traits).map(([k, v]) => [k, String(v)]))),
+        traits: JSON.stringify(traits),
+        milestone: String(h.founding_milestone),
+        season,
+        day: num(h.founding_day),
       });
       henOwners.set(id, account);
       minted.push(id);
+      numbers.set(id, opts.founding.base + founding_mints.length);
     } else if (h.chain_owner !== account) {
-      hen_moves.push({ token_id: `hen-${id}`, to: account });
+      hen_moves.push({ token_id: henToken(id, founding), to: account });
       henOwners.set(id, account);
     }
   }
@@ -180,12 +203,14 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
       digest: digestOf(farms),
       farms,
       eggs: moves,
-      hen_mints,
+      hen_mints: [],
+      ...(opts.founding ? { founding_mints } : {}),
       hen_moves,
     },
     balances,
     henOwners,
     minted,
+    numbers,
   };
 }
 
@@ -201,6 +226,8 @@ export async function commitBatch(db: Db, built: BuiltBatch, txHash: string | nu
       );
     }
     for (const [henId, owner] of built.henOwners) await q.query('UPDATE hens SET chain_owner = $2 WHERE id = $1', [henId, owner]);
-    for (const henId of built.minted) await q.query('UPDATE hens SET mint_tx = $2, mint_day = $3 WHERE id = $1', [henId, txHash, built.batch.day]);
+    for (const henId of built.minted) {
+      await q.query('UPDATE hens SET mint_tx = $2, mint_day = $3, founding_no = $4 WHERE id = $1', [henId, txHash, built.batch.day, built.numbers.get(henId) ?? null]);
+    }
   });
 }

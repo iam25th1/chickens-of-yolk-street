@@ -1,7 +1,7 @@
 // Removing a player and their farm entirely (see scripts/remove-player.ts).
 import type { Db } from '../../apps/server/src/db/db';
 
-export const FARM_TABLES = ['agent_memory', 'cards', 'contracts', 'debts', 'orders', 'coops', 'unlocks', 'lay_events', 'ledger', 'machine_days', 'hens'] as const;
+export const FARM_TABLES = ['agent_memory', 'cards', 'contracts', 'debts', 'orders', 'coops', 'unlocks', 'lay_events', 'ledger', 'machine_days', 'milestone_rolls', 'hens'] as const;
 
 export interface RemovalPlan {
   player: { id: string; name: string };

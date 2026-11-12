@@ -279,7 +279,10 @@ async function resolve(ctx: Ctx, farm: Farm, card: CardRow, status: CardView['st
   await ctx.q.query('UPDATE cards SET status = $2, outcome_milli = $3 WHERE id = $1', [card.id, status, totalMilli]);
   card.status = status;
   emit(ctx, farm, { kind: 'cardResolved', card: await cardView(ctx, card), outcome, totalMilli, auto });
-  if (outcome === 'won' && !auto) await markGoal(ctx.q, farm.id, 'haggle');
+  if (outcome === 'won' && !auto) {
+    await markGoal(ctx.q, farm.id, 'haggle');
+    await ctx.q.query('UPDATE farms SET haggles_won = haggles_won + 1 WHERE id = $1', [farm.id]);
+  }
   ctx.touched.add(farm.id);
 }
 

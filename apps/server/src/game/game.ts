@@ -36,6 +36,7 @@ import {
   type LedgerDay,
   type MarketDay,
   type MarketState,
+  type MilestoneId,
   type OrderView,
   type ServerMessage,
   type ShopHenView,
@@ -45,6 +46,7 @@ import { num, type Db, type Queryable } from '../db/db';
 import { migrate } from '../db/migrations';
 import { decide, type BrainOptions, type DecisionResult } from '../agents/brain';
 import type { FarmAction } from '../agents/decision';
+import { henToken } from '../chain/batch';
 import type { ChainWriter } from '../chain/chain';
 import { arriveCards, buyBagsFrom, createCards, expireCards, farmCards, practiceCard, respondCard, type Candidate } from './cards';
 import {
@@ -74,6 +76,7 @@ import {
   type Outbound,
 } from './ctx';
 import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
+import { foundingCount, milestoneViews, nextMilestone, rollMilestones, standing } from './founding';
 import { claimGoal, goalViews, markGoal, markToured, toured } from './goals';
 import { conveyorCarry, hopperRefill, logMachine, logSale, machineDay } from './machines';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
@@ -380,9 +383,12 @@ export class Game {
       ageDays: day - num(h.born_day),
       ...(h.chain_owner === undefined ? {} : { chainOwner: h.chain_owner ? String(h.chain_owner) : null }),
       ...(h.mint_tx === undefined ? {} : { mintTx: h.mint_tx ? String(h.mint_tx) : null, mintDay: h.mint_day === null ? null : num(h.mint_day) }),
+      ...(h.founding_milestone
+        ? { founding: { milestone: h.founding_milestone as MilestoneId, day: num(h.founding_day), number: h.founding_no === null ? null : num(h.founding_no) } }
+        : {}),
     });
     const hens = await q.query(
-      'SELECT id, body, eyes, comb, accessory, laying_trait, born_day, chain_owner, mint_tx, mint_day FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id',
+      'SELECT id, body, eyes, comb, accessory, laying_trait, born_day, chain_owner, mint_tx, mint_day, founding_milestone, founding_day, founding_no FROM hens WHERE farm_id = $1 AND status = $2 ORDER BY born_day, id',
       [farmId, 'alive'],
     );
     const coops = await q.query('SELECT id, kind, plot FROM coops WHERE farm_id = $1 ORDER BY plot', [farmId]);
@@ -419,6 +425,8 @@ export class Game {
       orders,
       goals: await goalViews(q, farmId),
       tourDone: await toured(q, farmId),
+      milestones: await milestoneViews(q, farmId),
+      standing: await standing(q, farmId, Math.max(1, day - 1)),
       machines: await machineDay(q, farmId, day),
       hopperCapMilli: farm.hopperCapMilli,
       shop: shopRows.map(
@@ -528,6 +536,7 @@ export class Game {
       })),
       explorer: this.chain.explorer,
       minting: this.chain.minting,
+      founding: await foundingCount(this.db, this.chain.foundingMinted),
     };
   }
 
@@ -903,6 +912,23 @@ export class Game {
         const reference = marketReference(await activeFarms(q));
         const nextMultiplier = marketMultiplier(supply, reference);
         await q.query('UPDATE market_days SET closed_at = $2, next_multiplier = $3, reference = $4 WHERE day = $1', [day, ctx.now, nextMultiplier, reference]);
+        // 4b. milestones: one auditable roll each, once, for player farms in good standing
+        const rolls = await rollMilestones(ctx, this.chain.foundingMinted, async (farmId) => {
+          const [henId] = await this.insertHens(ctx, farmId, 1);
+          if (!henId) throw new Error('no hen inserted');
+          return henId;
+        });
+        if (rolls.length) {
+          const { remaining } = await foundingCount(q, this.chain.foundingMinted);
+          for (const r of rolls) {
+            if (!r.playerId) continue;
+            const next = await nextMilestone(q, r.farmId);
+            ctx.out.push({
+              playerId: r.playerId,
+              msg: { t: 'event', event: { kind: 'milestoneRoll', milestone: r.milestone, won: r.won, henId: r.henId, next, remaining, roll: r.roll, odds: ECONOMY.founding.odds } },
+            });
+          }
+        }
         // 5. the next day opens
         const newDay = day + 1;
         let start = this.clock.dayStartedAt + this.dayMs;
@@ -971,21 +997,34 @@ export class Game {
       result.txHash,
       result.error ?? null,
     ]);
-    if (result.status === 'sent' && result.txHash && result.minted?.length) await this.announceMints(result.minted, result.txHash, closedDay);
+    if (result.status === 'sent' && result.txHash && result.minted?.length) await this.announceMints(result.minted, result.txHash, closedDay, result.numbers);
     this.emit(null, { t: 'market', market: await this.getMarketState() });
   }
 
-  /** Each minted hen's owner hears about it (the certificate moment) and gets the hen's new card. */
-  private async announceMints(henIds: string[], txHash: string, day: number): Promise<void> {
-    const rows = await this.db.query<{ id: string; chain_owner: string; farm_id: string; player_id: string | null }>(
-      `SELECT h.id, h.chain_owner, h.farm_id, f.player_id FROM hens h JOIN farms f ON f.id = h.farm_id WHERE h.id = ANY($1::text[]) AND f.owner_kind = 'player'`,
+  /** Each minted Founding Hen's owner hears about it (the certificate moment) and gets the hen's new card. */
+  private async announceMints(henIds: string[], txHash: string, day: number, numbers?: Map<string, number>): Promise<void> {
+    const rows = await this.db.query<{ id: string; chain_owner: string; farm_id: string; player_id: string | null; founding_milestone: string | null }>(
+      `SELECT h.id, h.chain_owner, h.farm_id, f.player_id, h.founding_milestone FROM hens h JOIN farms f ON f.id = h.farm_id WHERE h.id = ANY($1::text[]) AND f.owner_kind = 'player'`,
       [henIds],
     );
     const farms = new Map<string, string>();
     for (const r of rows) {
       if (!r.player_id) continue;
       farms.set(String(r.farm_id), String(r.player_id));
-      this.emit(String(r.player_id), { t: 'event', event: { kind: 'henMinted', henId: String(r.id), token: `hen-${String(r.id)}`, owner: String(r.chain_owner), txHash, day } });
+      const id = String(r.id);
+      this.emit(String(r.player_id), {
+        t: 'event',
+        event: {
+          kind: 'henMinted',
+          henId: id,
+          token: henToken(id, true),
+          owner: String(r.chain_owner),
+          txHash,
+          day,
+          number: numbers?.get(id) ?? null,
+          milestone: (r.founding_milestone as MilestoneId | null) ?? null,
+        },
+      });
     }
     for (const [farmId, playerId] of farms) this.emit(playerId, { t: 'farm', farm: await this.getFarmState(farmId) });
   }

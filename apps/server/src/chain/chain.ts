@@ -2,11 +2,17 @@
 // NEAR testnet, carrying the batch from batch.ts. Agents get testnet sub-accounts of the game
 // account (funded from it) so their tokens have a home. Without testnet credentials, or before the
 // contract is deployed, every day is built the same way and recorded as a loud no-op.
+//
+// Founding Hens are minted only by a contract that has them (version 3, which answers
+// founding_supply), and only as many as the game account's free balance can store: each mint keeps
+// CHAIN_MINT_NEAR in reserve on top of a CHAIN_MIN_BALANCE_NEAR margin. A hen that cannot be
+// minted yet waits for a later day close.
 import { createHmac } from 'node:crypto';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { Account, JsonRpcProvider, KeyPairSigner, baseEncode, nearToYocto, teraToGas } from 'near-api-js';
 import type { KeyPairString } from 'near-api-js';
 import { num, type Db } from '../db/db';
+import { ECONOMY } from '@coys/shared';
 import { buildDayBatch, commitBatch } from './batch';
 import type { HenRenderer } from './hen-image';
 
@@ -14,16 +20,19 @@ export interface SettleResult {
   status: 'sent' | 'noop' | 'failed';
   txHash: string | null;
   error?: string;
-  /** Hens this settlement minted. */
+  /** Founding Hens this settlement minted, and each one's number of 777. */
   minted?: string[];
+  numbers?: Map<string, number>;
 }
 
 export interface ChainWriter {
   readonly mode: 'noop' | 'near-testnet';
   /** Explorer base for transaction receipts, or null. */
   readonly explorer: string | null;
-  /** Whether day closes mint hen certificates: live, paused while the game account is low, or off. */
+  /** Whether day closes mint Founding Hens: live, paused (game account low, or its contract has no Founding Hens yet), or off. */
   readonly minting: 'live' | 'paused' | 'off';
+  /** Founding Hens the contract has minted, as last read; null without a chain or before version 3. */
+  readonly foundingMinted: number | null;
   /** Settles one closed day of a season. */
   settleDay(db: Db, season: string, day: number): Promise<SettleResult>;
 }
@@ -33,9 +42,17 @@ export interface TestnetConfig {
   privateKey: string;
   rpcUrl: string;
   contractId: string;
-  henMintCap: number;
+  /** NEAR kept free for each Founding Hen minted (her token's storage). */
+  mintNear: number;
+  /** NEAR always kept free on the game account, on top of the mints' reserve. */
   minBalanceNear: number;
   agentFundingNear: number;
+}
+
+/** How many Founding Hens a free balance can mint now: each keeps mintNear, above the margin. */
+export function mintsAffordable(availableNear: number, cfg: Pick<TestnetConfig, 'mintNear' | 'minBalanceNear'>, cap: number): number {
+  if (cfg.mintNear <= 0) return cap;
+  return Math.max(0, Math.min(cap, Math.floor((availableNear - cfg.minBalanceNear) / cfg.mintNear + 1e-9)));
 }
 
 /** Throws unless the config can only ever touch testnet. Checked before any key is used. */
@@ -60,13 +77,14 @@ export class NoopChain implements ChainWriter {
   readonly mode = 'noop' as const;
   readonly explorer = null;
   readonly minting = 'off' as const;
+  readonly foundingMinted = null;
   constructor(
     private readonly reason: string,
     private readonly log: (line: string) => void,
   ) {}
 
   async settleDay(db: Db, season: string, day: number): Promise<SettleResult> {
-    const built = await buildDayBatch(db, season, day, { henMintCap: 0, renderer: null });
+    const built = await buildDayBatch(db, season, day, { founding: null, renderer: null });
     this.log(
       `[chain] !!! NO-OP for season ${season} day ${day}: ${this.reason}. Batch built (${built.batch.farms.length} farms, ` +
         `digest ${built.batch.digest.slice(0, 12)}) and recorded in market_days only, not on NEAR testnet.`,
@@ -81,8 +99,10 @@ export class TestnetChain implements ChainWriter {
   private readonly provider: JsonRpcProvider;
   private readonly account: Account;
   private checked = false;
-  /** Last known: was the game account below the mint threshold? Null until first read. */
+  /** Last known: could the game account not afford a mint? Null until first read. */
   private low: boolean | null = null;
+  /** The contract's founding count; null until read, or when the contract is version 2. */
+  private founding: number | null = null;
 
   constructor(
     private readonly cfg: TestnetConfig,
@@ -95,14 +115,40 @@ export class TestnetChain implements ChainWriter {
     // the first status read happens at boot, so the game can tell players the truth before a day closes
     this.balanceNear().then(
       (b) => {
-        this.low = b < cfg.minBalanceNear;
+        this.low = mintsAffordable(b, cfg, 1) === 0;
+      },
+      () => undefined,
+    );
+    this.readFounding().then(
+      (n) => {
+        this.founding = n;
       },
       () => undefined,
     );
   }
 
   get minting(): 'live' | 'paused' {
-    return this.low ? 'paused' : 'live';
+    return this.low || this.founding === null ? 'paused' : 'live';
+  }
+
+  get foundingMinted(): number | null {
+    return this.founding;
+  }
+
+  /** The contract's Founding Hen count, or null when it has none (version 2: no founding_supply). */
+  private async readFounding(): Promise<number | null> {
+    try {
+      const r = await this.provider.callFunction<{ minted: number; max: number; remaining: number }>({
+        contractId: this.cfg.contractId,
+        method: 'founding_supply',
+        args: {},
+      });
+      return typeof r?.minted === 'number' ? r.minted : null;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/MethodNotFound|method.*not found|CodeDoesNotExist/i.test(msg)) return null;
+      throw err;
+    }
   }
 
   private async preflight(): Promise<string | null> {
@@ -121,20 +167,25 @@ export class TestnetChain implements ChainWriter {
     return Number(s.balance.available / 10n ** 21n) / 1000;
   }
 
-  /** Each open agent gets a funded sub-account of the game account. */
+  /**
+   * Each open agent gets a funded sub-account of the game account. A wallet that already exists on
+   * chain is linked at once (it costs nothing); only creating one needs the game account's funds.
+   */
   private async ensureAgentAccounts(db: Db): Promise<void> {
     const agents = await db.query(`SELECT id, kind, generation FROM agents WHERE status = 'open' AND near_account_id IS NULL ORDER BY kind`);
+    let lowSaid = false;
     for (const a of agents) {
-      if ((await this.balanceNear()) < this.cfg.minBalanceNear + this.cfg.agentFundingNear) {
-        this.log('[chain] game account balance is low; agent sub-accounts wait');
-        return;
-      }
       const name = agentAccountName(String(a.kind), num(a.generation), this.cfg.accountId);
       try {
         const exists = await new Account(name, this.provider).getState().then(
           () => true,
           () => false,
         );
+        if (!exists && (await this.balanceNear()) < this.cfg.minBalanceNear + this.cfg.agentFundingNear) {
+          if (!lowSaid) this.log('[chain] game account balance is low; new agent sub-accounts wait');
+          lowSaid = true;
+          continue;
+        }
         if (!exists) {
           await this.account.createSubAccount({
             accountOrPrefix: name,
@@ -158,10 +209,20 @@ export class TestnetChain implements ChainWriter {
         return { status: 'noop', txHash: null, error: blocked };
       }
       await this.ensureAgentAccounts(db);
-      const lowBalance = (await this.balanceNear()) < this.cfg.minBalanceNear;
-      this.low = lowBalance;
-      const built = await buildDayBatch(db, season, day, { henMintCap: lowBalance ? 0 : this.cfg.henMintCap, renderer: this.renderer });
-      if (lowBalance) this.log('[chain] game account balance is low; hen mints wait for a top-up');
+      this.founding = await this.readFounding();
+      const affordable = mintsAffordable(await this.balanceNear(), this.cfg, ECONOMY.founding.mintsPerBatch);
+      this.low = affordable === 0;
+      const founding = this.founding === null ? null : { cap: affordable, base: this.founding };
+      const built = await buildDayBatch(db, season, day, { founding, renderer: this.renderer });
+      const waiting = await db.query(`SELECT count(*) AS n FROM hens WHERE founding_milestone IS NOT NULL AND chain_owner IS NULL AND status = 'alive'`);
+      const left = num(waiting[0]?.n) - built.minted.length;
+      if (left > 0) {
+        this.log(
+          this.founding === null
+            ? `[chain] ${left} Founding Hens wait: the contract has no Founding Hens yet (upgrade to version 3)`
+            : `[chain] ${left} Founding Hens wait: the game account can store ${affordable} mints now (each keeps ${this.cfg.mintNear} NEAR)`,
+        );
+      }
       const outcome = await this.account.callFunctionRaw({
         contractId: this.cfg.contractId,
         methodName: 'settle_day',
@@ -171,10 +232,11 @@ export class TestnetChain implements ChainWriter {
       });
       const txHash = outcome.transaction_outcome.id;
       await commitBatch(db, built, txHash);
+      if (this.founding !== null) this.founding += built.minted.length;
       this.log(
-        `[chain] season ${season} day ${day} settled on NEAR testnet: ${txHash} (${built.batch.eggs.length} egg moves, ${built.batch.hen_mints.length} hens minted, ${built.batch.hen_moves.length} moved)`,
+        `[chain] season ${season} day ${day} settled on NEAR testnet: ${txHash} (${built.batch.eggs.length} egg moves, ${built.minted.length} Founding Hens minted, ${built.batch.hen_moves.length} hens moved)`,
       );
-      return { status: 'sent', txHash, minted: built.minted };
+      return { status: 'sent', txHash, minted: built.minted, numbers: built.numbers };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       this.log(`[chain] season ${season} day ${day} FAILED on NEAR testnet: ${error.slice(0, 300)}`);
@@ -193,8 +255,8 @@ export function createChainWriter(env: NodeJS.ProcessEnv, renderer: HenRenderer,
       privateKey,
       rpcUrl: env.NEAR_TESTNET_RPC_URL || 'https://test.rpc.fastnear.com',
       contractId: env.NEAR_GAME_CONTRACT_ID || accountId,
-      henMintCap: Number(env.CHAIN_HEN_MINTS_PER_DAY || 12),
-      minBalanceNear: Number(env.CHAIN_MIN_BALANCE_NEAR || 2),
+      mintNear: Number(env.CHAIN_MINT_NEAR || 0.03),
+      minBalanceNear: Number(env.CHAIN_MIN_BALANCE_NEAR || 0.25),
       agentFundingNear: Number(env.AGENT_ACCOUNT_FUNDING_NEAR || 0.05),
     },
     renderer,
