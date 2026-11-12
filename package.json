@@ -22,7 +22,10 @@
     "lint": "eslint . && tsx scripts/check-text.ts",
     "pack-assets": "tsx scripts/pack-assets.ts",
     "deploy-contract": "tsx scripts/deploy-testnet-contract.ts",
-    "derive-assets": "tsx scripts/derive-assets.ts"
+    "derive-assets": "tsx scripts/derive-assets.ts",
+    "generate-founders": "tsx scripts/generate-founders.ts",
+    "commit-provenance": "tsx scripts/commit-provenance.ts",
+    "release-chain-days": "tsx scripts/release-chain-days.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

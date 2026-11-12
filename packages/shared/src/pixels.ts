@@ -104,3 +104,41 @@ export function recolourBody(data: Uint8ClampedArray | Uint8Array, ramp: readonl
   }
   return changed;
 }
+
+/** Comb (and wattle) pixels: saturated reds, the only strongly red pixels on a hen layer. */
+export function isComb(r: number, g: number, b: number): boolean {
+  const { h, s, v } = hsv(r, g, b);
+  return v > 0.25 && s >= 0.45 && (h <= 18 || h >= 340);
+}
+
+/**
+ * Palette swap for a comb layer, like recolourBody: comb pixels map by brightness onto a
+ * [dark, light] ramp. The Founding Hens' comb colours are made this way from the existing comb
+ * layers (no new art). Returns the pixels changed.
+ */
+export function recolourComb(data: Uint8ClampedArray | Uint8Array, ramp: readonly [Rgb, Rgb]): number {
+  let lo = 255;
+  let hi = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if ((data[i + 3] ?? 0) === 0 || !isComb(data[i] ?? 0, data[i + 1] ?? 0, data[i + 2] ?? 0)) continue;
+    const l = luma(data[i] ?? 0, data[i + 1] ?? 0, data[i + 2] ?? 0);
+    lo = Math.min(lo, l);
+    hi = Math.max(hi, l);
+  }
+  if (hi < lo) return 0;
+  const span = Math.max(1, hi - lo);
+  const [dark, light] = ramp;
+  let changed = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i] ?? 0;
+    const g = data[i + 1] ?? 0;
+    const b = data[i + 2] ?? 0;
+    if ((data[i + 3] ?? 0) === 0 || !isComb(r, g, b)) continue;
+    const t = Math.min(1, Math.max(0, (luma(r, g, b) - lo) / span));
+    data[i] = Math.round(dark[0] + (light[0] - dark[0]) * t);
+    data[i + 1] = Math.round(dark[1] + (light[1] - dark[1]) * t);
+    data[i + 2] = Math.round(dark[2] + (light[2] - dark[2]) * t);
+    changed++;
+  }
+  return changed;
+}
