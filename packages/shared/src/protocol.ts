@@ -59,6 +59,8 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('claimGoal'), rid, goal: z.enum(GOAL_IDS) }).strict(),
   /** The tour's practice offer: one buyer's card, sent once per farm, to learn haggling on. */
   z.object({ t: z.literal('practiceCard'), rid }).strict(),
+  /** The player finished or skipped the how-to-play tour. */
+  z.object({ t: z.literal('tourDone'), rid }).strict(),
   z
     .object({ t: z.literal('linkWallet'), rid, accountId: z.string().regex(/^([0-9a-f]{64}|[a-z0-9_-]{2,48}\.testnet)$/) })
     .strict(),
@@ -244,6 +246,8 @@ export interface FarmState {
   machines: Partial<Record<UnlockId, MachineTally>>;
   /** The feed hopper's price cap per bag in milli-coins (0: the list price). */
   hopperCapMilli: number;
+  /** The player has done the how-to-play tour (it shows once per player). */
+  tourDone: boolean;
 }
 
 export interface GoalView {

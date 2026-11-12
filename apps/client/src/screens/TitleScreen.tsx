@@ -69,6 +69,9 @@ export function TitleScreen({ onPlay, onSettings, audioReady }: { onPlay: () => 
 
   return (
     <div className="layer">
+      <span className="beta big" data-ui="beta" style={{ position: 'absolute', left: 430, top: 118 }} aria-label="Beta">
+        BETA
+      </span>
       <div ref={buttons} style={{ position: 'absolute', left: 0, top: 266, width: 640, display: 'flex', justifyContent: 'center', gap: 12 }}>
         <button className="btn red big" style={{ height: 22, padding: '0 18px', opacity: 0 }} onMouseEnter={() => uiSound(audio, 'hover')} onClick={press(onPlay)}>
           PLAY

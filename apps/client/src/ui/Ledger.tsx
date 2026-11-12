@@ -1,7 +1,7 @@
 // The ledger: day-by-day profit, contracts and debts, the on-chain receipt for each settled day, and
 // each hen's certificate receipt.
 import { useEffect } from 'react';
-import type { FarmState } from '@coys/shared';
+import type { FarmState, LedgerDay } from '@coys/shared';
 import { useServices } from '../app/services';
 import type { Action } from '../net/socket';
 import { game } from '../state/game';
@@ -9,6 +9,17 @@ import { useStore } from '../state/store';
 import { Modal } from './Modal';
 
 const coins = (milli: number): string => (milli / 1000).toFixed(2);
+
+/** A day's machine work in one line: what the hopper saved, the grader and clerk added, the conveyor carried. */
+function machineLine(m: NonNullable<LedgerDay['machines']>): string {
+  const parts: string[] = [];
+  if (m.hopper?.milli) parts.push(`HOPPER -10%: SAVED ${coins(m.hopper.milli)}`);
+  if (m.grader?.milli) parts.push(`GRADER +${coins(m.grader.milli)}`);
+  if (m.clerk?.milli) parts.push(`CLERK +${coins(m.clerk.milli)}`);
+  if (m.cart?.units) parts.push(`CART ${m.cart.units} EGGS`);
+  if (m.conveyor?.units) parts.push(`BELT ${m.conveyor.units} EGGS, ${m.conveyor.saved} SAVED`);
+  return parts.join(', ');
+}
 
 export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a: Action) => Promise<boolean>; onClose: () => void }) {
   const { audio } = useServices();
@@ -34,7 +45,8 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
       <div className="col" style={{ gap: 3, maxHeight: 120, overflowY: 'auto' }}>
         {!days && <span>OPENING THE BOOKS</span>}
         {days?.map((d) => (
-          <div key={d.day} className="row spread">
+          <div key={d.day} className="col" style={{ gap: 1 }}>
+          <div className="row spread">
             <span style={{ width: 40 }}>{d.day}</span>
             <span style={{ width: 60, textAlign: 'right' }}>{coins(d.incomeMilli)}</span>
             <span style={{ width: 60, textAlign: 'right' }}>{coins(d.costMilli)}</span>
@@ -50,6 +62,10 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
                 <span style={{ color: '#b8743a' }}>{d.settlement?.status === 'noop' ? 'LOCAL ONLY' : d.settlement?.status === 'failed' ? 'RETRYING' : 'PENDING'}</span>
               )}
             </span>
+          </div>
+          {d.machines && Object.keys(d.machines).length > 0 && (
+            <span style={{ color: '#2f6f9e', paddingLeft: 40, lineHeight: '9px' }}>{machineLine(d.machines)}</span>
+          )}
           </div>
         ))}
       </div>

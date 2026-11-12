@@ -15,7 +15,8 @@ export type ModalState =
   | { kind: 'market'; tab: MarketTab }
   | { kind: 'card'; cardId: string }
   | { kind: 'certificate'; henId: string; txHash: string; day: number }
-  | { kind: 'settings' };
+  | { kind: 'settings' }
+  | { kind: 'guide' };
 
 export const ui = createStore<{ modal: ModalState | null }>({ modal: null });
 

@@ -773,3 +773,43 @@ input[type='range'].slider::-moz-range-thumb {
   align-items: center;
   text-align: center;
 }
+
+/* The BETA tag: a stamped label in the game's own pixel style. */
+.beta {
+  display: inline-flex;
+  align-items: center;
+  height: 12px;
+  padding: 0 4px;
+  background: var(--barn);
+  color: var(--cream);
+  box-shadow:
+    0 0 0 1px var(--ink),
+    inset 0 -1px 0 var(--barn-deep),
+    1px 1px 0 1px var(--ink);
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.beta.big {
+  height: 16px;
+  padding: 0 6px;
+  font-size: 8px;
+}
+
+/* The How to play guide. */
+.guide-text p {
+  margin: 0 0 6px;
+  line-height: 10px;
+}
+
+.guide-text ul {
+  margin: 0;
+  padding-left: 10px;
+  line-height: 10px;
+}
+
+.guide-text li {
+  margin-bottom: 3px;
+}

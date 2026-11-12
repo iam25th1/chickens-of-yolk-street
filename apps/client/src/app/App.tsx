@@ -13,6 +13,7 @@ import { LoginScreen, type SignedIn } from '../screens/LoginScreen';
 import { TitleScreen } from '../screens/TitleScreen';
 import { settings } from '../state/settings';
 import { Ticker } from '../ui/Hud';
+import { HowToPlay } from '../ui/HowToPlay';
 import { SettingsPanel } from '../ui/Panels';
 import { ServicesContext, type Services } from './services';
 import { Stage, useViewport } from './Stage';
@@ -29,6 +30,7 @@ export function App() {
   const [progress, setProgress] = useState(0);
   const [config, setConfig] = useState<ServerConfigView | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
   const [signedIn, setSignedIn] = useState<{ session: string; accountId: string | null } | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export function App() {
         const [pixi, assets, cfg] = await Promise.all([PixiHost.create(el), AssetStore.load(), api.config()]);
         setConfig(cfg);
         const audio = new AudioEngine(assets.index);
-        audio.setVolumes(settings.get().music, settings.get().sfx);
+        audio.setLevels(settings.get().sound);
         const v0 = viewport.get();
         // stage 1: the loading screen's own art (a few KB), on screen at once
         await assets.loadGroups([...BOOT_GROUPS], v0.p);
@@ -171,9 +173,20 @@ export function App() {
               <FarmScreen session={signedIn.session} accountId={signedIn.accountId} onSignedOut={signOut} />
             )}
           </div>
+          {guideOpen && screen !== 'farm' && (
+            <div className="layer" style={{ zIndex: 65 }}>
+              <HowToPlay onClose={() => setGuideOpen(false)} />
+            </div>
+          )}
           {settingsOpen && (
             <div className="stage640" style={{ zIndex: 60 }}>
-              <SettingsPanel onClose={() => setSettingsOpen(false)} />
+              <SettingsPanel
+                onClose={() => setSettingsOpen(false)}
+                onGuide={() => {
+                  setSettingsOpen(false);
+                  setGuideOpen(true);
+                }}
+              />
             </div>
           )}
         </ServicesContext.Provider>

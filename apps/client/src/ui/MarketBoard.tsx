@@ -7,10 +7,26 @@ import { EGG_GRADES, type EggGrade, type FarmState, type MarketState } from '@co
 import { uiSound, useServices } from '../app/services';
 import type { Action } from '../net/socket';
 import { uiEvents, type MarketTab } from '../state/ui';
+import { useViewport } from '../app/Stage';
+import { LOOK } from './cast';
 import { SplitFlap } from './Hud';
+import { SheetSprite } from './SheetSprite';
 import { Modal } from './Modal';
 
 const coins = (milli: number): string => (milli / 1000).toFixed(2);
+
+/** One sign per rival farm: the open farm when there is one, else the last that went bust. */
+function rivalSigns(market: MarketState): { sign: string; name: string; bust: boolean }[] {
+  const byKind = new Map<string, { sign: string; name: string; bust: boolean }>();
+  for (const r of market.ranking) {
+    if (r.kind === 'player') continue;
+    const sign = LOOK[r.kind].sign;
+    if (!sign) continue;
+    const have = byKind.get(r.kind);
+    if (!have || (have.bust && !r.bust)) byKind.set(r.kind, { sign, name: r.name, bust: r.bust });
+  }
+  return [...byKind.values()];
+}
 
 export function MarketBoard({
   farm,
@@ -28,6 +44,7 @@ export function MarketBoard({
   onClose: () => void;
 }) {
   const { audio } = useServices();
+  const v = useViewport();
   const [grade, setGrade] = useState<EggGrade>('brown');
   const [qty, setQty] = useState(5);
   const [price, setPrice] = useState(() => market.pricesMilli.brown);
@@ -102,6 +119,14 @@ export function MarketBoard({
           >
             <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
               FARMS ON THE STREET
+            </span>
+            <span className="row" style={{ gap: 10, alignItems: 'flex-end' }} data-ui="rival-signs">
+              {rivalSigns(market).map((r) => (
+                <span key={r.sign} className="col" style={{ alignItems: 'center', gap: 2 }} title={r.name}>
+                  <SheetSprite id={r.sign} row={r.bust ? 'tip-over' : 'sway'} play={r.bust ? 'once' : 'loop'} size={v.p} box={{ w: 52, h: 36 }} />
+                  <span style={{ color: r.bust ? '#b8321f' : '#2a160c' }}>{r.bust ? 'BUST' : 'TRADING'}</span>
+                </span>
+              ))}
             </span>
             {market.ranking.map((r, i) => (
               <span key={`${r.name}-${i}`} className="row spread" style={{ opacity: r.bust ? 0.6 : 1, width: '100%' }}>

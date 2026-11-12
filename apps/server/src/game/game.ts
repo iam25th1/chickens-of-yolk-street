@@ -74,7 +74,7 @@ import {
   type Outbound,
 } from './ctx';
 import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
-import { claimGoal, goalViews, markGoal } from './goals';
+import { claimGoal, goalViews, markGoal, markToured, toured } from './goals';
 import { conveyorCarry, hopperRefill, logMachine, logSale, machineDay } from './machines';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
 
@@ -418,6 +418,7 @@ export class Game {
       debts: await debtViews(ctx, farmId),
       orders,
       goals: await goalViews(q, farmId),
+      tourDone: await toured(q, farmId),
       machines: await machineDay(q, farmId, day),
       hopperCapMilli: farm.hopperCapMilli,
       shop: shopRows.map(
@@ -616,6 +617,8 @@ export class Game {
         return this.buyHen(ctx, farm, action.henId);
       case 'practiceCard':
         return practiceCard(ctx, farm);
+      case 'tourDone':
+        return markToured(ctx.q, farm.id);
       default:
         return this.applyFarmAction(ctx, farm, action);
     }

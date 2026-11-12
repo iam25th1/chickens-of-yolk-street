@@ -13,7 +13,7 @@ import { FarmScene, type WorldTarget } from '../pixi/farm/FarmScene';
 import { TownScene } from '../pixi/TownScene';
 import { events, game } from '../state/game';
 import { useStore } from '../state/store';
-import { tour } from '../state/tour';
+import { startTourFor, tour } from '../state/tour';
 import { closeModal, openModal, ui, type ModalState } from '../state/ui';
 import { CardOverlay, type OverlayResult } from '../ui/CardOverlay';
 import { LOOK } from '../ui/cast';
@@ -23,6 +23,7 @@ import { ToastArea, Tracker } from '../ui/Guide';
 import { TopBar } from '../ui/Hud';
 import { LedgerPanel } from '../ui/Ledger';
 import { MarketBoard } from '../ui/MarketBoard';
+import { HowToPlay } from '../ui/HowToPlay';
 import { Modal } from '../ui/Modal';
 import { SettingsBody, ShopPanel } from '../ui/Panels';
 import { Spotlight, TourBox } from '../ui/Tour';
@@ -97,6 +98,21 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       void send({ t: 'linkWallet', accountId });
     }
   }, [status, accountId, onSignedOut, send]);
+
+  // first entry to this farm: the tour starts on its own for a player who has never done it, and
+  // the server hears when it is finished or skipped
+  const farmId = farm?.farmId ?? null;
+  const tourDone = farm?.tourDone ?? false;
+  useEffect(() => {
+    if (farmId) startTourFor(farmId, tourDone);
+    // only the first state of a farm decides
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [farmId]);
+  const wasTouring = useRef(false);
+  useEffect(() => {
+    if (wasTouring.current && !touring && !tourDone) void send({ t: 'tourDone' });
+    wasTouring.current = touring;
+  }, [touring, tourDone, send]);
 
   // the world
   useEffect(() => {
@@ -282,6 +298,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         onSettings={() => openModal({ kind: 'settings' })}
         onMarket={() => openModal({ kind: 'market', tab: 'board' })}
         onLedger={() => openModal({ kind: 'ledger' })}
+        onHelp={() => openModal({ kind: 'guide' })}
       />
       {!(v.portrait && modal) && <SidePanel farm={farm} market={market} rect={z.side} send={send} onOpen={openCard} />}
       {touring ? (
@@ -304,7 +321,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       )}
       {modal?.kind === 'ledger' && <LedgerPanel farm={farm} send={send} onClose={closeModal} />}
       {modal?.kind === 'sell' && <SellPanel farm={farm} market={market} send={send} onClose={closeModal} />}
-      {modal?.kind === 'machine' && <MachinePanel unlock={modal.unlock} farm={farm} onShop={() => openModal({ kind: 'shop', tab: 'machines' })} onClose={closeModal} />}
+      {modal?.kind === 'machine' && <MachinePanel unlock={modal.unlock} farm={farm} send={send} onShop={() => openModal({ kind: 'shop', tab: 'machines' })} onClose={closeModal} />}
       {modal?.kind === 'hen' && hen && <HenPanel hen={hen} market={market} onClose={closeModal} />}
       {modal?.kind === 'certificate' && hen && (
         <CertificatePanel hen={hen} txHash={modal.txHash} day={modal.day} market={market} onLedger={() => openModal({ kind: 'ledger' })} onClose={closeModal} />
@@ -323,10 +340,11 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         />
       )}
       {modal?.kind === 'settings' && (
-        <Modal title="SETTINGS" onClose={closeModal} w={300} h={200}>
-          <SettingsBody onClose={closeModal} />
+        <Modal title="SETTINGS" onClose={closeModal} w={400} h={420}>
+          <SettingsBody onClose={closeModal} onGuide={() => openModal({ kind: 'guide' })} />
         </Modal>
       )}
+      {modal?.kind === 'guide' && <HowToPlay onClose={closeModal} />}
       {touring && <Spotlight ctx={ctx} />}
       <FxLayer />
     </div>
