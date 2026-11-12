@@ -1,16 +1,20 @@
-// Builds one day's settlement batch for the game contract, keyed by (season, day).
+// Builds one day's settlement for the game contract, keyed by (season, day).
+//
+// The full settlement (every farm's net result, every egg move, every Feather minted with its card
+// image's hash) is kept in the game's database; its SHA-256 is the digest the chain stores in the
+// season's head. The call itself carries only what moves tokens: the egg moves, the net totals of
+// the farms whose eggs move, and the day's Feathers.
 //
 // Eggs: the day's trades between holders with accounts become egg token transfers; then every
 // account is reconciled to what it really holds (crate plus eggs in open sell orders, or a buyer's
 // stock) with mints and burns. Starting from the balances last confirmed on chain means a failed
 // day is simply caught up by the next one, and no move ever burns more than an account holds.
-// Hens: only Founding Hens (won at milestones, 777 ever) are minted, to their owner's account, a
-// few per day; ordinary hens are not recorded. Hens on chain that changed owner move. Farms: every
-// farm's net result for the day, plus a SHA-256 digest of that list.
+// Feathers: redeemed tickets (queued) mint in redemption order, a few per day, to the player's
+// linked wallet; a ticket whose player has no wallet yet waits. Ordinary hens are never minted.
 import { createHash } from 'node:crypto';
-import { EGG_GRADES, type EggGrade, type HenView } from '@coys/shared';
+import { EGG_GRADES, type EggGrade, type FeatherGrade, type MilestoneId } from '@coys/shared';
 import { num, type Db } from '../db/db';
-import type { HenRenderer } from './hen-image';
+import type { FeatherRenderer } from './feather-image';
 
 export interface FarmNet {
   farm: string;
@@ -26,60 +30,81 @@ export interface EggMove {
   amount: string;
 }
 
-/** A Founding Hen to mint: the contract numbers her (#n of 777) and stores the rest with the token. */
-export interface FoundingMint {
-  token_id: string;
+/** A Feather to mint: the contract numbers it (#001 to #777, in mint order) and stores the rest with the token. */
+export interface FeatherMint {
   owner_id: string;
-  media: string;
-  media_hash: string;
-  /** Her traits, as JSON. */
-  traits: string;
-  milestone: string;
+  grade: FeatherGrade;
+  milestone: MilestoneId;
   season: string;
   day: number;
+  /** Its Feather card, a still PNG as a data URI. */
+  media: string;
+  media_hash: string;
 }
 
 export interface DayBatch {
   season: string;
   day: number;
+  /** SHA-256 (hex) of the day's full settlement, kept as text in market_days.settlement_json. */
+  digest: string;
   supply: number;
   multiplier_milli: number;
-  digest: string;
+  /** Net totals of the farms whose eggs move today. */
   farms: FarmNet[];
   eggs: EggMove[];
-  /** Always empty: ordinary hens are not minted (version 2 contracts still require the field). */
+  /** Present only for a contract with Feathers (version 4). */
+  feather_mints?: FeatherMint[];
+  /** Always empty: kept because version 2 contracts require the fields. */
   hen_mints: [];
-  /** Present only for a contract that mints Founding Hens (version 3). */
-  founding_mints?: FoundingMint[];
-  hen_moves: { token_id: string; to: string }[];
+  hen_moves: [];
 }
 
-/** Founding mints for this batch: how many at most, and how many the contract has minted before it. */
-export interface FoundingOpts {
+/** The day's full settlement, as the database keeps it. Its SHA-256 is the batch's digest. */
+export interface FullSettlement {
+  season: string;
+  day: number;
+  supply: number;
+  multiplier_milli: number;
+  farms: FarmNet[];
+  eggs: EggMove[];
+  feathers: { ticket: string; number: number; owner: string; grade: FeatherGrade; milestone: MilestoneId; season: string; day: number; media_sha256: string }[];
+}
+
+/** Feather mints for this batch: how many at most, and how many the contract has minted before it. */
+export interface FeatherOpts {
   cap: number;
   base: number;
 }
 
+export interface MintedFeather {
+  ticketId: string;
+  number: number;
+  token: string;
+  owner: string;
+  grade: FeatherGrade;
+  milestone: MilestoneId;
+  mediaSha256: string;
+}
+
 export interface BuiltBatch {
   batch: DayBatch;
+  settlement: FullSettlement;
   /** Egg balances once this batch lands, to store in chain_balances. */
   balances: Map<string, number>;
-  /** Hens whose chain owner changes once this batch lands. */
-  henOwners: Map<string, string>;
-  /** Founding Hens this batch mints, in order (a subset of henOwners), and the number each gets. */
-  minted: string[];
-  numbers: Map<string, number>;
+  /** Feathers this batch mints, in order. */
+  minted: MintedFeather[];
 }
 
 const key = (account: string, grade: EggGrade): string => `${account}|${grade}`;
 const token = (grade: EggGrade): string => `egg-${grade}`;
 
-/** A hen's NFT token id: Founding Hens are founding-<id>; hens minted by version 2 were hen-<id>. */
-export const henToken = (id: string, founding: boolean): string => (founding ? `founding-${id}` : `hen-${id}`);
+/** A Feather's token id: its number, three digits (the contract assigns the same). */
+export const featherToken = (n: number): string => String(n).padStart(3, '0');
 
-export const digestOf = (farms: FarmNet[]): string => createHash('sha256').update(JSON.stringify(farms)).digest('hex');
+/** SHA-256 (hex) of a value's JSON. */
+export const digestOf = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
-export async function buildDayBatch(db: Db, season: string, day: number, opts: { founding: FoundingOpts | null; renderer: HenRenderer | null }): Promise<BuiltBatch> {
+export async function buildDayBatch(db: Db, season: string, day: number, opts: { feathers: FeatherOpts | null; renderer: FeatherRenderer | null }): Promise<BuiltBatch> {
   // who holds what, off chain
   const farmAccounts = new Map<string, string>();
   for (const r of await db.query(
@@ -149,41 +174,30 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
     }
   }
 
-  // hens: mint waiting Founding Hens, oldest win first; move hens on chain that changed hands
-  const henOwners = new Map<string, string>();
-  const founding_mints: FoundingMint[] = [];
-  const hen_moves: { token_id: string; to: string }[] = [];
-  const minted: string[] = [];
-  const numbers = new Map<string, number>();
-  const hens = await db.query(
-    `SELECT id, farm_id, body, eyes, comb, accessory, laying_trait, born_day, chain_owner, founding_milestone, founding_day FROM hens
-     WHERE status = 'alive' AND (chain_owner IS NOT NULL OR founding_milestone IS NOT NULL) ORDER BY founding_day, id`,
-  );
-  for (const h of hens) {
-    const account = farmAccounts.get(String(h.farm_id));
-    if (!account) continue;
-    const id = String(h.id);
-    const founding = h.founding_milestone !== null && h.founding_milestone !== undefined;
-    if (!h.chain_owner) {
-      if (!founding || !opts.founding || !opts.renderer || founding_mints.length >= opts.founding.cap) continue;
-      const traits = { body: String(h.body), eyes: String(h.eyes), comb: String(h.comb), accessory: String(h.accessory), laying: num(h.laying_trait).toFixed(3) };
-      const img = opts.renderer.render(traits as unknown as HenView);
-      founding_mints.push({
-        token_id: henToken(id, true),
-        owner_id: account,
+  // Feathers: redeemed tickets, oldest redemption first, to the player's wallet
+  const minted: MintedFeather[] = [];
+  const feather_mints: FeatherMint[] = [];
+  if (opts.feathers && opts.renderer && opts.feathers.cap > 0) {
+    const queued = await db.query(
+      `SELECT t.id, t.grade, t.milestone, t.season, t.day, p.near_account_id AS account FROM feather_tickets t
+       JOIN farms f ON f.id = t.farm_id LEFT JOIN players p ON p.id = f.player_id
+       WHERE t.status = 'queued' AND p.near_account_id IS NOT NULL ORDER BY t.redeemed_seq, t.id LIMIT $1`,
+      [opts.feathers.cap],
+    );
+    for (const t of queued) {
+      const number = opts.feathers.base + feather_mints.length + 1;
+      const grade = t.grade as FeatherGrade;
+      const img = opts.renderer.render(grade, number);
+      feather_mints.push({
+        owner_id: String(t.account),
+        grade,
+        milestone: t.milestone as MilestoneId,
+        season: String(t.season),
+        day: num(t.day),
         media: img.dataUri,
         media_hash: img.sha256Base64,
-        traits: JSON.stringify(traits),
-        milestone: String(h.founding_milestone),
-        season,
-        day: num(h.founding_day),
       });
-      henOwners.set(id, account);
-      minted.push(id);
-      numbers.set(id, opts.founding.base + founding_mints.length);
-    } else if (h.chain_owner !== account) {
-      hen_moves.push({ token_id: henToken(id, founding), to: account });
-      henOwners.set(id, account);
+      minted.push({ ticketId: String(t.id), number, token: featherToken(number), owner: String(t.account), grade, milestone: t.milestone as MilestoneId, mediaSha256: img.sha256Hex });
     }
   }
 
@@ -193,28 +207,46 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
      GROUP BY f.id ORDER BY f.id`,
     [season, day],
   );
-  const farms: FarmNet[] = nets.map((n) => ({ farm: String(n.id), account: farmAccounts.get(String(n.id)) ?? null, net_milli: String(num(n.net)) }));
+  const all: FarmNet[] = nets.map((n) => ({ farm: String(n.id), account: farmAccounts.get(String(n.id)) ?? null, net_milli: String(num(n.net)) }));
+  const moving = new Set(moves.flatMap((m) => [m.from, m.to]).filter((a): a is string => a !== null));
+  const settlement: FullSettlement = {
+    season,
+    day,
+    supply: num(md?.supply ?? 0),
+    multiplier_milli: Math.round(num(md?.multiplier ?? 1) * 1000),
+    farms: all,
+    eggs: moves,
+    feathers: minted.map((m, i) => ({
+      ticket: m.ticketId,
+      number: m.number,
+      owner: m.owner,
+      grade: m.grade,
+      milestone: m.milestone,
+      season: feather_mints[i]?.season ?? season,
+      day: feather_mints[i]?.day ?? day,
+      media_sha256: m.mediaSha256,
+    })),
+  };
   return {
     batch: {
       season,
       day,
-      supply: num(md?.supply ?? 0),
-      multiplier_milli: Math.round(num(md?.multiplier ?? 1) * 1000),
-      digest: digestOf(farms),
-      farms,
+      digest: digestOf(settlement),
+      supply: settlement.supply,
+      multiplier_milli: settlement.multiplier_milli,
+      farms: all.filter((f) => f.account !== null && moving.has(f.account)),
       eggs: moves,
+      ...(opts.feathers ? { feather_mints } : {}),
       hen_mints: [],
-      ...(opts.founding ? { founding_mints } : {}),
-      hen_moves,
+      hen_moves: [],
     },
+    settlement,
     balances,
-    henOwners,
     minted,
-    numbers,
   };
 }
 
-/** Stores the balances and hen owners a landed batch produced. */
+/** Stores the balances and the Feathers a landed batch produced. */
 export async function commitBatch(db: Db, built: BuiltBatch, txHash: string | null = null): Promise<void> {
   await db.tx(async (q) => {
     for (const [k, amount] of built.balances) {
@@ -225,9 +257,11 @@ export async function commitBatch(db: Db, built: BuiltBatch, txHash: string | nu
         [account, grade, amount],
       );
     }
-    for (const [henId, owner] of built.henOwners) await q.query('UPDATE hens SET chain_owner = $2 WHERE id = $1', [henId, owner]);
-    for (const henId of built.minted) {
-      await q.query('UPDATE hens SET mint_tx = $2, mint_day = $3, founding_no = $4 WHERE id = $1', [henId, txHash, built.batch.day, built.numbers.get(henId) ?? null]);
+    for (const m of built.minted) {
+      await q.query(
+        `UPDATE feather_tickets SET status = 'minted', number = $2, token_id = $3, owner_account = $4, media_sha256 = $5, mint_tx = $6, mint_day = $7 WHERE id = $1`,
+        [m.ticketId, m.number, m.token, m.owner, m.mediaSha256, txHash, built.batch.day],
+      );
     }
   });
 }

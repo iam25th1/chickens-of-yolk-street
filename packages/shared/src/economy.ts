@@ -17,11 +17,19 @@ export type UnlockId = (typeof UNLOCK_IDS)[number];
 export const GOAL_IDS = ['collect', 'sell', 'coop', 'haggle', 'machine', 'rival'] as const;
 
 /**
- * Founding Hen milestones: each gives a farm in good standing one roll, once. In order of how soon
- * a farm usually reaches them.
+ * Milestones: each gives a farm in good standing one roll for a Feather Ticket, once. In order of
+ * how soon a farm usually reaches them.
  */
 export const MILESTONE_IDS = ['full-coop', 'good-week', 'eggs-sold', 'haggles-won', 'all-machines', 'outlast-rival', 'top-three'] as const;
 export type MilestoneId = (typeof MILESTONE_IDS)[number];
+
+/** Feather grades, lowest first: the grade sets a Feather's odds of a high-rarity hen at the reveal. */
+export const FEATHER_GRADES = ['fluff', 'plume', 'quill', 'golden-quill'] as const;
+export type FeatherGrade = (typeof FEATHER_GRADES)[number];
+
+/** Founding Hen rarities, highest first. */
+export const RARITIES = ['legendary', 'epic', 'rare', 'common'] as const;
+export type Rarity = (typeof RARITIES)[number];
 export type GoalId = (typeof GOAL_IDS)[number];
 export const GOAL_REWARDS: Record<GoalId, number> = { collect: 2, sell: 3, coop: 5, haggle: 5, machine: 8, rival: 10 };
 
@@ -210,13 +218,15 @@ export const ECONOMY = {
     clerk: { price: 160, revenueBonus: 0.05 },
   } satisfies Record<UnlockId, { price: number; [effect: string]: number }>,
   /**
-   * The Founding Hens: the only hens recorded on NEAR, 777 ever (the contract enforces the cap). A
-   * farm in good standing gets one roll at each milestone; a win becomes a Founding Hen on the farm
-   * and is minted at the next day close.
+   * The Feathers (beta): testnet NFTs that are claim tickets for the 777 Founding Hens, planned to
+   * be revealed and minted as hens at the mainnet launch. Ordinary hens are never minted. A farm in
+   * good standing gets one roll at each milestone; a win is a Feather Ticket. Redeeming a ticket
+   * with a coin fee mints one Feather at the next day close (the game pays testnet gas and storage),
+   * its grade set by the farm's management score at redemption. 777 ever: the contract enforces it.
    */
-  founding: {
+  feathers: {
     maxSupply: 777,
-    /** Chance a milestone's roll wins. */
+    /** Chance a milestone's roll wins a ticket. */
     odds: 0.3,
     /** Good standing: never bust this season, no credit past its due day, no contract missed in this many days. */
     missWindowDays: 3,
@@ -225,8 +235,26 @@ export const ECONOMY = {
     eggsSold: 500,
     hagglesWon: 10,
     topRank: 3,
-    /** Founding mints in one day's settlement (keeps one settle_day call well inside its gas). */
+    /** Feather mints in one day's settlement (keeps one settle_day call well inside its gas). */
     mintsPerBatch: 20,
+    /** Coins to redeem one ticket. */
+    redeemFee: 25,
+    /**
+     * The management score at redemption, 0 to 1: each part scores 0 to 1 against its full mark
+     * (days in good standing, coins of profit, haggles won; the delivery record is delivered over
+     * delivered plus missed), weighted. A farm with no contracts yet scores noContracts for delivery.
+     */
+    score: {
+      weights: { goodDays: 0.3, delivery: 0.25, haggles: 0.2, profit: 0.25 },
+      full: { goodDays: 30, haggles: 20, profit: 1000 },
+      noContracts: 0.5,
+    },
+    /** The lowest management score for each grade. */
+    bands: { fluff: 0, plume: 0.35, quill: 0.6, 'golden-quill': 0.85 },
+    /** Each grade's weight toward each hen rarity at the reveal, in RARITIES order (Legendary, Epic, Rare, Common). */
+    gradeWeights: { fluff: [1, 1, 1, 1], plume: [2, 2, 1.5, 1], quill: [4, 3, 2, 1], 'golden-quill': [8, 5, 3, 1] },
+    /** The 777 Founding Hens by rarity, in RARITIES order. */
+    rarityCounts: [7, 70, 200, 500],
   },
   limits: {
     maxHensPerPurchase: 20,

@@ -1,41 +1,49 @@
 // The chain writer. Once per in-game day it sends one settle_day call to the game contract on
-// NEAR testnet, carrying the batch from batch.ts. Agents get testnet sub-accounts of the game
-// account (funded from it) so their tokens have a home. Without testnet credentials, or before the
+// NEAR testnet, carrying the batch from batch.ts: the egg moves, the net totals of the farms whose
+// eggs move, the day's Feathers, and the SHA-256 of the full settlement (kept in the database). A
+// version 4 contract stores only a fixed-size head per season, so a settled day adds no storage
+// (measured on s1 before: 179 bytes a day, 480 days a real day, about 0.86 NEAR a real day; gas
+// is about 0.0004 NEAR a day either way). Agents get testnet sub-accounts of the game account
+// (funded from it) so their tokens have a home. Without testnet credentials, or before the
 // contract is deployed, every day is built the same way and recorded as a loud no-op.
 //
-// Founding Hens are minted only by a contract that has them (version 3, which answers
-// founding_supply), and only as many as the game account's free balance can store: each mint keeps
-// CHAIN_MINT_NEAR in reserve on top of a CHAIN_MIN_BALANCE_NEAR margin. The margin defaults to
-// about one real day of settlements at 3-minute days (measured on s1: 179 bytes of state and
-// 0.0004 NEAR of gas per settled day, 480 days a real day, so about 1.06 NEAR), so nothing optional
-// (mints, linking or creating agent wallets) ever eats into the days' own settlements. A hen that
-// cannot be minted yet waits for a later day close.
+// Feathers are minted only by a contract that has them (version 4, which answers feather_supply),
+// and only as many as the game account's free balance can store: each mint keeps CHAIN_MINT_NEAR
+// in reserve on top of a CHAIN_MIN_BALANCE_NEAR margin (default 0.5 NEAR: a few real days of
+// settlement gas), so nothing optional (mints, linking or creating agent wallets) ever eats into
+// the days' own settlements. A redeemed ticket that cannot be minted yet waits for a later day.
 import { createHmac } from 'node:crypto';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { Account, JsonRpcProvider, KeyPairSigner, baseEncode, nearToYocto, teraToGas } from 'near-api-js';
 import type { KeyPairString } from 'near-api-js';
 import { num, type Db } from '../db/db';
 import { ECONOMY } from '@coys/shared';
-import { buildDayBatch, commitBatch } from './batch';
-import type { HenRenderer } from './hen-image';
+import { buildDayBatch, commitBatch, type FullSettlement, type MintedFeather } from './batch';
+import type { FeatherRenderer } from './feather-image';
 
 export interface SettleResult {
   status: 'sent' | 'noop' | 'failed';
   txHash: string | null;
   error?: string;
-  /** Founding Hens this settlement minted, and each one's number of 777. */
-  minted?: string[];
-  numbers?: Map<string, number>;
+  /** Feathers this settlement minted. */
+  minted?: MintedFeather[];
+  /** The day's full settlement and its SHA-256 (the digest the chain stores). */
+  settlement?: FullSettlement;
+  digest?: string;
 }
 
 export interface ChainWriter {
   readonly mode: 'noop' | 'near-testnet';
   /** Explorer base for transaction receipts, or null. */
   readonly explorer: string | null;
-  /** Whether day closes mint Founding Hens: live, paused (game account low, or its contract has no Founding Hens yet), or off. */
+  /** Whether day closes mint Feathers: live, paused (game account low, or its contract has no Feathers yet), or off. */
   readonly minting: 'live' | 'paused' | 'off';
-  /** Founding Hens the contract has minted, as last read; null without a chain or before version 3. */
-  readonly foundingMinted: number | null;
+  /** Feathers the contract has minted, as last read; null without a chain or before version 4. */
+  readonly featherMinted: number | null;
+  /** The provenance hash the contract holds (founders.json), as last read; null if none yet. */
+  readonly provenance: string | null;
+  /** The game contract's account, or null without a chain. */
+  readonly contractId: string | null;
   /** Settles one closed day of a season. */
   settleDay(db: Db, season: string, day: number): Promise<SettleResult>;
 }
@@ -45,14 +53,14 @@ export interface TestnetConfig {
   privateKey: string;
   rpcUrl: string;
   contractId: string;
-  /** NEAR kept free for each Founding Hen minted (her token's storage). */
+  /** NEAR kept free for each Feather minted (its token's storage). */
   mintNear: number;
   /** NEAR always kept free on the game account, on top of the mints' reserve. */
   minBalanceNear: number;
   agentFundingNear: number;
 }
 
-/** How many Founding Hens a free balance can mint now: each keeps mintNear, above the margin. */
+/** How many Feathers a free balance can mint now: each keeps mintNear, above the margin. */
 export function mintsAffordable(availableNear: number, cfg: Pick<TestnetConfig, 'mintNear' | 'minBalanceNear'>, cap: number): number {
   if (cfg.mintNear <= 0) return cap;
   return Math.max(0, Math.min(cap, Math.floor((availableNear - cfg.minBalanceNear) / cfg.mintNear + 1e-9)));
@@ -80,19 +88,21 @@ export class NoopChain implements ChainWriter {
   readonly mode = 'noop' as const;
   readonly explorer = null;
   readonly minting = 'off' as const;
-  readonly foundingMinted = null;
+  readonly featherMinted = null;
+  readonly provenance = null;
+  readonly contractId = null;
   constructor(
     private readonly reason: string,
     private readonly log: (line: string) => void,
   ) {}
 
   async settleDay(db: Db, season: string, day: number): Promise<SettleResult> {
-    const built = await buildDayBatch(db, season, day, { founding: null, renderer: null });
+    const built = await buildDayBatch(db, season, day, { feathers: null, renderer: null });
     this.log(
-      `[chain] !!! NO-OP for season ${season} day ${day}: ${this.reason}. Batch built (${built.batch.farms.length} farms, ` +
+      `[chain] !!! NO-OP for season ${season} day ${day}: ${this.reason}. Settlement built (${built.settlement.farms.length} farms, ` +
         `digest ${built.batch.digest.slice(0, 12)}) and recorded in market_days only, not on NEAR testnet.`,
     );
-    return { status: 'noop', txHash: null };
+    return { status: 'noop', txHash: null, settlement: built.settlement, digest: built.batch.digest };
   }
 }
 
@@ -104,12 +114,12 @@ export class TestnetChain implements ChainWriter {
   private checked = false;
   /** Last known: could the game account not afford a mint? Null until first read. */
   private low: boolean | null = null;
-  /** The contract's founding count; null until read, or when the contract is version 2. */
-  private founding: number | null = null;
+  /** The contract's Feather count and provenance; null until read, or when the contract has no Feathers (before version 4). */
+  private feathers: { minted: number; provenance: string | null } | null = null;
 
   constructor(
     private readonly cfg: TestnetConfig,
-    private readonly renderer: HenRenderer,
+    private readonly renderer: FeatherRenderer,
     private readonly log: (line: string) => void,
   ) {
     assertTestnetConfig(cfg);
@@ -122,31 +132,39 @@ export class TestnetChain implements ChainWriter {
       },
       () => undefined,
     );
-    this.readFounding().then(
+    this.readFeathers().then(
       (n) => {
-        this.founding = n;
+        this.feathers = n;
       },
       () => undefined,
     );
   }
 
   get minting(): 'live' | 'paused' {
-    return this.low || this.founding === null ? 'paused' : 'live';
+    return this.low || this.feathers === null ? 'paused' : 'live';
   }
 
-  get foundingMinted(): number | null {
-    return this.founding;
+  get featherMinted(): number | null {
+    return this.feathers?.minted ?? null;
   }
 
-  /** The contract's Founding Hen count, or null when it has none (version 2: no founding_supply). */
-  private async readFounding(): Promise<number | null> {
+  get provenance(): string | null {
+    return this.feathers?.provenance ?? null;
+  }
+
+  get contractId(): string {
+    return this.cfg.contractId;
+  }
+
+  /** The contract's Feather count and provenance, or null when it has none (before version 4: no feather_supply). */
+  private async readFeathers(): Promise<{ minted: number; provenance: string | null } | null> {
     try {
-      const r = await this.provider.callFunction<{ minted: number; max: number; remaining: number }>({
+      const r = await this.provider.callFunction<{ minted: number; max: number; remaining: number; provenance: string | null }>({
         contractId: this.cfg.contractId,
-        method: 'founding_supply',
+        method: 'feather_supply',
         args: {},
       });
-      return typeof r?.minted === 'number' ? r.minted : null;
+      return typeof r?.minted === 'number' ? { minted: r.minted, provenance: r.provenance ?? null } : null;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (/MethodNotFound|method.*not found|CodeDoesNotExist/i.test(msg)) return null;
@@ -218,18 +236,18 @@ export class TestnetChain implements ChainWriter {
         return { status: 'noop', txHash: null, error: blocked };
       }
       await this.ensureAgentAccounts(db);
-      this.founding = await this.readFounding();
-      const affordable = mintsAffordable(await this.balanceNear(), this.cfg, ECONOMY.founding.mintsPerBatch);
+      this.feathers = await this.readFeathers();
+      const affordable = mintsAffordable(await this.balanceNear(), this.cfg, ECONOMY.feathers.mintsPerBatch);
       this.low = affordable === 0;
-      const founding = this.founding === null ? null : { cap: affordable, base: this.founding };
-      const built = await buildDayBatch(db, season, day, { founding, renderer: this.renderer });
-      const waiting = await db.query(`SELECT count(*) AS n FROM hens WHERE founding_milestone IS NOT NULL AND chain_owner IS NULL AND status = 'alive'`);
+      const feathers = this.feathers === null ? null : { cap: affordable, base: this.feathers.minted };
+      const built = await buildDayBatch(db, season, day, { feathers, renderer: this.renderer });
+      const waiting = await db.query(`SELECT count(*) AS n FROM feather_tickets WHERE status = 'queued'`);
       const left = num(waiting[0]?.n) - built.minted.length;
       if (left > 0) {
         this.log(
-          this.founding === null
-            ? `[chain] ${left} Founding Hens wait: the contract has no Founding Hens yet (upgrade to version 3)`
-            : `[chain] ${left} Founding Hens wait: the game account can store ${affordable} mints now (each keeps ${this.cfg.mintNear} NEAR)`,
+          this.feathers === null
+            ? `[chain] ${left} redeemed Feathers wait: the contract has no Feathers yet (upgrade to version 4)`
+            : `[chain] ${left} redeemed Feathers wait: the game account can store ${affordable} mints now (each keeps ${this.cfg.mintNear} NEAR), or their player has no wallet linked`,
         );
       }
       const outcome = await this.account.callFunctionRaw({
@@ -241,11 +259,11 @@ export class TestnetChain implements ChainWriter {
       });
       const txHash = outcome.transaction_outcome.id;
       await commitBatch(db, built, txHash);
-      if (this.founding !== null) this.founding += built.minted.length;
+      if (this.feathers !== null) this.feathers.minted += built.minted.length;
       this.log(
-        `[chain] season ${season} day ${day} settled on NEAR testnet: ${txHash} (${built.batch.eggs.length} egg moves, ${built.minted.length} Founding Hens minted, ${built.batch.hen_moves.length} hens moved)`,
+        `[chain] season ${season} day ${day} settled on NEAR testnet: ${txHash} (digest ${built.batch.digest.slice(0, 12)}, ${built.batch.eggs.length} egg moves, ${built.batch.farms.length} farms moving, ${built.minted.length} Feathers minted)`,
       );
-      return { status: 'sent', txHash, minted: built.minted, numbers: built.numbers };
+      return { status: 'sent', txHash, minted: built.minted, settlement: built.settlement, digest: built.batch.digest };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       this.log(`[chain] season ${season} day ${day} FAILED on NEAR testnet: ${error.slice(0, 300)}`);
@@ -254,7 +272,7 @@ export class TestnetChain implements ChainWriter {
   }
 }
 
-export function createChainWriter(env: NodeJS.ProcessEnv, renderer: HenRenderer, log: (line: string) => void): ChainWriter {
+export function createChainWriter(env: NodeJS.ProcessEnv, renderer: FeatherRenderer, log: (line: string) => void): ChainWriter {
   const accountId = env.NEAR_TESTNET_ACCOUNT_ID;
   const privateKey = env.NEAR_TESTNET_PRIVATE_KEY;
   if (!accountId || !privateKey) return new NoopChain('NEAR_TESTNET_ACCOUNT_ID or NEAR_TESTNET_PRIVATE_KEY is not set', log);
@@ -264,8 +282,8 @@ export function createChainWriter(env: NodeJS.ProcessEnv, renderer: HenRenderer,
       privateKey,
       rpcUrl: env.NEAR_TESTNET_RPC_URL || 'https://test.rpc.fastnear.com',
       contractId: env.NEAR_GAME_CONTRACT_ID || accountId,
-      mintNear: Number(env.CHAIN_MINT_NEAR || 0.03),
-      minBalanceNear: Number(env.CHAIN_MIN_BALANCE_NEAR || 1.25),
+      mintNear: Number(env.CHAIN_MINT_NEAR || 0.035),
+      minBalanceNear: Number(env.CHAIN_MIN_BALANCE_NEAR || 0.5),
       agentFundingNear: Number(env.AGENT_ACCOUNT_FUNDING_NEAR || 0.05),
     },
     renderer,

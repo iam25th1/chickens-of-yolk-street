@@ -199,6 +199,9 @@ export function createGameServer(opts: GameServerOptions): Server {
         if (req.method === 'GET' && url.pathname === '/api/config') {
           return json(res, 200, { protocol: PROTOCOL_VERSION, privyAppId: opts.privyAppId, devLogin: opts.devLogin });
         }
+        if (req.method === 'GET' && url.pathname === '/api/feathers') {
+          return json(res, 200, await game.getMintPage());
+        }
         if (req.method === 'GET' && url.pathname === '/api/market') {
           return json(res, 200, { market: await game.getMarketState(), clock: game.getClock() });
         }
