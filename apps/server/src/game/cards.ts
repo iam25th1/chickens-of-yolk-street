@@ -465,14 +465,16 @@ export async function respondCard(ctx: Ctx, farm: Farm, cardId: string, choice: 
 /**
  * The tour's practice offer: a buyer asks for a few eggs at a little under today's white price,
  * arriving at once. Its walk-away price sits just above the offer, so a first counter always gets a
- * counter back: the player sees a haggle happen. Sent once per farm, beside the day's own cards.
+ * counter back: the player sees a haggle happen. Sent once per farm, beside the day's own cards;
+ * asking again does nothing.
  */
 export async function practiceCard(ctx: Ctx, farm: Farm): Promise<void> {
   const [row] = await ctx.q.query(
     `SELECT ${AGENT_COLUMNS} FROM agents WHERE status = 'open' AND role = 'buyer' ORDER BY (kind = 'wholesaler') DESC, (kind = 'trader') DESC, kind LIMIT 1`,
   );
   if (!row) throw new ActionError('not_found', 'no buyer is open');
-  if (!(await takePractice(ctx.q, farm.id))) throw new ActionError('invalid_action', 'the practice offer was already sent');
+  // a replayed tour asks again: the offer came once, so there is nothing more to send
+  if (!(await takePractice(ctx.q, farm.id))) return;
   const agent = toAgent(row);
   const kind = agent.kind as AgentKind;
   const m = await liveMultiplier(ctx);

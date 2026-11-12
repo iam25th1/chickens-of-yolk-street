@@ -30,9 +30,25 @@ describe('the practice offer', () => {
       expect(haggle.card.offerMilli).toBeGreaterThan(arrived.card.offerMilli);
     }
 
-    expect(await t.game.act(playerId, { t: 'practiceCard', rid: 'p3' })).toMatchObject({ ok: false, code: 'invalid_action' });
+    // asking again (a replayed tour) sends nothing more
+    expect(await t.game.act(playerId, { t: 'practiceCard', rid: 'p3' })).toMatchObject({ ok: true });
     const farm = await t.game.getFarmState(farmId);
     expect(farm.cards.filter((c) => c.kind === 'bulk-order')).toHaveLength(1);
+    await t.db.close();
+  });
+});
+
+describe('feed on credit', () => {
+  it('a new player short of coins can take a bag from the Loyalist and owe it', async () => {
+    const t = await makeGame({ cast: true, seed: 3 });
+    const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-credit', 'Cleo');
+    const before = await t.game.getFarmState(farmId);
+    expect(before.cashMilli).toBeLessThan(ECONOMY.feed.tiers.cheap.bagPrice * 1000);
+    expect(await t.game.act(playerId, { t: 'buyFeedOnCredit', rid: 'c1', tier: 'cheap', bags: 1 })).toMatchObject({ ok: true });
+    const after = await t.game.getFarmState(farmId);
+    expect(after.cashMilli).toBe(before.cashMilli);
+    expect(after.feedGrams.cheap - before.feedGrams.cheap).toBe(ECONOMY.feed.bagKg * 1000);
+    expect(after.debts.filter((d) => d.status === 'open')).toHaveLength(1);
     await t.db.close();
   });
 });
