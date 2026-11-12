@@ -17,7 +17,7 @@ import { ed25519 } from '@noble/curves/ed25519.js';
 import { Account, JsonRpcProvider, KeyPairSigner, baseEncode, nearToYocto, teraToGas } from 'near-api-js';
 import type { KeyPairString } from 'near-api-js';
 import { num, type Db } from '../db/db';
-import { ECONOMY } from '@coys/shared';
+import { ECONOMY, type FeatherGrade, type MilestoneId } from '@coys/shared';
 import { buildDayBatch, commitBatch, type FullSettlement, type MintedFeather } from './batch';
 import type { FeatherRenderer } from './feather-image';
 
@@ -46,6 +46,18 @@ export interface ChainWriter {
   readonly contractId: string | null;
   /** Settles one closed day of a season. */
   settleDay(db: Db, season: string, day: number): Promise<SettleResult>;
+  /** Every Feather on the contract (any season), as last read; absent without a chain. */
+  featherTokens?(): Promise<ChainFeather[]>;
+}
+
+/** A Feather as the contract holds it: its number, grade, milestone, season, day and owner. */
+export interface ChainFeather {
+  number: number;
+  grade: FeatherGrade;
+  milestone: MilestoneId;
+  season: string;
+  day: number;
+  owner: string;
 }
 
 export interface TestnetConfig {
@@ -138,6 +150,32 @@ export class TestnetChain implements ChainWriter {
       },
       () => undefined,
     );
+  }
+
+  private tokens: { at: number; list: ChainFeather[] } | null = null;
+
+  /** Every Feather token, read a page of 100 at a time and kept for a minute. */
+  async featherTokens(): Promise<ChainFeather[]> {
+    if (this.tokens && Date.now() - this.tokens.at < 60_000) return this.tokens.list;
+    const list: ChainFeather[] = [];
+    for (let from = 0; from < ECONOMY.feathers.maxSupply; from += 100) {
+      const page = await this.provider.callFunction<{ token_id: string; owner_id: string; metadata?: { extra?: string | null } | null }[]>({
+        contractId: this.cfg.contractId,
+        method: 'nft_tokens',
+        args: { from_index: String(from), limit: 100 },
+      });
+      for (const t of page ?? []) {
+        try {
+          const x = JSON.parse(t.metadata?.extra ?? '{}') as { number?: number; grade?: FeatherGrade; milestone?: MilestoneId; season?: string; day?: number };
+          if (typeof x.number === 'number' && x.grade) list.push({ number: x.number, grade: x.grade, milestone: x.milestone ?? 'full-coop', season: x.season ?? '', day: x.day ?? 0, owner: t.owner_id });
+        } catch {
+          // not a Feather (no token of another kind exists on version 4, but stay safe)
+        }
+      }
+      if (!page || page.length < 100) break;
+    }
+    this.tokens = { at: Date.now(), list };
+    return list;
   }
 
   get minting(): 'live' | 'paused' {
@@ -260,6 +298,7 @@ export class TestnetChain implements ChainWriter {
       const txHash = outcome.transaction_outcome.id;
       await commitBatch(db, built, txHash);
       if (this.feathers !== null) this.feathers.minted += built.minted.length;
+      if (built.minted.length) this.tokens = null;
       this.log(
         `[chain] season ${season} day ${day} settled on NEAR testnet: ${txHash} (digest ${built.batch.digest.slice(0, 12)}, ${built.batch.eggs.length} egg moves, ${built.batch.farms.length} farms moving, ${built.minted.length} Feathers minted)`,
       );
