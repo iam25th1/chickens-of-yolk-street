@@ -58,7 +58,9 @@ the next one catches it up once topped up.
 At the first day close the server creates one funded sub-account per open agent under the signing
 account: `bakery1.play.coys-game.testnet`, `loyalist1...`, `oldmoney1...`, `squeezer1...`,
 `trader1...`, `upstart1...`, `wholesaler1...`. A successor after a bust gets the next generation
-(`upstart2...`). Their keys are derived from the game key with HMAC-SHA256, so nothing new is
+(`upstart2...`) only when no earlier agent of its kind has a wallet: a successor after a bust takes over its
+predecessor's wallet, since rivals go bust often (about 30 times a real day on `s1`) and a funded account each time would
+cost about 0.057 NEAR. Their keys are derived from the game key with HMAC-SHA256, so nothing new is
 stored. Only the parent can create its sub-accounts, which is why the signing account and the
 contract account are the same.
 
@@ -111,7 +113,11 @@ the contract's archive hash after each one:
 npm run release-chain-days -- --account play.coys-game.testnet --season s1 --backup <backup file>
 ```
 
-It needs `DATABASE_URL` (the live game database) as well as the signing key. To check it later: fold the rows of
+It needs `DATABASE_URL` (the live game database) as well as the signing key. Done on 12 November 2026 for `s1` days 1 to
+489 in three transactions ([F6VE65CK...](https://testnet.nearblocks.io/txns/F6VE65CKSg3bGsau1P9u9MZGyEjxWPu8XXG2SH4yohxq),
+[7RHumWmX...](https://testnet.nearblocks.io/txns/7RHumWmXks3QS9YmfnqLCewaqKGcQVzdoDTb1aPoZxtf),
+[3Wva5eNt...](https://testnet.nearblocks.io/txns/3Wva5eNte8hmPsb6CEh7Unk1nr1WVmET36px94ysjZuC)): about 87,600 bytes back,
+archive `cfe525e7...`, equal to the fold over `chain_archive`. To check it later: fold the rows of
 `chain_archive` for the season in day order, $a_d = \mathrm{SHA256}(a_{d-1} \,|\, d \,|\, \text{record}_d)$ from 64
 zeros, and compare with `season_head({ "season": "s1" }).archive`.
 

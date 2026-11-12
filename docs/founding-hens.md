@@ -98,6 +98,11 @@ pays testnet gas and storage, so players never need testnet NEAR. A ticket whose
   ([JBoKNVa6...](https://testnet.nearblocks.io/txns/JBoKNVa6Pi5jAb2BA4chAh8K43GGpWgw8AtHJy26b5AB)), and copied into
   every Feather's `extra`.
 
+On testnet, the verification minted three Feathers in the test season `verify-feathers-1` to a test farm's wallet:
+#001 Fluff, #002 Quill and #003 Golden Quill, redeemed at management scores 0.169, 0.683 and 0.875
+([BFBD96ii...](https://testnet.nearblocks.io/txns/BFBD96iiCiatw79xgcpzysjf3rb6osjM2Z1Qk1QLJQ7g)). They count toward the 777
+like any other; the mint page names their season.
+
 Tests: 18 contract unit tests and 8 sandbox tests on the CI-built wasm, among them **mint 777 in 39 batches of 20 then
 refuse the 778th** (126 Tgas at most per batch, 3,169 bytes a Feather), and the upgrade of the exact version 2 code
 deployed on testnet.

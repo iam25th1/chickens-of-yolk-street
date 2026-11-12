@@ -182,3 +182,17 @@ describe('the Feather reserve', () => {
     expect(mintsAffordable(50, cfg, 20)).toBe(20);
   });
 });
+
+describe('agent wallets', () => {
+  it("a bust agent's successor takes over its wallet instead of a new funded one", async () => {
+    const { successorWallet } = await import('../src/chain/chain');
+    const t = await makeGame({ cast: true });
+    const [upstart] = await t.db.query(`SELECT id, kind FROM agents WHERE kind = 'upstart' LIMIT 1`);
+    expect(await successorWallet(t.db, 'upstart')).toBeNull();
+    await t.db.query(`UPDATE agents SET status = 'bust', bust_day = 1, near_account_id = 'upstart1.game.testnet' WHERE id = $1`, [upstart?.id]);
+    expect(await successorWallet(t.db, 'upstart')).toBe('upstart1.game.testnet');
+    // another kind's wallet is never taken over
+    expect(await successorWallet(t.db, 'old-money')).toBeNull();
+    await t.db.close();
+  });
+});

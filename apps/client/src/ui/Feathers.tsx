@@ -236,7 +236,9 @@ export function MintPage({ farm, market, send, onClose }: { farm: FarmState; mar
               <span className="panel-title small" style={{ margin: 0 }}>
                 {data.minted} MINTED, {data.left} LEFT OF {data.max}
               </span>
-              <span>{data.tickets} TICKETS WAITING</span>
+              <span>
+                {data.tickets} TICKET{data.tickets === 1 ? '' : 'S'} WAITING
+              </span>
               {FEATHER_GRADES.map((g) => (
                 <span key={g}>
                   {GRADE_LABEL[g]} {data.byGrade[g]}

@@ -96,6 +96,20 @@ export function agentPublicKey(gamePrivateKey: string, kind: string, generation:
 
 export const agentAccountName = (kind: string, generation: number, game: string): string => `${kind.replace(/[^a-z0-9]/g, '')}${generation}.${game}`;
 
+/**
+ * The wallet a new agent takes over: the most recent bust agent of the same kind's, if any. A rival
+ * that goes bust is replaced by a successor of its kind (often, in a lively market: on s1 about 30
+ * times a real day at 3-minute days), and a fresh funded sub-account for each would cost about
+ * 0.057 NEAR every time, so the successor carries on in its predecessor's wallet instead.
+ */
+export async function successorWallet(db: Db, kind: string): Promise<string | null> {
+  const [prev] = await db.query<{ near_account_id: string }>(
+    `SELECT near_account_id FROM agents WHERE kind = $1 AND status = 'bust' AND near_account_id IS NOT NULL ORDER BY generation DESC LIMIT 1`,
+    [kind],
+  );
+  return prev?.near_account_id ?? null;
+}
+
 export class NoopChain implements ChainWriter {
   readonly mode = 'noop' as const;
   readonly explorer = null;
@@ -240,6 +254,12 @@ export class TestnetChain implements ChainWriter {
     }
     let lowSaid = false;
     for (const a of agents) {
+      const inherited = await successorWallet(db, String(a.kind));
+      if (inherited) {
+        await db.query('UPDATE agents SET near_account_id = $2 WHERE id = $1', [a.id, inherited]);
+        this.log(`[chain] ${String(a.kind)} ${num(a.generation)} takes over its predecessor's wallet ${inherited}`);
+        continue;
+      }
       const name = agentAccountName(String(a.kind), num(a.generation), this.cfg.accountId);
       try {
         const exists = await new Account(name, this.provider).getState().then(

@@ -248,6 +248,69 @@ workspace `@25th/game-11` (each SHA-256 equals its content-addressed CDN name) a
 new art was needed: the belt's start and end pieces, the pads, the fence and the gate already exist, and the silhouettes
 and Founding Hen palettes are recolours of existing layers.
 
+**Checked live** on 12 November 2026 (commit `4471029`, healthz OK), with one temporary check farm made through the
+game's own `ensurePlayer` and removed afterwards (`scripts/remove-player.ts`, service stopped; no trades, no tickets).
+
+| On chain (`play.coys-game.testnet`) | Transaction |
+|---|---|
+| Version 4 deployed with `migrate`, 20:30 UTC | [9jsFd4EA...](https://testnet.nearblocks.io/txns/9jsFd4EAZc3nkE4v11x4poVTMhLyYzPpuZKrsCud9J4s) |
+| founders.json provenance `bd2daafd...` committed | [JBoKNVa6...](https://testnet.nearblocks.io/txns/JBoKNVa6Pi5jAb2BA4chAh8K43GGpWgw8AtHJy26b5AB) |
+| Version 2 records of `s1` days 1 to 200 released | [F6VE65CK...](https://testnet.nearblocks.io/txns/F6VE65CKSg3bGsau1P9u9MZGyEjxWPu8XXG2SH4yohxq) |
+| Days 201 to 400 released | [7RHumWmX...](https://testnet.nearblocks.io/txns/7RHumWmXks3QS9YmfnqLCewaqKGcQVzdoDTb1aPoZxtf) |
+| Days 401 to 489 released; archive `cfe525e7...` | [3Wva5eNt...](https://testnet.nearblocks.io/txns/3Wva5eNte8hmPsb6CEh7Unk1nr1WVmET36px94ysjZuC) |
+| Test season `verify-feathers-1`, a test farm: Feathers #001 Fluff, #002 Quill, #003 Golden Quill minted to its wallet (the game account) | [BFBD96ii...](https://testnet.nearblocks.io/txns/BFBD96iiCiatw79xgcpzysjf3rb6osjM2Z1Qk1QLJQ7g) |
+| First compact `s1` day after the release, a settled day storing nothing | [31a2B6RG...](https://testnet.nearblocks.io/txns/31a2B6RG1SdWN2aoTSX5W3K3CwjFLoPHyjU5G4aiAxGK) |
+
+- **Settlement cost, measured live.** Before: 179 bytes a day (478 records held 85.6 KB). After: `s1` days 511 to 517
+  added 333 bytes in all, three first egg balances for agent wallets linked that day, and nothing per day; each
+  settlement burnt 0.00025 to 0.00041 NEAR of gas (0.12 to 0.20 NEAR a real day). The release returned about 87,600 bytes
+  (489 records of 179 bytes; 0.876 NEAR): storage went from 443,112 to 355,706 bytes and the free balance from 0.35 to
+  1.20 NEAR. A fold over the 489 rows of `chain_archive` in the live database gives the on-chain archive hash `cfe525e7...`.
+- **Feathers.** The Founding Hen won on day 409 is a held Feather Ticket on the real player's farm; the board and the mint
+  page show **774 of 777 left** (the three test-season Feathers) and **1 ticket waiting**; minting is live. Three
+  redemptions at three management scores (0.169, 0.683, 0.875) graded Fluff, Quill and Golden Quill, and one day close
+  minted all three (`nft_token("003")`: "Feather #003 of 777: Golden Quill", its card image and the provenance in `extra`).
+- **Agent wallets.** With the account above its margin, the six open agents were linked to their wallets (`bakery1`,
+  `loyalist1`, `oldmoney1`, `squeezer1`, `trader1`, `wholesaler1`), and the current rival got `upstart33` (0.05 NEAR). That
+  showed a cost the old margin had hidden: rivals go bust about 30 times a real day on `s1`, and a fresh wallet for each
+  successor would cost about 1.7 NEAR a real day. A successor now takes over its predecessor's wallet.
+- **Layout, live, at 1280x720, 1920x1080, 2560x1440, 390x844 and 360x640:** the top bar, side panel, tracker and toasts
+  never overlapped; all five machines were on screen and clear of the UI; no page errors. The debug overlay shows every
+  connection green.
+
+| 1280x720 | 1920x1080 |
+|---|---|
+| ![The farm at 1280x720: the belt runs from the field under the grader into the crate; the clerk behind the crate faces the path; the cart is parked on the path against the crate; the hopper's spout over the trough; the fence spans the width with a gate on the path](docs/screenshots/feathers-farm-1280x720.png) | ![The same composition at 1920x1080, at night](docs/screenshots/feathers-farm-1920x1080.png) |
+| **2560x1440** | **390x844 and 360x640** |
+| ![The farm at 2560x1440](docs/screenshots/feathers-farm-2560x1440.png) | ![The phone: the farm across the width and down the height, the trough and hopper mid-yard](docs/screenshots/feathers-farm-390x844.png) ![The farm at 360x640](docs/screenshots/feathers-farm-360x640.png) |
+
+<details>
+<summary><b>The layout debug overlay</b> (<code>?debug=layout</code>) at the five sizes</summary>
+
+Pink: each object's art bounds and its footprint (filled); white crosses: anchors; cyan: connection points; green lines and
+circles: connections within one world pixel (red would mean one is off: none is).
+
+| 1280x720 | 1920x1080 |
+|---|---|
+| ![Overlay at 1280x720](docs/screenshots/feathers-debug-1280x720.png) | ![Overlay at 1920x1080](docs/screenshots/feathers-debug-1920x1080.png) |
+| **2560x1440** | **390x844 and 360x640** |
+| ![Overlay at 2560x1440](docs/screenshots/feathers-debug-2560x1440.png) | ![Overlay at 390x844](docs/screenshots/feathers-debug-390x844.png) ![Overlay at 360x640](docs/screenshots/feathers-debug-360x640.png) |
+
+</details>
+
+| Mint page (live) | Its estimates (live) |
+|---|---|
+| ![The mint page: 3 minted, 774 left of 777, 1 ticket waiting, by grade, the founders provenance and the contract](docs/screenshots/feathers-mint-top.png) | ![Each grade's estimated chance of a Legendary, Epic, Rare or Common hen, labelled as an estimate that locks at the reveal](docs/screenshots/feathers-mint-estimates.png) |
+| **Unminted slots (live)** | **The minted filter (live)** |
+| ![Unminted numbers: the empty Spawn frame with a dark hen silhouette and the number](docs/screenshots/feathers-mint-silhouettes.png) | ![Recent mints and the minted filter: #001 Fluff in the common frame, #002 Quill in the epic frame, #003 Golden Quill in the legendary frame](docs/screenshots/feathers-mint-minted.png) |
+
+The reveal moment, from the local check harness (the real server code on a memory database with a stand-in chain, 20-second
+days), since a live reveal would mint one of the 777 in `s1`:
+
+| Before the flip | After: a Quill | On a phone |
+|---|---|---|
+| ![The unminted card with its silhouette and number 041](docs/screenshots/feathers-reveal-closed.png) | ![The Quill card in the epic frame with confetti and the stamp: Feather 041 of 777, won at sell 500 eggs, planned to hatch into a Founding Hen at mainnet launch](docs/screenshots/feathers-reveal-open.png) | ![The same reveal on a phone](docs/screenshots/feathers-reveal-phone.png) |
+
 ## Founding Hens, machines at work, sound and a guide (12 November 2026)
 
 *Superseded the same day by [the Feathers beta](#the-feathers-beta-compact-settlement-and-the-layout-spec-12-november-2026): hens are never minted now, and the Founding Hen won live below became a Feather Ticket.*
@@ -790,6 +853,12 @@ On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and buil
 
 The live Pier deploy and its tunnel were checked end to end on 11 November 2026 (receipts under [How NEAR fits in](#how-near-fits-in)).
 
+Brief 7 was checked live on 12 November 2026 on `4471029`: the version 4 upgrade and the release of version 2's records on
+`play.coys-game.testnet`, three Feathers minted in a test season, the mint page and the board, and the farm and its layout
+overlay at five sizes with no overlap (under [the Feathers beta](#the-feathers-beta-compact-settlement-and-the-layout-spec-12-november-2026)).
+The contracts job builds both contracts; the sandbox mints 777 Feathers and refuses the 778th, settles 30 days with no new
+storage, upgrades version 2 and releases its records, and reveals exactly 7/70/200/500.
+
 Brief 6 was checked live on 12 November 2026 on `c48d2f2`: the farm at four sizes with no overlap, the first-run tour for brand-new players at three sizes, a 30-second capture of the belt and the coop doors, and live milestone rolls (under [Founding Hens](#founding-hens-machines-at-work-sound-and-a-guide-12-november-2026)). The contracts job builds the version 3 wasm and the sandbox mints 777 Founding Hens and refuses the 778th.
 
 The visual-quality pass was checked live on 12 November 2026: cold load at five sizes, the whole tour completed by an automated browser at five sizes, the no-overlap check with every modal and tour step open, and device-pixel crops (numbers under [Visual quality](#visual-quality-and-the-tour-12-november-2026)).
@@ -835,6 +904,13 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
   exact pixel art (belt 0.59, hay bale 0.96).
 - **Docs**: [docs/founding-hens.md](docs/founding-hens.md) rewritten for the Feathers, [docs/mainnet-plan.md](docs/mainnet-plan.md)
   (snapshot, claim, reveal seed, the mainnet contract, sybil checks) and the checklist updated. No mainnet action.
+- **Live** (checked under [the Feathers beta](#the-feathers-beta-compact-settlement-and-the-layout-spec-12-november-2026)):
+  the release of 489 records (three transactions, archive `cfe525e7...`, checked against the live database), three test
+  Feathers minted in a test season, six agent wallets linked, and the layout at five sizes with no overlap. Running it
+  found three more things, fixed in PRs #17 and #18: the mint page drew only this season's Feathers (it reads the contract
+  now), the release script needed paced reads (the public RPC answered 429, and two `s1` days failed to settle for those
+  six minutes; the next day caught their eggs up), and each bust rival's successor got a newly funded wallet (it now takes
+  over its predecessor's). Merged as PRs #16 and #17 (live on `4471029`), docs and fixes in #18.
 
 ### Brief 6: Founding Hens, machines at work, sound, a guide and BETA (12 November 2026)
 
