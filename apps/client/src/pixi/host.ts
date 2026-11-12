@@ -1,17 +1,21 @@
-// One PixiJS application for the whole game. The canvas fills the window at device resolution;
-// the world is 360 pixels tall (see app/viewport.ts) and drawn nearest-neighbour with rounded pixels.
-// Scenes are told the visible world size and lay themselves out to it.
+// One PixiJS application for the whole game. The canvas fills the window at device resolution. A
+// scene's world is drawn at k device pixels per world pixel (k whole, from app/viewport.ts) and
+// placed on whole device pixels, so every texel lands on whole device pixels: the farm by its own
+// view, the 640x360 plates (title, loading, town square) centred by theirs. Scenes are told the
+// part of the world the window shows and lay themselves out to it.
 import { Application, Container, TextureSource } from 'pixi.js';
-import { viewport, type Viewport } from '../app/viewport';
+import { viewport, type Viewport, type WorldView } from '../app/viewport';
 import { juice } from '../motion/juice';
 
 TextureSource.defaultOptions.scaleMode = 'nearest';
 
 export interface Scene {
   readonly root: Container;
+  /** Which view the scene's world uses: the farm's, or a centred 640x360 plate's. */
+  readonly fit: 'farm' | 'plate';
   update(dtMs: number): void;
-  /** The visible world, in world pixels. */
-  resize?(width: number, height: number): void;
+  /** The visible world, in world pixels (it may start left of or above the origin). */
+  resize?(view: { x: number; y: number; w: number; h: number }, v: Viewport): void;
   destroy(): void;
 }
 
@@ -44,18 +48,30 @@ export class PixiHost {
       if (!host.scene) return;
       // Hitstop freezes the world: scenes get no time while it lasts.
       host.scene.update(juice.frozen() ? 0 : Math.min(t.deltaMS, 100));
-      const o = juice.offset();
-      const z = viewport.get().zoom;
-      host.world.position.set(Math.round(o.x * z), Math.round(o.y * z));
+      host.place();
     });
     return host;
+  }
+
+  private view(v: Viewport): WorldView {
+    return this.scene?.fit === 'farm' ? v.farm : v.plate;
+  }
+
+  /** The world's offset, plus any screen shake, on whole device pixels. */
+  private place(): void {
+    const v = viewport.get();
+    const view = this.view(v);
+    const o = juice.offset();
+    this.world.position.set((view.offX + Math.round(o.x * view.k)) / v.dpr, (view.offY + Math.round(o.y * view.k)) / v.dpr);
   }
 
   private layout(v: Viewport): void {
     this.app.renderer.resolution = v.dpr;
     this.app.renderer.resize(v.cssW, v.cssH);
-    this.world.scale.set(v.zoom);
-    this.scene?.resize?.(v.worldW, v.worldH);
+    const view = this.view(v);
+    this.world.scale.set(view.k / v.dpr);
+    this.place();
+    this.scene?.resize?.({ x: -view.offX / view.k, y: -view.offY / view.k, w: v.devW / view.k, h: v.devH / view.k }, v);
   }
 
   /** Swaps scenes; keep leaves the old one alive (the farm keeps running behind the market board). */
@@ -65,10 +81,7 @@ export class PixiHost {
       if (!opts.keep) this.scene.destroy();
     }
     this.scene = scene;
-    if (scene) {
-      this.world.addChild(scene.root);
-      const v = viewport.get();
-      scene.resize?.(v.worldW, v.worldH);
-    }
+    if (scene) this.world.addChild(scene.root);
+    this.layout(viewport.get());
   }
 }

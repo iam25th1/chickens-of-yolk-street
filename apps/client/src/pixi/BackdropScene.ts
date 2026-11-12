@@ -14,6 +14,7 @@ interface Drifter {
 
 export class BackdropScene implements Scene {
   readonly root = new Container();
+  readonly fit = 'plate' as const;
   private readonly drifters: Drifter[] = [];
   private readonly sprites: FrameSprite[] = [];
   private logo: FrameSprite | null = null;
@@ -80,11 +81,11 @@ export class BackdropScene implements Scene {
   }
 
   /** Clouds and marching hens cross the whole window, not only the plate. */
-  resize(w: number, h: number): void {
-    const o = this.plate.resize(w, h);
+  resize(view: { x: number; y: number; w: number; h: number }): void {
+    this.plate.resize(view);
     for (const d of this.drifters) {
-      d.min = Math.min(d.min, -o.x - 200);
-      d.max = Math.max(PLATE_W + 40, w - o.x + 80);
+      d.min = Math.min(d.min, view.x - 200);
+      d.max = Math.max(PLATE_W + 40, view.x + view.w + 80);
     }
   }
 

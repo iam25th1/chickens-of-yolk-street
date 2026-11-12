@@ -8,6 +8,7 @@ import { Plate, PLATE_W } from './plate';
 
 export class TownScene implements Scene {
   readonly root = new Container();
+  readonly fit = 'plate' as const;
   private readonly sprites: FrameSprite[] = [];
   private readonly crowd: { s: FrameSprite; dir: number; min: number; max: number }[] = [];
   private murmur: LoopHandle | null;
@@ -41,8 +42,8 @@ export class TownScene implements Scene {
     this.murmur = audio.loop('34-market', { volume: 0.4, fadeMs: 900 });
   }
 
-  resize(w: number, h: number): void {
-    this.plate.resize(w, h);
+  resize(view: { x: number; y: number; w: number; h: number }): void {
+    this.plate.resize(view);
   }
 
   update(dtMs: number): void {

@@ -1,7 +1,7 @@
 // The farm world. It mirrors the server's farm state (sync) and turns server events into motion
 // and sound (onEvent). It never decides an outcome: eggs, sales and builds come from the server.
 import { animate, createTimeline, steps } from 'animejs';
-import { ColorMatrixFilter, Container, Graphics, Rectangle, RenderTexture, Sprite, type Renderer } from 'pixi.js';
+import { ColorMatrixFilter, Container, Graphics, RenderTexture, Sprite, type Renderer } from 'pixi.js';
 import type { CoopKind, FarmState, HenView, LaidEgg, UnlockId } from '@coys/shared';
 import type { AssetStore } from '../../assets/store';
 import type { AudioEngine, LoopHandle } from '../../audio/audio';
@@ -11,7 +11,7 @@ import { FrameSprite } from '../FrameSprite';
 import { Fx } from '../Fx';
 import type { Scene } from '../host';
 import { HenActor } from './HenActor';
-import { FARM_W, PORTRAIT_FARM_TOP, PLOTS, PROPS, SPOTS, TRAY_W, TROUGH_SPOTS, YARD, randomIn, type Point } from './layout';
+import { COMP, PLOTS, PROPS, SPOTS, TROUGH_SPOTS, YARD, randomIn, type Point } from './layout';
 
 const MAX_VISIBLE_HENS = 40;
 const TILE = 16;
@@ -53,6 +53,7 @@ const MACHINE_SPRITES: Record<Exclude<UnlockId, 'conveyor'>, { id: string; idle:
 
 export class FarmScene implements Scene {
   readonly root = new Container();
+  readonly fit = 'farm' as const;
   private readonly world = new Container();
   private readonly ysort = new Container();
   private readonly fx: Fx;
@@ -75,7 +76,6 @@ export class FarmScene implements Scene {
   private roostIndex = 0;
   private ground: Sprite | null = null;
   private readonly extras: FrameSprite[] = [];
-  private view = { w: 640, h: 360, x: 0, y: 0 };
   private readonly targetsList = new Map<FrameSprite, () => WorldTarget>();
 
   constructor(
@@ -131,8 +131,7 @@ export class FarmScene implements Scene {
   private clickable<T extends FrameSprite>(s: T, target: () => WorldTarget): T {
     s.eventMode = 'static';
     s.cursor = 'pointer';
-    const b = s.getLocalBounds();
-    s.hitArea = new Rectangle(b.minX - 1, b.minY - 1, b.maxX - b.minX + 2, b.maxY - b.minY + 2);
+    s.hitBox(1);
     s.on('pointerover', () => {
       s.filters = [HOVER];
     });
@@ -167,6 +166,13 @@ export class FarmScene implements Scene {
     return out;
   }
 
+  /** The straw yard's box in CSS pixels (where hens lay), for the tour's spotlight. */
+  yardBox(): { x: number; y: number; w: number; h: number } {
+    const a = this.world.toGlobal({ x: YARD.left, y: YARD.top });
+    const b = this.world.toGlobal({ x: YARD.right, y: YARD.bottom });
+    return { x: Math.round(a.x), y: Math.round(a.y), w: Math.round(b.x - a.x), h: Math.round(b.y - a.y) };
+  }
+
   private unplace(s: FrameSprite): void {
     const i = this.animated.indexOf(s);
     if (i >= 0) this.animated.splice(i, 1);
@@ -174,36 +180,34 @@ export class FarmScene implements Scene {
   }
 
   /**
-   * The window shows a w x h world. The farm (FARM_W wide) is centred in the part the tray leaves
-   * free; grass, the fence and a few props run on to the window's edges, so there is no border.
+   * The window shows this part of the world (farm coordinates: the farm's composition sits whole in
+   * the free part of the window, app/viewport.ts). Grass, the fence and a few props run on to the
+   * window's edges, so there is no border.
    */
-  resize(w: number, h: number): void {
-    const portrait = h > w;
-    const free = portrait ? w : w - TRAY_W;
-    const x = Math.round((free - FARM_W) / 2);
-    const y = portrait ? PORTRAIT_FARM_TOP : 0;
-    this.view = { w, h, x, y };
-    this.world.position.set(x, y);
+  resize(view: { x: number; y: number; w: number; h: number }): void {
     this.ground?.destroy(true);
-    this.ground = this.bakeGround(-x, -y, w, h);
+    // baked on whole world pixels, so every tile pixel lands on k whole device pixels
+    const gx = Math.floor(view.x);
+    const gy = Math.floor(view.y);
+    this.ground = this.bakeGround(gx, gy, Math.ceil(view.x + view.w) - gx, Math.ceil(view.y + view.h) - gy);
     this.world.addChildAt(this.ground, 0);
-    this.night.clear().rect(0, 0, w, h).fill({ color: 0x3b4f7a, alpha: 0.24 });
+    this.night.clear().rect(view.x, view.y, view.w, view.h).fill({ color: 0x3b4f7a, alpha: 0.24 });
     for (const s of this.extras.splice(0)) this.unplace(s);
     // props on the grass beyond the farm, the same every time for the same window
     const rows = ['hay-bale', 'flowers', 'flowers', 'puddle'] as const;
     let n = 0;
-    for (let px = -x + 24; px < w - x; px += 56) {
-      if (px > -16 && px < FARM_W + 16) continue;
-      const row = rows[n % rows.length] ?? 'flowers';
-      const py = 70 + ((n * 97) % 240);
+    for (let px = Math.floor(view.x / 56) * 56 + 24; px < view.x + view.w; px += 56) {
+      if (px > COMP.left - 24 && px < COMP.right + 24) continue;
+      const row = rows[Math.abs(n) % rows.length] ?? 'flowers';
+      const py = 70 + ((Math.abs(px) * 97) % 240);
       this.extras.push(this.place(new FrameSprite(this.assets, ['24-farm-props'], row).desync(), { x: px, y: py }));
       n++;
     }
   }
 
-  /** A farm point in stage coordinates (for effects drawn in the UI layer). */
+  /** A farm point in world coordinates (the farm is drawn at the world origin). */
   toStage(p: Point): Point {
-    return { x: p.x + this.view.x, y: p.y + this.view.y };
+    return { x: p.x, y: p.y };
   }
 
   /** Grass, straw yard, dirt path and fence, drawn once per window size into a texture. */
@@ -526,9 +530,8 @@ export class FarmScene implements Scene {
     this.eggs.set(egg.id, g);
     s.eventMode = 'static';
     s.cursor = 'pointer';
-    const eb = s.getLocalBounds();
     // eggs are small: a generous hit box so a tap on a phone finds them
-    s.hitArea = new Rectangle(eb.minX - 3, eb.minY - 3, eb.maxX - eb.minX + 6, eb.maxY - eb.minY + 6);
+    s.hitBox(3);
     s.on('pointerover', () => {
       s.filters = [HOVER];
     });

@@ -1,6 +1,6 @@
 // A frame-by-frame sprite driven by anim.json timing. Several sheets can be stacked as layers
 // (the hen: body, eyes, comb, accessory) and they advance on the same clock, frame for frame.
-import { Container, Sprite } from 'pixi.js';
+import { Container, Rectangle, Sprite } from 'pixi.js';
 import type { AssetStore, Frame } from '../assets/store';
 
 export class FrameSprite extends Container {
@@ -13,6 +13,13 @@ export class FrameSprite extends Container {
   private ended = false;
   private facing = 1;
   private size = 1;
+  private sx = 1;
+  private sy = 1;
+  /** Multiplies the art's own size (1 for nearly everything; the market's rival signs use it). */
+  private readonly extra: number;
+  private seen = -1;
+  /** When set, the hit box follows the art (in world pixels of margin), at whatever density is drawn. */
+  private hitMargin: number | null = null;
   row = '';
   speed = 1;
   /** The row to settle on after a play-once row ends (see rest). */
@@ -22,11 +29,10 @@ export class FrameSprite extends Container {
     private readonly assets: AssetStore,
     private sheets: string[],
     row: string,
-    scale?: number,
+    extra = 1,
   ) {
     super();
-    this.size = scale ?? assets.scale(sheets[0] ?? '');
-    this.scale.set(this.size);
+    this.extra = extra;
     this.play(row);
   }
 
@@ -60,7 +66,7 @@ export class FrameSprite extends Container {
       return this;
     }
     this.row = row;
-    this.frames = this.sheets.map((id) => this.assets.frames(id, row));
+    this.load();
     this.looping = opts.loop ?? this.assets.rowMode(this.sheets[0] ?? '', row) === 'loop';
     this.onDone = opts.onDone ?? null;
     this.ended = false;
@@ -70,6 +76,50 @@ export class FrameSprite extends Container {
     while (this.layers.length > this.frames.length) this.layers.pop()?.destroy();
     this.apply();
     return this;
+  }
+
+  /** Frames at the level the store draws now; a sharper atlas landing swaps them in place. */
+  private load(): void {
+    this.seen = this.assets.version;
+    this.frames = this.sheets.map((id) => this.assets.frames(id, this.row));
+    this.size = this.assets.texelScale(this.sheets[0] ?? '') * this.extra;
+    this.applyScale();
+    this.fitHit();
+  }
+
+  /** Makes the hit box the art's own box (this row's first frame, all layers), margin world pixels larger all round. */
+  hitBox(margin: number): this {
+    this.hitMargin = margin;
+    this.fitHit();
+    return this;
+  }
+
+  private fitHit(): void {
+    if (this.hitMargin === null) return;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const frames of this.frames) {
+      const t = frames[0]?.texture;
+      if (!t) continue;
+      const w = t.frame.width;
+      const h = t.frame.height;
+      const ax = (t.defaultAnchor?.x ?? 0.5) * w;
+      const ay = (t.defaultAnchor?.y ?? 1) * h;
+      x0 = Math.min(x0, -ax);
+      y0 = Math.min(y0, -ay);
+      x1 = Math.max(x1, w - ax);
+      y1 = Math.max(y1, h - ay);
+    }
+    if (x0 === Infinity) return;
+    const m = this.hitMargin / Math.max(1e-6, this.size);
+    this.hitArea = new Rectangle(x0 - m, y0 - m, x1 - x0 + 2 * m, y1 - y0 + 2 * m);
+  }
+
+  private applyScale(): void {
+    if (this.destroyed) return;
+    this.scale.set(this.size * this.sx * this.facing, this.size * this.sy);
   }
 
   /** Random start frame, so a flock does not move in lockstep. */
@@ -83,18 +133,20 @@ export class FrameSprite extends Container {
   face(dir: 1 | -1): void {
     if (this.destroyed) return;
     this.facing = dir;
-    this.scale.x = this.size * dir;
+    this.applyScale();
   }
 
   get dir(): number {
     return this.facing;
   }
 
-  /** Scale on top of the art divisor (squash and stretch). */
+  /** Scale on top of the art's own size (squash and stretch). */
   squash(sx: number, sy: number): void {
     // tweens can outlive the sprite (an egg collected mid-bounce)
     if (this.destroyed) return;
-    this.scale.set(this.size * sx * this.facing, this.size * sy);
+    this.sx = sx;
+    this.sy = sy;
+    this.applyScale();
   }
 
   get finished(): boolean {
@@ -106,6 +158,10 @@ export class FrameSprite extends Container {
   }
 
   update(dtMs: number): void {
+    if (this.seen !== this.assets.version && this.row) {
+      this.load();
+      this.apply();
+    }
     const base = this.frames[0];
     if (!base || this.ended || base.length <= 1) return;
     this.t += dtMs * this.speed;

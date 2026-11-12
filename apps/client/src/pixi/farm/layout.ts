@@ -1,18 +1,18 @@
-// Where things stand on the farm, in world pixels. The farm itself is FARM_W x 360; the window shows
-// more ground around it (see FarmScene.resize). The HUD covers the top 24 px, the card tray the
-// right 132 px (the bottom of the window in portrait) and the ticker the bottom 16 px.
+// Where things stand on the farm, in world pixels. The window shows the farm's composition (COMP)
+// whole, inside the part of the window no UI zone covers (app/viewport.ts), with grass around it.
+// Below SAFE_Y the composition's left part holds only ground: the goal tracker and the toasts may
+// sit there; every hen, egg and machine stays above it or to its right.
 
 export interface Point {
   x: number;
   y: number;
 }
 
-export const FARM_W = 508;
-export const TRAY_W = 132;
-/** In portrait the top bar wraps to two rows and the tray sits under the farm. */
-export const PORTRAIT_FARM_TOP = 40;
-
-export const FIELD = { left: 0, top: 24, right: FARM_W, bottom: 344 };
+/** Everything the farm draws, roofs to the gate, in world pixels (with a 2 px margin). */
+export const COMP = { left: 4, top: 36, right: 506, bottom: 348 } as const;
+/** Below this line, left of SAFE_X, there is only ground. */
+export const SAFE_Y = 312;
+export const SAFE_X = 330;
 
 /** The straw yard the hens roam. */
 export const YARD = { left: 24, top: 150, right: 392, bottom: 304 };
@@ -37,16 +37,16 @@ export const SPOTS = {
   cart: { x: 484, y: 340 },
   /** Where new hens arrive. */
   gate: { x: 444, y: 344 },
-  conveyorY: 316,
+  conveyorY: 304,
   conveyorFrom: 40,
   conveyorTo: 424,
 } as const;
 
 export const PROPS: { row: 'hay-bale' | 'flowers' | 'puddle' | 'signpost'; x: number; y: number }[] = [
   { row: 'hay-bale', x: 22, y: 160 },
-  { row: 'flowers', x: 300, y: 340 },
-  { row: 'hay-bale', x: 494, y: 212 },
-  { row: 'puddle', x: 120, y: 336 },
+  { row: 'flowers', x: 340, y: 344 },
+  { row: 'hay-bale', x: 484, y: 212 },
+  { row: 'puddle', x: 408, y: 250 },
   { row: 'flowers', x: 410, y: 160 },
 ];
 

@@ -1,5 +1,5 @@
-// A 640x360 painted plate that stays centred in a window of any shape: the window around it is
-// filled with each edge's own colour, so wide and tall windows show no black bars.
+// A 640x360 painted plate at the world origin: the window around it (the visible world beyond the
+// plate) is filled with each edge's own colour, so wide and tall windows show no black bars.
 import { Container, Graphics, Sprite } from 'pixi.js';
 import type { AssetStore } from '../assets/store';
 
@@ -22,21 +22,21 @@ export class Plate {
     if (frame) {
       const bg = new Sprite(frame.texture);
       bg.anchor.set(0);
-      bg.scale.set(assets.scale(id));
+      bg.scale.set(assets.texelScale(id));
       this.content.addChild(bg);
     }
     root.addChild(this.fill, this.content);
   }
 
-  /** Centres the plate in a w x h world and paints the margins. Returns the plate's offset. */
-  resize(w: number, h: number): { x: number; y: number } {
-    const x = Math.round((w - PLATE_W) / 2);
-    const y = Math.round((h - PLATE_H) / 2);
-    this.content.position.set(x, y);
+  /** Paints the visible world around the plate. */
+  resize(view: { x: number; y: number; w: number; h: number }): void {
     const c = this.colours;
+    const x1 = view.x + view.w;
+    const y1 = view.y + view.h;
     this.fill.clear();
-    if (y > 0) this.fill.rect(0, 0, w, y).fill(c.top).rect(0, y + PLATE_H, w, h - y - PLATE_H).fill(c.bottom);
-    if (x > 0) this.fill.rect(0, Math.max(0, y), x, Math.min(h, PLATE_H)).fill(c.left).rect(x + PLATE_W, Math.max(0, y), w - x - PLATE_W, Math.min(h, PLATE_H)).fill(c.right);
-    return { x, y };
+    if (view.y < 0) this.fill.rect(view.x, view.y, view.w, -view.y).fill(c.top);
+    if (y1 > PLATE_H) this.fill.rect(view.x, PLATE_H, view.w, y1 - PLATE_H).fill(c.bottom);
+    if (view.x < 0) this.fill.rect(view.x, 0, -view.x, PLATE_H).fill(c.left);
+    if (x1 > PLATE_W) this.fill.rect(PLATE_W, 0, x1 - PLATE_W, PLATE_H).fill(c.right);
   }
 }
