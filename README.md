@@ -81,7 +81,7 @@ with honest wording on every hen's card.
 Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what to do and what you should see. Commands are the same in PowerShell and a POSIX shell unless shown otherwise.
 
 1. **Install.** Run `npm ci --ignore-scripts`. You see the lockfile install with no package install scripts (`.npmrc` also sets `ignore-scripts=true`).
-2. **Test.** Run `npm test`. On a fresh clone you see **253 tests pass and 3 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it), and the asset re-pack check needs a coys-assets checkout beside the repo. Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
+2. **Test.** Run `npm test`. On a fresh clone you see **282 tests pass and 3 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it), and the asset re-pack check needs a coys-assets checkout beside the repo. Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
 3. **Play.** Run `npm run dev` and open http://localhost:5173. You see an egg fill up over the loading plate, then the title: the logo stamps in and the price ticker scrolls.
 4. **Sign in.** Press **PLAY**. With `PRIVY_APP_ID` set you sign in with email; without it a red **LOCAL DEV LOGIN** label asks for a name. You see your farm: 10 hens, a starter coop, **50.00** coins, **DAY001**.
 5. **Take the tour.** The first time you enter your farm the tour starts on its own: your hen walks you through the loop by doing it (collect an egg, sell, the market, feed, an offer, a hen, machines, rivals, the ledger). Each step ends when you do the thing; **SKIP** ends it, and it never comes back unless you press **REPLAY THE TOUR** in **SETTINGS**. After it, the goal in the corner shows what to aim for next, with a **CLAIM** button and coins when you reach it. The **?** in the top bar opens **HOW TO PLAY**, the guide to everything.
@@ -212,6 +212,45 @@ milestones, and a glossary. It opens from Settings and from the **?** in the top
 **Beta.** A BETA tag on the title logo, in the top bar and in the page title. The first-run tour now starts for every new
 player on their first farm entry with no click, and never again unless replayed: the server remembers it per player
 (`tourDone`), and the browser remembers it too.
+
+**Checked live** on 12 November 2026 (commit `c48d2f2`), from fresh headless browsers through the tunnel, with five
+temporary check farms made through the game's own `ensurePlayer` and removed afterwards (`scripts/remove-player.ts`,
+service stopped; no trades with anyone). One check farm owned all five machines.
+
+| 1280x720 | 1920x1080 |
+|---|---|
+| ![The farm at 1280x720: coop door shut, one belt along the bottom into the grader and crate, the fence along the bottom with a gate on the path, every machine on its pad with a name plate, BETA in the top bar](docs/screenshots/founders-farm-1280x720.png) | ![The farm at 1920x1080: the yard across most of the width, hens spread out, the hopper by the trough, the clerk at its desk right of the path, the cart by the crate](docs/screenshots/founders-farm-1920x1080.png) |
+| **2560x1440** | **390x844 (phone)** |
+| ![The farm at 2560x1440: the same composition at four device pixels a world pixel](docs/screenshots/founders-farm-2560x1440.png) | ![The phone: the farm across the width and most of the height, the guide and the side panel below](docs/screenshots/founders-farm-390x844.png) |
+
+| First-run tour, no click, 1280x720 | First-run tour, 390x844 | Title with BETA |
+|---|---|---|
+| ![A brand-new player's first farm entry: the tour's first step is up at once, the spotlight on an egg](docs/screenshots/founders-tour-1280x720.png) | ![The same on a phone](docs/screenshots/founders-tour-390x844.png) | ![The title plate with the BETA stamp beside the logo](docs/screenshots/founders-title-beta.png) |
+
+| How to play | Sound settings | Market board |
+|---|---|---|
+| ![The guide: eleven sections on the left, Founding Hens open on the right with its picture](docs/screenshots/founders-guide-founding.png) | ![Twelve sound groups, each with a slider, a percentage and a mute, a reset button, reduce motion, How to play and Replay the tour](docs/screenshots/founders-settings-sound.png) | ![The board with FOUNDING HENS: 773 OF 777 LEFT TO WIN, 4 WAITING (while the check farms were in play)](docs/screenshots/founders-board-founding.png) |
+| **Ledger** | **An ordinary hen** | **A machine's card** |
+| ![The ledger: machine lines per day, Founding Hen certificates, every milestone with its state, and good standing](docs/screenshots/founders-ledger-milestones.png) | ![An ordinary hen's card: not recorded on NEAR; only Founding Hens, won at milestones, are](docs/screenshots/founders-hen-ordinary.png) | ![The conveyor's card: what it does and what it did today](docs/screenshots/founders-machine-conveyor.png) |
+
+- **First-run tour:** for a brand-new player at 1280x720, 1920x1080 and 390x844 the first step was up 16 to 208 ms after
+  the farm appeared, with no click on the farm; after Skip it did not come back on a reload, nor in a second fresh
+  browser for the same player.
+- **Layout:** at 1280x720, 1920x1080, 2560x1440 and 390x844 the top bar, side panel, tracker and toasts never
+  overlapped; all five machines were on screen with their plates, none under a UI zone; one belt; no page errors.
+- **30-second capture** ([founders-live-30s.mp4](docs/screenshots/founders-live-30s.mp4), the equipped check farm at
+  1280x720): an egg is laid in the yard, rides the belt and drops into the grader and crate. The coop door is shut in
+  31 of the 32 one-second frames; it swung once, with no hen near it: the rare idle creak (every 25 to 75 s).
+
+  ![Four frames a little under a second apart: an egg in the yard, then on the belt, moving right into the grader](docs/screenshots/founders-belt-ride.png)
+
+- **Milestones, live:** the first day closes on this build rolled every milestone the farms had reached, each logged
+  with its anchor and seed. The real player's farm missed three (top three by 0.0027) and then **won a Founding Hen**
+  at a good week (roll 0.003145, day 409). She waits on the farm until the contract is upgraded; the board says 776 of
+  777 left, 1 waiting. The check farms' wins went with them.
+- **Found and fixed while checking:** the phone left half its screen empty under the side panel (the farm now takes the
+  height it can, PR #13); phones whose world zoom is 1 (360x640, 375x667 at 2x) threw `sprite 16-farmhouse not loaded`
+  (they now load the smallest painted level, PR #13); the guide's list ran over its text (short names, PR #14).
 
 ## Visual quality and the tour (12 November 2026)
 
@@ -648,6 +687,8 @@ On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and buil
 
 The live Pier deploy and its tunnel were checked end to end on 11 November 2026 (receipts under [How NEAR fits in](#how-near-fits-in)).
 
+Brief 6 was checked live on 12 November 2026 on `c48d2f2`: the farm at four sizes with no overlap, the first-run tour for brand-new players at three sizes, a 30-second capture of the belt and the coop doors, and live milestone rolls (under [Founding Hens](#founding-hens-machines-at-work-sound-and-a-guide-12-november-2026)). The contracts job builds the version 3 wasm and the sandbox mints 777 Founding Hens and refuses the 778th.
+
 The visual-quality pass was checked live on 12 November 2026: cold load at five sizes, the whole tour completed by an automated browser at five sizes, the no-overlap check with every modal and tour step open, and device-pixel crops (numbers under [Visual quality](#visual-quality-and-the-tour-12-november-2026)).
 
 The playability rescue was checked live on 12 November 2026: cold load, the four window sizes, every world object's card, an egg collected, and a 20-second flicker capture (numbers under [Playability rescue](#playability-rescue-12-november-2026)).
@@ -702,6 +743,9 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
   settlements; then the owner runs the upgrade in [deploy/testnet.md](deploy/testnet.md), and the server links the
   wallets and mints waiting Founding Hens at the next day close on its own.
 - [Mainnet checklist](docs/mainnet-checklist.md) written; nothing touched mainnet.
+- Live checks found three more things, fixed the same day: a half-empty phone screen and a crash on phones whose world
+  zoom is 1 (PR #13), and the guide's section list running over its text (PR #14). Merged as PRs #12, #13 and #14;
+  live on `c48d2f2`.
 
 ### Brief 5: visual quality, layout and the tour (12 November 2026)
 
