@@ -551,7 +551,15 @@ export class Game {
   /** The mint page: the Feathers minted so far, by grade, the estimates, recent mints and all 777 slots. Public. */
   async getMintPage(): Promise<MintPageData> {
     const count = await featherCount(this.db, this.chain.featherMinted);
-    const slots = await featherSlots(this.db);
+    // the contract is the record: every Feather on it, with this season's own details where the database has them
+    const local = await featherSlots(this.db);
+    const onChain = this.chain.featherTokens ? await this.chain.featherTokens().catch(() => null) : null;
+    const byNumber = new Map(local.map((x) => [x.number, x]));
+    for (const t of onChain ?? []) {
+      if (byNumber.has(t.number)) continue;
+      byNumber.set(t.number, { number: t.number, grade: t.grade, milestone: t.milestone, day: t.day, owner: t.owner, farm: t.season === this.season ? 'A FARM' : `TEST SEASON ${t.season.toUpperCase()}`, mintTx: null });
+    }
+    const slots = [...byNumber.values()].sort((a, b) => a.number - b.number);
     const byGrade = Object.fromEntries(FEATHER_GRADES.map((g) => [g, slots.filter((x) => x.grade === g).length])) as Record<FeatherGrade, number>;
     const F = ECONOMY.feathers;
     return {

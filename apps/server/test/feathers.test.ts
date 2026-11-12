@@ -356,3 +356,36 @@ describe('the Feathers migration', () => {
     await t.db.close();
   });
 });
+
+describe('the mint page', () => {
+  it('shows every Feather on the contract, this season with its details and a test season by name', async () => {
+    class ChainWithTokens extends RecordingChain {
+      async featherTokens() {
+        return [
+          { number: 1, grade: 'fluff' as const, milestone: 'full-coop' as const, season: 'verify-feathers-1', day: 1, owner: 'game.testnet' },
+          { number: 2, grade: 'quill' as const, milestone: 'eggs-sold' as const, season: 'verify-feathers-1', day: 1, owner: 'game.testnet' },
+        ];
+      }
+    }
+    const chain = new ChainWithTokens('game.testnet', F.mintsPerBatch);
+    chain.featherMinted = 2;
+    const t = await makeGame({ cast: true, chain, season: 'mp' });
+    const { playerId, farmId } = await player(t);
+    await t.game.act(playerId, { t: 'linkWallet', rid: 'w1', accountId: 'ada.testnet' });
+    await t.db.query(`INSERT INTO feather_tickets (id, farm_id, milestone, season, day, created_at) VALUES ('m1', $1, 'good-week', 'mp', 1, 0)`, [farmId]);
+    await t.game.act(playerId, { t: 'redeemTicket', rid: 'r1', ticketId: 'm1' });
+    t.clock.t = t.game.getClock().dayStartedAt + ECONOMY.day.lengthMs;
+    await t.game.endDay();
+    const page = await t.game.getMintPage();
+    expect(page.slots.map((s) => [s.number, s.farm])).toEqual([
+      [1, 'TEST SEASON VERIFY-FEATHERS-1'],
+      [2, 'TEST SEASON VERIFY-FEATHERS-1'],
+      [3, "Ada's Farm"],
+    ]);
+    expect(page.minted).toBe(3);
+    expect(page.left).toBe(774);
+    expect(page.byGrade.fluff + page.byGrade.quill + page.byGrade.plume + page.byGrade['golden-quill']).toBe(3);
+    expect(page.recent.map((s) => s.number)).toEqual([3, 2, 1]);
+    await t.db.close();
+  });
+});
