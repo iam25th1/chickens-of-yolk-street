@@ -97,58 +97,70 @@ export function RevealPanel({ reveal, market, onLedger, onMintPage, onClose }: {
     const t3 = setTimeout(() => setPhase('stamped'), 1500);
     return () => [t1, t2, t3].forEach(clearTimeout);
   }, [audio, big, reveal.grade]);
+  useEffect(() => {
+    if (phase !== 'stamped') return;
+    audio.play('18-stamp');
+    juice.hitstop(big ? 140 : 70);
+    juice.shake(big ? 6 : 2, big ? 420 : 220);
+    if (big) audio.play('45-deal-closed', { delayMs: 240 });
+  }, [audio, big, phase]);
   const z = 2;
   return (
-    <Modal title="YOUR FEATHER" onClose={onClose} w={340} h={330} className="certificate reveal" dismiss={phase === 'stamped'}>
-      <div className="col" style={{ alignItems: 'center', gap: 6 }}>
-        <div style={{ position: 'relative', width: CARD.w * z + 120, height: CARD.h * z, display: 'flex', justifyContent: 'center' }}>
+    <Modal title="YOUR FEATHER" onClose={onClose} w={420} h={330} className="reveal" dismiss={phase === 'stamped'}>
+      <div className="row" style={{ gap: 12, alignItems: 'center' }}>
+        <div style={{ position: 'relative', width: CARD.w * z, height: CARD.h * z, flex: 'none' }}>
           <div className={`flip ${phase}`} data-ui="reveal-card">
             {phase === 'closed' || phase === 'turning' ? <UnmintedCard number={reveal.number} z={z} /> : <FeatherCard grade={reveal.grade} number={reveal.number} z={z} row={phase === 'open' ? 'shine' : 'float'} />}
           </div>
           {phase !== 'closed' && phase !== 'turning' && big && (
             <>
-              <SheetSprite id="35-particles" row="confetti" play="once" zoom={2} style={{ position: 'absolute', left: 0, top: 10 }} />
-              <SheetSprite id="35-particles" row="confetti" play="once" zoom={2} style={{ position: 'absolute', right: 0, top: 40 }} />
-              {reveal.grade === 'golden-quill' && <SheetSprite id="35-particles" row="sparkle" play="loop" zoom={2} style={{ position: 'absolute', left: 40, top: -6 }} />}
+              <SheetSprite id="35-particles" row="confetti" play="once" zoom={2} style={{ position: 'absolute', left: -28, top: 4 }} />
+              <SheetSprite id="35-particles" row="confetti" play="once" zoom={2} style={{ position: 'absolute', right: -28, top: 40 }} />
+              {reveal.grade === 'golden-quill' && <SheetSprite id="35-particles" row="sparkle" play="loop" zoom={2} style={{ position: 'absolute', left: 30, top: -10 }} />}
             </>
           )}
           {phase === 'stamped' && (
-            <div style={{ position: 'absolute', left: 0, top: -90 }}>
-              <CardStamp row="accepted" coins={big ? 40 : 10} onDone={() => undefined} />
+            <div style={{ position: 'absolute', left: -16, top: -40, width: 128 }}>
+              <CardStamp row="accepted" onDone={() => undefined} />
             </div>
           )}
         </div>
-        <span className="panel-title small" style={{ margin: 0 }} data-ui="feather-number">
-          FEATHER {featherNo(reveal.number)} OF {ECONOMY.feathers.maxSupply}: {GRADE_LABEL[reveal.grade]}
-        </span>
-        <span style={{ color: '#2f6f9e' }}>WON AT: {MILESTONE_TEXT[reveal.milestone]}</span>
-        <p className="meaning" data-ui="planned-hatch">
-          {PLANNED} THIS IS THE BETA: IT LIVES ON NEAR&apos;S TEST NETWORK. THE RECEIPT IS IN THE LEDGER FOR DAY {reveal.day}.
-        </p>
-        <div className="row" style={{ gap: 6 }}>
-          <button
-            className="btn red"
-            onClick={() => {
-              uiSound(audio, 'click');
-              onLedger();
-            }}
-          >
-            OPEN THE LEDGER
-          </button>
-          <button
-            className="btn"
-            onClick={() => {
-              uiSound(audio, 'click');
-              onMintPage();
-            }}
-          >
-            MINT PAGE
-          </button>
-          {market.explorer && (
-            <a className="btn" href={`${market.explorer}${reveal.txHash}`} target="_blank" rel="noreferrer">
-              RECEIPT
-            </a>
-          )}
+        <div className="col" style={{ gap: 6 }}>
+          <span className="panel-title small" style={{ margin: 0 }} data-ui="feather-number">
+            FEATHER {featherNo(reveal.number)} OF {ECONOMY.feathers.maxSupply}
+          </span>
+          <span className="panel-title small" style={{ margin: 0, color: '#2f6f9e' }}>
+            {GRADE_LABEL[reveal.grade]}
+          </span>
+          <span>WON AT: {MILESTONE_TEXT[reveal.milestone]}</span>
+          <p className="meaning" style={{ margin: 0 }} data-ui="planned-hatch">
+            {PLANNED} BETA, ON NEAR&apos;S TEST NETWORK. RECEIPT IN THE LEDGER, DAY {reveal.day}.
+          </p>
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            <button
+              className="btn red"
+              onClick={() => {
+                uiSound(audio, 'click');
+                onLedger();
+              }}
+            >
+              LEDGER
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                uiSound(audio, 'click');
+                onMintPage();
+              }}
+            >
+              MINT PAGE
+            </button>
+            {market.explorer && (
+              <a className="btn" href={`${market.explorer}${reveal.txHash}`} target="_blank" rel="noreferrer">
+                RECEIPT
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </Modal>

@@ -225,7 +225,8 @@ export function farmLayout(w: number, h: number, guide: { w: number; h: number }
 
   // the trough at the yard's centre; the hopper behind it with its spout over the feed
   const troughX = Math.round((yard.left + yard.right) / 2);
-  const troughGround = Math.min(yard.top + 64, yard.bottom - 6);
+  // (64 px down a shallow yard, the middle of a deep one: a phone's yard runs far down the screen)
+  const troughGround = Math.min(Math.max(yard.top + 64, Math.round((yard.top + yard.bottom) / 2)), yard.bottom - 6);
   const troughAt = pivotFor('trough', [192, ART.trough.ground], { x: troughX, y: troughGround });
   const rimY = troughAt.y + dy('trough', ART.trough.rim);
   objects.trough = artObject('trough', troughAt, {

@@ -341,7 +341,9 @@ export class FarmScene implements Scene {
       text.position.set(3, 1);
       plate.addChild(bg, text);
       const x = Math.max(2, Math.min(this.layout.w - w - 2, u === 'conveyor' ? pad.left + 4 : Math.round((pad.left + pad.right) / 2 - w / 2)));
-      plate.position.set(Math.round(x), Math.round(pad.bottom + 2));
+      // the clerk stands behind the crate, so its plate goes over its head rather than on the crate
+      const clerkTop = this.layout.spec.objects.clerk?.box.top ?? pad.top;
+      plate.position.set(Math.round(x), Math.round(u === 'clerk' ? clerkTop - 12 : pad.bottom + 2));
       plate.label = `plate:${u}`;
       this.layers.by.labels.addChild(plate);
       this.plates.set(u, plate);
