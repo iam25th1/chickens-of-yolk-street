@@ -72,3 +72,16 @@ describe.each(SIZES)('layout at %ix%i, %i device pixels per CSS pixel', (w, h, d
     }
   });
 });
+
+describe('the phone layout', () => {
+  it('the farm takes the height the side panel and a modal do not need', () => {
+    const v = measure(390, 844, 3);
+    const z = v.zones;
+    expect(v.farm.h).toBeGreaterThan(500);
+    expect(z.side.h).toBeGreaterThanOrEqual(360);
+    expect(z.modal.h).toBeGreaterThanOrEqual(350);
+    const small = measure(360, 640, 2);
+    expect(small.farm.h).toBeGreaterThanOrEqual(314);
+    expect(small.zones.side.y + 200).toBeLessThanOrEqual(small.uiH);
+  });
+});
