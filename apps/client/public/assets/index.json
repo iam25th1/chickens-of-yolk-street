@@ -2,8 +2,8 @@
   "version": 1,
   "source": {
     "repo": "iam25th1/coys-assets",
-    "commit": "0376fa58f006708602881f57810536040cfb2177",
-    "manifestSha256": "1967d56d6b3805234c7d1095556c8da51ba3c174406b9ce364b5822f62f15d0e"
+    "commit": "2de9231d3d731dd942cd11c51103e0cecb9f1d33",
+    "manifestSha256": "16ef3ba6cfe35cf4fdba1bd084504d1f5e78fc6ee53d60b96e37cfaae12333b4"
   },
   "sprites": {
     "01-hen-base": {
@@ -2671,6 +2671,228 @@
           "vanish": false,
           "frameCount": 4,
           "totalMs": 1320
+        }
+      }
+    },
+    "x-feather-fluff": {
+      "json": "sprites/x-feather-fluff.json",
+      "png": "sprites/x-feather-fluff.png",
+      "sha256": "c599d93189fa586b3c99776a6b32b81f846a3b861aa659d7d73dc7df855bed85",
+      "source": "art/x-feather-fluff/x-feather-fluff.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "feather, fluff",
+      "width": 1024,
+      "height": 768,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "float": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        }
+      }
+    },
+    "x-feather-plume": {
+      "json": "sprites/x-feather-plume.json",
+      "png": "sprites/x-feather-plume.png",
+      "sha256": "f4e2820c18c348702e672934c8ac99c6fedf25a6b84caf039a14f91dccd68270",
+      "source": "art/x-feather-plume/x-feather-plume.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "feather, plume",
+      "width": 1024,
+      "height": 768,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "float": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        }
+      }
+    },
+    "x-feather-quill": {
+      "json": "sprites/x-feather-quill.json",
+      "png": "sprites/x-feather-quill.png",
+      "sha256": "ca0887f63dfcc7afeac7f549723ca3fd3053cb2d1237ed57ea6334f8747728c9",
+      "source": "art/x-feather-quill/x-feather-quill.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "feather, quill",
+      "width": 1024,
+      "height": 768,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "float": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        }
+      }
+    },
+    "x-feather-golden-quill": {
+      "json": "sprites/x-feather-golden-quill.json",
+      "png": "sprites/x-feather-golden-quill.png",
+      "sha256": "20d197aefdcc7e6a0b2b61f0697e92bc09fc419040357e38b4d05725721464fe",
+      "source": "art/x-feather-golden-quill/x-feather-golden-quill.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "feather, golden quill",
+      "width": 1024,
+      "height": 768,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "float": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "shine": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 480
+        }
+      }
+    },
+    "x-founders-frame-common": {
+      "json": "sprites/x-founders-frame-common.json",
+      "png": "sprites/x-founders-frame-common.png",
+      "sha256": "7984e66154a3090b733748c6499d9cc10a42b3cdc948763833ed292a1c786811",
+      "source": "art/x-founders-frame-common/x-founders-frame-common.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "Founders card frame, common",
+      "width": 384,
+      "height": 544,
+      "grid": 8,
+      "anchor": "center",
+      "static": true,
+      "rows": {
+        "plate": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 0
+        }
+      }
+    },
+    "x-founders-frame-rare": {
+      "json": "sprites/x-founders-frame-rare.json",
+      "png": "sprites/x-founders-frame-rare.png",
+      "sha256": "5bdd720ddbb5612ed703efdd93d8d4da12c188f4766971bbacba0144ea660019",
+      "source": "art/x-founders-frame-rare/x-founders-frame-rare.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "Founders card frame, rare",
+      "width": 384,
+      "height": 544,
+      "grid": 8,
+      "anchor": "center",
+      "static": true,
+      "rows": {
+        "plate": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 0
+        }
+      }
+    },
+    "x-founders-frame-epic": {
+      "json": "sprites/x-founders-frame-epic.json",
+      "png": "sprites/x-founders-frame-epic.png",
+      "sha256": "23f0f48c9f8a5fb50b0ae463090e8941e2dfd0487c1f62c5062e1e1d6deaaeac",
+      "source": "art/x-founders-frame-epic/x-founders-frame-epic.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "Founders card frame, epic",
+      "width": 384,
+      "height": 544,
+      "grid": 8,
+      "anchor": "center",
+      "static": true,
+      "rows": {
+        "plate": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 0
+        }
+      }
+    },
+    "x-founders-frame-legendary": {
+      "json": "sprites/x-founders-frame-legendary.json",
+      "png": "sprites/x-founders-frame-legendary.png",
+      "sha256": "cc44f0271dabb36437397190a3145387a7afcbd24c2d403d6887d088d5443b83",
+      "source": "art/x-founders-frame-legendary/x-founders-frame-legendary.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "Founders card frame, legendary",
+      "width": 384,
+      "height": 544,
+      "grid": 8,
+      "anchor": "center",
+      "static": true,
+      "rows": {
+        "plate": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 0
+        }
+      }
+    },
+    "x-founders-frame-unminted": {
+      "json": "sprites/x-founders-frame-unminted.json",
+      "png": "sprites/x-founders-frame-unminted.png",
+      "sha256": "13796d7110f3aeb6a31bbd89efbdb2fc03171c735a3f64a93a66c26b6bd489db",
+      "source": "art/x-founders-frame-unminted/x-founders-frame-unminted.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "Founders card frame, unminted",
+      "width": 384,
+      "height": 544,
+      "grid": 8,
+      "anchor": "center",
+      "static": true,
+      "rows": {
+        "plate": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 0
         }
       }
     }
