@@ -86,7 +86,7 @@ jobs:
       - name: Build the contract (cargo near)
         working-directory: contracts/coys-game
         run: cargo near build non-reproducible-wasm --locked
-      - name: Sandbox tests (Founding Hens and the 777 cap, upgrade, transfer, settlement, access control)
+      - name: Sandbox tests (Feathers and the 777 cap, compact settlement, the version 2 upgrade and release, provenance, access control)
         working-directory: contracts/sandbox-tests
         env:
           COYS_WASM: ${{ github.workspace }}/contracts/coys-game/target/near/coys_game.wasm
