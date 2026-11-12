@@ -234,11 +234,21 @@ async fn exactly_777_founding_hens_then_the_778th_is_refused() -> anyhow::Result
     let (player, agent, mallory) = accounts(&worker).await?;
     let start = contract.view_account().await?;
 
-    // one batch can never pass the cap
+    // one batch can never pass the cap (tiny portraits, so the 778 fit in one transaction and reach the contract)
     let mut too_many = batch_in("s1", 1, &player, &agent);
-    too_many["founding_mints"] = Value::Array((0..=777).map(|i| founding(&format!("f-{i}"), &player, "s1", 1)).collect());
+    too_many["founding_mints"] = Value::Array(
+        (0..=777)
+            .map(|i| {
+                let mut f = founding(&format!("f-{i}"), &player, "s1", 1);
+                f["media"] = json!("data:image/png;base64,AA==");
+                f
+            })
+            .collect(),
+    );
     let over = contract.call("settle_day").args_json(json!({ "batch": too_many })).max_gas().transact().await?;
     assert!(over.is_failure(), "a batch of 778 was accepted");
+    let none: Value = contract.view("founding_supply").await?.json()?;
+    assert_eq!(none["minted"], 0);
 
     let (mut minted, mut day, mut max_gas) = (0u32, 1u32, 0u64);
     while minted < 777 {

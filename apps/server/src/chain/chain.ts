@@ -5,8 +5,11 @@
 //
 // Founding Hens are minted only by a contract that has them (version 3, which answers
 // founding_supply), and only as many as the game account's free balance can store: each mint keeps
-// CHAIN_MINT_NEAR in reserve on top of a CHAIN_MIN_BALANCE_NEAR margin. A hen that cannot be
-// minted yet waits for a later day close.
+// CHAIN_MINT_NEAR in reserve on top of a CHAIN_MIN_BALANCE_NEAR margin. The margin defaults to
+// about one real day of settlements at 3-minute days (measured on s1: 179 bytes of state and
+// 0.0004 NEAR of gas per settled day, 480 days a real day, so about 1.06 NEAR), so nothing optional
+// (mints, linking or creating agent wallets) ever eats into the days' own settlements. A hen that
+// cannot be minted yet waits for a later day close.
 import { createHmac } from 'node:crypto';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { Account, JsonRpcProvider, KeyPairSigner, baseEncode, nearToYocto, teraToGas } from 'near-api-js';
@@ -169,10 +172,16 @@ export class TestnetChain implements ChainWriter {
 
   /**
    * Each open agent gets a funded sub-account of the game account. A wallet that already exists on
-   * chain is linked at once (it costs nothing); only creating one needs the game account's funds.
+   * chain only needs linking (its egg balances then take a little state); creating one also needs
+   * its funding. Both wait while the game account is under its margin.
    */
   private async ensureAgentAccounts(db: Db): Promise<void> {
     const agents = await db.query(`SELECT id, kind, generation FROM agents WHERE status = 'open' AND near_account_id IS NULL ORDER BY kind`);
+    if (!agents.length) return;
+    if ((await this.balanceNear()) < this.cfg.minBalanceNear) {
+      this.log(`[chain] game account under its ${this.cfg.minBalanceNear} NEAR margin; ${agents.length} agent wallets wait to be linked`);
+      return;
+    }
     let lowSaid = false;
     for (const a of agents) {
       const name = agentAccountName(String(a.kind), num(a.generation), this.cfg.accountId);
@@ -256,7 +265,7 @@ export function createChainWriter(env: NodeJS.ProcessEnv, renderer: HenRenderer,
       rpcUrl: env.NEAR_TESTNET_RPC_URL || 'https://test.rpc.fastnear.com',
       contractId: env.NEAR_GAME_CONTRACT_ID || accountId,
       mintNear: Number(env.CHAIN_MINT_NEAR || 0.03),
-      minBalanceNear: Number(env.CHAIN_MIN_BALANCE_NEAR || 0.25),
+      minBalanceNear: Number(env.CHAIN_MIN_BALANCE_NEAR || 1.25),
       agentFundingNear: Number(env.AGENT_ACCOUNT_FUNDING_NEAR || 0.05),
     },
     renderer,

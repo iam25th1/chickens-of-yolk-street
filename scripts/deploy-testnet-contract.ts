@@ -12,7 +12,7 @@
 //                      public key (so the same private key signs for it), funded with --fund NEAR
 //   --fund <near>      NEAR sent to a created account (default 8)
 //   --owner <id>       owner_id for new() on a fresh contract (default: the account itself)
-//   --migrate          call migrate() after deploying, to upgrade version 1 state in place
+//   --migrate          call migrate() after deploying, to upgrade the previous version's state in place
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';

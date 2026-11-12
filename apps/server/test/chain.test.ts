@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ECONOMY } from '@coys/shared';
 import { buildDayBatch, commitBatch } from '../src/chain/batch';
-import { NoopChain, agentAccountName, agentPublicKey, assertTestnetConfig } from '../src/chain/chain';
+import { NoopChain, agentAccountName, agentPublicKey, assertTestnetConfig, mintsAffordable } from '../src/chain/chain';
 import { HenRenderer } from '../src/chain/hen-image';
 import { decodePng } from '../src/chain/png';
 import { openDb } from '../src/db/db';
@@ -134,5 +134,16 @@ describe('testnet only', () => {
     expect(a).toMatch(/^ed25519:[1-9A-HJ-NP-Za-km-z]{43,44}$/);
     expect(agentPublicKey('ed25519:secret', 'bakery', 1)).toBe(a);
     expect(agentPublicKey('ed25519:secret', 'bakery', 2)).not.toBe(a);
+  });
+});
+
+describe('the Founding Hen reserve', () => {
+  it('mints only as many as the free balance stores above the margin, never past the batch cap', () => {
+    const cfg = { mintNear: 0.03, minBalanceNear: 1.25 };
+    expect(mintsAffordable(0.667, cfg, 20)).toBe(0);
+    expect(mintsAffordable(1.25, cfg, 20)).toBe(0);
+    expect(mintsAffordable(1.28, cfg, 20)).toBe(1);
+    expect(mintsAffordable(1.4, cfg, 20)).toBe(5);
+    expect(mintsAffordable(50, cfg, 20)).toBe(20);
   });
 });
