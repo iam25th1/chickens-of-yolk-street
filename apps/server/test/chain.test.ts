@@ -79,7 +79,8 @@ describe('the daily batch', () => {
     expect(first.settlement.feathers.map((f) => f.media_sha256)).toEqual([renderer.render('golden-quill', 41).sha256Hex, renderer.render('plume', 42).sha256Hex]);
     expect(first.settlement.farms.length).toBeGreaterThanOrEqual(first.batch.farms.length);
     await commitBatch(t.db, first, 'tx-1');
-    const minted = await t.db.query(`SELECT id, status, number, token_id, owner_account, mint_tx FROM feather_tickets ORDER BY id`);
+    // (the day close's own milestone rolls may have added a ticket of their own: look at these three)
+    const minted = await t.db.query(`SELECT id, status, number, token_id, owner_account, mint_tx FROM feather_tickets WHERE id IN ('t1', 't2', 't3') ORDER BY id`);
     expect(minted.map((m) => [m.id, m.status, m.number === null ? null : Number(m.number), m.mint_tx])).toEqual([
       ['t1', 'minted', 42, 'tx-1'],
       ['t2', 'minted', 41, 'tx-1'],
