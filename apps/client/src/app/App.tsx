@@ -50,16 +50,13 @@ export function App() {
         // the page's own loading screen (index.html) hands over to the game's
         document.getElementById('boot')?.remove();
         setServices({ assets, audio, pixi });
-        // stage 2: the title (art, fonts, the button clicks); music streams after the first tap
-        const total = TITLE_GROUPS.length + FONTS.length + 1;
+        // stage 2: the title (art and fonts); the button clicks follow, music streams after the first tap
+        const total = TITLE_GROUPS.length + FONTS.length;
         let done = 0;
         const tick = () => setProgress(++done / total);
-        await Promise.all([
-          assets.loadGroups([...TITLE_GROUPS], v0.p, { onEach: tick }),
-          audio.load(BOOT_SOUNDS, () => undefined).then(tick, tick),
-          ...FONTS.map((f) => document.fonts.load(f).then(tick, tick)),
-        ]);
+        await Promise.all([assets.loadGroups([...TITLE_GROUPS], v0.p, { onEach: tick }), ...FONTS.map((f) => document.fonts.load(f).then(tick, tick))]);
         setScreen('title');
+        void audio.load(BOOT_SOUNDS).catch(() => undefined);
         // stage 3 starts now: the farm's art downloads while the player reads the title
         void assets.loadGroups([...FARM_GROUPS], viewport.get().farm.k, { quick: true }).catch(() => undefined);
       } catch (e) {
@@ -68,12 +65,12 @@ export function App() {
     })();
   }, []);
 
-  // a new window density brings the matching atlases (sprites keep drawing meanwhile)
+  // a new window density brings the matching atlases for the groups already loaded (sprites keep
+  // drawing meanwhile); it never starts a group early
   useEffect(() => {
-    if (!services || screen === 'boot') return;
-    void services.assets.loadGroups([...TITLE_GROUPS, ...LATER_GROUPS], vp.p).catch(() => undefined);
-    void services.assets.loadGroups([...FARM_GROUPS], vp.farm.k, { quick: true }).catch(() => undefined);
-  }, [services, screen, vp.p, vp.farm.k]);
+    if (!services) return;
+    services.assets.retarget({ farm: vp.farm.k, fx: vp.farm.k }, vp.p);
+  }, [services, vp.p, vp.farm.k]);
 
   // pixel cursor from 34-cursor: each art pixel p device pixels
   const cursorPx = Math.min(128, Math.max(16, Math.round((16 * vp.p) / vp.dpr)));
@@ -130,14 +127,14 @@ export function App() {
       .loadGroups([...FARM_GROUPS], v.farm.k, { quick: true, onEach: tick })
       .then(() => {
         setTimeout(() => setScreen('farm'), 250);
-        // the sharp farm first, then sounds and the other screens' art; nothing waits for them
+        // the sharp farm first; sounds and the other screens' art a few seconds after it, so nothing
+        // shares the line with the farm while it opens
         void assets
           .loadGroups([...FARM_GROUPS], v.farm.k)
           .catch(() => undefined)
-          .then(() => {
-            void audio.load(FARM_SOUNDS).catch(() => undefined);
-            void assets.loadGroups([...LATER_GROUPS], v.p).catch(() => undefined);
-          });
+          .then(() => new Promise((r) => setTimeout(r, 3000)))
+          .then(() => audio.load(FARM_SOUNDS).catch(() => undefined))
+          .then(() => assets.loadGroups([...LATER_GROUPS], viewport.get().p).catch(() => undefined));
       })
       .catch((e: unknown) => setFatal(e instanceof Error ? e.message : String(e)));
   }, [screen, services]);

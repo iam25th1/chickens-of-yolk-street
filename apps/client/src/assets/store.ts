@@ -145,6 +145,14 @@ export class AssetStore {
     );
   }
 
+  /** After the window's density changes: reloads every group already asked for at its new density. */
+  retarget(byGroup: Partial<Record<Group, number>>, others: number): void {
+    for (const [g, d] of [...this.density]) {
+      const next = byGroup[g] ?? others;
+      if (next !== d) void this.loadGroups([g], next, { quick: true }).catch(() => undefined);
+    }
+  }
+
   /** Every group a set of sprites lives in. */
   groupsOf(ids: string[]): Group[] {
     return [...new Set(ids.map((id) => this.sprite(id).group))];
