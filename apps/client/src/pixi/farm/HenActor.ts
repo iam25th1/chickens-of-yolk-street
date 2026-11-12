@@ -8,13 +8,14 @@ import type { Point } from './layout';
 
 type HenState = 'idle' | 'walk' | 'eat' | 'lay' | 'sleep' | 'happy' | 'sad';
 
+/** Walks are routes: points to walk to in turn, round anything standing in the way (movement.ts). */
 export interface HenWorld {
   night: boolean;
   fed: boolean;
-  troughSpot(): Point;
-  roost(): Point;
+  troughSpot(from: Point): Point[];
+  roost(from: Point): Point[];
   /** A free spot in the yard, away from the other hens. */
-  spot(): Point;
+  spot(from: Point): Point[];
   /** A hen reached (or left) her roost by a coop: the coop's door swings once. */
   door(at: Point): void;
 }
@@ -35,6 +36,8 @@ export class HenActor {
   private state: HenState = 'idle';
   private timer = 400 + Math.random() * 2400;
   private target: Point | null = null;
+  /** The rest of the route after target. */
+  private route: Point[] = [];
   private afterWalk: HenState = 'idle';
   private puff = { s: 1 };
 
@@ -56,18 +59,40 @@ export class HenActor {
     return { x: this.sprite.x, y: this.sprite.y };
   }
 
-  walkTo(p: Point, then: HenState = 'idle'): void {
+  walkTo(p: Point | Point[], then: HenState = 'idle'): void {
     if (this.state === 'lay') return;
-    this.target = { ...p };
+    const points = Array.isArray(p) ? p.map((q) => ({ ...q })) : [{ ...p }];
+    const first = points.shift();
+    if (!first) return;
+    this.target = first;
+    this.route = points;
     this.afterWalk = then;
     this.state = 'walk';
     this.sprite.play('waddle');
+  }
+
+  /**
+   * The window changed: the yard re-flowed. Carry the hen (and any walk she was on) to her place in
+   * the new layout, in world units; she then picks a fresh walk from there.
+   */
+  carry(map: (p: Point) => Point): void {
+    const at = map(this.position);
+    this.sprite.position.set(at.x, at.y);
+    this.target = null;
+    this.route = [];
+    if (this.state === 'walk') {
+      this.state = 'idle';
+      this.afterWalk = 'idle';
+      this.timer = 200 + Math.random() * 600;
+      this.sprite.play('idle');
+    }
   }
 
   /** Lay: puff up, strain, and drop the egg at frame two. */
   lay(onDrop: (at: Point, dir: number) => void): void {
     this.state = 'lay';
     this.target = null;
+    this.route = [];
     this.sprite.play('lay', {
       loop: false,
       restart: true,
@@ -98,10 +123,10 @@ export class HenActor {
     if (this.state === 'lay') return;
 
     if (world.night && this.state !== 'sleep' && this.afterWalk !== 'sleep') {
-      this.walkTo(world.roost(), 'sleep');
+      this.walkTo(world.roost(this.position), 'sleep');
     } else if (!world.night && this.state === 'sleep') {
       world.door(this.position);
-      this.walkTo(world.spot());
+      this.walkTo(world.spot(this.position));
     }
 
     if (this.state === 'walk' && this.target) {
@@ -112,6 +137,11 @@ export class HenActor {
       if (Math.abs(dx) > 0.5) this.sprite.face(dx > 0 ? 1 : -1);
       if (dist <= step) {
         this.sprite.position.set(Math.round(this.target.x), Math.round(this.target.y));
+        const next = this.route.shift();
+        if (next) {
+          this.target = next;
+          return;
+        }
         this.target = null;
         if (this.afterWalk === 'sleep') world.door(this.position);
         this.enter(this.afterWalk);
@@ -127,8 +157,8 @@ export class HenActor {
     if (this.timer > 0) return;
     const roll = Math.random();
     if (!world.fed && roll < 0.25) this.enter('sad');
-    else if (world.fed && roll < 0.28) this.walkTo(world.troughSpot(), 'eat');
-    else if (roll < 0.8) this.walkTo(world.spot());
+    else if (world.fed && roll < 0.28) this.walkTo(world.troughSpot(this.position), 'eat');
+    else if (roll < 0.8) this.walkTo(world.spot(this.position));
     else this.enter('idle');
   }
 
