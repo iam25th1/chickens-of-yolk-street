@@ -2,7 +2,7 @@
 // art. Opens from Settings and from the ? in the top bar. One section at a time, with previous and
 // next; a section longer than the window allows is split into pages (never a scrollbar).
 import { Children, Fragment, isValidElement, useState, type ReactNode } from 'react';
-import { BADGES, ECONOMY, MARKET_CHART_DAYS, UNLOCK_IDS, type MilestoneId } from '@coys/shared';
+import { BADGES, ECONOMY, LAND_IDS, LAND_NAME, MARKET_CHART_DAYS, UNLOCK_IDS, type MilestoneId } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { Modal } from './Modal';
@@ -156,6 +156,25 @@ const SECTIONS: Section[] = [
     ),
   },
   {
+    id: 'land',
+    title: 'LAND AND LOOKING ROUND',
+    short: 'LAND',
+    picture: () => <Art id="24-farm-props" row="signpost" zoom={2} />,
+    body: (
+      <>
+        <p>
+          YOUR FARM STARTS ON ITS HOME PLOT. IN THE SHOP&apos;S LAND TAB YOU CAN BUY THE FOUR PLOTS AROUND IT: THE {LAND_IDS.map((id) => LAND_NAME[id]).join(', ')}. EACH ADDS{' '}
+          {ECONOMY.land.plots.east.coopSlots} COOP PLOTS AND A PASTURE FOR YOUR HENS. THE FIRST PLOT YOU BUY COSTS {ECONOMY.land.prices[0]} COINS, AND EACH ONE AFTER COSTS MORE, UP TO{' '}
+          {ECONOMY.land.prices[ECONOMY.land.prices.length - 1]}.
+        </p>
+        <p>
+          WITH LAND YOUR FARM IS BIGGER THAN THE SCREEN: DRAG IT TO LOOK ROUND, OR USE THE ARROW KEYS OR WASD. THE SMALL MAP AT THE TOP LEFT SHOWS WHERE YOU ARE (TAP IT TO GO
+          THERE), AND HOME BRINGS YOUR HOME PLOT BACK.
+        </p>
+      </>
+    ),
+  },
+  {
     id: 'rivals',
     title: 'RIVALS AND BUSTS',
     short: 'RIVALS AND BUSTS',
@@ -280,7 +299,7 @@ const SECTIONS: Section[] = [
         <li>FEATHER: A TESTNET NFT, A CLAIM TICKET FOR ONE OF THE 777 FOUNDING HENS (PLANNED).</li>
         <li>GRADE: FLUFF, PLUME, QUILL OR GOLDEN QUILL; IT SETS THE ODDS, NOT THE HEN.</li>
         <li>RECEIPT: THE DAY&apos;S RECORD ON NEAR, LINKED IN THE LEDGER.</li>
-        <li>NET WORTH: COINS, PLUS HENS AT THE HEN PRICE, COOPS AT THEIR PRICE AND MACHINES AT THEIR PRICE TIMES THEIR CONDITION.</li>
+        <li>NET WORTH: COINS, PLUS HENS AT THE HEN PRICE, COOPS AT THEIR PRICE, MACHINES AT THEIR PRICE TIMES THEIR CONDITION, AND LAND AT WHAT IT COST.</li>
         <li>BADGE: A MARK OF SOMETHING YOUR FARM DID. COSMETIC ONLY.</li>
         <li>TESTNET: NEAR&apos;S PRACTICE NETWORK, WHERE THIS BETA RECORDS EVERYTHING.</li>
       </ul>

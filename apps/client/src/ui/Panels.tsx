@@ -7,6 +7,9 @@ import {
   UNLOCK_IDS,
   coopPlots,
   coopUpgradeCost,
+  landCoopPlots,
+  landOfCoopPlot,
+  LAND_NAME,
   desperation,
   feedGramsPerHenDay,
   loyalistBagPrice,
@@ -27,11 +30,18 @@ import { DEFAULT_SETTINGS, settings } from '../state/settings';
 import { useStore } from '../state/store';
 import { replayTour } from '../state/tour';
 import { uiEvents, type ShopTab } from '../state/ui';
+import { LandTab } from './Land';
 import { Modal } from './Modal';
 import { Paged } from './Paged';
 import { SheetSprite } from './SheetSprite';
 
 export type { ShopTab };
+
+/** Where a coop stands, for the coops list: its plot on the home plot, or the land it is on. */
+function coopPlace(plot: number): string {
+  const land = landOfCoopPlot(plot);
+  return land ? `${LAND_NAME[land]} ${landCoopPlots(land).indexOf(plot) + 1}` : `PLOT ${plot + 1}`;
+}
 
 /** A bordered panel at a fixed spot (screens drawn for 640x360: the title's settings, login). */
 export function Panel({ title, x, y, w, h, onClose, children }: { title: string; x: number; y: number; w: number; h: number; onClose: () => void; children: ReactNode }) {
@@ -138,7 +148,7 @@ export function ShopPanel({
   return (
     <Modal title="FARM SHOP" onClose={onClose} w={420} h={300}>
       <div className="tabs">
-        {(['hens', 'feed', 'coops', 'machines'] as const).map((t) => (
+        {(['hens', 'feed', 'coops', 'machines', 'land'] as const).map((t) => (
           <button
             key={t}
             className={`btn ${tab === t ? 'red' : ''}`}
@@ -243,7 +253,7 @@ export function ShopPanel({
               return (
                 <div key={c.id} className="row spread">
                   <span>
-                    PLOT {c.plot + 1}: {c.kind.toUpperCase()} ({ECONOMY.coops.kinds[c.kind].capacity} HENS)
+                    {coopPlace(c.plot)}: {c.kind.toUpperCase()} ({ECONOMY.coops.kinds[c.kind].capacity} HENS)
                   </span>
                   {next ? (
                     <button className="btn" disabled={cash < coopUpgradeCost(c.kind, next)} onClick={click(() => void send({ t: 'upgradeCoop', coopId: c.id }))}>
@@ -271,6 +281,7 @@ export function ShopPanel({
           ]}
         />
       )}
+      {tab === 'land' && <LandTab farm={farm} send={send} onBought={onClose} />}
       {tab === 'machines' && (
         <Paged
           gap={2}

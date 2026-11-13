@@ -3,14 +3,16 @@
 // above it, and one modal at a time over a dimmed backdrop (shop, ledger, a card, a hen, a machine,
 // the crate, a hen's certificate, settings) or a page of its own (the Market, the Feather Mint).
 // Server state flows in through the socket; player choices go out as actions and come back as
-// events with juice.
+// events with juice. A farm with land is bigger than the window: drag it, use the arrow keys or WASD,
+// or the small map to look round, and HOME to come back (pixi/farm/camera.ts).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ECONOMY, isCrash, type CardView } from '@coys/shared';
 import { useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
-import { worldToUi } from '../app/viewport';
+import { viewport, worldToUi } from '../app/viewport';
 import { GameSocket, type Action } from '../net/socket';
 import { FarmScene, type WorldTarget } from '../pixi/farm/FarmScene';
+import { attachLook } from '../pixi/farm/camera';
 import { TownScene } from '../pixi/TownScene';
 import { events, game } from '../state/game';
 import { useStore } from '../state/store';
@@ -36,6 +38,8 @@ import { NameFarm } from '../ui/NameFarm';
 import { ProfilePage } from '../ui/Profile';
 import { PublicProfileModal } from '../ui/PublicProfile';
 import { BadgeMoments } from '../ui/BadgeMoment';
+import { LookAround } from '../ui/Land';
+import { LAND_NAME } from '@coys/shared';
 import { MACHINE_NAME } from '../pixi/farm/FarmScene';
 
 /** What clicking each thing on the farm opens. */
@@ -89,6 +93,8 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
   const scene = useRef<FarmScene | null>(null);
   const town = useRef<TownScene | null>(null);
   const linked = useRef(false);
+  /** Removes the look-round input (drag, keys) when the farm screen goes. */
+  const unlook = useRef<(() => void) | null>(null);
 
   const send = useCallback(async (a: Action): Promise<boolean> => {
     const ack = await socket.current?.send(a);
@@ -152,22 +158,35 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       open: (target) => openModal(modalFor(target)),
     });
     scene.current = s;
-    // read-only hooks for automated checks: where things are on the farm, and opening a modal as a click would
-    (window as unknown as { __coysFarm?: unknown }).__coysFarm = { targets: () => s.targets(), yard: () => s.yardBox(), hatching: () => s.hatching() };
+    // read-only hooks for automated checks: where things are on the farm (and where its camera looks), and opening a modal as a click would
+    (window as unknown as { __coysFarm?: unknown }).__coysFarm = { targets: () => s.targets(), yard: () => s.yardBox(), hatching: () => s.hatching(), camera: () => s.camera(), land: () => s.landMomentState() };
     (window as unknown as { __coysUi?: unknown }).__coysUi = { open: openModal, close: closeModal };
     // and showing any tour step, so every step's box can be checked at every window size
     (window as unknown as { __coysTour?: unknown }).__coysTour = { count: TOUR.length, show: (step: number) => tour.set({ active: true, step }), end: () => tour.set({ active: false, step: 0 }) };
     s.sync(farm);
     pixi.setScene(s);
+    // drag the farm, or the arrow keys and WASD (not while a modal or the tour is up, or a field has the keys)
+    unlook.current = attachLook(
+      pixi.app.canvas,
+      s,
+      () => ({ k: viewport.get().farm.k, dpr: viewport.get().dpr }),
+      () => ui.get().modal === null && !tour.get().active,
+    );
   }, [farm, assets, audio, pixi, send]);
 
   useEffect(
     () => () => {
+      unlook.current?.();
+      unlook.current = null;
       town.current?.destroy();
       pixi.setScene(null);
     },
     [pixi],
   );
+  // the tour points at the home plot: the camera goes home when it starts
+  useEffect(() => {
+    if (touring) scene.current?.goHome();
+  }, [touring]);
   useEffect(() => {
     if (farm) scene.current?.sync(farm);
   }, [farm]);
@@ -370,6 +389,9 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
           case 'unlockBought':
             uiFx.emit({ kind: 'toast', text: `${e.unlock.toUpperCase()} ONLINE` });
             break;
+          case 'landBought':
+            uiFx.emit({ kind: 'toast', text: `THE ${LAND_NAME[e.plot]} IS YOURS: ROOM FOR MORE COOPS` });
+            break;
           default:
             break;
         }
@@ -408,6 +430,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       {!(v.portrait && modal) && <SidePanel farm={farm} market={market} rect={z.side} send={send} onOpen={openCard} />}
       <ToastArea farm={farm} rect={z.toasts} offline={status === 'offline'} />
       <Tracker farm={farm} rect={z.tracker} send={send} />
+      {!touring && !(v.portrait && modal) && <LookAround rect={z.world} onHome={() => scene.current?.goHome()} onLook={(p) => scene.current?.lookAt(p)} />}
       {touring && <TourBox ctx={ctx} send={send} />}
       {modal?.kind === 'shop' && (
         <ShopPanel
