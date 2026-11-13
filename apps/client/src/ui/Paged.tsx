@@ -3,7 +3,7 @@
 // the room the panel has left (the closest [data-room] ancestor says how tall it may grow), with
 // previous and next controls when there is more than one page. The room is read again on every
 // resize, so the same content splits differently at every window size, and nothing is ever cut off.
-import { Fragment, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 
@@ -80,23 +80,33 @@ export function Paged({
   const measure = useRef<HTMLDivElement>(null);
   const [pages, setPages] = useState<number[][]>(() => [items.map((_, i) => i)]);
   const [at, setAt] = useState(0);
-  const tries = useRef(0);
-  const sig = `${items.length}|${v.uiW}x${v.uiH}|${String(resetKey)}`;
-  const lastSig = useRef(sig);
-  if (lastSig.current !== sig) {
-    lastSig.current = sig;
-    tries.current = 0;
-  }
+  /** When the pages last changed: a layout that keeps changing its mind waits a moment before trying again. */
+  const changes = useRef<number[]>([]);
   useLayoutEffect(() => {
     setAt(0);
   }, [resetKey]);
+  // an item that changes size without a new render (a font arriving, a sprite loading) fits again
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const m = measure.current;
+    if (!m || typeof ResizeObserver === 'undefined') return;
+    // (observing reports every size once at the start: that first report is not a change)
+    let first = true;
+    const ro = new ResizeObserver(() => {
+      if (first) first = false;
+      else setTick((n) => n + 1);
+    });
+    for (const c of m.children) ro.observe(c);
+    return () => ro.disconnect();
+  }, [items.length]);
 
   useLayoutEffect(() => {
     const el = self.current;
     const m = measure.current;
     if (!el || !m) return;
-    // a layout that keeps changing its mind stops after a few tries (until the size or items change)
-    if (tries.current > 6) return;
+    const now = performance.now();
+    changes.current = changes.current.filter((t) => now - t < 1000);
+    if (changes.current.length >= 6) return;
     const budget = fill ? el.clientHeight : el.offsetHeight + freeRoom(el);
     let next: number[][];
     if (cell) {
@@ -122,7 +132,7 @@ export function Paged({
     }
     const same = next.length === pages.length && next.every((p, i) => p.length === pages[i]?.length && p[0] === pages[i]?.[0]);
     if (!same) {
-      tries.current++;
+      changes.current.push(now);
       setPages(next);
     }
   }, [cell, pages, gap, items, onPrevEdge, onNextEdge, fill, v.uiW, v.uiH]);
