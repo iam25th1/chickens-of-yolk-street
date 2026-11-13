@@ -47,7 +47,7 @@ Every step is the owner's.
       relayer if the owner sponsors claims.
 - [ ] Settlement runway (if the game itself settles on mainnet): about 0.19 NEAR of gas a real day
       at 3-minute days (see 1), much less with longer days. Keep at least a week of it.
-- [ ] Agent wallets: 0.05 NEAR each (`AGENT_ACCOUNT_FUNDING_NEAR`), 7 at first.
+- [ ] Agent wallets: 0.01 NEAR each (`AGENT_ACCOUNT_FUNDING_NEAR`), 7 at first, reused from a pool.
 - [ ] Set `CHAIN_MIN_BALANCE_NEAR` to the runway you want kept free, and `CHAIN_MINT_NEAR` to the
       measured cost of one mint (0.035 covers the 3,169 bytes a Feather measured).
 

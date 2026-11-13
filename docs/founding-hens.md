@@ -175,6 +175,6 @@ $7/777 \approx 0.9\%$ of a Legendary.
 |---|---|
 | Version 4 wasm | 353,408 bytes (version 2: 341,943) |
 | Upgrade in place (sandbox, exact v2 code) | +11,490 bytes, `migrate` 1 Tgas |
-| One Feather | 3,169 bytes with its card image, about 0.032 NEAR (`CHAIN_MINT_NEAR`, default 0.035); all 777 about 24.6 NEAR |
+| One Feather | 1,913 to 2,075 bytes with its card image and about 0.0005 NEAR of gas, measured on testnet: about 0.021 NEAR (`CHAIN_MINT_NEAR`, default 0.027 with a quarter more); all 777 about 16.5 NEAR |
 | One settled day | 0 bytes (version 2: 179); about 0.0004 NEAR of gas |
 | Release of a version 2 day record | 179 bytes back |
