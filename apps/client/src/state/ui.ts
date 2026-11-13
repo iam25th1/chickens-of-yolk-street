@@ -14,13 +14,17 @@ export type ModalState =
   | { kind: 'machine'; unlock: UnlockId }
   | { kind: 'market'; tab: MarketTab }
   | { kind: 'card'; cardId: string }
-  | { kind: 'reveal'; ticketId: string; number: number; grade: FeatherGrade; milestone: MilestoneId; txHash: string; day: number }
+  | { kind: 'reveal'; ticketId: string; number: number; grade: FeatherGrade; milestone: MilestoneId; txHash: string | null; day: number }
   | { kind: 'feathers' }
+  | { kind: 'minting'; ticketId: string; attempt: number }
   | { kind: 'settings' }
   | { kind: 'guide' }
   | { kind: 'name'; mode: 'first' | 'rename' };
 
 export const ui = createStore<{ modal: ModalState | null }>({ modal: null });
+
+/** Set (session storage) when the player signs in from the open Feather Mint: the farm opens with the mint. */
+export const OPEN_MINT_KEY = 'coys.openMint';
 
 /** Things the player did in the UI that the tour waits for (opened a modal, switched a tab, tapped an explainer). */
 export type UiEvent = { kind: 'opened'; modal: ModalState } | { kind: 'tab'; modal: 'shop' | 'market'; tab: string } | { kind: 'tapped'; what: string };

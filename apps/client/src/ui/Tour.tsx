@@ -143,11 +143,11 @@ export const TOUR: TourStep[] = [
     done: (s) => tapped(s, 'farms'),
   },
   {
-    title: 'FEATHERS (BETA)',
+    title: 'THE FEATHER MINT (BETA)',
     hen: true,
     text: (c) =>
-      `MILESTONES WIN FEATHER TICKETS. REDEEM ONE FOR A FEATHER, A CLAIM ON ONE OF ${c.market.feathers.max} FOUNDING HENS (PLANNED). OPEN THE MINT PAGE.`,
-    target: (c) => (c.modal?.kind === 'feathers' ? { dom: 'mint-tickets', tag: 'YOUR TICKETS' } : c.modal ? close : { dom: 'feathers', tag: 'THE MINT PAGE' }),
+      `MILESTONES WIN FEATHER TICKETS. MINT ONE HERE FOR A FEATHER WITH A RANDOM NUMBER, A CLAIM ON ONE OF ${c.market.feathers.max} FOUNDING HENS (PLANNED). OPEN THE MINT.`,
+    target: (c) => (c.modal?.kind === 'feathers' ? { dom: 'mint-tickets', tag: 'YOUR TICKETS' } : c.modal ? close : { dom: 'feathers', tag: 'MINT' }),
     done: (s) => opened(s, 'feathers'),
   },
   {

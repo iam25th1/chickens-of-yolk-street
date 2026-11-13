@@ -1,12 +1,13 @@
 // The real game server for the browser checks: a memory database, no chain (every day a recorded
 // no-op), the local dev login, the built client (apps/client/dist), and a clock the test can move
-// forward to close days. Never touches NEAR. Farms whose name starts with "Ada Check" can be given
-// every machine and a handful of Feather tickets, so every screen has content to page.
+// forward to close days. Never touches NEAR: its Feather mints are a stand-in that answers after a
+// short wait (the next ones can be made to fail, as NEAR refusing them would). A named farm can be
+// given every machine, a handful of Feather tickets and a wallet, so every screen has content to page.
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { InferenceBudget } from '../apps/server/src/agents/brain';
 import { createSessionSigner } from '../apps/server/src/auth/session';
-import { NoopChain, type ChainWriter } from '../apps/server/src/chain/chain';
+import { NoopChain, type ChainWriter, type MintResult } from '../apps/server/src/chain/chain';
 import { openDb } from '../apps/server/src/db/db';
 import { Game } from '../apps/server/src/game/game';
 import { createGameServer } from '../apps/server/src/net/server';
@@ -30,6 +31,10 @@ export interface TestServer {
   closeDays(n: number): Promise<void>;
   /** Gives the farm of this name every machine and `tickets` Feather tickets. */
   seed(name: string, tickets: number): Promise<void>;
+  /** Links a (made-up) testnet wallet to the named farm's player, so its mints can go out. */
+  wallet(name: string, account: string): Promise<void>;
+  /** The next n mints fail, as if NEAR testnet refused them after every retry. */
+  failMints(n: number): void;
   /** Sets the condition (and broken flag) of the named farm's machines. */
   wear(name: string, machines: Record<string, { condition: number; broken?: boolean }>): Promise<void>;
   close(): Promise<void>;
@@ -40,16 +45,28 @@ export async function startTestServer(): Promise<TestServer> {
   let offset = 0;
   const now = () => Date.now() + offset;
   const quiet = () => undefined;
-  // no chain, but reported as minting, so the screens show the texts the live game shows
+  // no chain, but reported as minting, so the screens show the texts the live game shows; a mint
+  // answers after a short wait, as NEAR would (or fails, when the check asks for it)
   const noop = new NoopChain('browser checks', quiet);
+  let failing = 0;
   const chain: ChainWriter = {
     mode: 'noop',
-    explorer: null,
+    explorer: 'https://testnet.nearblocks.io/txns/',
     minting: 'live',
     featherMinted: 0,
     provenance: null,
     contractId: null,
     settleDay: (q, season, day) => noop.settleDay(q, season, day),
+    collectionFor: async () => 'live',
+    mintFeather: async (req): Promise<MintResult> => {
+      await new Promise((r) => setTimeout(r, 900));
+      if (failing > 0) {
+        failing--;
+        return { status: 'failed', txHash: null, token: null, mediaSha256: null, note: 'NEAR testnet refused the call, even after a few tries' };
+      }
+      const token = String(req.number).padStart(3, '0');
+      return { status: 'sent', txHash: `browser-check-${token}`, token, mediaSha256: 'browser-check' };
+    },
   };
   const game = new Game({
     db,
@@ -97,6 +114,14 @@ export async function startTestServer(): Promise<TestServer> {
           milestones[i % milestones.length],
         ]);
       }
+    },
+    async wallet(name, account) {
+      const [farm] = await db.query<{ player_id: string }>('SELECT player_id FROM farms WHERE name LIKE $1 LIMIT 1', [`${name}%`]);
+      if (!farm) throw new Error(`no farm named ${name}`);
+      await db.query('UPDATE players SET near_account_id = $2 WHERE id = $1', [farm.player_id, account]);
+    },
+    failMints(n) {
+      failing = n;
     },
     async wear(name, machines) {
       const [farm] = await db.query<{ id: string }>('SELECT id FROM farms WHERE name LIKE $1 LIMIT 1', [`${name}%`]);

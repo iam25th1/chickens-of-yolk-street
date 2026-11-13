@@ -1,17 +1,14 @@
 // The Feathers (beta) in the UI: a Feather card (its grade's Spawn card frame, its feather in the
 // window, its number in the nameplate), the unminted card (the empty frame with a dark hen
-// silhouette and the number only), the reveal moment when a day close mints one of the player's
-// Feathers, and the mint page in tabs: the player's tickets with Redeem; all 777 slots in a grid
-// paged to fit the window; each grade's estimated odds; the provenance hash, contract and recent mints.
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ECONOMY, FEATHER_GRADES, RARITIES, type FarmState, type FeatherGrade, type FeatherSlot, type MarketState, type MilestoneId, type MintPageData, type Rarity } from '@coys/shared';
+// silhouette and the number only), and the reveal when a mint the player did not watch (a catch-up
+// at a day close) lands. The Feather Mint itself is FeatherMint.tsx; the minting moment MintMoment.tsx.
+import { useEffect, useState } from 'react';
+import { ECONOMY, type FeatherGrade, type MarketState, type MilestoneId, type Rarity } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { juice } from '../motion/juice';
-import type { Action } from '../net/socket';
 import { CardStamp } from './Cards';
 import { MILESTONE_TEXT } from './HowToPlay';
 import { Modal } from './Modal';
-import { Paged } from './Paged';
 import { HenArt } from './Panels';
 import { SheetSprite } from './SheetSprite';
 
@@ -74,7 +71,7 @@ export interface RevealState {
   number: number;
   grade: FeatherGrade;
   milestone: MilestoneId;
-  txHash: string;
+  txHash: string | null;
   day: number;
 }
 
@@ -154,254 +151,15 @@ export function RevealPanel({ reveal, market, onLedger, onMintPage, onClose }: {
                 onMintPage();
               }}
             >
-              MINT PAGE
+              THE MINT
             </button>
-            {market.explorer && (
+            {market.explorer && reveal.txHash && (
               <a className="btn" href={`${market.explorer}${reveal.txHash}`} target="_blank" rel="noreferrer">
                 RECEIPT
               </a>
             )}
           </div>
         </div>
-      </div>
-    </Modal>
-  );
-}
-
-type Filter = 'all' | 'minted' | 'unminted' | 'mine';
-type MintTab = 'tickets' | 'all' | 'odds' | 'about';
-const MINT_TABS: [MintTab, string][] = [
-  ['tickets', 'YOUR TICKETS'],
-  ['all', 'ALL 777'],
-  ['odds', 'ODDS'],
-  ['about', 'ABOUT'],
-];
-const pct = (x: number): string => (x >= 0.1 ? `${Math.round(x * 100)}%` : `${(x * 100).toFixed(1)}%`);
-
-/** The mint page. Its data is public (GET /api/feathers); the tickets are the player's own. */
-export function MintPage({ farm, market, send, onClose }: { farm: FarmState; market: MarketState; send: (a: Action) => Promise<boolean>; onClose: () => void }) {
-  const { audio } = useServices();
-  const [data, setData] = useState<MintPageData | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [filter, setFilter] = useState<Filter>('all');
-  const [grade, setGrade] = useState<FeatherGrade | 'any'>('any');
-  const [view, setView] = useState<MintTab>('tickets');
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch('/api/feathers');
-      if (!res.ok) throw new Error(String(res.status));
-      setData((await res.json()) as MintPageData);
-      setFailed(false);
-    } catch {
-      setFailed(true);
-    }
-  }, []);
-  useEffect(() => {
-    void load();
-  }, [load, market.feathers.minted, market.feathers.tickets, farm.tickets.length]);
-  const mine = useMemo(() => new Set(farm.tickets.flatMap((t) => (t.number ? [t.number] : []))), [farm.tickets]);
-  const slots = useMemo(() => new Map((data?.slots ?? []).map((s) => [s.number, s])), [data]);
-  const numbers = useMemo(() => {
-    const all = Array.from({ length: ECONOMY.feathers.maxSupply }, (_, i) => i + 1);
-    return all.filter((n) => {
-      const s = slots.get(n);
-      if (filter === 'minted' && !s) return false;
-      if (filter === 'unminted' && s) return false;
-      if (filter === 'mine' && !mine.has(n)) return false;
-      if (grade !== 'any' && s?.grade !== grade) return false;
-      return true;
-    });
-  }, [slots, filter, grade, mine]);
-  const tab = (label: string, active: boolean, onClick: () => void) => (
-    <button
-      key={label}
-      className={`btn ${active ? 'red' : ''}`}
-      onClick={() => {
-        uiSound(audio, 'click');
-        onClick();
-      }}
-    >
-      {label}
-    </button>
-  );
-  const fee = ECONOMY.feathers.redeemFee;
-  const held = farm.tickets.filter((t) => t.status === 'held');
-  const ticketRows = farm.tickets.map((t) => (
-    <div key={t.id} className="row" style={{ gap: 8, alignItems: 'center' }}>
-      {t.status === 'minted' && t.grade && t.number ? <FeatherCard grade={t.grade} number={t.number} z={1} play={false} /> : <UnmintedCard number={t.number ?? 0} z={1} />}
-      <span className="col" style={{ gap: 2 }}>
-        <span>
-          TICKET FROM {MILESTONE_TEXT[t.milestone]}, DAY {t.day}
-        </span>
-        {t.status === 'held' && (
-          <button
-            className="btn red"
-            data-ui="redeem"
-            disabled={farm.cashMilli < fee * 1000}
-            onClick={() => {
-              uiSound(audio, 'click');
-              void send({ t: 'redeemTicket', ticketId: t.id }).then(() => load());
-            }}
-          >
-            REDEEM FOR {fee} COINS
-          </button>
-        )}
-        {t.status === 'queued' && t.grade && <span>REDEEMED AS A {GRADE_LABEL[t.grade]}: IT MINTS AT THE NEXT DAY CLOSE.</span>}
-        {t.status === 'minted' && t.number && t.grade && (
-          <span>
-            FEATHER {featherNo(t.number)}, {GRADE_LABEL[t.grade]}, MINTED DAY {t.mintDay}
-            {t.mintTx && market.explorer && (
-              <>
-                {' '}
-                <a href={`${market.explorer}${t.mintTx}`} target="_blank" rel="noreferrer" style={{ color: '#2f6f9e' }}>
-                  RECEIPT
-                </a>
-              </>
-            )}
-          </span>
-        )}
-      </span>
-    </div>
-  ));
-  const cells = numbers.map((n) => {
-    const s = slots.get(n);
-    return (
-      <span key={n} className="col" style={{ alignItems: 'center', gap: 1 }} data-slot={n} data-minted={s ? '1' : '0'}>
-        {s ? <FeatherCard grade={s.grade} number={n} z={1} play={false} /> : <UnmintedCard number={n} z={1} />}
-        <span>{featherNo(n)}</span>
-      </span>
-    );
-  });
-  return (
-    <Modal title="FEATHERS (BETA)" onClose={onClose} w={500} h={640} className="mint-page">
-      <div className="col" style={{ gap: 6 }} data-ui="mint-page">
-        {failed && <span className="down">THE MINT PAGE COULD NOT LOAD. TRY AGAIN IN A MOMENT.</span>}
-        {data && (
-          <div className="row" style={{ gap: 12, flexWrap: 'wrap' }} data-ui="mint-supply">
-            <span className="panel-title small" style={{ margin: 0 }}>
-              {data.minted} MINTED, {data.left} LEFT OF {data.max}
-            </span>
-            <span>
-              {data.tickets} TICKET{data.tickets === 1 ? '' : 'S'} WAITING
-            </span>
-          </div>
-        )}
-        <div className="row" style={{ gap: 3, flexWrap: 'wrap' }} data-ui="mint-tabs">
-          {MINT_TABS.map(([id, label]) => tab(label, view === id, () => setView(id)))}
-        </div>
-
-        {view === 'tickets' && (
-          <div className="col" style={{ gap: 4 }} data-ui="mint-tickets" data-tour="mint-tickets">
-            {farm.tickets.length === 0 && <span>NO TICKETS YET. EACH MILESTONE GIVES ONE ROLL ({Math.round(ECONOMY.feathers.odds * 100)}%) WHILE YOUR FARM IS IN GOOD STANDING.</span>}
-            {held.length > 0 && (
-              <span style={{ color: '#2f6f9e', lineHeight: '9px' }} data-ui="mint-score">
-                REDEEM NOW FOR A {GRADE_LABEL[farm.score.grade]}: MANAGEMENT SCORE {Math.round(farm.score.score * 100)} (GOOD DAYS {pct(farm.score.parts.goodDays)}, DELIVERIES {pct(farm.score.parts.delivery)}, HAGGLES {pct(farm.score.parts.haggles)}, PROFIT {pct(farm.score.parts.profit)}). TICKETS KEEP: A BETTER-RUN FARM REDEEMS A BETTER GRADE.
-              </span>
-            )}
-            {ticketRows.length > 0 && <Paged items={ticketRows} gap={4} ui="mint-ticket-list" />}
-          </div>
-        )}
-
-        {view === 'all' && (
-          <>
-            <div className="row" style={{ gap: 3, flexWrap: 'wrap' }} data-ui="mint-filters">
-              {tab('ALL', filter === 'all', () => setFilter('all'))}
-              {tab('MINTED', filter === 'minted', () => setFilter('minted'))}
-              {tab('NOT MINTED', filter === 'unminted', () => setFilter('unminted'))}
-              {tab('MINE', filter === 'mine', () => setFilter('mine'))}
-              {tab('ANY GRADE', grade === 'any', () => setGrade('any'))}
-              {FEATHER_GRADES.map((g) => tab(GRADE_LABEL[g], grade === g, () => setGrade(g)))}
-            </div>
-            {cells.length === 0 ? <span>NONE HERE YET.</span> : <Paged cell="auto" gap={3} items={cells} resetKey={`${filter}|${grade}`} label={`${numbers.length}`} ui="mint-grid" />}
-          </>
-        )}
-
-        {view === 'odds' && data && (
-          <Paged
-            gap={6}
-            ui="mint-odds"
-            items={[
-              <div key="table" className="col" style={{ gap: 6 }}>
-                <h3 className="panel-title small" style={{ margin: 0 }}>
-                  EACH GRADE&apos;S ODDS OF A HEN (ESTIMATE)
-                </h3>
-                <table className="mint-table" data-ui="mint-estimates">
-                  <thead>
-                    <tr>
-                      <th />
-                      {RARITIES.map((r) => (
-                        <th key={r}>
-                          {RARITY_LABEL[r]} ({data.rarityCounts[r]})
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {FEATHER_GRADES.map((g) => (
-                      <tr key={g}>
-                        <td>{GRADE_LABEL[g]}</td>
-                        {RARITIES.map((r) => (
-                          <td key={r}>{pct(data.estimates[g][r])}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>,
-              <span key="note" style={{ lineHeight: '9px' }}>
-                AN ESTIMATE FROM THE {data.minted} FEATHERS MINTED SO FAR (NUMBERS NOT MINTED COUNT AS FLUFF), UNDER THE GRADE WEIGHTS. IT LOCKS AT THE PLANNED REVEAL, WHEN A SEED FROM A PUBLIC EVENT CHOSEN IN ADVANCE DRAWS EXACTLY 7 LEGENDARY, 70 EPIC, 200 RARE AND 500 COMMON HENS.
-              </span>,
-              <div key="by-grade" className="row" style={{ gap: 12, flexWrap: 'wrap' }} data-ui="mint-by-grade">
-                {FEATHER_GRADES.map((g) => (
-                  <span key={g}>
-                    {GRADE_LABEL[g]} {data.byGrade[g]}
-                  </span>
-                ))}
-              </div>,
-            ]}
-          />
-        )}
-
-        {view === 'about' && (
-          <Paged
-            gap={6}
-            ui="mint-about"
-            items={[
-              <p key="intro" style={{ margin: 0, lineHeight: '10px' }}>
-                777 FEATHERS WILL EVER EXIST. EACH IS A CLAIM TICKET FOR ONE OF THE 777 FOUNDING HENS, PLANNED TO HATCH AT MAINNET LAUNCH. WIN A TICKET AT A MILESTONE; REDEEM IT HERE FOR {fee} COINS AND THE NEXT DAY CLOSE MINTS ITS FEATHER ON NEAR&apos;S TEST NETWORK, PAID BY THE GAME.
-              </p>,
-              ...(data
-                ? [
-                    <div key="prov" className="col" style={{ gap: 2 }} data-ui="mint-provenance">
-                      <span title={data.provenance} style={{ wordBreak: 'break-all', lineHeight: '9px' }}>
-                        FOUNDERS PROVENANCE (SHA-256): {data.provenance || 'NOT SET'}
-                      </span>
-                      {data.contractUrl && (
-                        <a href={data.contractUrl} target="_blank" rel="noreferrer" style={{ color: '#2f6f9e' }}>
-                          CONTRACT {data.contract} ON NEAR TESTNET
-                        </a>
-                      )}
-                    </div>,
-                  ]
-                : []),
-              ...(data && data.recent.length > 0
-                ? [
-                    <h3 key="recent-title" className="panel-title small" style={{ margin: 0 }}>
-                      RECENT MINTS
-                    </h3>,
-                    <div key="recent" className="row" style={{ gap: 6, flexWrap: 'wrap' }} data-ui="mint-recent">
-                      {data.recent.map((s: FeatherSlot) => (
-                        <span key={s.number} className="col" style={{ alignItems: 'center', gap: 1 }}>
-                          <FeatherCard grade={s.grade} number={s.number} z={1} />
-                          <span>{featherNo(s.number)}</span>
-                        </span>
-                      ))}
-                    </div>,
-                  ]
-                : []),
-            ]}
-          />
-        )}
       </div>
     </Modal>
   );
