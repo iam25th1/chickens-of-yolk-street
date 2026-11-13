@@ -205,6 +205,8 @@ export class Game {
   private mintAgain = false;
   private clock = { day: 1, dayStartedAt: 0 };
   private ticking = false;
+  /** The agents' decisions for the coming close, gathered ahead of midnight so model calls never hold the close up. */
+  private gathering: { day: number; promise: Promise<Gathered[] | null> } | null = null;
   /** Decisions, reflections and model calls (by tier, with their tokens), for reports and tests. */
   readonly stats = { decisions: 0, modelCalls: 0, fallbacks: 0, skipped: 0, reflections: 0, reflectionCalls: 0, mainCalls: 0, cheapCalls: 0, promptTokens: 0, completionTokens: 0 };
 
@@ -329,6 +331,12 @@ export class Game {
     if (this.now() >= this.clock.dayStartedAt + this.dayMs) {
       await this.tickIfDue();
       return;
+    }
+    // a model call takes seconds: the agents decide in the day's last stretch (the close's model time
+    // and a little more), in the background, so the close itself never waits on a model
+    const lead = (this.brain.chain?.closeBudgetMs ?? 0) + 10_000;
+    if (this.withCast && lead > 10_000 && !this.gathering && this.now() >= this.clock.dayStartedAt + this.dayMs - lead) {
+      this.gathering = { day: this.clock.day, promise: this.gatherDecisions().catch(() => null) };
     }
     await this.serial(() =>
       this.inTx(async (ctx) => {
@@ -1183,7 +1191,10 @@ export class Game {
    * total supply, then open the next day with fresh cards and a fresh shop.
    */
   async endDay(): Promise<void> {
-    const decisions = await this.gatherDecisions();
+    // the decisions gathered ahead of midnight for this day, or gathered now
+    const early = this.gathering?.day === this.clock.day ? await this.gathering.promise : null;
+    this.gathering = null;
+    const decisions = early ?? (await this.gatherDecisions());
     const closedDay = await this.serial(async () => {
       let ctxOut: Ctx | null = null;
       const outcome = await this.db.tx(async (q) => {
