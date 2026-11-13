@@ -90,11 +90,13 @@ export const ECONOMY = {
    * plot adds coopSlots coop plots (numbered after the home plot's four, in LAND_IDS order, so a
    * coop keeps its number whatever was bought first), a pasture the hens walk, and room for props
    * (props spots). depth is how far the plot reaches out from the home plot, in 16-pixel tiles.
-   * Prices tuned with the 30-day simulation (apps/server/test/sim.test.ts): the first plot is a
-   * goal for the middle of a good run, the fourth for late in a long one.
+   * Prices tuned with the 30-day simulation (apps/server/test/sim.test.ts, its SIM LAND line): the
+   * street's most successful farm can pay for its first plot by day 3 to 6, two by day 10, three by
+   * day 16 to 21 and all four only by day 28 to 30, or not within the 30 days; the simulation's
+   * greedy players, who never build a second coop, never hold enough.
    */
   land: {
-    prices: [600, 1200, 2000, 3200],
+    prices: [600, 900, 1200, 1500],
     plots: {
       east: { coopSlots: 2, props: 3, depth: 18 },
       west: { coopSlots: 2, props: 3, depth: 16 },
