@@ -1,6 +1,6 @@
 // The side panel: the crate's sell card, the glut notice, waiting cards (a queue with a count; only
 // one opens at a time, as a modal), and the desk: contracts with their delivery button, feed credit
-// owed, recent answers and the sales clerk's floor (paged to fit the panel, never scrolled).
+// owed, recent answers and the sales clerk's floor; all below the sell card is paged to fit the panel, never scrolled.
 import { ECONOMY, type CardView, type FarmState, type MarketState } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import type { Rect } from '../app/viewport';
@@ -43,36 +43,48 @@ export function SidePanel({
     <div className="side zone" data-ui="side" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
       <SellCard farm={farm} market={market} send={send} tour="sell" />
       <div className="side-section" style={{ flex: 1, minWidth: 120 }}>
-        {market.crash && <GlutNotice market={market} />}
         <div className="side-title">
           <span>CARDS WAITING</span>
           <span data-tour="card-count">{waiting.length}</span>
         </div>
-        {waiting.length === 0 && <span style={{ color: '#e3cc96' }}>NONE RIGHT NOW</span>}
-        {waiting.slice(0, 3).map((c, i) => (
-          <button
-            key={c.id}
-            className={`btn ${i === 0 ? 'red' : ''}`}
-            data-tour={i === 0 ? 'card-queue' : undefined}
-            style={{ justifyContent: 'space-between', width: '100%' }}
-            onMouseEnter={() => uiSound(audio, 'hover')}
-            onClick={click(() => onOpen(c))}
-          >
-            <span>{CARD_TITLE[c.kind].split(' ')[0]}</span>
-            <span>{c.from.split(' ').slice(-1)[0]?.toUpperCase()}</span>
-          </button>
-        ))}
-        {waiting.length > 3 && <span style={{ color: '#e3cc96' }}>AND {waiting.length - 3} MORE</span>}
-        <span className="side-title">
-          <span>TODAY</span>
-          <span>
-            {farm.cards.length}/{ECONOMY.cards.maxPerDay} CARDS
-          </span>
-        </span>
         <Paged
           fill
           ui="desk"
           items={[
+            ...(market.crash ? [<GlutNotice key="glut" market={market} />] : []),
+            ...(waiting.length === 0
+              ? [
+                  <span key="none" style={{ color: '#e3cc96' }}>
+                    NONE RIGHT NOW
+                  </span>,
+                ]
+              : []),
+            ...waiting.slice(0, 3).map((c, i) => (
+              <button
+                key={c.id}
+                className={`btn ${i === 0 ? 'red' : ''}`}
+                data-tour={i === 0 ? 'card-queue' : undefined}
+                style={{ justifyContent: 'space-between', width: '100%' }}
+                onMouseEnter={() => uiSound(audio, 'hover')}
+                onClick={click(() => onOpen(c))}
+              >
+                <span>{CARD_TITLE[c.kind].split(' ')[0]}</span>
+                <span>{c.from.split(' ').slice(-1)[0]?.toUpperCase()}</span>
+              </button>
+            )),
+            ...(waiting.length > 3
+              ? [
+                  <span key="more" style={{ color: '#e3cc96' }}>
+                    AND {waiting.length - 3} MORE
+                  </span>,
+                ]
+              : []),
+            <span key="today" className="side-title">
+              <span>TODAY</span>
+              <span>
+                {farm.cards.length}/{ECONOMY.cards.maxPerDay} CARDS
+              </span>
+            </span>,
             ...closed.slice(-3).map((c) => (
               <span key={c.id} style={{ color: c.status === 'won' || c.status === 'accepted' ? '#8fd36a' : '#e3cc96' }}>
                 {CARD_TITLE[c.kind].split(' ')[0]} {c.status.toUpperCase()}
