@@ -3,7 +3,8 @@
 // suggestion filled in, SHUFFLE, a refused email-like name, CONFIRM), or keeps the generated name;
 // Settings renames. Tour, at 1280x720, 1920x1080, 390x844 and 360x640: it shows on first entry with
 // no click; on every step its box sits beside the spotlight, never over it, inside the window and
-// clear of the top bar, the side panel, the goal tracker and the toasts; BACK, NEXT (after a few
+// clear of the top bar, the side panel (on a phone it may sit below the farm when the farm has no
+// room), the goal tracker and the toasts; BACK, NEXT (after a few
 // seconds), SKIP STEP and END TOUR (asked once more) work, and Settings replays it.
 // SCREENSHOTS=1 saves three steps at 1920x1080 and 390x844 to docs/screenshots.
 import { mkdirSync } from 'node:fs';
@@ -151,12 +152,17 @@ describe('the tour', () => {
           if (box.x < 0 || box.y < 0 || box.x + box.w > w + 0.5 || box.y + box.h > h + 0.5) problems.push(`${size} step ${i + 1}: box off screen ${JSON.stringify(box)}`);
           const ring = await rectOf(page, '.spot-ring');
           if (ring && overlap(box, ring)) problems.push(`${size} step ${i + 1}: box over its target`);
+          // on a phone whose farm has no room clear of the target, the box may sit below the farm, over
+          // the side panel's zone (pointing up at it); everywhere else the side panel stays clear
+          const tracker = await rectOf(page, '[data-ui="tracker"]');
+          const belowFarm = w < 600 && tracker !== null && box.y >= tracker.y + tracker.h;
           for (const [zone, sel] of [
             ['top bar', '[data-ui="topbar"]'],
             ['side panel', '[data-ui="side"]'],
             ['tracker', '[data-ui="tracker"]'],
             ['toasts', '[data-ui="toasts"]'],
           ] as const) {
+            if (zone === 'side panel' && belowFarm) continue;
             const z = await rectOf(page, sel);
             if (z && overlap(box, z)) problems.push(`${size} step ${i + 1}: box over the ${zone}`);
           }
