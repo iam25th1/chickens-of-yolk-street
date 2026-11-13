@@ -15,6 +15,8 @@ filter, so every piece of text is drawn with Pillow into overlays.
 Partial frames are dropped and the frame before them held: a frame of a scene that is darker or brighter
 than both its neighbours (the naming prompt's fade restarting on each keystroke, a modal caught half
 faded in), and, once a line's footage is sped up, any single frame left between two others like that.
+After the export, flashcheck.py checks the video (WCAG's general flash threshold, and one-frame jumps);
+if it fails, the build keeps no output and lists the moments.
 """
 from __future__ import annotations
 
@@ -539,6 +541,22 @@ def main() -> None:
     cols = 10
     rows = int(np.ceil(total / cols))
     run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(out), '-vf', f'fps=1,scale=384:-1,tile={cols}x{rows}', '-frames:v', '1', str(sheet)])
+
+    # the flash check: a video that fails it is not kept (no bytecode left beside the scripts)
+    import sys
+
+    sys.dont_write_bytecode = True
+    import flashcheck
+
+    found = flashcheck.check(str(out))
+    if found:
+        for f in (out, OUT / 'coys-demo-auto.srt', sheet):
+            f.unlink(missing_ok=True)
+        print(f'flash check FAILED: {len(found)} moments; no output kept')
+        for line in found:
+            print('  ' + line)
+        raise SystemExit(1)
+    print('flash check passed')
 
     log = {'length': total, 'sections': [{'chip': c, 'start': round(a, 2), 'end': round(b, 2)} for a, b, c in chips], 'captions': [{'start': round(a, 2), 'end': round(b, 2), 'text': c} for a, b, c, _ in captions]}
     (OUT / 'coys-demo-auto.json').write_text(json.dumps(log, indent=1))
