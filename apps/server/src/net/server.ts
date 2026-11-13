@@ -309,6 +309,7 @@ export function createGameServer(opts: GameServerOptions): Server {
             farm: await game.getFarmState(info.farmId),
             market: await game.getMarketState(),
             clock: game.getClock(),
+            build: BUILD.commit,
           });
         }
         if (!playerId) return send(ws, { t: 'ack', rid: msg.rid, ok: false, code: 'unauthenticated', message: 'say hello first' });

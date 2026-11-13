@@ -633,7 +633,8 @@ export type GameEvent =
   | { kind: 'badgeEarned'; badge: string; level: BadgeLevel; day: number };
 
 export type ServerMessage =
-  | { t: 'welcome'; v: number; playerId: string; name: string; farm: FarmState; market: MarketState; clock: ClockState }
+  /** build: the server's commit, so a client open across a deploy can offer a reload. */
+  | { t: 'welcome'; v: number; playerId: string; name: string; farm: FarmState; market: MarketState; clock: ClockState; build?: string | null }
   | { t: 'farm'; farm: FarmState }
   | { t: 'market'; market: MarketState }
   | { t: 'clock'; clock: ClockState }
