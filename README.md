@@ -8,8 +8,8 @@ Run an egg farm in **one shared live market** with other players and AI. Some fa
 
 | | |
 |---|---|
-| **Play loop** | Hens lay on a schedule; you collect, sell, buy hens, feed, coops and machines. One in-game day is 3 real minutes, and each day brings 2 to 4 decision cards from the agents. Everything on the farm is clickable; a first-run tour walks the loop by doing it, then a chain of goals pays coins for learning the rest. |
-| **Market** | One price multiplier for everyone, set by the whole market's daily supply against demand that grows with the number of farms. Instant street sales, a real order book with limit orders, and player-to-player trades. |
+| **Play loop** | Hens lay on a schedule; you collect, sell, buy hens, feed, coops and machines. One in-game day is 3 real minutes, and each day brings 2 to 4 decision cards from the agents. Everything on the farm is clickable; a first-run tour walks the loop by doing it, then a chain of goals pays coins for learning the rest. Every farm keeps a **profile** (eight tabs, a public version) and earns **73 cosmetic badges**; new hens hatch from an egg in the yard. |
+| **Market** | One price multiplier for everyone, set by the whole market's daily supply against demand that grows with the number of farms. Instant street sales, a real order book with limit orders, and player-to-player trades, all on one **Market** page with seven tabs. |
 | **Agents** | Seven: two rival farms, two feed suppliers, three egg buyers. Each decides once a day on NEAR AI Cloud (structured JSON output) or its rule policy, pays for its thinking, remembers every deal, haggles in character, borrows, and can go bust. |
 | **Chain** | Hens are never minted. The beta mints **Feathers** (NEP-171 on NEAR testnet, **777 ever**, capped on chain): claim tickets for the 777 Founding Hens, planned to be revealed at the mainnet launch. Milestones win tickets; a player redeems one for coins and the game pays the testnet gas. Eggs are NEP-245 tokens, and each day settles in one call that stores nothing new: a SHA-256 of the day's full record, kept in the game's database. Agents hold sub-account wallets. Players sign in with email; their wallet is made silently. |
 | **Feel** | Squash and stretch, hitstop, screen shake, particles and layered sound on every action, portraits that talk with voice babble, and a reduce-motion switch. |
@@ -87,7 +87,7 @@ Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what 
 7. **Meet the agents.** From day 2 cards slide in: a portrait talks in its own voice while its line types out (the Bakery offering a standing contract, the Wholesaler a bulk order, the Squeezer a feed deal). Press **ACCEPT**: you see the right stamp slam.
 8. **Win a haggle.** On a buyer's card, press **-** a few times so **YOUR PRICE** sits just above the offer, then **COUNTER**. You see the card flip to gold with confetti and the win chime (inside the agent's walk-away price).
 9. **Lose one.** On another card, press **+** many times and **COUNTER**. You see the agent counter, get cross, and after three rounds (or at once, if it is proud) walk off with the fail sound.
-10. **Sell into a glut.** Speed days up: `DEMO_DAY_SECONDS=30` before `npm run dev` (PowerShell: `$env:DEMO_DAY_SECONDS = "30"; npm run dev`). Open the **market board**: you see **SOLD n OF d**, today's sales against demand. When a day's supply runs well past demand (Old Money releasing its hoard, the Wholesaler reselling), you see the next multiplier fall, the ticker turn red at 0.80 or lower, the **GLUT WARNING** card in the tray, and the tension music take over.
+10. **Sell into a glut.** Speed days up: `DEMO_DAY_SECONDS=30` before `npm run dev` (PowerShell: `$env:DEMO_DAY_SECONDS = "30"; npm run dev`). Open the **Market** (top bar): its PRICES tab shows today's sales against what the street needs. When a day's supply runs well past demand (Old Money releasing its hoard, the Wholesaler reselling), you see the next multiplier fall, the ticker turn red at 0.80 or lower, the **GLUT WARNING** card in the tray, and the tension music take over.
 11. **Watch a rival bust.** The Upstart borrows feed from the Loyalist to grow on good weeks. When a glut meets its debt, it goes below zero: you see its sign tip over, a price wave cross the ticker, feathers fall, and its hens appear in the shop as **AUCTION** hens at half price; a new rival opens three days later. At 30-second days this usually happens 8 to 14 minutes into a season.
 12. **Deliver a contract.** Accept the Bakery's contract, then press **DELIVER** on the desk each day (or buy the delivery cart: it delivers at dusk). You see coins arrive; with testnet credentials the day's batch moves those egg tokens to the Bakery's wallet. Miss one and you pay a penalty and the Bakery remembers.
 13. **Read the ledger.** Open the **ledger** (top bar): you see the season and tabs: **DAYS** (income, costs and net a day, with an **ON-CHAIN RECEIPT** link per settled day that opens the testnet explorer, in pages that fit the window), **CONTRACTS**, **FEATHERS** and **MILESTONES**. Nothing in the game scrolls: longer lists have **PREV** and **NEXT**.
@@ -152,6 +152,303 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 [tall](docs/screenshots/live-resize-3-tall-560x1000.png), [wide again](docs/screenshots/live-resize-4-wide-1600x760.png))
 and the [belt](docs/screenshots/live-belt-clean.png), which carries only real eggs.
 
+## Hatching, the Market page, profiles and badges (13 November 2026)
+
+**Who runs the farms.** Some farms on Yolk Street are other players, some are AI (marked AI). The feed suppliers and
+the egg buyers are AI, each with its own coins and memory. The title, How to Play, the tour, this README, the page
+header and the submission notes all say so; nothing says every farm is AI any more.
+
+**The stray egg.** A small egg bobbed below the crate. It was not a game egg: the crate sheet's `overflow` frame has a
+pile of eggs that pokes up into the row above, so when the atlas cutter split the painted sheet into frames, no cell
+held most of that pile, and the loose egg became the main body of a frame on its own. The cutter
+([`scripts/lib/derive.ts`](scripts/lib/derive.ts)) now hands any loose piece of the crate sheet to the body directly
+below it (`FALL_INTO_BODY_BELOW`), and a test checks that every crate frame sits on its feet with nothing loose.
+
+**The shop.** A hen's button says what it does: `BUY 4`. An auction hen wears a small `AUCTION` tag, and the hens tab
+explains it in one line: "Auction hens come from farms that went bust, sold cheap."
+
+**New hens hatch.** A hen you buy (from the list, the auction or at random) no longer walks in from the gate. A big egg
+drops into a free spot in the coop yard (never on an object, the path or another hen), lands with a squash, wobbles,
+cracks and bursts; the hen pops out with a squash and stretch, a feather puff and shell bits, shakes herself off and
+wanders. Several hatch a beat apart, spread across the yard, and three or more get the hen chorus. The sounds (egg crack,
+pop or splat, cluck, chorus) follow the sound settings' categories; the shake and hitstop follow reduce motion. Her card
+opens from her as soon as she has hatched. The egg is new Spawn art (below), 24 world pixels tall and 20 wide, room
+for a crouched hen ([size table](apps/client/src/pixi/farm/spec.ts)).
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> drop: hen bought
+  drop --> land: squash, dust
+  land --> wobble
+  wobble --> crack: crack sound
+  crack --> burst: pop or splat, hitstop
+  burst --> pop: hen squash and stretch, feathers, cluck
+  pop --> shake: looks left, right
+  shake --> wander
+  burst --> bits: shell bits fade
+```
+
+**The Market page.** The market was a board behind a small icon. It is now a page of its own: **MARKET** in the top bar,
+or the farm's own sign. It fills the window under the top bar (your coins stay in sight), never scrolls, and each tab
+opens with one plain line saying what it is for.
+
+| Tab | What it holds |
+|---|---|
+| **Prices** | today's price per grade on split-flaps, today's sales against what the street needs with the glut line, a 10-day chart (price level or one grade, a normal-price line, each day marked glut or scarce), what each AI trader last said, and the big trades |
+| **Sell** | sell one grade or the whole crate at today's price (machine bonuses included), or post a sell order at your own price |
+| **Buy orders** | the AI buyers' orders, each filled with one tap from your crate |
+| **Your orders** | your open orders (at most 10), each with CANCEL |
+| **Trade** | other farms' offers to buy from (AI farms tagged AI), and your own offers as everyone sees them |
+| **Hen auction** | hens from farms that went bust, sold cheap |
+| **Farms** | the AI farms' signs, and every farm ranked with its best badges; tap one for its public profile |
+
+The server now sends the last 10 closed days with the market state (`MarketState.chart`). The tour's market steps and
+How to Play point at the page.
+
+**Your profile.** The **PROFILE** button in the top bar, your farm's name in Settings, or your own farm in the Market's
+ranking opens your farm's record in eight tabs, without scrolling:
+
+| Tab | What it shows |
+|---|---|
+| **Overview** | farm sign and name, days on the street, good standing, coins, net worth and its parts, rank and the rank and net-worth charts, a row of your best badges, the street |
+| **Eggs** | laid, collected, broken and sold, by grade, per day and for the season |
+| **Money** | coins in and out by kind (feed, hens, coops, machines, repairs, fees), profit per day, the best and worst day |
+| **Flock** | room in the coops, eggs a day, each hen's looks, laying rate and age, the looks seen |
+| **Machines** | each machine's condition, effect and work, repairs paid, streaks, breakdowns, days since the last |
+| **Market** | contracts kept and missed, deliveries in a row, haggles won and lost, orders filled, eggs sold, market share, rivals outlasted |
+| **Mint** | Feather tickets, Feathers by grade with their numbers, milestones reached |
+| **Badges** | every badge, earned and locked, with filters and each badge's progress |
+
+$$
+\text{net worth} = \text{coins} + \text{hens} \times p_{\text{hen}} + \sum_{\text{coops}} p_{\text{coop}} + \sum_{\text{machines}} p_{\text{machine}} \times \text{condition}
+$$
+
+The numbers come from a new record per farm and day (`farm_days`: coins, net worth, rank, eggs by grade, profit, share,
+standing), written at each day close, and counters kept from now on (`farm_stats`): migration 14. The private profile
+goes over the farm's own socket only. **Public profiles.** Any farm in a ranking opens its public profile
+(`GET /api/profile/:farmId`): farm name, sign, rank, days on the street, hens, eggs sold, haggles won, rivals outlasted
+and its badges. It is built field by field from a short list; a test checks it carries exactly those fields and no
+coins, orders, wallet, player id or anything from sign-in.
+
+**Badges.** 73 cosmetic badges, in ten categories; they change nothing in the game. 40 have bronze, silver and gold
+levels and 33 have one, so there are 153 to earn; 7 are secret and show as a mystery until earned. The server checks
+them after the actions that can move them (each action reads only its own numbers) and at every day close; only player
+farms earn them. An unlock slams down at the top of the farm with a stamp, a beat of hitstop and a small shake, and
+the win chime; several queue one at a time. Badges show on the profile, as a small row in the Market's ranking and on
+public profiles. Existing farms were back-filled once, quietly, from their history: the ledger (coins, profit, rank,
+repairs), trades (sales by grade, share, buyer orders, contract deliveries), agent memory (haggles) and the crate;
+what was never recorded (eggs picked by hand, past breakdowns, night play, the crow streak) starts from zero.
+
+```mermaid
+flowchart LR
+  act["An action<br/>(sell, collect, haggle, repair...)"] --> stats["farm_stats<br/>counters"]
+  close["Day close"] --> days["farm_days<br/>one row per farm"]
+  stats --> eval{"Its badges<br/>past a level?"}
+  days --> eval
+  eval -- yes --> badge["badges row<br/>tier, day, progress"]
+  badge --> moment["Unlock moment<br/>stamp, sound"]
+  badge --> show["Profile, Market ranking,<br/>public profile"]
+  hist["History: ledger, trades,<br/>memory, crate"] -. once, at boot .-> stats
+```
+
+<details>
+<summary>All 73 badges</summary>
+
+**Eggs** (8)
+
+| Badge | How | Bronze | Silver | Gold |
+|---|---|---|---|---|
+| First Egg | Put your first egg in the crate | one level | | |
+| Crate Filler | Put n eggs in the crate | 100 | 1,000 | 10,000 |
+| Hand Picked | Pick up n eggs by hand | 50 | 500 | 2,500 |
+| Golden Egg | Collect a golden egg | one level | | |
+| Golden Hoard | Collect n golden eggs | 10 | 50 | 250 |
+| Laying Day | Your hens lay n eggs in one day | 25 | 60 | 150 |
+| Packed Crate | Hold n eggs in the crate at once | 50 | 150 | 400 |
+| Safe Landing | The conveyor saves n eggs from cracking | 10 | 100 | 500 |
+
+**Market** (11)
+
+| Badge | How | Bronze | Silver | Gold |
+|---|---|---|---|---|
+| First Sale | Sell your first egg | one level | | |
+| Market Stall | Sell n eggs | 100 | 1,000 | 5,000 |
+| Into the Glut | Sell to the street in a glut, with prices at 80% or less | one level | | |
+| Top of the Market | Sell to the street at a peak (prices at 150% or more) n times | 1 | 5 | 20 |
+| Order Filler | Fill n buyer orders from the book | 1 | 10 | 50 |
+| Big Trade | Make one sale worth 25 coins or more | one level | | |
+| Market Mover | Sell n% of all the eggs the street sells in one day | 10 | 25 | 50 |
+| Coin Purse | Hold n coins | 200 | 1,000 | 5,000 |
+| Nest Egg | Reach a net worth of n coins | 500 | 2,000 | 10,000 |
+| Good Day | Make n coins of profit in one day | 25 | 100 | 400 |
+| In the Black | Close n days with a profit | 5 | 20 | 60 |
+
+**Haggling** (5)
+
+| Badge | How | Bronze | Silver | Gold |
+|---|---|---|---|---|
+| First Haggle | Win your first haggle | one level | | |
+| Haggler | Win n haggles | 10 | 25 | 50 |
+| Worked the Room | Win a haggle against every trader: both suppliers and all three buyers | one level | | |
+| No Thanks | Turn down n offers | 10 | 50 | 200 |
+| ??? | a secret, below | | | |
+
+**Contracts** (5)
+
+| Badge | How | Bronze | Silver | Gold |
+|---|---|---|---|---|
+| Signed And Sealed | Take a standing contract | one level | | |
+| First Delivery | Deliver a contract day | one level | | |
+| On Time | Deliver n contract days in a row without a miss | 5 | 15 | 40 |
+| Standing Order | Deliver n contract days | 10 | 50 | 200 |
+| Clean Record | Finish n contracts without a miss | 1 | 5 | 15 |
+
+**Flock** (8)
+
+| Badge | How | Bronze | Silver | Gold |
+|---|---|---|---|---|
+| Full House | Fill your coops | one level | | |
+| Big Flock | Keep n hens | 20 | 60 | 150 |
+| Seen Them All | Keep hens of every look: each body, eyes, comb and accessory | one level | | |
+| Old Bird | Keep a hen n days old | 30 | 60 | 120 |
+| Dapper | Keep a hen in a top hat | one level | | |
+| Builder | Own n coops | 2 | 3 | 4 |
+| Deluxe Living | Own a deluxe coop | one level | | |
+| Auction Find | Buy n hens at auction | 1 | 10 | 30 |
+
+**Machines** (11)
+
+| Badge | How | Bronze | Silver | Gold |
+|---|---|---|---|---|
+| On the Belt | Buy the conveyor | one level | | |
+| Graded | Buy the egg grader | one level | | |
+| On the Road | Buy the delivery cart | one level | | |
+| Hopper Happy | Buy the feed hopper | one level | | |
+| Front Desk | Hire the sales clerk | one level | | |
+| Fully Automated | Own all five machines | one level | | |
+| Handy | Pay for n repairs | 1 | 10 | 30 |
+| Stitch in Time | Repair n machines in a row before any breaks down | 3 | 10 | 25 |
+| Smooth Running | Run your machines for n days without a breakdown | 10 | 30 | 90 |
+| Hard at Work | Your machines carry, grade, deliver and pour n times | 100 | 1,000 | 5,000 |
+| ??? | a secret, below | | | |
+
+**Rivals** (5)
+
+| Badge | How | Bronze | Silver | Gold |
+|---|---|---|---|---|
+| Last One Standing | Outlast n rival farms that go bust | 1 | 3 | 6 |
+| Podium | Close n days in the street's top 3 | 1 | 7 | 30 |
+| Number One | Close n days as the richest farm on the street | 1 | 7 | 30 |
+| Top Half | Close n days in the top half of the street | 1 | 10 | 50 |
+| Climber | Climb n places in one day | 2 | 5 | 10 |
+
+**Feathers** (8)
+
+| Badge | How | Bronze | Silver | Gold |
+|---|---|---|---|---|
+| Ticket Holder | Win a feather ticket | one level | | |
+| Lucky | Win n feather tickets | 2 | 4 | 7 |
+| Fluff | Mint a fluff feather | one level | | |
+| Plume | Mint a plume feather | one level | | |
+| Quill | Mint a quill feather | one level | | |
+| Golden Quill | Mint a golden quill feather | one level | | |
+| Full Plumage | Mint a feather of every grade | one level | | |
+| Milestone Hunter | Reach n milestones | 2 | 4 | 7 |
+
+**Days** (5)
+
+| Badge | How | Bronze | Silver | Gold |
+|---|---|---|---|---|
+| Opening Day | See your farm through its first day close | one level | | |
+| Good Standing | Stay in good standing for n days | 7 | 30 | 100 |
+| Old Hand | Keep your farm on the street for n days | 7 | 30 | 100 |
+| Well Fed | Feed your hens on n days | 7 | 30 | 100 |
+| Premium Diet | Feed your hens premium feed on n days | 3 | 10 | 30 |
+
+**Fun** (7)
+
+| Badge | How | Bronze | Silver | Gold |
+|---|---|---|---|---|
+| Night Owl | Do business after dark, while the hens sleep | one level | | |
+| Rooster Crew | Be on your farm when the rooster crows (at dawn) n days in a row | 3 | 7 | 14 |
+| ??? | a secret, below | | | |
+| ??? | a secret, below | | | |
+| ??? | a secret, below | | | |
+| ??? | a secret, below | | | |
+| ??? | a secret, below | | | |
+
+<details>
+<summary>The 7 secret badges (spoilers)</summary>
+
+| Badge | How |
+|---|---|
+| Thick Skin | Have 10 traders walk away from your asking price |
+| Spare Parts | Have a machine break down |
+| Omelette | Crack 100 eggs |
+| Shoestring | Close a day with less than 1 coin and keep farming |
+| Clear the Crate | Sell 200 eggs to the street in one go |
+| Gold Rush | Sell a golden egg at a peak |
+| New Sign | Rename your farm in settings |
+
+</details>
+
+</details>
+
+**Mint reserve from measured costs.** The thresholds were guesses; they now come from what the live contract cost
+(play.coys-game.testnet, 13 November 2026): a Feather mint stores 1,913 to 2,075 bytes (0.0191 to 0.0208 NEAR) and
+burns 0.0004 to 0.0005 NEAR of gas, so 0.0213 at most; a day close burns 0.00081 to 0.00087 NEAR of gas, 480 a real day,
+about 0.40 NEAR. A mint goes out while
+
+$$
+\text{free balance} \ \ge\ \underbrace{1.25 \times 0.0213}_{\text{per mint, }0.027} \ +\ \underbrace{120 \times 0.00084}_{\text{margin, }0.1}
+$$
+
+that is, six real hours of day closes stay covered after it.
+
+| Setting | Old | New | Why |
+|---|---|---|---|
+| `CHAIN_MINT_NEAR` (kept free per mint) | 0.035 | 0.027 | measured 0.0213, plus 25% |
+| `CHAIN_MIN_BALANCE_NEAR` (margin) | 0.5 | 0.1 | 120 day closes of settlement gas |
+| `AGENT_ACCOUNT_FUNDING_NEAR` (new agent wallet) | 0.05 | 0.01 | the account itself stores 0.0018 |
+| A mint waits until free balance is | 0.535 | 0.127 | |
+| A new agent wallet waits until | 0.55 | 0.11 | |
+
+With 0.4537 NEAR free when measured, 13 mints fit where none did before.
+
+**New art from Spawn.** Three new assets, made in the Spawn world `@25th/game-11` by the Spawn agent account `@gama`
+(Spawn commit `7ec6c4c`), each derived from existing game art in the pico #6 style (PICO-8 palette, 32 px grid) and
+pulled byte-exact into [iam25th1/coys-assets](https://github.com/iam25th1/coys-assets) (PR #6): **badge frames**
+(`x-badge-frames`: a medal per tier, bronze, silver, gold, plain and locked, each with a glint), **badge icons**
+(`x-badge-icons`: 40 icons composed from the game's own sprites: eggs, coins, hens, machines, feathers, the rooster)
+and the **hatching egg** (`x-hatch-egg`: rows land, wobble, crack, burst, shell bits). No existing Spawn asset was
+changed, and nothing is drawn in code.
+
+**Screenshots** (the browser checks' test server, made-up farm names; every tab of both pages is checked at 1920x1080,
+390x844, 1280x720 and 360x640 with nothing scrolled or cut off):
+
+| Market, PRICES, 1920x1080 | Market, PRICES, 390x844 |
+|---|---|
+| ![The Market page's PRICES tab: split-flap prices per grade, today's sales against what the street needs, a 10-day chart of the price level with glut and scarce days marked, and what each AI trader last said](docs/screenshots/v10-market-prices-1920x1080.png) | ![The PRICES tab on a phone: the same parts in one column](docs/screenshots/v10-market-prices-390x844.png) |
+| **Market, FARMS** | **Market, SELL (phone)** |
+| ![The FARMS tab: the AI farms' signs and every farm ranked, AI farms tagged](docs/screenshots/v10-market-farms-1920x1080.png) | ![The SELL tab on a phone: sell a grade or the crate, or post an order at your own price](docs/screenshots/v10-market-sell-390x844.png) |
+| **Profile, OVERVIEW** | **Profile, OVERVIEW (phone)** |
+| ![The profile's overview: farm sign, coins, net worth and its parts, rank, the badge row, rank and net-worth charts, the street](docs/screenshots/v10-profile-overview-1920x1080.png) | ![The overview on a phone](docs/screenshots/v10-profile-overview-390x844.png) |
+| **Profile, BADGES** | **Profile, MONEY** |
+| ![The badges tab: category filters, earned medals in colour, locked ones dark, and the chosen badge's detail](docs/screenshots/v10-profile-badges-1920x1080.png) | ![The money tab: coins in and out by kind, profit per day, best and worst day](docs/screenshots/v10-profile-money-1920x1080.png) |
+| **A badge unlocks** | **A public profile (phone)** |
+| ![BADGE EARNED: the medal slams down at the top of the farm with its name and how it was earned](docs/screenshots/v10-badge-moment-1920x1080.png) | ![Another farm's public profile: name, sign, rank, headline numbers and badges, no coins](docs/screenshots/v10-profile-public-390x844.png) |
+
+Five hens hatching, left to right and top to bottom, about a third of a second apart (the coops filled up too, so FULL
+HOUSE unlocked at the same time):
+
+![Eight frames of five new hens hatching: big eggs land in free yard spots, wobble and crack, and the hens pop out and wander](docs/screenshots/v10-hatch-strip-1280x720.png)
+
+**A clean history.** On 13 November 2026 the repository moved to a fresh public history: three screenshot files from
+11 and 12 November that showed farm names made from players' emails were removed from every commit (the later, clean
+versions of those screenshots are kept). Every commit message, author and date is unchanged; the old history is
+archived privately.
+
 ## Agents that reflect, and AI farms that enter (13 November 2026)
 
 **The agent loop.** Each agent decides once per in-game day from a compact observation (its cash and stock, the last
@@ -160,7 +457,7 @@ farm, its memory of every farm, its last reflection and reasons). A persona prom
 NEAR AI: the cheap model on routine days, the main model on hard days (a crash or glut, or cash under the struggle line)
 and for the weekly reflection. Every answer, model or rules, passes `validateDecision` on the server; anything unusable,
 or anything past the global or per-agent caps, falls back to the upgraded rules. Each decision carries a public reason
-under 80 characters, shown on the market board; every seven days each agent writes a reflection under 400 characters
+under 80 characters, shown on the Market page; every seven days each agent writes a reflection under 400 characters
 that it reads back next time.
 
 ```mermaid
@@ -173,7 +470,7 @@ flowchart LR
   rules["Rules (trend-aware)"]
   val["validateDecision<br/>one zod schema, own role only,<br/>known farms and orders"]
   apply["Apply: farm actions, orders,<br/>offers (cards), restock"]
-  pub["Public reason (under 80)<br/>on the market board"]
+  pub["Public reason (under 80)<br/>on the Market page"]
   refl["Weekly reflection (under 400)<br/>stored, read back"]
   obs --> caps
   caps -- no --> rules
@@ -199,7 +496,7 @@ $$
 \text{cap} = \max\left(4,\ \lfloor 1.5 \times \text{active player farms} \rfloor\right).
 $$
 
-Every AI farm and agent wears an **AI** tag on the market board and the ticker. Agent wallets are now a reusable pool:
+Every AI farm and agent wears an **AI** tag on the Market page and the ticker. Agent wallets are now a reusable pool:
 a wallet whose agents are all bust (any kind) goes to the next new agent, and no wallet is funded while one is free;
 each wallet created and its funding is recorded, and the server logs the pool's size and the NEAR spent.
 
@@ -1082,7 +1379,7 @@ On standard feed at $m = 1$: margin $= 0.4624$, payback $= 17.3$ days.
 
 Each agent has its own cash, stock and **memory of every farm** (deals, value, refusals, haggles won and lost, missed deliveries, sulks) in Postgres, a persona, its last few **public reasons** (one line each, on the market board) and a **weekly reflection** it reads back. It decides once per in-game day and pays 0.50 coins per decision from its own cash. Below 40 coins it thinks only every other day, so a struggling business visibly gets worse. Below zero it closes: its orders and contracts end, a rival's hens go to auction at half price, and a new agent of the same role opens three days later under a fresh name.
 
-**New AI farms** enter too: Early Bird Eggs, the Cluck Collective, Gilded Roost Estates and Pennywise Poultry (from a registry; they look like the Upstart or Old Money, start smaller and have their own personas). At each day close one may enter (a 25% chance) after three days of supply under demand or a rival's bust, always when fewer than two AI farms are open, never past `max(4, 1.5 x player farms)`. Every AI farm and agent wears an **AI** tag on the market board and the ticker. Details, the 30-day model-against-rules comparison and the credits needed: [docs/agents.md](docs/agents.md).
+**New AI farms** enter too: Early Bird Eggs, the Cluck Collective, Gilded Roost Estates and Pennywise Poultry (from a registry; they look like the Upstart or Old Money, start smaller and have their own personas). At each day close one may enter (a 25% chance) after three days of supply under demand or a rival's bust, always when fewer than two AI farms are open, never past `max(4, 1.5 x player farms)`. Every AI farm and agent wears an **AI** tag on the Market page and the ticker. Details, the 30-day model-against-rules comparison and the credits needed: [docs/agents.md](docs/agents.md).
 
 ## Systems
 
@@ -1124,8 +1421,8 @@ Each agent has its own cash, stock and **memory of every farm** (deals, value, r
 - **Seasons**: a season is one game world from day 1, and one database holds one season (`GAME_SEASON`). A new season starts again at day 1 on the same contract while repeats within a season are refused; a server pointed at another season's database refuses to start. Version 1 settled days without seasons; `migrate` upgrades it in place and files those days under `legacy` (done on `coys-game.testnet`).
 - The batch (`apps/server/src/chain/batch.ts`): the day's trades between holders become egg transfers; then every account is reconciled to what it really holds (crate plus open sell orders, or a buyer's stock) with mints and burns, starting from the balances last confirmed on chain. A failed day is caught up by the next, and no burn exceeds a balance. The day's full settlement (every farm's net, the egg moves, the Feathers) is kept as exact text in `market_days.settlement_json`; its SHA-256 is the digest on chain, and the call carries only the moving farms' nets.
 - **Feathers only** (version 4): hens are never minted; `settle_day` refuses them and mints Feathers up to a hard cap of 777, numbering each, with the founders provenance committed once ([docs/founding-hens.md](docs/founding-hens.md)).
-- **Feather images**: the grade's Spawn card frame and feather, with the number, are composed once at mint into a 96x136 PNG and stored in the token metadata with its `media_hash`. Why: it is the simplest correct storage. The token is self-contained and verifiable from the chain alone, with no image host, pinning service or URL to keep alive. A Feather costs 3,169 bytes of state (sandbox), about 0.032 NEAR. At most 20 mint in one day close, and only as many as the game account's free balance stores above its margin (`CHAIN_MINT_NEAR`, default 0.035 each; `CHAIN_MIN_BALANCE_NEAR`, default 0.5); the rest wait.
-- **Agent wallets**: sub-accounts of the game account, funded from it (`AGENT_ACCOUNT_FUNDING_NEAR`, default 0.05), with keys derived from the game key by HMAC so no extra secret is stored. They are a pool: a wallet whose agents are all bust (any kind) is free, and a new agent takes a free one before a new one is created and funded; every wallet and its funding is recorded (`agent_wallets`), and each creation logs the pool's size and the NEAR spent.
+- **Feather images**: the grade's Spawn card frame and feather, with the number, are composed once at mint into a 96x136 PNG and stored in the token metadata with its `media_hash`. Why: it is the simplest correct storage. The token is self-contained and verifiable from the chain alone, with no image host, pinning service or URL to keep alive. A Feather costs 1,913 to 2,075 bytes of state, measured on the live contract (0.019 to 0.021 NEAR), plus 0.0004 to 0.0005 NEAR of gas. Mints go out only while the game account's free balance stays above its margin (`CHAIN_MINT_NEAR`, default 0.027 each; `CHAIN_MIN_BALANCE_NEAR`, default 0.1); the rest wait, and go out once it does.
+- **Agent wallets**: sub-accounts of the game account, funded from it (`AGENT_ACCOUNT_FUNDING_NEAR`, default 0.01), with keys derived from the game key by HMAC so no extra secret is stored. They are a pool: a wallet whose agents are all bust (any kind) is free, and a new agent takes a free one before a new one is created and funded; every wallet and its funding is recorded (`agent_wallets`), and each creation logs the pool's size and the NEAR spent.
 - **Players**: the Privy wallet holds their Feathers and eggs. Minting and transfers happen only in the day batch, never per click.
 - Testnet only, enforced in code before any key is used: accounts must be `.testnet` (or implicit), RPC hosts must be testnet, and the RPC's `chain_id` must say `testnet` before anything is signed. Without credentials, every day's batch is built the same way and logged as a NO-OP.
 - **Deliveries on chain**: a contract delivery is a trade from the player's wallet to the Bakery's sub-account, so the day's batch moves the eggs as NEP-245 tokens between them (then burns them when the Bakery bakes). Proven on testnet (receipt above), in a dedicated test, and in every seed of the simulation.
@@ -1213,7 +1510,7 @@ All optional for local play. Copy `.env.example` to `.env` at the repo root. Pro
 | `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY` | server, client (via `/api/config`) | labelled local dev login |
 | `NEAR_TESTNET_ACCOUNT_ID`, `NEAR_TESTNET_PRIVATE_KEY` | server, deploy script | daily settlement is a recorded NO-OP |
 | `NEAR_TESTNET_RPC_URL`, `NEAR_GAME_CONTRACT_ID` | server | `https://test.rpc.fastnear.com`; the signing account |
-| `CHAIN_MINT_NEAR`, `CHAIN_MIN_BALANCE_NEAR`, `AGENT_ACCOUNT_FUNDING_NEAR` | server | 0.035 kept free per Feather mint; 0.5 margin (a few real days of settlement gas) under which mints and agent wallet links wait; 0.05 |
+| `CHAIN_MINT_NEAR`, `CHAIN_MIN_BALANCE_NEAR`, `AGENT_ACCOUNT_FUNDING_NEAR` | server | 0.027 kept free per Feather mint (measured 0.0213, plus 25%); 0.1 margin (120 day closes of settlement gas, six real hours) under which mints and agent wallet links wait; 0.01 per new agent wallet |
 | `NEARAI_API_KEY`, `NEARAI_BASE_URL`, `NEARAI_MODEL`, `NEARAI_CHEAP_MODEL` | server | agents use their rule policies |
 | `NEARAI_DAILY_SPEND_CAP_USD` | server | 1.00 |
 | `NEARAI_AGENT_DAILY_CAP_USD`, `NEARAI_AGENT_DAILY_CALLS` | server | a quarter of the global cap; 40 calls |
@@ -1289,6 +1586,23 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
 **Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
+
+### Brief 10: a clean history, the Market page, profiles, badges and hatching (13 November 2026)
+
+- **History.** Three screenshot files that showed email-derived farm names were removed from every commit; the
+  repository moved to a fresh public history with every commit message, author and date unchanged, and the old one is
+  archived privately. Pier deploys from the new repository.
+- **Fixes.** The stray egg below the crate (a loose piece of the crate sheet cut as a frame of its own), the wording
+  about who runs the farms (players and AI; suppliers and buyers are AI), the shop's hen button (`BUY 4`, with a small
+  `AUCTION` tag and one line on auction hens), and the mint reserve from measured costs (0.127 NEAR free for a mint,
+  was 0.535).
+- **Market page.** Seven tabs in place of the market board, a 10-day price chart from the server, one-tap fills,
+  ranking with badges and public profiles.
+- **Profile and badges.** Eight private tabs and a public profile with a whitelisted set of fields; 73 cosmetic
+  badges (153 levels to earn, 7 secret), day records and counters (migration 14), a one-off back-fill, the unlock
+  moment.
+- **Hatching.** New hens hatch from an egg in a free yard spot, a beat apart, with sound and reduce-motion respected.
+- **Art.** Badge frames, badge icons and the hatching egg, made in Spawn by `@gama` and backed up in coys-assets.
 
 ### Brief 9, stage 4: agents that reflect, AI farms that enter (13 November 2026)
 
