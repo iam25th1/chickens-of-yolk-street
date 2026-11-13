@@ -135,13 +135,36 @@ export interface AgentRow {
   lastDecidedDay: number;
   lastBrain: string | null;
   account: string | null;
+  /** The entrant registry entry of an AI farm that entered the street; null for the base cast. */
+  entrant: string | null;
+  /** Its last few public one-line reasons, newest last. */
+  reasons: AgentReason[];
+  /** Its latest weekly reflection, and the day it was written. */
+  reflection: string | null;
+  reflectionDay: number | null;
+  /** What its current week started from; null until its first decision. */
+  weekStart: WeekStart | null;
+}
+
+export interface AgentReason {
+  day: number;
+  text: string;
+}
+
+export interface WeekStart {
+  day: number;
+  cashMilli: number;
+  deals: number;
+  refusals: number;
 }
 
 export const AGENT_COLUMNS =
-  'id, kind, role, name, generation, status, cash_milli, farm_id, stock, opened_day, bust_day, last_decided_day, last_brain, near_account_id';
+  'id, kind, role, name, generation, status, cash_milli, farm_id, stock, opened_day, bust_day, last_decided_day, last_brain, near_account_id, entrant_key, reasons, reflection, reflection_day, week_start';
+
+const json = <T>(v: unknown, fallback: T): T => (typeof v === 'string' ? (JSON.parse(v) as T) : ((v as T | null | undefined) ?? fallback));
 
 export function toAgent(r: Record<string, unknown>): AgentRow {
-  const stock = typeof r.stock === 'string' ? (JSON.parse(r.stock) as Record<string, number>) : ((r.stock as Record<string, number>) ?? {});
+  const stock = json<Record<string, number>>(r.stock, {});
   return {
     id: String(r.id),
     kind: String(r.kind),
@@ -157,6 +180,11 @@ export function toAgent(r: Record<string, unknown>): AgentRow {
     lastDecidedDay: num(r.last_decided_day ?? 0),
     lastBrain: (r.last_brain as string | null) ?? null,
     account: (r.near_account_id as string | null) ?? null,
+    entrant: (r.entrant_key as string | null) ?? null,
+    reasons: json<AgentReason[]>(r.reasons, []),
+    reflection: (r.reflection as string | null) ?? null,
+    reflectionDay: r.reflection_day === null || r.reflection_day === undefined ? null : num(r.reflection_day),
+    weekStart: json<WeekStart | null>(r.week_start, null),
   };
 }
 
