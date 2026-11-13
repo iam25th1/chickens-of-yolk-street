@@ -2,7 +2,7 @@
 // art. Opens from Settings and from the ? in the top bar. One section at a time, with previous and
 // next; a section longer than the window allows is split into pages (never a scrollbar).
 import { Children, Fragment, isValidElement, useState, type ReactNode } from 'react';
-import { ECONOMY, UNLOCK_IDS, type MilestoneId } from '@coys/shared';
+import { ECONOMY, MARKET_CHART_DAYS, UNLOCK_IDS, type MilestoneId } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { Modal } from './Modal';
@@ -17,7 +17,7 @@ export const MILESTONE_TEXT: Record<MilestoneId, string> = {
   'haggles-won': `WIN ${ECONOMY.feathers.hagglesWon} HAGGLES`,
   'all-machines': 'OWN ALL FIVE MACHINES',
   'outlast-rival': 'OUTLAST A RIVAL FARM THAT GOES BUST',
-  'top-three': `FINISH A DAY IN THE BOARD'S TOP ${ECONOMY.feathers.topRank}`,
+  'top-three': `FINISH A DAY IN THE TOP ${ECONOMY.feathers.topRank} OF THE MARKET'S FARMS`,
 };
 
 const minutes = Math.round(ECONOMY.day.lengthMs / 60_000);
@@ -89,7 +89,11 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <p>ONE PRICE FOR EVERYONE. TODAY&apos;S PRICE COMES FROM YESTERDAY&apos;S SUPPLY: HOW MANY EGGS THE WHOLE STREET SOLD AGAINST WHAT IT NEEDS.</p>
-        <p>SELL TOO MANY AT ONCE AND PRICES CRASH (A GLUT). WHEN EGGS ARE SCARCE, PRICES RISE. THE BOARD SHOWS BOTH, AND AN ORDER BOOK FOR YOUR OWN PRICE.</p>
+        <p>SELL TOO MANY AT ONCE AND PRICES CRASH (A GLUT). WHEN EGGS ARE SCARCE, PRICES RISE.</p>
+        <p>
+          THE MARKET (MARKET IN THE TOP BAR, OR TAP YOUR FARM SIGN) HAS IT ALL: PRICES WITH THE LAST {MARKET_CHART_DAYS} DAYS AND WHAT THE AI TRADERS SAY; SELL FROM YOUR CRATE OR POST YOUR OWN PRICE; THE AI
+          BUYERS&apos; ORDERS TO FILL; YOUR ORDERS; OTHER FARMS&apos; OFFERS TO BUY; THE HEN AUCTION; AND THE FARMS RANKED.
+        </p>
       </>
     ),
   },
@@ -157,7 +161,7 @@ const SECTIONS: Section[] = [
     picture: () => <Art id="17-sign-upstart" row="sway" />,
     body: (
       <>
-        <p>RIVAL FARMS TRADE IN THE SAME MARKET. A FARM THAT RUNS OUT OF COINS GOES BUST: ITS SIGN FALLS AND ITS HENS GO TO AUCTION IN THE SHOP.</p>
+        <p>RIVAL FARMS TRADE IN THE SAME MARKET. A FARM THAT RUNS OUT OF COINS GOES BUST: ITS SIGN FALLS AND ITS HENS GO TO THE MARKET&apos;S HEN AUCTION.</p>
         <p>YOUR FARM CAN GO BUST TOO. WATCH YOUR COINS AND YOUR CREDIT.</p>
       </>
     ),
@@ -206,7 +210,7 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <p>
-          THE FEATHER MINT (MINT IN THE TOP BAR, ON THE TITLE AND ON THE BOARD, OR /MINT) SHOWS ALL 777 NUMBERS: MINTED ONES AS FEATHER CARDS, THE REST AS DARK SILHOUETTES. IT LISTS YOUR
+          THE FEATHER MINT (MINT IN THE TOP BAR OR ON THE TITLE, OR /MINT) SHOWS ALL 777 NUMBERS: MINTED ONES AS FEATHER CARDS, THE REST AS DARK SILHOUETTES. IT LISTS YOUR
           TICKETS, RECENT MINTS, THE FOUNDERS HASH (COMMITTED ON NEAR BEFORE THE FIRST FEATHER) AND THE CONTRACT. ANYONE CAN OPEN IT; YOU SIGN IN ONLY TO MINT.
         </p>
         <p>

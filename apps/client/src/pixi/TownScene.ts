@@ -1,4 +1,4 @@
-// The market board backdrop: the town square plate, bunting across the top and a milling crowd.
+// The Market's backdrop: the town square plate, bunting across the top and a milling crowd.
 import { Container } from 'pixi.js';
 import type { AssetStore } from '../assets/store';
 import type { AudioEngine, LoopHandle } from '../audio/audio';

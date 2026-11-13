@@ -2,9 +2,11 @@
 // no-op), the local dev login, the built client (apps/client/dist), and a clock the test can move
 // forward to close days. Never touches NEAR: its Feather mints are a stand-in that answers after a
 // short wait (the next ones can be made to fail, as NEAR refusing them would). A named farm can be
-// given every machine, a handful of Feather tickets and a wallet, so every screen has content to page.
+// given every machine, a handful of Feather tickets and a wallet, so every screen has content to page;
+// and the Market can be given eggs to sell, a buyer's order, another player's offer and auction hens.
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
+import type { EggGrade } from '@coys/shared';
 import { InferenceBudget } from '../apps/server/src/agents/brain';
 import { createSessionSigner } from '../apps/server/src/auth/session';
 import { NoopChain, type ChainWriter, type MintResult } from '../apps/server/src/chain/chain';
@@ -37,6 +39,18 @@ export interface TestServer {
   failMints(n: number): void;
   /** Sets the condition (and broken flag) of the named farm's machines. */
   wear(name: string, machines: Record<string, { condition: number; broken?: boolean }>): Promise<void>;
+  /** Days close only when closeDays says (true), or on their own again when their time is up (false). */
+  hold(on: boolean): void;
+  /** Puts these eggs in the named farm's crate and sends the farm its fresh state. */
+  crate(name: string, eggs: Partial<Record<EggGrade, number>>): Promise<void>;
+  /** An AI buyer's order for eggs at this share of today's price, open for three days; the browsers see it with the next market. Returns its id. */
+  buyOrder(grade: EggGrade, qty: number, share: number): Promise<string>;
+  /** The AI buyers take back their open orders for these grades (as when they have bought enough), so an offer at a higher price than today's rests instead of filling. */
+  pullBids(grades: EggGrade[]): Promise<void>;
+  /** n of the breeder's hens go to auction, as a bust farm's would; a farm sees them with its next state. */
+  auction(n: number): Promise<void>;
+  /** Another player's farm (made as the dev login makes one) offers its eggs at this share of today's price; every browser gets the market. Returns the farm's name and the order's id. */
+  trader(name: string, grade: EggGrade, qty: number, share: number): Promise<{ name: string; orderId: string }>;
   close(): Promise<void>;
 }
 
@@ -91,7 +105,17 @@ export async function startTestServer(): Promise<TestServer> {
     pingDb: () => db.query('SELECT 1'),
     log: quiet,
   });
-  const timer = setInterval(() => void game.tick().catch(() => undefined), 1000);
+  let held = false;
+  let bids = 0;
+  const timer = setInterval(() => {
+    if (!held) void game.tick().catch(() => undefined);
+  }, 1000);
+  /** The named farm, and its player. */
+  const farmNamed = async (name: string) => {
+    const [farm] = await db.query<{ id: string; player_id: string; clerk_floor: number }>('SELECT id, player_id, clerk_floor FROM farms WHERE name LIKE $1 LIMIT 1', [`${name}%`]);
+    if (!farm) throw new Error(`no farm named ${name}`);
+    return farm;
+  };
   const port = await freePort();
   await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve));
   return {
@@ -129,6 +153,44 @@ export async function startTestServer(): Promise<TestServer> {
       for (const [u, s] of Object.entries(machines)) {
         await db.query('UPDATE unlocks SET condition = $3, broken = $4 WHERE farm_id = $1 AND unlock_id = $2', [farm.id, u, s.condition, s.broken ?? false]);
       }
+    },
+    hold(on) {
+      held = on;
+    },
+    async crate(name, eggs) {
+      const farm = await farmNamed(name);
+      for (const [g, n] of Object.entries(eggs)) await db.query(`UPDATE farms SET crate_${g} = $2 WHERE id = $1`, [farm.id, n]);
+      // a setting set to what it is: the server sends the farm its state, as after any action
+      const ok = await game.act(farm.player_id, { t: 'setClerkFloor', rid: 'browser-check', floor: Number(farm.clerk_floor) });
+      if (!ok.ok) throw new Error(`could not refresh ${name}: ${ok.message}`);
+    },
+    async buyOrder(grade, qty, share) {
+      const [agent] = await db.query<{ id: string }>(`SELECT id FROM agents WHERE role = 'buyer' AND status = 'open' ORDER BY id LIMIT 1`);
+      if (!agent) throw new Error('no open buyer');
+      const market = await game.getMarketState();
+      const id = `browser-check-buy-${++bids}`;
+      await db.query(
+        `INSERT INTO orders (id, deal_id, agent_id, day, side, kind, grade, qty, price_milli, status, created_at, expires_day)
+         VALUES ($1, $1, $2, $3, 'buy', 'limit', $4, $5, $6, 'open', $7, $8)`,
+        [id, agent.id, market.day, grade, qty, Math.round(market.pricesMilli[grade] * share), now(), market.day + 3],
+      );
+      return id;
+    },
+    async pullBids(grades) {
+      await db.query(`UPDATE orders SET status = 'cancelled' WHERE side = 'buy' AND status = 'open' AND agent_id IS NOT NULL AND grade = ANY($1::text[])`, [grades]);
+    },
+    async auction(n) {
+      await db.query(`UPDATE hens SET status = 'auction', farm_id = NULL WHERE id IN (SELECT id FROM hens WHERE status = 'forsale' ORDER BY id LIMIT $1)`, [n]);
+    },
+    async trader(name, grade, qty, share) {
+      const p = await game.ensurePlayer('dev', `browser-check-${name}`, name);
+      await db.query(`UPDATE farms SET crate_${grade} = crate_${grade} + $2 WHERE id = $1`, [p.farmId, qty]);
+      const price = Math.round((await game.getMarketState()).pricesMilli[grade] * share) / 1000;
+      const ok = await game.act(p.playerId, { t: 'placeOrder', rid: 'browser-check', grade, qty, price });
+      if (!ok.ok) throw new Error(`the trader could not post: ${ok.message}`);
+      const [order] = await db.query<{ id: string }>(`SELECT id FROM orders WHERE farm_id = $1 AND status = 'open' AND kind = 'limit' ORDER BY created_at DESC LIMIT 1`, [p.farmId]);
+      if (!order) throw new Error('the trader has no open order');
+      return { name: p.name, orderId: order.id };
     },
     async close() {
       clearInterval(timer);

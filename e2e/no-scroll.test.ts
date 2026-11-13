@@ -123,7 +123,23 @@ describe('no scrollbars and nothing cut off', () => {
           }
         };
         await tabs('shop', ['shop-hens', 'shop-feed', 'shop-coops', 'shop-machines']);
-        await tabs('market', ['market-board', 'market-farms', 'market-orders', 'market-trades']);
+        // the Market (a page of its own): every tab, and every page of every list on it
+        await open('market');
+        await page.locator('[data-ui="market-page"]').waitFor();
+        for (const id of ['prices', 'sell', 'buyers', 'mine', 'trade', 'auction', 'farms']) {
+          await page.locator(`[data-tour="market-${id}"]`).click();
+          await check(`market ${id}`);
+          const pagers = page.locator('[data-ui="market-page"] [data-ui="pager"] >> visible=true');
+          const lists = await pagers.count();
+          for (let l = 0; l < lists; l++) {
+            for (let i = 0; i < 12; i++) {
+              const next = pagers.nth(l).locator('[data-ui="page-next"]:not([disabled])');
+              if (!(await next.count())) break;
+              await next.click();
+              await check(`market ${id} list ${l + 1} page ${i + 2}`);
+            }
+          }
+        }
         await tabs('ledger', ['ledger-days', 'ledger-contracts', 'ledger-feathers', 'ledger-milestones']);
         await open('settings');
         await walk('settings');
