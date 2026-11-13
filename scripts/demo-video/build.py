@@ -9,8 +9,8 @@ footage (scene clips, sped up at most 3x to fit the voice, the last frame held i
 The frame: a 1920x1080 dark brown canvas, the footage inset at 1568x882 (x 176, y 74) in a cream border
 inside a dark red one, the logo top left, YOLKSTREET.25TH.DEV in the top bar, a red track chip top
 right, captions below the footage (never over it). Audio: the farm-day loop under the voice, ducked by
-it, game sounds at the actions the capture logged, a sting on the end card, -15 LUFS. ffmpeg here has
-no drawtext or subtitles filter, so every piece of text is drawn with Pillow into overlays.
+it, game sounds at the actions the capture logged, -15 LUFS. ffmpeg here has no drawtext or subtitles
+filter, so every piece of text is drawn with Pillow into overlays.
 
 Partial frames are dropped and the frame before them held: a frame of a scene that is darker or brighter
 than both its neighbours (the naming prompt's fade restarting on each keystroke, a modal caught half
@@ -136,7 +136,6 @@ SFX = {
 }
 # a hatch: the egg cracks, pops, the hen clucks; three or more: the chorus
 HATCH = [(1.6, '09-crack/09-crack-a.mp3', 0.5), (2.4, '08-egg-pop/08-egg-pop-b.mp3', 0.5), (2.7, '01-cluck/01-cluck-a.mp3', 0.45)]
-STING = ('45-deal-closed/45-deal-closed-a.mp3', 0.7)
 MUSIC = '42-farm-day/42-farm-day-a-loop.ogg'
 
 
@@ -468,7 +467,7 @@ def main() -> None:
     end_card(card)
     overlays.append((card, t, total + 1))
 
-    # audio: voice, game sounds, the sting; the music under it, ducked by the voice
+    # audio: voice and game sounds; the music under it, ducked by the voice
     n = int((total + 0.5) * SR)
     voice = np.zeros(n, np.float32)
     effects = np.zeros(n, np.float32)
@@ -484,7 +483,6 @@ def main() -> None:
         elif kind in SFX:
             rel, g = SFX[kind]
             place(effects, load_audio(rel), at, g)
-    place(effects, load_audio(STING[0]), t + 0.15, STING[1])
     loop = load_audio(MUSIC)
     music = np.tile(loop, int(np.ceil(n / len(loop))) + 1)[:n] * 0.32
     fade_in, fade_out = int(1.2 * SR), int(2.5 * SR)
