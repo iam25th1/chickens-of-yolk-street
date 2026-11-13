@@ -148,7 +148,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     });
     scene.current = s;
     // read-only hooks for automated checks: where things are on the farm, and opening a modal as a click would
-    (window as unknown as { __coysFarm?: unknown }).__coysFarm = { targets: () => s.targets(), yard: () => s.yardBox() };
+    (window as unknown as { __coysFarm?: unknown }).__coysFarm = { targets: () => s.targets(), yard: () => s.yardBox(), hatching: () => s.hatching() };
     (window as unknown as { __coysUi?: unknown }).__coysUi = { open: openModal, close: closeModal };
     // and showing any tour step, so every step's box can be checked at every window size
     (window as unknown as { __coysTour?: unknown }).__coysTour = { count: TOUR.length, show: (step: number) => tour.set({ active: true, step }), end: () => tour.set({ active: false, step: 0 }) };

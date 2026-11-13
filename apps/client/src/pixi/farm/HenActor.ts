@@ -6,7 +6,7 @@ import type { AssetStore } from '../../assets/store';
 import { FrameSprite } from '../FrameSprite';
 import type { Point } from './layout';
 
-type HenState = 'idle' | 'walk' | 'eat' | 'lay' | 'sleep' | 'happy' | 'sad';
+type HenState = 'idle' | 'walk' | 'eat' | 'lay' | 'sleep' | 'happy' | 'sad' | 'hatch';
 
 /** Walks are routes: points to walk to in turn, round anything standing in the way (movement.ts). */
 export interface HenWorld {
@@ -52,7 +52,39 @@ export class HenActor {
   }
 
   get busy(): boolean {
-    return this.state === 'lay';
+    return this.state === 'lay' || this.state === 'hatch';
+  }
+
+  /** A new hen waits, unseen, in her egg at `at` until it bursts (the farm plays the egg). */
+  awaitHatch(at: Point): void {
+    this.state = 'hatch';
+    this.target = null;
+    this.route = [];
+    this.sprite.position.set(at.x, at.y);
+    this.sprite.visible = false;
+  }
+
+  /** The egg burst: she pops out with a squash and a stretch, shakes herself off, then wanders. */
+  popOut(): void {
+    this.sprite.visible = true;
+    this.sprite.play('happy');
+    const k = { s: 0.35 };
+    animate(k, {
+      s: [0.35, 1.3, 0.9, 1],
+      duration: 620,
+      ease: 'outQuad',
+      onUpdate: () => this.sprite.squash(2 - k.s, k.s),
+    });
+    // she shakes herself off: a quick look one way, the other, and back
+    for (const [ms, dir] of [[640, -1], [760, 1], [880, -1], [1000, 1]] as const) {
+      setTimeout(() => this.state === 'hatch' && this.sprite.face(dir), ms);
+    }
+    setTimeout(() => {
+      if (this.state !== 'hatch') return;
+      this.state = 'idle';
+      this.timer = 200 + Math.random() * 500;
+      this.sprite.play('idle');
+    }, 1100);
   }
 
   get position(): Point {
@@ -120,7 +152,7 @@ export class HenActor {
 
   update(dtMs: number, world: HenWorld): void {
     this.sprite.update(dtMs);
-    if (this.state === 'lay') return;
+    if (this.state === 'lay' || this.state === 'hatch') return;
 
     if (world.night && this.state !== 'sleep' && this.afterWalk !== 'sleep') {
       this.walkTo(world.roost(this.position), 'sleep');
@@ -165,7 +197,7 @@ export class HenActor {
   private enter(state: HenState): void {
     this.state = state;
     this.afterWalk = 'idle';
-    const rows: Record<HenState, string> = { idle: 'idle', walk: 'waddle', eat: 'eat', lay: 'lay', sleep: 'sleep', happy: 'happy', sad: 'sad' };
+    const rows: Record<HenState, string> = { idle: 'idle', walk: 'waddle', eat: 'eat', lay: 'lay', sleep: 'sleep', happy: 'happy', sad: 'sad', hatch: 'idle' };
     this.sprite.play(rows[state]);
     this.timer = state === 'eat' ? 2200 + Math.random() * 1800 : 800 + Math.random() * 2600;
   }
