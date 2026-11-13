@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ECONOMY, feedGramsPerHenDay, marketMultiplier, marketReference, toMilli, type FarmState } from '@coys/shared';
+import { ECONOMY, EGG_GRADES, MARKET_CHART_DAYS, eggPrice, feedGramsPerHenDay, marketMultiplier, marketReference, toMilli, type FarmState } from '@coys/shared';
 import { makeGame, type TestGame } from './helpers';
 
 let t: TestGame | null = null;
@@ -95,6 +95,23 @@ describe('actions are priced by the server', () => {
     // a quiet market: one player farm and no agents, so demand is one farm's worth
     expect(after.multiplier).toBeCloseTo(marketMultiplier(count, marketReference(1)), 10);
     expect(await t.game.ledgerTotal(farmId)).toBe(farm.cashMilli);
+  });
+});
+
+describe("the Market page's price chart", () => {
+  it('sends the last closed days, oldest first, each with its demand and one egg per grade at its price level', async () => {
+    t = await makeGame();
+    await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
+    expect((await t.game.getMarketState()).chart).toEqual([]);
+    for (let i = 0; i < MARKET_CHART_DAYS + 2; i++) await nextDay(t);
+    const market = await t.game.getMarketState();
+    expect(market.chart.map((d) => d.day)).toEqual(Array.from({ length: MARKET_CHART_DAYS }, (_, i) => market.day - MARKET_CHART_DAYS + i));
+    expect(market.chart.map((d) => ({ day: d.day, supply: d.supply, multiplier: d.multiplier }))).toEqual(market.history.slice(-MARKET_CHART_DAYS));
+    for (const d of market.chart) {
+      // one player farm and no agents: demand is one farm's worth
+      expect(d.demand).toBe(marketReference(1));
+      for (const g of EGG_GRADES) expect(d.pricesMilli[g]).toBe(toMilli(eggPrice(g, d.multiplier, [])));
+    }
   });
 });
 

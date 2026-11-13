@@ -52,8 +52,8 @@ The game still bounds every number when it applies a decision (price bands, stoc
 ## Reasons and reflections
 
 - **Reasons**: every decision's `reason` (the rules write one too) is kept with the agent, the last
-  five, and the newest is in `MarketState.agents[].reason`. The market board's TRADES tab shows it
-  under each agent of THE CAST, upper case, wrapping inside the row of the paged list.
+  five, and the newest is in `MarketState.agents[].reason`. The Market page's PRICES tab shows it
+  under each agent in WHAT THE AI TRADERS SAY, upper case, wrapping inside the row of the paged list.
 - **Weekly reflections**: every 7 in-game days per agent (`ECONOMY.agents.reflectEveryDays`), before
   its decision that day, the agent writes a reflection under 400 characters: what went well or badly
   and what it will change. The main model writes it when the caps allow; otherwise `ruleReflection`

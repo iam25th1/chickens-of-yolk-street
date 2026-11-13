@@ -11,7 +11,7 @@
 // Feathers are minted one at a time, at once, as tickets are redeemed (mintFeather: version 6's
 // mint_feather, with the number the server drew), never in a day's settlement. A mint goes out only
 // while the game account's free balance can store it: each keeps CHAIN_MINT_NEAR in reserve on top
-// of a CHAIN_MIN_BALANCE_NEAR margin (default 0.5 NEAR: a few real days of settlement gas), so
+// of a CHAIN_MIN_BALANCE_NEAR margin (both set from measured costs, see MEASURED below), so
 // nothing optional (mints, linking or creating agent wallets) ever eats into the days' own
 // settlements; a mint that cannot go out yet waits, at the latest for a day close. The contract
 // names its live season: that season's Feathers are the 777, any other season's go into its own
@@ -638,6 +638,27 @@ function returnedString(outcome: unknown): string | null {
   }
 }
 
+/**
+ * What the game account really pays, measured on play.coys-game.testnet on 13 November 2026 (account
+ * storage one block before and after, gas burnt over every receipt): a Feather mint stores 1,913 to
+ * 2,075 bytes (0.0191 to 0.0208 NEAR) and burns 0.0004 to 0.0005 NEAR of gas; a day's settlement
+ * burns 0.00081 to 0.00087 NEAR of gas and stores nothing; a new agent wallet needs 182 bytes of its
+ * own (0.0018 NEAR) and never pays for anything itself.
+ */
+export const MEASURED = { mintNear: 0.0213, settleNear: 0.00084, walletStorageNear: 0.0018 } as const;
+
+/**
+ * The thresholds the writer keeps, from those costs plus a buffer: each mint keeps its cost and a
+ * quarter more; the margin kept free for settlements is 120 day closes of gas (about six real hours at
+ * 3-minute days); a wallet is funded with a little over five times what its own storage needs. A mint
+ * goes out at 0.127 NEAR free and a new wallet is made at 0.11 (they used to wait for 0.535 and 0.55).
+ */
+export const RESERVE = {
+  mintNear: Math.ceil(MEASURED.mintNear * 1.25 * 1000) / 1000,
+  minBalanceNear: Math.round(MEASURED.settleNear * 120 * 100) / 100,
+  agentFundingNear: 0.01,
+} as const;
+
 /** The gap between this writer's calls to the public RPC, which refuses bursts. */
 const PACE_MS = 1500;
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -652,9 +673,9 @@ export function createChainWriter(env: NodeJS.ProcessEnv, renderer: FeatherRende
       privateKey,
       rpcUrl: env.NEAR_TESTNET_RPC_URL || 'https://test.rpc.fastnear.com',
       contractId: env.NEAR_GAME_CONTRACT_ID || accountId,
-      mintNear: Number(env.CHAIN_MINT_NEAR || 0.035),
-      minBalanceNear: Number(env.CHAIN_MIN_BALANCE_NEAR || 0.5),
-      agentFundingNear: Number(env.AGENT_ACCOUNT_FUNDING_NEAR || 0.05),
+      mintNear: Number(env.CHAIN_MINT_NEAR || RESERVE.mintNear),
+      minBalanceNear: Number(env.CHAIN_MIN_BALANCE_NEAR || RESERVE.minBalanceNear),
+      agentFundingNear: Number(env.AGENT_ACCOUNT_FUNDING_NEAR || RESERVE.agentFundingNear),
     },
     renderer,
     log,

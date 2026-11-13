@@ -1,6 +1,6 @@
 // AI farms entering Yolk Street: the floor, the cap (counting base rivals about to reopen), the
 // chance entry on lasting scarcity, entrants never coming back through the base cast, and what the
-// market board shows of them (reasons, the AI flags on trades).
+// Market page shows of them (reasons, the AI flags on trades).
 import { describe, expect, it } from 'vitest';
 import { ECONOMY, aiFarmCap, type GameEvent } from '@coys/shared';
 import { CAST } from '../src/agents/cast';
@@ -84,9 +84,10 @@ describe('AI farms enter the street', () => {
     }
     expect(first).toMatch(new RegExp(`supply under demand for ${ECONOMY.agents.entry.scarceDays} days`));
     await t.db.close();
-  });
+    // forty day closes with the full cast, each also recording profiles and checking badges
+  }, 120_000);
 
-  it("the market board shows each agent's latest reason, and which trades an AI made", async () => {
+  it("the Market page shows each agent's latest reason, and which trades an AI made", async () => {
     const t = await makeGame({ cast: true, seed: 2 });
     await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
     await nextDay(t);

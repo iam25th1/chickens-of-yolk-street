@@ -1,8 +1,9 @@
 // The farm: the world on the canvas and the UI in fixed zones that never overlap (app/viewport.ts):
 // the top bar, the side panel (crate, waiting cards, desk), the goal tracker with the toast area
-// above it, and one modal at a time over a dimmed backdrop (shop, ledger, market board, a card, a
-// hen, a machine, the crate, a hen's certificate, settings). Server state flows in through the
-// socket; player choices go out as actions and come back as events with juice.
+// above it, and one modal at a time over a dimmed backdrop (shop, ledger, a card, a hen, a machine,
+// the crate, a hen's certificate, settings) or a page of its own (the Market, the Feather Mint).
+// Server state flows in through the socket; player choices go out as actions and come back as
+// events with juice.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ECONOMY, isCrash, type CardView } from '@coys/shared';
 import { useServices } from '../app/services';
@@ -22,7 +23,7 @@ import { FxLayer, uiFx } from '../ui/FxLayer';
 import { ToastArea, Tracker } from '../ui/Guide';
 import { TopBar } from '../ui/Hud';
 import { LedgerPanel } from '../ui/Ledger';
-import { MarketBoard } from '../ui/MarketBoard';
+import { MarketPage } from '../ui/Market';
 import { HowToPlay, MILESTONE_TEXT } from '../ui/HowToPlay';
 import { Modal } from '../ui/Modal';
 import { SettingsBody, ShopPanel } from '../ui/Panels';
@@ -32,6 +33,9 @@ import { FeatherMint } from '../ui/FeatherMint';
 import { MintMoment } from '../ui/MintMoment';
 import { HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
 import { NameFarm } from '../ui/NameFarm';
+import { ProfilePage } from '../ui/Profile';
+import { PublicProfileModal } from '../ui/PublicProfile';
+import { BadgeMoments } from '../ui/BadgeMoment';
 import { MACHINE_NAME } from '../pixi/farm/FarmScene';
 
 /** What clicking each thing on the farm opens. */
@@ -54,7 +58,7 @@ function modalFor(t: WorldTarget): ModalState {
     case 'farmhouse':
       return { kind: 'ledger' };
     case 'sign':
-      return { kind: 'market', tab: 'board' };
+      return { kind: 'market', tab: 'prices' };
     case 'machine':
       return { kind: 'machine', unlock: t.unlock };
   }
@@ -76,6 +80,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
   const market = useStore(game, (s) => s.market);
   const status = useStore(game, (s) => s.status);
   const modal = useStore(ui, (s) => s.modal);
+  const profile = useStore(game, (s) => s.profile);
   const touring = useStore(tour, (s) => s.active);
   // the open card's live state: haggle mood and outcome arrive as events
   const [cardState, setCardState] = useState<{ card: CardView; result: OverlayResult | null; mood: 'warm' | 'firm' | 'cross' | null } | null>(null);
@@ -98,7 +103,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       s.close();
       socket.current = null;
       closeModal();
-      game.set({ status: 'idle', farm: null, ledger: null });
+      game.set({ status: 'idle', farm: null, ledger: null, profile: null });
     };
   }, [session]);
 
@@ -148,7 +153,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     });
     scene.current = s;
     // read-only hooks for automated checks: where things are on the farm, and opening a modal as a click would
-    (window as unknown as { __coysFarm?: unknown }).__coysFarm = { targets: () => s.targets(), yard: () => s.yardBox() };
+    (window as unknown as { __coysFarm?: unknown }).__coysFarm = { targets: () => s.targets(), yard: () => s.yardBox(), hatching: () => s.hatching() };
     (window as unknown as { __coysUi?: unknown }).__coysUi = { open: openModal, close: closeModal };
     // and showing any tour step, so every step's box can be checked at every window size
     (window as unknown as { __coysTour?: unknown }).__coysTour = { count: TOUR.length, show: (step: number) => tour.set({ active: true, step }), end: () => tour.set({ active: false, step: 0 }) };
@@ -181,11 +186,11 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     scene.current?.setRivals([...byKind.values()]);
   }, [market, farm]);
 
-  // the market board swaps the canvas to the town square (on a phone the farm stays behind it);
-  // the farm keeps running either way
+  // the Market swaps the canvas to the town square (on a phone the farm stays behind it); the farm
+  // keeps running either way
   const marketOpen = modal?.kind === 'market' && !v.portrait;
-  // the town square's art comes with the later groups: a board opened before they arrive loads them
-  // first (the farm stays behind the board meanwhile) instead of drawing art that is not there
+  // the town square's art comes with the later groups: a Market opened before they arrive loads them
+  // first (the farm stays behind the page meanwhile) instead of drawing art that is not there
   const townReady = () => assets.has('27-town-square-plate') && assets.has('27-town-square-anim');
   const [townArt, setTownArt] = useState(townReady);
   useEffect(() => {
@@ -238,6 +243,16 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     const next = reveals.current.shift();
     if (next) openModal({ kind: 'reveal', ...next });
   }, [modal, farm]);
+
+  // the profile asks for its data when it opens, and again when a day closes or a badge comes while it is open
+  const profileOpen = modal?.kind === 'profile';
+  useEffect(() => {
+    if (!profileOpen) return;
+    void send({ t: 'getProfile' });
+    return events.on((e) => {
+      if (e.kind === 'dayEnded' || e.kind === 'badgeEarned') void send({ t: 'getProfile' });
+    });
+  }, [profileOpen, send]);
 
   /** Mints a held ticket: the minting moment opens at once and follows the mint's stages. */
   const startMint = useCallback(
@@ -380,10 +395,11 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         rect={z.top}
         onShop={() => openModal({ kind: 'shop', tab: 'hens' })}
         onSettings={() => openModal({ kind: 'settings' })}
-        onMarket={() => openModal({ kind: 'market', tab: 'board' })}
+        onMarket={() => openModal({ kind: 'market', tab: 'prices' })}
         onLedger={() => openModal({ kind: 'ledger' })}
         onHelp={() => openModal({ kind: 'guide' })}
         onFeathers={() => openModal({ kind: 'feathers' })}
+        onProfile={() => openModal({ kind: 'profile', tab: 'overview' })}
       />
       {!(v.portrait && modal) && <SidePanel farm={farm} market={market} rect={z.side} send={send} onOpen={openCard} />}
       <ToastArea farm={farm} rect={z.toasts} offline={status === 'offline'} />
@@ -409,6 +425,21 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       {modal?.kind === 'feathers' && (
         <FeatherMint farm={farm} market={market} onMint={startMint} onSignIn={null} onClose={closeModal} closeLabel="BACK TO THE FARM" />
       )}
+      {modal?.kind === 'profile' && (
+        <ProfilePage
+          farm={farm}
+          market={market}
+          profile={profile}
+          tab={modal.tab}
+          onTab={(tab) => ui.set({ modal: { kind: 'profile', tab } })}
+          onPublic={(farmId) => openModal({ kind: 'publicProfile', farmId, back: modal.tab })}
+          onMint={() => openModal({ kind: 'feathers' })}
+          onClose={closeModal}
+        />
+      )}
+      {modal?.kind === 'publicProfile' && (
+        <PublicProfileModal key={modal.farmId} farmId={modal.farmId} onClose={() => (modal.back === 'market' ? openModal({ kind: 'market', tab: 'farms' }) : modal.back ? openModal({ kind: 'profile', tab: modal.back }) : closeModal())} />
+      )}
       {modal?.kind === 'minting' && (
         <MintMoment
           key={`${modal.ticketId}-${modal.attempt}`}
@@ -420,15 +451,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         />
       )}
       {modal?.kind === 'market' && (
-        <MarketBoard
-          farm={farm}
-          market={market}
-          send={send}
-          tab={modal.tab}
-          onTab={(tab) => ui.set({ modal: { kind: 'market', tab } })}
-          onFeathers={() => openModal({ kind: 'feathers' })}
-          onClose={closeModal}
-        />
+        <MarketPage farm={farm} market={market} send={send} tab={modal.tab} onTab={(tab) => ui.set({ modal: { kind: 'market', tab } })} onClose={closeModal} />
       )}
       {modal?.kind === 'card' && card && (
         <CardOverlay
@@ -442,12 +465,19 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       )}
       {modal?.kind === 'settings' && (
         <Modal title="SETTINGS" onClose={closeModal} w={400} h={420}>
-          <SettingsBody onClose={closeModal} onGuide={() => openModal({ kind: 'guide' })} farm={farm} onRename={() => openModal({ kind: 'name', mode: 'rename' })} />
+          <SettingsBody
+            onClose={closeModal}
+            onGuide={() => openModal({ kind: 'guide' })}
+            farm={farm}
+            onRename={() => openModal({ kind: 'name', mode: 'rename' })}
+            onProfile={() => openModal({ kind: 'profile', tab: 'overview' })}
+          />
         </Modal>
       )}
       {modal?.kind === 'guide' && <HowToPlay onClose={closeModal} />}
       {modal?.kind === 'name' && farm && <NameFarm farm={farm} mode={modal.mode} send={send} onClose={closeModal} />}
       {touring && <Spotlight ctx={ctx} />}
+      <BadgeMoments />
       <FxLayer />
     </div>
   );

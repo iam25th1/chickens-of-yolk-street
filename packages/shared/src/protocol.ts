@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { COOP_KINDS, ECONOMY, EGG_GRADES, FEED_TIERS, GOAL_IDS, UNLOCK_IDS, type GoalId } from './economy';
 import type { BodyColour, CoopKind, EggGrade, FeatherGrade, FeedTier, MilestoneId, Rarity, UnlockId } from './economy';
 import type { AgentKind, AgentRole, CardKind } from './market';
+import type { BadgeLevel } from './badges';
 
 export const PROTOCOL_VERSION = 2;
 
@@ -81,6 +82,8 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
     .strict(),
   z.object({ t: z.literal('setSupplier'), rid, supplier: z.enum(['squeezer', 'loyalist']) }).strict(),
   z.object({ t: z.literal('getLedger'), rid }).strict(),
+  /** The player's own profile (answered with a profile message, only to them). */
+  z.object({ t: z.literal('getProfile'), rid }).strict(),
   /** Name the farm (the first choice, or a rename in Settings once an in-game week). The server checks the rules. */
   z.object({ t: z.literal('setFarmName'), rid, name: z.string().min(1).max(64) }).strict(),
   /** Keep the generated farm name (the naming screen skipped or closed). */
@@ -377,6 +380,22 @@ export interface MarketDay {
   multiplier: number;
 }
 
+/** How many closed market days the Market page's price chart shows. */
+export const MARKET_CHART_DAYS = 10;
+
+/** One closed market day on the Market page's price chart. */
+export interface MarketChartDay {
+  day: number;
+  /** The day's price level (1 is normal), set by the day before's supply. */
+  multiplier: number;
+  /** Eggs the whole street sold that day. */
+  supply: number;
+  /** What the street needed that day (the supply at which the next day's prices are normal); null on days closed before it was kept. */
+  demand: number | null;
+  /** One egg's price per grade that day, before farm bonuses. */
+  pricesMilli: Record<EggGrade, number>;
+}
+
 export interface Settlement {
   day: number;
   status: 'pending' | 'sent' | 'noop' | 'failed';
@@ -384,11 +403,15 @@ export interface Settlement {
 }
 
 export interface RivalRank {
+  /** Opens the farm's public profile (GET /api/profile/:farmId). */
+  farmId: string;
   name: string;
   kind: 'player' | AgentKind;
   hens: number;
   cashMilli: number;
   bust: boolean;
+  /** The farm's best few badges, for a small row beside its name. */
+  badges: BadgeMark[];
 }
 
 export interface MarketState {
@@ -404,6 +427,8 @@ export interface MarketState {
   reference: number;
   crash: boolean;
   history: MarketDay[];
+  /** The last MARKET_CHART_DAYS closed market days, oldest first, for the Market page's price chart. */
+  chart: MarketChartDay[];
   farms: { players: number; agents: number; bust: number };
   settlement: Settlement | null;
   agents: AgentView[];
@@ -451,6 +476,122 @@ export interface LedgerDay {
   machines?: Partial<Record<UnlockId, MachineTally>>;
 }
 
+/** A badge a farm has earned, at its level (public: the farms ranking and the public profile). */
+export interface BadgeMark {
+  id: string;
+  level: BadgeLevel;
+}
+
+/** One badge on the player's own profile: the level held (null: locked), when, and the count toward the next level. */
+export interface BadgeView {
+  id: string;
+  level: BadgeLevel | null;
+  earnedDay: number | null;
+  progress: number;
+}
+
+/** One closed day on the profile. Days from before the profile was kept are estimated from the ledger and the trades. */
+export interface ProfileDay {
+  day: number;
+  cashMilli: number;
+  /** Coins plus hens at the hen price, coops at their price and machines at their price times their condition. */
+  netWorthMilli: number;
+  /** Place among the open farms by coins (1 is the richest), or null when the farm was not open. */
+  rank: number | null;
+  farms: number;
+  profitMilli: number;
+  /** Eggs laid, collected (by hand or belt before midnight) and broken that day; null where not recorded. */
+  laid: number | null;
+  collected: number | null;
+  broken: number | null;
+  sold: number;
+  estimated: boolean;
+}
+
+/** The player's own profile: private, sent only to them, on request. */
+export interface ProfileData {
+  farmId: string;
+  name: string;
+  day: number;
+  createdDay: number;
+  daysPlayed: number;
+  cashMilli: number;
+  netWorthMilli: number;
+  netWorth: { cashMilli: number; hensMilli: number; coopsMilli: number; machinesMilli: number };
+  rank: number | null;
+  farms: number;
+  goodDays: number;
+  /** The last 30 closed days, oldest first. */
+  days: ProfileDay[];
+  eggs: {
+    /** By grade over the days recorded since `since` (null: none yet). */
+    laid: EggStock;
+    collected: EggStock;
+    broken: EggStock;
+    /** By grade over the whole season (from the trades). */
+    sold: EggStock;
+    since: number | null;
+    /** Season totals: into the crate (by hand, belt or at midnight), picked up by hand, laid, broken, sold, golden. */
+    totals: { collected: number; picked: number; laid: number; broken: number; sold: number; golden: number };
+  };
+  money: {
+    /** The season's coins in and out, by ledger kind (milli-coins, signed), the opening balance left out. */
+    byKind: Record<string, number>;
+    best: { day: number; profitMilli: number } | null;
+    worst: { day: number; profitMilli: number } | null;
+  };
+  flock: { traitsSeen: string[]; auctionHens: number };
+  machines: {
+    repairs: number;
+    breakdowns: number;
+    repairStreak: number;
+    bestRepairStreak: number;
+    daysNoBreakdown: number;
+    /** Each machine's work over the season. */
+    work: Partial<Record<UnlockId, MachineTally>>;
+  };
+  market: {
+    contractsTaken: number;
+    contractsKept: number;
+    contractMisses: number;
+    deliveries: number;
+    deliveryStreak: number;
+    bestDeliveryStreak: number;
+    hagglesWon: number;
+    hagglesLost: number;
+    ordersFilled: number;
+    eggsSold: number;
+    /** Share of the street's eggs sold on the last closed day, and the best day's, in percent. */
+    sharePct: number;
+    bestSharePct: number;
+    rivalsOutlasted: number;
+    bigTrades: number;
+  };
+  mint: { ticketsWon: number; milestones: number; minted: Record<FeatherGrade, number> };
+  badges: BadgeView[];
+}
+
+/**
+ * A farm's public profile (GET /api/profile/:farmId), for anyone: its name, sign, rank, badges and a
+ * few headline numbers. Built from a whitelist on the server: never coins, orders, a wallet, a player
+ * id or anything from sign-in.
+ */
+export interface PublicProfile {
+  farmId: string;
+  name: string;
+  kind: 'player' | AgentKind;
+  bust: boolean;
+  rank: number | null;
+  farms: number;
+  daysOnStreet: number;
+  hens: number;
+  eggsSold: number;
+  hagglesWon: number;
+  rivalsOutlasted: number;
+  badgeCount: number;
+  badges: BadgeMark[];
+}
+
 export type CardOutcome = 'accepted' | 'declined' | 'won' | 'failed' | 'expired';
 
 export type GameEvent =
@@ -487,7 +628,9 @@ export type GameEvent =
   | { kind: 'contractMissed'; contractId: string; penaltyMilli: number }
   | { kind: 'debtCharged'; debtId: string; paidMilli: number; defaulted: boolean }
   | { kind: 'orderFilled'; orderId: string; side: 'buy' | 'sell'; qty: number; priceMilli: number; counterparty: string }
-  | { kind: 'bigTrade'; trade: TradeView };
+  | { kind: 'bigTrade'; trade: TradeView }
+  /** A badge (or a higher level of one) is earned: the unlock moment. Cosmetic. */
+  | { kind: 'badgeEarned'; badge: string; level: BadgeLevel; day: number };
 
 export type ServerMessage =
   | { t: 'welcome'; v: number; playerId: string; name: string; farm: FarmState; market: MarketState; clock: ClockState }
@@ -496,6 +639,7 @@ export type ServerMessage =
   | { t: 'clock'; clock: ClockState }
   | { t: 'event'; event: GameEvent }
   | { t: 'ledger'; days: LedgerDay[] }
+  | { t: 'profile'; profile: ProfileData }
   | { t: 'ack'; rid: string; ok: true; duplicate?: boolean }
   | { t: 'ack'; rid: string; ok: false; code: ErrorCode; message: string }
   | { t: 'error'; code: ErrorCode; message: string }

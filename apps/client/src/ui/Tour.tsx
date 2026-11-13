@@ -74,15 +74,15 @@ export const TOUR: TourStep[] = [
   },
   {
     title: 'ONE SHARED MARKET',
-    text: 'PRICES COME FROM ONE MARKET SHARED BY EVERY FARM AND TRADER ON THE STREET. OPEN THE MARKET BOARD.',
-    target: (c) => (c.modal ? close : { dom: 'market', tag: 'THE BOARD' }),
+    text: 'PRICES COME FROM ONE MARKET SHARED BY EVERY FARM AND TRADER ON THE STREET. OPEN THE MARKET (OR TAP YOUR FARM SIGN).',
+    target: (c) => (c.modal ? close : { dom: 'market', tag: 'THE MARKET' }),
     done: (s) => opened(s, 'market'),
   },
   {
     title: 'GLUT OR SHORTAGE',
-    text: 'WHEN EVERYONE SELLS AT ONCE, PRICES CRASH (A GLUT). WHEN EGGS ARE SCARCE, THEY RISE. TAP THE SUPPLY METER.',
+    text: "WHEN EVERYONE SELLS AT ONCE, PRICES CRASH (A GLUT). WHEN EGGS ARE SCARCE, THEY RISE. TAP THE SUPPLY METER ON THE MARKET'S PRICES.",
     target: (c) =>
-      c.modal?.kind === 'market' ? (c.modal.tab === 'board' ? { dom: 'supply', tag: 'TAP THE METER' } : { dom: 'market-board' }) : c.modal ? close : { dom: 'market', tag: 'THE BOARD' },
+      c.modal?.kind === 'market' ? (c.modal.tab === 'prices' ? { dom: 'supply', tag: 'TAP THE METER' } : { dom: 'market-prices' }) : c.modal ? close : { dom: 'market', tag: 'THE MARKET' },
     done: (s) => tapped(s, 'supply'),
   },
   {
@@ -140,9 +140,9 @@ export const TOUR: TourStep[] = [
   },
   {
     title: 'RIVALS GO BUST',
-    text: 'RIVAL FARMS CAN RUN OUT OF COINS AND GO BUST. THEIR HENS GO TO AUCTION. OPEN THE BOARD, THEN ITS FARMS, AND TAP THEM.',
+    text: "RIVAL FARMS CAN RUN OUT OF COINS AND GO BUST. THEIR HENS GO TO THE MARKET'S HEN AUCTION. OPEN THE MARKET, THEN FARMS, AND TAP THE SIGNS.",
     target: (c) =>
-      c.modal?.kind === 'market' ? (c.modal.tab === 'farms' ? { dom: 'farms', tag: 'THE FARMS' } : { dom: 'market-farms' }) : c.modal ? close : { dom: 'market', tag: 'THE BOARD' },
+      c.modal?.kind === 'market' ? (c.modal.tab === 'farms' ? { dom: 'farms', tag: 'THE FARMS' } : { dom: 'market-farms' }) : c.modal ? close : { dom: 'market', tag: 'THE MARKET' },
     done: (s) => tapped(s, 'farms'),
   },
   {
@@ -152,6 +152,12 @@ export const TOUR: TourStep[] = [
       `MILESTONES WIN FEATHER TICKETS. MINT ONE HERE FOR A FEATHER WITH A RANDOM NUMBER, A CLAIM ON ONE OF ${c.market.feathers.max} FOUNDING HENS (PLANNED). OPEN THE MINT.`,
     target: (c) => (c.modal?.kind === 'feathers' ? { dom: 'mint-tickets', tag: 'YOUR TICKETS' } : c.modal ? close : { dom: 'feathers', tag: 'MINT' }),
     done: (s) => opened(s, 'feathers'),
+  },
+  {
+    title: 'YOUR PROFILE',
+    text: "YOUR PROFILE KEEPS YOUR FARM'S RECORD: RANK, EGGS, MONEY, FLOCK, MACHINES, AND THE BADGES YOU EARN (JUST FOR SHOW). OPEN IT.",
+    target: (c) => (c.modal?.kind === 'profile' ? { dom: 'profile-badges', tag: 'YOUR BADGES' } : c.modal ? close : { dom: 'profile', tag: 'PROFILE' }),
+    done: (s) => opened(s, 'profile'),
   },
   {
     title: 'THE LEDGER',

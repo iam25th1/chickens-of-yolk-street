@@ -87,13 +87,18 @@ export function HenArt({ hen, scale = 1, box }: { hen: Parameters<typeof henLaye
 function HenTile({ hen, cash, onBuy, tour }: { hen: ShopHenView; cash: number; onBuy: () => void; tour?: string }) {
   const traits = [hen.body, hen.eyes !== 'default' ? hen.eyes : '', hen.comb !== 'default' ? hen.comb : '', hen.accessory !== 'none' ? hen.accessory : ''].filter(Boolean);
   return (
-    <div className="col" style={{ width: 84, gap: 2, alignItems: 'center', background: hen.source === 'auction' ? '#e3cc96' : undefined, padding: 2 }}>
+    <div className="col" style={{ position: 'relative', width: 84, gap: 2, alignItems: 'center', background: hen.source === 'auction' ? '#e3cc96' : undefined, padding: 2 }}>
+      {/* an auction hen (from a farm that went bust) wears a small tag; the button still says what it does */}
+      {hen.source === 'auction' && (
+        <span className="auction-tag" data-ui="auction-tag" style={{ position: 'absolute', left: 2, top: 2 }}>
+          AUCTION
+        </span>
+      )}
       <HenArt hen={hen} box={{ w: 40, h: 40 }} />
       <span style={{ textAlign: 'center', minHeight: 16, lineHeight: '8px' }}>{traits.join(' ').toUpperCase()}</span>
       <span>LAYS {Math.round(hen.layingTrait * 100)}%</span>
       <button className={`btn ${hen.source === 'auction' ? 'red' : ''}`} data-tour={tour} disabled={cash < hen.priceMilli / 1000} onClick={onBuy}>
-        {hen.source === 'auction' ? 'AUCTION ' : 'BUY '}
-        {(hen.priceMilli / 1000).toFixed(0)}
+        BUY {(hen.priceMilli / 1000).toFixed(0)}
       </button>
     </div>
   );
@@ -150,6 +155,11 @@ export function ShopPanel({
       {tab === 'hens' && (
         <div className="col" style={{ gap: 6 }}>
           <span style={{ lineHeight: '10px' }}>EVERY HEN IS ONE OF A KIND: HER LOOKS AND HOW WELL SHE LAYS ARE HERS ALONE.</span>
+          {farm.shop.some((h) => h.source === 'auction') && (
+            <span style={{ lineHeight: '10px', color: '#7f2215' }} data-ui="auction-line">
+              AUCTION HENS COME FROM FARMS THAT WENT BUST, SOLD CHEAP.
+            </span>
+          )}
           {farm.shop.length === 0 ? (
             <span>THE BREEDER IS OUT. MORE AT DAWN.</span>
           ) : (
@@ -299,7 +309,20 @@ export function ShopPanel({
 }
 
 /** Settings: a volume and mute for every sound category, reduce motion, the guide and the tour. */
-export function SettingsBody({ onClose, onGuide, farm, onRename }: { onClose: () => void; onGuide?: () => void; farm?: FarmState | null; onRename?: () => void }) {
+export function SettingsBody({
+  onClose,
+  onGuide,
+  farm,
+  onRename,
+  onProfile,
+}: {
+  onClose: () => void;
+  onGuide?: () => void;
+  farm?: FarmState | null;
+  onRename?: () => void;
+  /** The farm's name opens its profile. */
+  onProfile?: () => void;
+}) {
   const { audio } = useServices();
   const s = useStore(settings, (v) => v);
   useEffect(() => audio.setLevels(s.sound), [audio, s.sound]);
@@ -311,7 +334,23 @@ export function SettingsBody({ onClose, onGuide, farm, onRename }: { onClose: ()
       {farm && onRename && (
         <div className="row spread" style={{ gap: 6 }} data-ui="farm-name-setting">
           <span style={{ minWidth: 0 }}>
-            FARM NAME: <b>{farm.name.toUpperCase()}</b>
+            FARM NAME:{' '}
+            {onProfile ? (
+              <button
+                className="link"
+                data-ui="farm-name-profile"
+                title="Your profile"
+                style={{ border: 0, padding: 0, background: 'transparent', font: 'inherit', fontWeight: 700, color: '#2f6f9e', cursor: 'pointer' }}
+                onClick={() => {
+                  uiSound(audio, 'click');
+                  onProfile();
+                }}
+              >
+                {farm.name.toUpperCase()}
+              </button>
+            ) : (
+              <b>{farm.name.toUpperCase()}</b>
+            )}
           </span>
           <button
             className="btn"

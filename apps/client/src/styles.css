@@ -797,6 +797,21 @@ input[type='range'].slider::-moz-range-thumb {
 }
 
 /* The AI tag on AI farms and agents: a smaller stamp than BETA, inline, never wrapping or widening a row. */
+/* The shop's tag on an auction hen: small, on the tile's corner, never in the way of the button. */
+.auction-tag {
+  display: inline-block;
+  height: 8px;
+  padding: 0 2px;
+  background: var(--barn);
+  color: var(--cream);
+  box-shadow: 0 0 0 1px var(--ink);
+  font-family: var(--font-body);
+  font-size: 8px;
+  line-height: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .ai-badge {
   display: inline-block;
   /* aligned to the line's top, so it never makes a line taller than its text */

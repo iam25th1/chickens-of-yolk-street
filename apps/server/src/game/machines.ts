@@ -31,6 +31,7 @@ import {
 import { num, type Queryable } from '../db/db';
 import { ActionError, loadFarm, moveCash, type Ctx, type Farm } from './ctx';
 import { emit } from './market';
+import { bumpStats } from './profile';
 
 /** A farm's machines: which it owns, each one's condition, and the effect share the price formulas use. */
 export interface Machines extends MachinePower {
@@ -133,16 +134,16 @@ export async function machineDay(q: Queryable, farmId: string, day: number): Pro
   return out;
 }
 
-/** The conveyor's carry: eggs laid long enough ago ride into the crate. Runs every tick. */
-export async function conveyorCarry(ctx: Ctx): Promise<void> {
+/** The conveyor's carry: eggs laid long enough ago ride into the crate. Runs every tick. Returns the farms it carried for. */
+export async function conveyorCarry(ctx: Ctx): Promise<string[]> {
   const cutoff = ctx.elapsed - ECONOMY.unlocks.conveyor.carryMs;
-  if (cutoff < 0) return;
+  if (cutoff < 0) return [];
   const rows = await ctx.q.query(
     `SELECT l.id, l.farm_id, l.grade FROM lay_events l JOIN unlocks u ON u.farm_id = l.farm_id AND u.unlock_id = 'conveyor' AND NOT u.broken
      WHERE l.day = $1 AND NOT l.collected AND NOT l.broken AND l.at_ms <= $2 ORDER BY l.farm_id, l.at_ms`,
     [ctx.day, cutoff],
   );
-  if (!rows.length) return;
+  if (!rows.length) return [];
   const byFarm = new Map<string, { id: string; grade: EggGrade }[]>();
   for (const r of rows) {
     const list = byFarm.get(String(r.farm_id)) ?? [];
@@ -155,10 +156,12 @@ export async function conveyorCarry(ctx: Ctx): Promise<void> {
     for (const e of eggs) add[e.grade] = (add[e.grade] ?? 0) + 1;
     for (const [g, n] of Object.entries(add)) await ctx.q.query(`UPDATE farms SET crate_${g} = crate_${g} + $2 WHERE id = $1`, [farmId, n]);
     await logMachine(ctx.q, farmId, ctx.day, 'conveyor', { units: eggs.length });
+    await bumpStats(ctx.q, farmId, { eggs_collected: eggs.length, golden_collected: add.golden ?? 0 });
     const farm = await loadFarm(ctx.q, farmId);
     for (const e of eggs) emit(ctx, farm, { kind: 'collected', eggId: e.id, grade: e.grade, auto: true });
     ctx.touched.add(farmId);
   }
+  return [...byFarm.keys()];
 }
 
 /** A street sale's machine tally: what the grader's +10% and the clerk's +5% added (at their effect now). */

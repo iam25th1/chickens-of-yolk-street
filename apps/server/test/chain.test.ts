@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ECONOMY } from '@coys/shared';
 import { buildDayBatch, buildLateSettlement, commitBatch, digestOf } from '../src/chain/batch';
-import { NoopChain, agentAccountName, agentPublicKey, assertTestnetConfig, freeWallet, lateDaysToSend, mintsAffordable, refusedByRpc, settledCountsAgree, walletPool, withBackoff } from '../src/chain/chain';
+import { MEASURED, NoopChain, RESERVE, agentAccountName, agentPublicKey, assertTestnetConfig, freeWallet, lateDaysToSend, mintsAffordable, refusedByRpc, settledCountsAgree, walletPool, withBackoff } from '../src/chain/chain';
 import { FeatherRenderer } from '../src/chain/feather-image';
 import { decodePng } from '../src/chain/png';
 import { openDb } from '../src/db/db';
@@ -349,5 +349,20 @@ describe('calls the RPC refuses', () => {
     expect(waits).toEqual([]);
     expect(refusedByRpc(new Error('Server error 503'))).toBe(true);
     expect(refusedByRpc(new Error('MethodNotFound'))).toBe(false);
+  });
+});
+
+describe('the reserve the game account keeps', () => {
+  it('comes from the measured costs: a mint goes out at 0.127 NEAR free (it waited for 0.535), a wallet is made at 0.11 (it waited for 0.55)', () => {
+    expect(RESERVE.mintNear).toBe(0.027);
+    expect(RESERVE.mintNear).toBeGreaterThan(MEASURED.mintNear);
+    expect(RESERVE.minBalanceNear).toBe(0.1);
+    expect(RESERVE.minBalanceNear / MEASURED.settleNear).toBeGreaterThanOrEqual(100);
+    expect(RESERVE.agentFundingNear).toBeGreaterThan(MEASURED.walletStorageNear * 4);
+    expect(mintsAffordable(0.127, RESERVE, 1)).toBe(1);
+    expect(mintsAffordable(0.126, RESERVE, 1)).toBe(0);
+    // the account had 0.4537 NEAR free when measured: mints go out again
+    expect(mintsAffordable(0.4537, RESERVE, 20)).toBe(13);
+    expect(mintsAffordable(0.4537, { mintNear: 0.035, minBalanceNear: 0.5 }, 1)).toBe(0);
   });
 });

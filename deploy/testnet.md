@@ -42,15 +42,16 @@ created with the same public key as `coys-game.testnet`, so the existing
 | Item | NEAR |
 |---|---|
 | Contract code storage (version 4: 353,408 bytes) | about 3.5 |
-| Settlements with version 4: no storage (one fixed-size head per season) and about 0.0004 NEAR of gas per settled day, 480 days a real day at 3-minute days | about 0.19 a real day |
+| Settlements since version 4: no storage (one fixed-size head per season) and 0.00081 to 0.00087 NEAR of gas per settled day (measured 13 November 2026), 480 days a real day at 3-minute days | about 0.40 a real day |
 | Settlements with version 2 (before 12 November): 179 bytes of state and 0.0004 NEAR of gas per settled day | about 1.06 a real day |
-| Feathers (3,169 bytes each with the card image, measured in the sandbox; 777 ever, at most 20 a day close) | about 0.032 each, about 24.6 for all 777 |
-| Agent wallets: 7 at first, one more per bust (`AGENT_ACCOUNT_FUNDING_NEAR`, default 0.05 each) | about 0.35 |
-| Margin under which Feather mints and agent wallet links wait (`CHAIN_MIN_BALANCE_NEAR`, default 0.5) | 0.5 |
+| Feathers (1,913 to 2,075 bytes each with the card image and 0.0004 to 0.0005 NEAR of gas, measured on testnet; 777 ever) | about 0.021 each, about 16.5 for all 777 |
+| Agent wallets: 7 at first, then one only when no wallet in the pool is free (`AGENT_ACCOUNT_FUNDING_NEAR`, default 0.01 each) | 0.01 each |
+| Margin kept for settlements, under which Feather mints and agent wallet links wait (`CHAIN_MIN_BALANCE_NEAR`, default 0.1: about 120 day closes) | 0.1 |
 
-Gas is the only steady cost now: about 0.19 NEAR a real day at 3-minute days. Each Feather mint keeps
-`CHAIN_MINT_NEAR` (default 0.035) free above the margin; redeemed tickets that cannot be minted yet wait for a later day
-close and nothing is lost. If the account cannot pay for a day's gas or a mint's storage, that day's settlement fails and
+Gas is the only steady cost now: about 0.40 NEAR a real day at 3-minute days. Each Feather mint keeps
+`CHAIN_MINT_NEAR` (default 0.027, its measured cost and a quarter more) free above the margin, so a mint goes out at
+0.127 NEAR free (it used to wait for 0.535) and a new agent wallet is made at 0.11 (it used to wait for 0.55); a mint
+that cannot go out yet waits for a later chance and nothing is lost. If the account cannot pay for a day's gas or a mint's storage, that day's settlement fails and
 the next one catches it up once topped up.
 
 ## Agent wallets

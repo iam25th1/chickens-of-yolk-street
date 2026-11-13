@@ -159,3 +159,42 @@ export function carry(p: Point, from: Areas, to: Areas): Point {
   };
   return nearestFree(q, to);
 }
+
+/** The hatching egg's footprint around its feet point (world px): 24 tall, about as wide as a hen. */
+export const EGG_HALF_W = 10;
+export const EGG_H = 24;
+
+/** Whether an egg standing at p (its feet) is wholly in the yard and clear of every keep-out. */
+export function eggClear(p: Point, a: Areas): boolean {
+  const pts = [p, { x: p.x - EGG_HALF_W, y: p.y }, { x: p.x + EGG_HALF_W, y: p.y }, { x: p.x, y: p.y - EGG_H / 2 }, { x: p.x - EGG_HALF_W, y: p.y - EGG_H / 2 }, { x: p.x + EGG_HALF_W, y: p.y - EGG_H / 2 }];
+  return pts.every((q) => inside(q, a.yard) && free(q, a));
+}
+
+/**
+ * Spots for the eggs new hens hatch from: n spots in the yard, each egg wholly clear of every
+ * keep-out (never on an object, the path or a hen), at least `gap` from each other and from the
+ * hens already there, spread across the yard (of many random candidates, the one farthest from
+ * everything taken). Pure: tested in test/hatch.test.ts.
+ */
+export function hatchSpots(a: Areas, others: Point[], n: number, rnd: () => number = Math.random, gap = 2 * HEN_HALF + 4): Point[] {
+  const y = a.yard;
+  const out: Point[] = [];
+  for (let k = 0; k < n; k++) {
+    const taken = [...others, ...out];
+    let best: Point | null = null;
+    let bestD = -1;
+    for (let i = 0; i < 400; i++) {
+      const c = { x: Math.round(y.left + EGG_HALF_W + rnd() * (y.right - y.left - 2 * EGG_HALF_W)), y: Math.round(y.top + EGG_H / 2 + rnd() * (y.bottom - y.top - EGG_H / 2)) };
+      if (!eggClear(c, a)) continue;
+      let near = Infinity;
+      for (const o of taken) near = Math.min(near, Math.hypot(o.x - c.x, (o.y - c.y) * 1.6));
+      if (near > bestD) {
+        bestD = near;
+        best = c;
+      }
+      if (i >= 40 && best && bestD >= gap) break;
+    }
+    out.push(best ?? freeSpot(a, taken, rnd));
+  }
+  return out;
+}

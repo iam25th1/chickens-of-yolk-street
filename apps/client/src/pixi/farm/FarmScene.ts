@@ -18,9 +18,11 @@ import type { Scene } from '../host';
 import { HenActor } from './HenActor';
 import { WorldLayers } from './layers';
 import { MIN_H, MIN_W, connectionGaps, farmLayout, labelSpot, specPoint, troughSpots, type FarmLayout, type Point } from './layout';
-import { carry, freeSpot, movementAreas, nearestFree, route, type Areas } from './movement';
+import { carry, freeSpot, hatchSpots, movementAreas, nearestFree, route, type Areas } from './movement';
 
 const MAX_VISIBLE_HENS = 40;
+/** Several new hens hatch this far apart. */
+const HATCH_STAGGER_MS = 420;
 const TILE = 16;
 /** How long an egg takes from the ground to the crate on the conveyor (the server collects it at 5 s). */
 const RIDE_MS = 4200;
@@ -71,6 +73,8 @@ function labelOf(t: WorldTarget): { name: string; text: string } | null {
   if (t.kind === 'crate') return { name: 'crate', text: 'CRATE' };
   if (t.kind === 'feed') return { name: 'trough', text: 'TROUGH AND FEED' };
   if (t.kind === 'farmhouse') return { name: 'farmhouse', text: 'FARMHOUSE' };
+  // the farm's own sign by the path opens the Market
+  if (t.kind === 'sign') return { name: 'sign', text: 'MARKET' };
   return null;
 }
 
@@ -89,6 +93,8 @@ export class FarmScene implements Scene {
   private readonly night = new Graphics();
   private readonly animated: FrameSprite[] = [];
   private readonly hens = new Map<string, HenActor>();
+  /** Eggs new hens are hatching from, until their shells fade. */
+  private readonly hatchEggs = new Set<FrameSprite>();
   private readonly coops = new Map<string, { s: FrameSprite; kind: CoopKind; plot: number; swungAt: number; nextCreak: number }>();
   private readonly machines = new Map<UnlockId, FrameSprite>();
   private belt: FrameSprite[] = [];
@@ -207,6 +213,14 @@ export class FarmScene implements Scene {
     }
     for (const [id, g] of this.eggs) if (!g.pending && !g.s.destroyed) out.push({ kind: 'egg', id, ...box(g.s) });
     return out;
+  }
+
+  /** Eggs hatching now, with their feet in CSS pixels (for checks). */
+  hatching(): { x: number; y: number }[] {
+    return [...this.hatchEggs].filter((s) => !s.destroyed).map((s) => {
+      const p = this.layers.root.toGlobal({ x: s.x, y: s.y });
+      return { x: Math.round(p.x), y: Math.round(p.y) };
+    });
   }
 
   /** The draw order, for checks: layer, kind and foot position of everything in the world. */
@@ -458,7 +472,7 @@ export class FarmScene implements Scene {
     const l = this.layout;
 
     // hens: show up to MAX_VISIBLE_HENS, keeping the ones already on screen (they persist by id);
-    // new ones walk in through the gate
+    // new ones (bought, from the auction or turned up) hatch from an egg in the yard
     const present = new Set(farm.hens.map((h) => h.id));
     const keep = [...this.hens.keys()].filter((id) => present.has(id)).slice(0, MAX_VISIBLE_HENS);
     const shown = [...farm.hens.filter((h) => keep.includes(h.id)), ...farm.hens.filter((h) => !keep.includes(h.id))].slice(0, MAX_VISIBLE_HENS);
@@ -469,6 +483,7 @@ export class FarmScene implements Scene {
         this.hens.delete(id);
       }
     }
+    const fresh: HenActor[] = [];
     for (const h of shown) {
       if (this.hens.has(h.id)) continue;
       const others = [...this.hens.values()].map((a) => a.position);
@@ -478,9 +493,9 @@ export class FarmScene implements Scene {
       actor.sprite.label = `hen:${h.id}`;
       this.hens.set(h.id, actor);
       this.layers.add('depth', actor.sprite);
-      // a new hen comes down the path and turns into the yard below the farm sign
-      if (!first) actor.walkTo([areas.enter, ...route(areas.enter, freeSpot(areas, others), areas)]);
+      if (!first) fresh.push(actor);
     }
+    if (fresh.length) this.hatch(fresh);
 
     // coops: at rest the door is shut and nothing moves
     for (const c of farm.coops) {
@@ -614,12 +629,9 @@ export class FarmScene implements Scene {
   onEvent(e: ClientEvent): void {
     const l = this.layout;
     switch (e.kind) {
-      case 'hensBought': {
-        this.fx.burst('dust-puff', l.gate.x, l.gate.y - 4, { count: 3, spread: 10 });
-        this.audio.play('01-cluck', { volume: 0.8 });
-        this.audio.play('03-flap', { delayMs: 120, volume: 0.6 });
+      case 'hensBought':
+        // the new hens hatch in the yard (sync, which runs first, starts their eggs)
         break;
-      }
       case 'feedBought': {
         const hopper = this.machines.get('hopper');
         if (e.auto && hopper) {
@@ -859,6 +871,89 @@ export class FarmScene implements Scene {
         this.audio.play('13-tray', { volume: 0.3, minGapMs: 200 });
         if (!s.destroyed) this.flyToCrate(s, 120, () => this.audio.play('12-crate', { volume: 0.4, minGapMs: 80 }));
       });
+  }
+
+  /**
+   * New hens hatch: each egg drops into a free spot in the yard (clear of every object, the path
+   * and the other hens), lands with a squash, wobbles, cracks and bursts, and the hen pops out,
+   * shakes herself off and wanders. Several hatch a beat apart; three or more get the chorus.
+   */
+  private hatch(actors: HenActor[]): void {
+    const others = [...this.hens.values()].filter((a) => !actors.includes(a)).map((a) => a.position);
+    const spots = hatchSpots(this.areas, others, actors.length);
+    actors.forEach((actor, i) => {
+      const at = spots[i] ?? freeSpot(this.areas, others);
+      actor.awaitHatch(at);
+      setTimeout(() => this.hatchOne(actor, at), 120 + i * HATCH_STAGGER_MS);
+    });
+    if (actors.length >= 3) this.audio.play('07-chorus', { delayMs: 120 + actors.length * HATCH_STAGGER_MS + 1400, volume: 0.8 });
+  }
+
+  private hatchOne(actor: HenActor, at: Point): void {
+    if (actor.sprite.destroyed) return;
+    const egg = this.place(new FrameSprite(this.assets, ['x-hatch-egg'], 'land').still('land', 0));
+    egg.label = 'hatch-egg';
+    this.hatchEggs.add(egg);
+    // one pixel lower than the hen, so the shell halves sit in front of her as she pops out
+    const ground = { x: Math.round(at.x), y: Math.round(at.y) + 1 };
+    const drop = { y: ground.y - 46 };
+    this.moveTo(egg, { x: ground.x, y: drop.y });
+    const gone = () => egg.destroyed || actor.sprite.destroyed;
+    const done = () => {
+      this.hatchEggs.delete(egg);
+      if (!egg.destroyed) this.unplace(egg);
+    };
+    animate(drop, {
+      y: ground.y,
+      duration: 280,
+      ease: 'inQuad',
+      onUpdate: () => !egg.destroyed && egg.position.set(ground.x, Math.round(drop.y)),
+      onComplete: () => {
+        if (gone()) return done();
+        this.moveTo(egg, ground);
+        juice.shake(1, 140);
+        this.fx.burst('dust-puff', ground.x, ground.y - 2, { count: 2, spread: 8 });
+        egg.play('land', {
+          loop: false,
+          restart: true,
+          onDone: () => {
+            if (gone()) return done();
+            egg.play('wobble');
+            setTimeout(() => {
+              if (gone()) return done();
+              this.audio.play('09-crack', { volume: 0.8 });
+              egg.play('crack', {
+                loop: false,
+                restart: true,
+                onDone: () => {
+                  if (gone()) return done();
+                  this.audio.play(Math.random() < 0.5 ? '08-egg-pop' : '10-splat', { volume: 0.8 });
+                  juice.hitstop(40);
+                  egg.play('burst', {
+                    loop: false,
+                    restart: true,
+                    onDone: () => {
+                      if (egg.destroyed) return;
+                      egg.play('shell-bits', {
+                        loop: false,
+                        restart: true,
+                        onDone: () => animate(egg, { alpha: 0, duration: 300, delay: 250, onComplete: done }),
+                      });
+                    },
+                  });
+                  setTimeout(() => {
+                    if (actor.sprite.destroyed) return;
+                    actor.popOut();
+                    this.fx.burst('feather-puff', ground.x, ground.y - 12, { count: 4, spread: 12, rise: 10 });
+                    this.audio.play('01-cluck', { delayMs: 160, volume: 0.8 });
+                  }, 130);
+                },
+              });
+            }, 700 + Math.random() * 400);
+          },
+        });
+      },
+    });
   }
 
   private spawnEgg(egg: LaidEgg, at: Point, animated: boolean): void {

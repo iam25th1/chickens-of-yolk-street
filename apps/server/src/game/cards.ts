@@ -40,6 +40,7 @@ import {
 import { markGoal, takePractice } from './goals';
 import { logMachine } from './machines';
 import { emit, executeFill, liveMultiplier, loadOrderById, recordTrade, streetSell } from './market';
+import { bumpStats } from './profile';
 
 export interface Candidate {
   agent: AgentRow;
@@ -461,6 +462,7 @@ export async function respondCard(ctx: Ctx, farm: Farm, cardId: string, choice: 
         return;
       }
       await remember(ctx, agent.id, farm.id, { haggles_lost: 1, refusals: 1 });
+      await bumpStats(ctx.q, farm.id, { haggles_lost: 1 });
       card.line = replyFor(kind, result.insulted ? 'insulted' : 'walk', {});
       await ctx.q.query('UPDATE cards SET line = $2 WHERE id = $1', [card.id, card.line]);
       return resolve(ctx, farm, card, 'failed', 'failed', 0, false);

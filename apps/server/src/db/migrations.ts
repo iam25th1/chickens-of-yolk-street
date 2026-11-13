@@ -521,6 +521,100 @@ SELECT DISTINCT ON (near_account_id) near_account_id, kind, generation, NULL, id
 FROM agents WHERE near_account_id IS NOT NULL ORDER BY near_account_id, generation;
 `,
   },
+  {
+    id: 14,
+    name: 'profiles and badges',
+    sql: `
+-- The player profile: one row per farm per closed day, written at each day close (game/profile.ts).
+-- Net worth is coins plus hens at the hen price, coops at their price and machines at their price
+-- times their condition. Rank is the farm's place among the open farms by coins (1 the richest),
+-- null when it was not open. laid, collected (by hand or belt before midnight), broken and sold are
+-- egg counts by grade (JSON objects); share is the farm's share of all the eggs the street sold that
+-- day (0 to 1); fed is the laying multiplier its feed gave that day; good is its standing at the close.
+CREATE TABLE farm_days (
+  farm_id text NOT NULL REFERENCES farms(id),
+  day integer NOT NULL,
+  cash_milli bigint NOT NULL,
+  net_worth_milli bigint NOT NULL,
+  rank integer,
+  open_farms integer NOT NULL DEFAULT 0,
+  hens integer,
+  profit_milli bigint NOT NULL DEFAULT 0,
+  laid jsonb,
+  collected jsonb,
+  broken jsonb,
+  laid_n integer,
+  sold jsonb NOT NULL DEFAULT '{}',
+  sold_n integer NOT NULL DEFAULT 0,
+  share double precision NOT NULL DEFAULT 0,
+  fed double precision,
+  good boolean,
+  -- made from history when this migration first ran, not written at the day's close
+  estimated boolean NOT NULL DEFAULT false,
+  PRIMARY KEY (farm_id, day)
+);
+
+-- Counters a profile and its badges need that nothing kept before: eggs into the crate (by hand, by
+-- the conveyor or at midnight), eggs picked up by hand, laid and broken, golden eggs collected, buyer
+-- orders filled, haggles lost, contract days delivered (and in a row since the last miss), hens bought
+-- at auction, repairs paid (and in a row before any breakdown), breakdowns, actions at night, the
+-- rooster crow streak (an action at dawn on days in a row), and every hen look the farm has kept.
+CREATE TABLE farm_stats (
+  farm_id text PRIMARY KEY REFERENCES farms(id),
+  eggs_laid integer NOT NULL DEFAULT 0,
+  eggs_collected integer NOT NULL DEFAULT 0,
+  eggs_picked integer NOT NULL DEFAULT 0,
+  eggs_broken integer NOT NULL DEFAULT 0,
+  golden_collected integer NOT NULL DEFAULT 0,
+  orders_filled integer NOT NULL DEFAULT 0,
+  haggles_lost integer NOT NULL DEFAULT 0,
+  deliveries integer NOT NULL DEFAULT 0,
+  delivery_streak integer NOT NULL DEFAULT 0,
+  best_delivery_streak integer NOT NULL DEFAULT 0,
+  auction_hens integer NOT NULL DEFAULT 0,
+  repairs integer NOT NULL DEFAULT 0,
+  repair_streak integer NOT NULL DEFAULT 0,
+  best_repair_streak integer NOT NULL DEFAULT 0,
+  breakdowns integer NOT NULL DEFAULT 0,
+  last_breakdown_day integer,
+  night_actions integer NOT NULL DEFAULT 0,
+  crow_streak integer NOT NULL DEFAULT 0,
+  best_crow_streak integer NOT NULL DEFAULT 0,
+  last_crow_day integer,
+  traits_seen jsonb NOT NULL DEFAULT '[]',
+  -- made from history at the first boot after this migration (see below)
+  backfilled boolean NOT NULL DEFAULT false
+);
+
+-- Badges (cosmetic): one row per farm and badge, with the tier held (bronze, silver, gold, or plain
+-- for a badge without levels; null while locked), the day it was earned, and the badge's count now.
+CREATE TABLE badges (
+  farm_id text NOT NULL REFERENCES farms(id),
+  badge text NOT NULL,
+  tier text CHECK (tier IN ('bronze', 'silver', 'gold', 'plain')),
+  earned_day integer,
+  progress bigint NOT NULL DEFAULT 0,
+  backfilled boolean NOT NULL DEFAULT false,
+  PRIMARY KEY (farm_id, badge)
+);
+CREATE INDEX badges_earned ON badges (farm_id) WHERE tier IS NOT NULL;
+CREATE INDEX trades_seller ON trades (seller_farm);
+CREATE INDEX orders_farm ON orders (farm_id);
+
+-- Farms from before this migration are filled in from their history at the next boot, once (an
+-- idempotent step: game/profile.ts backfillProfiles, for every farm without a farm_stats row). From
+-- the ledger: coins, profit and rank on every closed day, and repairs paid. From the trades: eggs sold
+-- by grade and share each day, buyer orders filled, contract days delivered and the streak since the
+-- last miss. From agent_memory: haggles lost. From the crate and the trades: eggs into the crate and
+-- golden eggs (estimates). From hens, coops and unlocks: net worth each day (estimated with today's
+-- hens and machine condition) and the hen looks kept. From the two days lay_events still holds: laid,
+-- collected and broken on those days. What cannot be filled in, and starts at zero (or null) from
+-- this migration: eggs laid, collected and broken on older days, eggs picked up by hand, hens bought
+-- at auction (estimated from single auction purchases only), repairs in a row before a breakdown, past
+-- breakdowns (only machines broken now count), actions at night, the rooster crow streak, feed and
+-- standing on older days. Badges are then earned from what is known, quietly, as of the boot day.
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

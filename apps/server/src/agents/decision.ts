@@ -171,7 +171,7 @@ export const REASON_MAX = 80;
 export const decisionSchema = z.strictObject({
   /** One short sentence of reasoning, logged with the decision. */
   note: z.string().max(240),
-  /** One public line, in character, shown to players on the market board. */
+  /** One public line, in character, shown to players on the Market page. */
   reason: z.string().max(REASON_MAX),
   farmActions: z.array(farmActionSchema).max(6),
   sellOrders: z.array(z.strictObject({ grade, qty, priceShare: share })).max(4),

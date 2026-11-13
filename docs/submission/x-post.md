@@ -6,7 +6,7 @@ Drafts only. Nothing has been posted. Fill the two slots, attach the demo video,
 
 > Built at NEAR HACKATHON: Chickens of Yolk Street 🥚
 >
-> An egg farm in one shared live market where every rival, supplier and buyer is an AI agent with its own cash, memory and wallet. Haggle, ride the gluts, watch rivals go bust.
+> An egg farm in one shared live market with other players and AI: AI farms, AI suppliers and AI buyers, each with its own cash, memory and wallet. Haggle, ride the gluts, watch rivals go bust.
 >
 > Hens are NFTs, eggs are tokens, every day settles on NEAR.
 >
