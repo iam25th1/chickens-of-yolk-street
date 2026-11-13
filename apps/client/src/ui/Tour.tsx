@@ -154,6 +154,12 @@ export const TOUR: TourStep[] = [
     done: (s) => opened(s, 'feathers'),
   },
   {
+    title: 'YOUR PROFILE',
+    text: "YOUR PROFILE KEEPS YOUR FARM'S RECORD: RANK, EGGS, MONEY, FLOCK, MACHINES, AND THE BADGES YOU EARN (JUST FOR SHOW). OPEN IT.",
+    target: (c) => (c.modal?.kind === 'profile' ? { dom: 'profile-badges', tag: 'YOUR BADGES' } : c.modal ? close : { dom: 'profile', tag: 'PROFILE' }),
+    done: (s) => opened(s, 'profile'),
+  },
+  {
     title: 'THE LEDGER',
     text: 'EACH DAY CLOSES WITH A RECEIPT IN THE LEDGER: COINS IN AND OUT, AND THE RECORD ON NEAR. OPEN IT.',
     target: (c) => (c.modal ? close : { dom: 'ledger', tag: 'THE LEDGER' }),
