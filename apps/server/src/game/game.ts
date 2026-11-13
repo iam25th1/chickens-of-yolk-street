@@ -24,6 +24,7 @@ import {
   gradeForRoll,
   henLayingRate,
   isCrash,
+  MARKET_CHART_DAYS,
   marketMultiplier,
   marketReference,
   nextCoopKind,
@@ -41,6 +42,7 @@ import {
   type GameEvent,
   type HenView,
   type LedgerDay,
+  type MarketChartDay,
   type MarketDay,
   type MarketState,
   type MintPageData,
@@ -546,9 +548,18 @@ export class Game {
     const day = this.clock.day;
     const [today] = await this.db.query('SELECT multiplier, supply FROM market_days WHERE day = $1', [day]);
     const multiplier = num(today?.multiplier ?? ECONOMY.market.openingMultiplier);
-    const history = (await this.db.query('SELECT day, supply, multiplier FROM market_days WHERE closed_at IS NOT NULL ORDER BY day DESC LIMIT 30'))
-      .map((r): MarketDay => ({ day: num(r.day), supply: num(r.supply), multiplier: num(r.multiplier) }))
-      .reverse();
+    const closed = (await this.db.query('SELECT day, supply, multiplier, reference FROM market_days WHERE closed_at IS NOT NULL ORDER BY day DESC LIMIT 30')).reverse();
+    const history = closed.map((r): MarketDay => ({ day: num(r.day), supply: num(r.supply), multiplier: num(r.multiplier) }));
+    // the price chart: the last closed days, each with its demand and one egg's price per grade
+    const chart = closed.slice(-MARKET_CHART_DAYS).map(
+      (r): MarketChartDay => ({
+        day: num(r.day),
+        multiplier: num(r.multiplier),
+        supply: num(r.supply),
+        demand: r.reference === null || r.reference === undefined ? null : num(r.reference),
+        pricesMilli: Object.fromEntries(EGG_GRADES.map((g) => [g, toMilli(eggPrice(g, num(r.multiplier), []))])) as Record<EggGrade, number>,
+      }),
+    );
     const reference = marketReference(await activeFarms(this.db));
     const counts = await this.db.query(`SELECT owner_kind, (bust_day IS NOT NULL) AS bust, count(*) AS n FROM farms GROUP BY owner_kind, (bust_day IS NOT NULL)`);
     const farms = { players: 0, agents: 0, bust: 0 };
@@ -597,6 +608,7 @@ export class Game {
       reference,
       crash: isCrash(multiplier),
       history,
+      chart,
       farms,
       settlement: settled
         ? { day: num(settled.day), status: settled.settlement_status as 'pending' | 'sent' | 'noop' | 'failed', txHash: (settled.settlement_tx as string | null) ?? null }

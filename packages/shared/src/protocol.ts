@@ -377,6 +377,22 @@ export interface MarketDay {
   multiplier: number;
 }
 
+/** How many closed market days the Market page's price chart shows. */
+export const MARKET_CHART_DAYS = 10;
+
+/** One closed market day on the Market page's price chart. */
+export interface MarketChartDay {
+  day: number;
+  /** The day's price level (1 is normal), set by the day before's supply. */
+  multiplier: number;
+  /** Eggs the whole street sold that day. */
+  supply: number;
+  /** What the street needed that day (the supply at which the next day's prices are normal); null on days closed before it was kept. */
+  demand: number | null;
+  /** One egg's price per grade that day, before farm bonuses. */
+  pricesMilli: Record<EggGrade, number>;
+}
+
 export interface Settlement {
   day: number;
   status: 'pending' | 'sent' | 'noop' | 'failed';
@@ -404,6 +420,8 @@ export interface MarketState {
   reference: number;
   crash: boolean;
   history: MarketDay[];
+  /** The last MARKET_CHART_DAYS closed market days, oldest first, for the Market page's price chart. */
+  chart: MarketChartDay[];
   farms: { players: number; agents: number; bust: number };
   settlement: Settlement | null;
   agents: AgentView[];
