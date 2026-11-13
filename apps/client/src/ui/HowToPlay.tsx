@@ -136,6 +136,21 @@ const SECTIONS: Section[] = [
     ),
   },
   {
+    id: 'wear',
+    title: 'MACHINES WEAR OUT',
+    short: 'WEAR AND REPAIR',
+    picture: () => <Art id="19c-egg-grader-wear" row="worn" />,
+    body: (
+      <>
+        <p>
+          A MACHINE WEARS A LITTLE EACH DAY IT WORKS (THE CART: EACH DELIVERY). DOWN TO {pct(ECONOMY.wear.fullEffectAbove)} IT GIVES ITS FULL EFFECT; BELOW THAT IT GIVES LESS. UNDER{' '}
+          {pct(ECONOMY.wear.breakdownBelow)} IT MAY BREAK DOWN AT A DAY CLOSE AND STOP UNTIL YOU REPAIR IT.
+        </p>
+        <p>TAP A MACHINE TO SEE ITS CONDITION. A REPAIR TO 100% COSTS UP TO {pct(ECONOMY.wear.repairShare)} OF ITS PRICE, LESS THE LESS IT IS WORN. EACH MACHINE PAYS FOR ITSELF BEFORE ITS FIRST REPAIR.</p>
+      </>
+    ),
+  },
+  {
     id: 'rivals',
     title: 'RIVALS AND BUSTS',
     short: 'RIVALS AND BUSTS',

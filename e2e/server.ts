@@ -30,6 +30,8 @@ export interface TestServer {
   closeDays(n: number): Promise<void>;
   /** Gives the farm of this name every machine and `tickets` Feather tickets. */
   seed(name: string, tickets: number): Promise<void>;
+  /** Sets the condition (and broken flag) of the named farm's machines. */
+  wear(name: string, machines: Record<string, { condition: number; broken?: boolean }>): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -94,6 +96,13 @@ export async function startTestServer(): Promise<TestServer> {
           farm.id,
           milestones[i % milestones.length],
         ]);
+      }
+    },
+    async wear(name, machines) {
+      const [farm] = await db.query<{ id: string }>('SELECT id FROM farms WHERE name LIKE $1 LIMIT 1', [`${name}%`]);
+      if (!farm) throw new Error(`no farm named ${name}`);
+      for (const [u, s] of Object.entries(machines)) {
+        await db.query('UPDATE unlocks SET condition = $3, broken = $4 WHERE farm_id = $1 AND unlock_id = $2', [farm.id, u, s.condition, s.broken ?? false]);
       }
     },
     async close() {

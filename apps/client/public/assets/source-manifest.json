@@ -9,7 +9,7 @@
   },
   "counts": {
     "easels": 65,
-    "artFolders": 77,
+    "artFolders": 82,
     "easelSheets": 65,
     "traitLayers": 10,
     "soundNumbers": 45,
@@ -17,7 +17,7 @@
     "audioTakes": 124,
     "unmappedEasels": 0,
     "unmappedUploads": 37,
-    "totalBytes": 99709936,
+    "totalBytes": 102693126,
     "loopOggs": 12
   },
   "known_issues": [
@@ -2336,6 +2336,146 @@
           "path": "art/x-founders-frame-unminted/anim.json",
           "sha256": "be76a05679dc0c51f54f6f8e154f74d561307881a217bc5c9459a8f4e4dc5fd8",
           "bytes": 985,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "18c-conveyor-wear",
+      "number": "18c",
+      "doc_tracker": "18",
+      "role": "alternate",
+      "name": "conveyor-wear",
+      "label": "egg conveyor, worn and broken",
+      "sourceEasel": null,
+      "spawnAsset": "conveyor-wear",
+      "folder": "art/18c-conveyor-wear",
+      "files": [
+        {
+          "path": "art/18c-conveyor-wear/18c-conveyor-wear.png",
+          "sha256": "7bf5cf2814930b97ecc7a850919375b5cc4dad663cd41a0c0545b7deb37c869c",
+          "bytes": 9419,
+          "source": "/cdn/value.7bf5cf2814930b97ecc7a850919375b5cc4dad663cd41a0c0545b7deb37c869c.png",
+          "width": 512,
+          "height": 768,
+          "role": "sheet"
+        },
+        {
+          "path": "art/18c-conveyor-wear/anim.json",
+          "sha256": "ee1195c630a3ab8b92bc5ea7150a39f941217583f06b9fe15258cb672f7a92e3",
+          "bytes": 5617,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "19c-egg-grader-wear",
+      "number": "19c",
+      "doc_tracker": "19",
+      "role": "alternate",
+      "name": "egg-grader-wear",
+      "label": "egg grader, worn and broken",
+      "sourceEasel": null,
+      "spawnAsset": "egg-grader-wear",
+      "folder": "art/19c-egg-grader-wear",
+      "files": [
+        {
+          "path": "art/19c-egg-grader-wear/19c-egg-grader-wear.png",
+          "sha256": "b6093597db9e821603b1d3d3daedd24331715ad4e3452ffe7cc78998ae6719eb",
+          "bytes": 732145,
+          "source": "/cdn/value.b6093597db9e821603b1d3d3daedd24331715ad4e3452ffe7cc78998ae6719eb.png",
+          "width": 1024,
+          "height": 512,
+          "role": "sheet"
+        },
+        {
+          "path": "art/19c-egg-grader-wear/anim.json",
+          "sha256": "2065374ab7cb870fc413ab2eb94bd18b19be5d61fabd3b866e8dd6d774814887",
+          "bytes": 2242,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "20c-delivery-cart-wear",
+      "number": "20c",
+      "doc_tracker": "20",
+      "role": "alternate",
+      "name": "delivery-cart-wear",
+      "label": "delivery cart, worn and broken",
+      "sourceEasel": null,
+      "spawnAsset": "delivery-cart-wear",
+      "folder": "art/20c-delivery-cart-wear",
+      "files": [
+        {
+          "path": "art/20c-delivery-cart-wear/20c-delivery-cart-wear.png",
+          "sha256": "7dd1fb96c0ea5fb5171efcb5d1f0220abe1633b76c19e97eec34735a58e3dcc3",
+          "bytes": 648610,
+          "source": "/cdn/value.7dd1fb96c0ea5fb5171efcb5d1f0220abe1633b76c19e97eec34735a58e3dcc3.png",
+          "width": 1024,
+          "height": 512,
+          "role": "sheet"
+        },
+        {
+          "path": "art/20c-delivery-cart-wear/anim.json",
+          "sha256": "78c73aff25d59805af9c4dd09663f72e09bfeb8cbfb61ae3bb0ea9ba8d51c81c",
+          "bytes": 2257,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "21c-feed-hopper-wear",
+      "number": "21c",
+      "doc_tracker": "21",
+      "role": "alternate",
+      "name": "feed-hopper-wear",
+      "label": "feed hopper, worn and broken",
+      "sourceEasel": null,
+      "spawnAsset": "feed-hopper-wear",
+      "folder": "art/21c-feed-hopper-wear",
+      "files": [
+        {
+          "path": "art/21c-feed-hopper-wear/21c-feed-hopper-wear.png",
+          "sha256": "eff6d1b5362f43c5ab04401fad766c9ed1fc36be073f253701a8700463a04804",
+          "bytes": 936719,
+          "source": "/cdn/value.eff6d1b5362f43c5ab04401fad766c9ed1fc36be073f253701a8700463a04804.png",
+          "width": 1024,
+          "height": 768,
+          "role": "sheet"
+        },
+        {
+          "path": "art/21c-feed-hopper-wear/anim.json",
+          "sha256": "79f017b6cccb5e72bc98079d56379c3892c09576f5f693e0154c4c02f0369143",
+          "bytes": 2247,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "22c-sales-clerk-wear",
+      "number": "22c",
+      "doc_tracker": "22",
+      "role": "alternate",
+      "name": "sales-clerk-wear",
+      "label": "sales clerk, worn and broken",
+      "sourceEasel": null,
+      "spawnAsset": "sales-clerk-wear",
+      "folder": "art/22c-sales-clerk-wear",
+      "files": [
+        {
+          "path": "art/22c-sales-clerk-wear/22c-sales-clerk-wear.png",
+          "sha256": "72d4c1fe7cba27d2b3b66cc965b67039c27cc82727073c214c6fd33ee323eacb",
+          "bytes": 641687,
+          "source": "/cdn/value.72d4c1fe7cba27d2b3b66cc965b67039c27cc82727073c214c6fd33ee323eacb.png",
+          "width": 1024,
+          "height": 512,
+          "role": "sheet"
+        },
+        {
+          "path": "art/22c-sales-clerk-wear/anim.json",
+          "sha256": "aaddd118fbd529cb71d010344c357b96288b72fbfaf4dca73339c353e4f1ab5c",
+          "bytes": 2247,
           "role": "anim"
         }
       ]

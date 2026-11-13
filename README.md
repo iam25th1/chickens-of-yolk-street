@@ -112,9 +112,9 @@ The tour and the modals, at 1280x720. The market board shows the temporary check
 
 | Tour step 1: collect | Tour step 4: gluts |
 |---|---|
-| ![The spotlight dims everything but an egg on the ground, tagged TAP THE EGG; the step box reads 1/10 COLLECT AN EGG with progress dots, BACK and SKIP](docs/screenshots/live-tour-collect.png) | ![The market board open, the supply meter spotlit with TAP THE METER; the step box explains gluts and shortages](docs/screenshots/live-tour-glut.png) |
+| ![The spotlight dims everything but an egg on the ground, tagged TAP THE EGG; the step box reads 1/10 COLLECT AN EGG with progress dots, BACK and SKIP](docs/screenshots/live-tour-collect.png) | ![The tour's glut step over the market board (test server, made-up names; replaced on 13 November 2026): the box beside the spotlit supply meter with its pointer, STEP 4, BACK, SKIP STEP and END TOUR](docs/screenshots/live-tour-glut.png) |
 | **A card, composed** | **Market board** |
-| ![The Wholesaler's bulk order as one panel: portrait and line on top, what accepting means, the card art upright beside it, the answers in one row](docs/screenshots/live-card.png) | ![Today's price per grade on split flaps, the street's sales against what it needs, and the farms ranked with the bust ones](docs/screenshots/live-board.png) |
+| ![The Wholesaler's bulk order as one panel: portrait and line on top, what accepting means, the card art upright beside it, the answers in one row](docs/screenshots/live-card.png) | ![The market board's FARMS tab (test server, made-up names; replaced on 13 November 2026): the rival signs and the farms ranked](docs/screenshots/live-board.png) |
 | **Shop** | **A hen's card** |
 | ![The shop's hens: each one of a kind, drawn from her trait layers at full detail, with how she lays and her price](docs/screenshots/live-shop.png) | ![A hen's portrait at twice her farm size, her traits in words, and her certificate: pending while recording on NEAR is paused](docs/screenshots/live-hen.png) |
 | **Feed** | **Ledger** |
@@ -578,7 +578,7 @@ service stopped; no trades with anyone). One check farm owned all five machines.
 
 | How to play | Sound settings | Market board |
 |---|---|---|
-| ![The guide: eleven sections on the left, Founding Hens open on the right with its picture](docs/screenshots/founders-guide-founding.png) | ![Twelve sound groups, each with a slider, a percentage and a mute, a reset button, reduce motion, How to play and Replay the tour](docs/screenshots/founders-settings-sound.png) | ![The board with FOUNDING HENS: 773 OF 777 LEFT TO WIN, 4 WAITING (while the check farms were in play)](docs/screenshots/founders-board-founding.png) |
+| ![The guide: eleven sections on the left, Founding Hens open on the right with its picture](docs/screenshots/founders-guide-founding.png) | ![Twelve sound groups, each with a slider, a percentage and a mute, a reset button, reduce motion, How to play and Replay the tour](docs/screenshots/founders-settings-sound.png) | ![The board at 2560x1440 (test server, made-up names; replaced on 13 November 2026): today's prices on split flaps, the supply meter and the Feathers left](docs/screenshots/founders-board-founding.png) |
 | **Ledger** | **An ordinary hen** | **A machine's card** |
 | ![The ledger: machine lines per day, Founding Hen certificates, every milestone with its state, and good standing](docs/screenshots/founders-ledger-milestones.png) | ![An ordinary hen's card: not recorded on NEAR; only Founding Hens, won at milestones, are](docs/screenshots/founders-hen-ordinary.png) | ![The conveyor's card: what it does and what it did today](docs/screenshots/founders-machine-conveyor.png) |
 

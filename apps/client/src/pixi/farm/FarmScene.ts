@@ -60,6 +60,9 @@ const MACHINE_ROWS: Record<Exclude<UnlockId, 'conveyor'>, { id: string; idle: st
   clerk: { id: '22-sales-clerk', idle: 'idle', run: 'stamping' },
 };
 
+/** The worn and broken looks of each machine (made from its own art; see coys-assets 18c to 22c). */
+const WEAR_SHEET: Record<Exclude<UnlockId, 'conveyor'>, string> = { grader: '19c-egg-grader-wear', cart: '20c-delivery-cart-wear', hopper: '21c-feed-hopper-wear', clerk: '22c-sales-clerk-wear' };
+
 export const MACHINE_NAME: Record<UnlockId, string> = { conveyor: 'CONVEYOR', grader: 'GRADER', cart: 'DELIVERY CART', hopper: 'FEED HOPPER', clerk: 'SALES CLERK' };
 
 /** The label a world thing shows on hover or tap (the layout object it names), if it has one. */
@@ -89,6 +92,12 @@ export class FarmScene implements Scene {
   private readonly coops = new Map<string, { s: FrameSprite; kind: CoopKind; plot: number; swungAt: number; nextCreak: number }>();
   private readonly machines = new Map<UnlockId, FrameSprite>();
   private belt: FrameSprite[] = [];
+  /** Broken machines: their smoke puffs (a timer each); worn ones: their wobble. */
+  private readonly smoke = new Map<UnlockId, ReturnType<typeof setInterval>>();
+  private readonly wobble = new Map<UnlockId, ReturnType<typeof animate>>();
+  /** Each machine's look (as built, worn, broken), and each belt tile's own row. */
+  private readonly looks = new Map<UnlockId, 'normal' | 'worn' | 'broken'>();
+  private readonly beltRow = new WeakMap<FrameSprite, string>();
   private readonly eggs = new Map<string, GroundEgg>();
   private readonly spawned = new Set<string>();
   private readonly farmhouse: FrameSprite;
@@ -491,6 +500,7 @@ export class FarmScene implements Scene {
 
     // machines bought with unlocks
     for (const u of farm.unlocks) this.ensureMachine(u, false);
+    for (const u of farm.unlocks) this.machineCondition(u);
     const plotsKey = farm.coops.map((c) => c.plot).join();
     if (plotsKey !== this.plotsKey) {
       this.plotsKey = plotsKey;
@@ -551,6 +561,7 @@ export class FarmScene implements Scene {
     for (let x = c.from; x < c.to; x += TILE) {
       const row = x === c.from ? 'start' : x + TILE >= c.to ? 'end' : 'horizontal';
       const s = new FrameSprite(this.assets, ['18b-conveyor-clean'], row);
+      this.beltRow.set(s, row);
       s.position.set(x + TILE / 2, c.y);
       s.label = 'conveyor';
       this.clickable(s, () => ({ kind: 'machine', unlock: 'conveyor' }));
@@ -671,6 +682,36 @@ export class FarmScene implements Scene {
         this.audio.play('24-machine');
         juice.shake(1, 160);
         break;
+      case 'machineBroke': {
+        // the breakdown: a last sputter, a clunk, smoke, and it stops
+        const at = this.machineSpot(e.unlock);
+        const s = this.machineSprites(e.unlock);
+        for (const x of s) x.play(e.unlock === 'conveyor' ? 'horizontal' : MACHINE_ROWS[e.unlock].run, { restart: true });
+        this.audio.play('22-boing', { volume: 0.7 });
+        this.audio.play('32-collapse', { delayMs: 380, volume: 0.6 });
+        setTimeout(() => {
+          this.fx.burst('dust-puff', at.x, at.y - 10, { count: 4, spread: 12, rise: 0.03 });
+          this.fx.burst('steam-puff', at.x, at.y - 22, { count: 3, spread: 8, rise: 0.04 });
+          juice.shake(2, 220);
+          this.machineCondition(e.unlock);
+        }, 400);
+        break;
+      }
+      case 'machineRepaired': {
+        // the repair: hammer taps, a shine, and it starts up again
+        const at = this.machineSpot(e.unlock);
+        for (const ms of [0, 220, 440]) this.audio.play('21-build', { delayMs: ms, volume: 0.5 });
+        setTimeout(() => {
+          this.fx.burst('sparkle', at.x, at.y - 20, { count: 6, spread: 14, rise: 0.02 });
+          this.audio.play('24-machine', { volume: 0.7 });
+          this.machineCondition(e.unlock);
+          for (const x of this.machineSprites(e.unlock)) {
+            const k = { s: 1 };
+            animate(k, { s: [1, 1.12, 1], duration: 360, ease: 'outBack(2)', onUpdate: () => x.squash(k.s, k.s) });
+          }
+        }, 620);
+        break;
+      }
       case 'collected': {
         const g = this.eggs.get(e.eggId);
         if (!g) break;
@@ -982,7 +1023,78 @@ export class FarmScene implements Scene {
     this.fx.update(dtMs);
   }
 
+  /** Where a machine stands (its feet), for its smoke and sparkles. */
+  private machineSpot(u: UnlockId): Point {
+    return u === 'conveyor' ? { x: Math.round((this.layout.conveyor.from + this.layout.conveyor.to) / 2), y: this.layout.conveyor.y + 6 } : this.layout.machines[u];
+  }
+
+  private machineSprites(u: UnlockId): FrameSprite[] {
+    if (u === 'conveyor') return this.belt;
+    const s = this.machines.get(u);
+    return s ? [s] : [];
+  }
+
+  /**
+   * A machine as its condition shows it: broken, its broken look (stopped, a puff of smoke rising),
+   * its sound stopped, and now and then a puff from the effects; worn under half, its worn look
+   * (rust and dents) with a wobble as it works; otherwise as built. Any work animation asked of a
+   * worn or broken machine plays its worn or broken row.
+   */
+  private machineCondition(u: UnlockId): void {
+    const st = this.farm?.machineState?.[u];
+    const sprites = this.machineSprites(u);
+    if (!st || !sprites.length) return;
+    const look = st.broken ? 'broken' : st.condition < 0.5 ? 'worn' : 'normal';
+    if (this.looks.get(u) !== look) {
+      this.looks.set(u, look);
+      for (const s of sprites) {
+        // (the alias is set before the sheet changes: changing it replays the current row)
+        if (u === 'conveyor') {
+          const base = this.beltRow.get(s) ?? 'horizontal';
+          const row = look === 'normal' ? base : `${look}-${base}`;
+          s.alias = () => row;
+          s.setSheets([look === 'normal' ? '18b-conveyor-clean' : '18c-conveyor-wear']);
+          if (look === 'normal') s.alias = null;
+        } else {
+          const m = MACHINE_ROWS[u];
+          const row = look === 'normal' ? m.idle : look;
+          s.alias = () => row;
+          s.setSheets([look === 'normal' ? m.id : WEAR_SHEET[u]]);
+          if (look === 'normal') s.alias = null;
+        }
+      }
+    }
+    const smoking = this.smoke.has(u);
+    if (st.broken && !smoking) {
+      this.machineLoops.get(u)?.stop(400);
+      this.machineLoops.delete(u);
+      const at = this.machineSpot(u);
+      this.smoke.set(
+        u,
+        setInterval(() => this.fx.burst('steam-puff', at.x + (Math.random() - 0.5) * 8, at.y - 22, { count: 1, spread: 4, rise: 0.03 }), 2600),
+      );
+    } else if (!st.broken && smoking) {
+      clearInterval(this.smoke.get(u));
+      this.smoke.delete(u);
+      if (u === 'conveyor' && !this.machineLoops.has(u)) this.machineLoops.set('conveyor', this.audio.loop('25-conveyor', { volume: 0.18, fadeMs: 800 }) as LoopHandle);
+      if (u === 'grader' && !this.machineLoops.has(u)) this.machineLoops.set('grader', this.audio.loop('26-sorter', { volume: 0.14, fadeMs: 800 }) as LoopHandle);
+    }
+    // worn: a wobble while it works (not the belt, not when broken)
+    const worn = look === 'worn' && u !== 'conveyor';
+    if (worn && !this.wobble.has(u)) {
+      const s = sprites[0] as FrameSprite;
+      const k = { r: 0 };
+      this.wobble.set(u, animate(k, { r: [-0.025, 0.025], duration: 260, alternate: true, loop: true, ease: 'inOutSine', onUpdate: () => (s.rotation = k.r) }));
+    } else if (!worn && this.wobble.has(u)) {
+      this.wobble.get(u)?.pause();
+      this.wobble.delete(u);
+      for (const s of sprites) s.rotation = 0;
+    }
+  }
+
   destroy(): void {
+    for (const id of this.smoke.values()) clearInterval(id);
+    for (const w of this.wobble.values()) w.pause();
     this.ambience.day?.stop(600);
     this.ambience.night?.stop(600);
     this.ambience.snore?.stop(600);

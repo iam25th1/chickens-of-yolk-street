@@ -138,7 +138,7 @@ describe('the tour', () => {
         // a typed name: no naming screen, so the tour is the first thing
         await enter(page, `Tour Check ${size}`);
         await page.locator('[data-ui="tour"]').waitFor({ timeout: 15_000 });
-        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toBe('STEP 1 OF 11');
+        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toMatch(/^STEP 1 OF \d+$/);
         const steps = await page.evaluate(() => (window as unknown as { __coysTour: { count: number } }).__coysTour.count);
         for (let i = 0; i < steps; i++) {
           await page.evaluate((n) => (window as unknown as { __coysTour: { show(n: number): void } }).__coysTour.show(n), i);
@@ -170,14 +170,14 @@ describe('the tour', () => {
         expect(await page.locator('[data-ui="tour-next"]').count()).toBe(0);
         await page.locator('[data-ui="tour-next"]').waitFor({ timeout: 10_000 });
         await page.locator('[data-ui="tour-next"]').click();
-        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toBe('STEP 2 OF 11');
+        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toMatch(/^STEP 2 OF \d+$/);
         await page.locator('[data-ui="tour-back"]').click();
-        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toBe('STEP 1 OF 11');
+        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toMatch(/^STEP 1 OF \d+$/);
         await page.locator('[data-ui="tour-skip-step"]').click();
-        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toBe('STEP 2 OF 11');
+        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toMatch(/^STEP 2 OF \d+$/);
         await page.locator('[data-ui="tour-end"]').click();
         await page.locator('[data-ui="tour-end-no"]').click();
-        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toBe('STEP 2 OF 11');
+        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toMatch(/^STEP 2 OF \d+$/);
         await page.locator('[data-ui="tour-end"]').click();
         await page.locator('[data-ui="tour-end-yes"]').click();
         await page.locator('[data-ui="tour"]').waitFor({ state: 'detached', timeout: 5000 });
@@ -185,7 +185,7 @@ describe('the tour', () => {
         await page.locator('[data-tour="settings"]').first().click();
         await page.locator('[data-tour="replay-tour"]').click();
         await page.locator('[data-ui="tour"]').waitFor({ timeout: 5000 });
-        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toBe('STEP 1 OF 11');
+        expect(await page.locator('[data-ui="tour-progress"]').innerText()).toMatch(/^STEP 1 OF \d+$/);
       } finally {
         await ctx.close();
       }

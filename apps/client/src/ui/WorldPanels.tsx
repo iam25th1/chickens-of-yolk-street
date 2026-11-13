@@ -1,8 +1,9 @@
 // Cards that open when the player clicks something on the farm (a hen, the crate, a machine).
-import { ECONOMY, UNLOCK_IDS, type FarmState, type HenView, type MarketState, type UnlockId } from '@coys/shared';
+import { ECONOMY, UNLOCK_IDS, type FarmState, type HenView, type MachineView, type MarketState, type UnlockId } from '@coys/shared';
 import type { Action } from '../net/socket';
 import { SellCard } from './Cards';
 import { Modal } from './Modal';
+import { Paged } from './Paged';
 import { HenArt, MachineArt, UNLOCK_TEXT } from './Panels';
 
 const WORDS: Record<string, string> = {
@@ -92,39 +93,81 @@ export function machineToday(unlock: UnlockId, farm: FarmState): string {
   }
 }
 
+/** A machine's condition on its card: the bar, its effect now, what wear does, and the repair. */
+function MachineCondition({ unlock, state, cashMilli, send }: { unlock: UnlockId; state: MachineView; cashMilli: number; send: (a: Action) => Promise<boolean> }) {
+  const colour = state.broken || state.condition < ECONOMY.wear.breakdownBelow ? '#b8321f' : state.condition < ECONOMY.wear.fullEffectAbove ? '#d9a33b' : '#5c9e3a';
+  return (
+    <div className="col" style={{ gap: 3 }} data-ui="machine-condition">
+      <span className="row spread" style={{ gap: 6 }}>
+        <span>CONDITION {Math.round(state.condition * 100)}%</span>
+        <span style={{ color: state.effect < 1 ? '#b8321f' : '#2f6f9e' }}>EFFECT {Math.round(state.effect * 100)}%</span>
+      </span>
+      <span style={{ position: 'relative', height: 6, background: '#f6e7c1', boxShadow: '0 0 0 1px #2a160c', display: 'block' }}>
+        <span style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${Math.round(state.condition * 100)}%`, background: colour }} />
+      </span>
+      <span style={{ lineHeight: '9px', color: '#8b5a2b' }}>WEARS EACH DAY IT WORKS. FULL EFFECT DOWN TO 50%; UNDER 20% IT MAY BREAK DOWN.</span>
+      {state.repairMilli > 0 && (
+        <button
+          className="btn red"
+          data-ui="repair"
+          data-tour={`repair-${unlock}`}
+          disabled={cashMilli < state.repairMilli}
+          style={{ alignSelf: 'flex-start' }}
+          onClick={() => void send({ t: 'repairMachine', unlock })}
+        >
+          REPAIR FOR {(state.repairMilli / 1000).toFixed(2)}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function MachinePanel({ unlock, farm, send, onShop, onClose }: { unlock: UnlockId; farm: FarmState; send: (a: Action) => Promise<boolean>; onShop: () => void; onClose: () => void }) {
   const t = UNLOCK_TEXT[unlock];
   const next = UNLOCK_IDS.find((u) => !farm.unlocks.includes(u));
   const owned = farm.unlocks.includes(unlock);
+  const state = farm.machineState?.[unlock];
   const listCap = ECONOMY.feed.tiers[farm.feedTier].bagPrice;
   const cap = farm.hopperCapMilli > 0 ? farm.hopperCapMilli / 1000 : listCap;
   return (
-    <Modal title={t.name} onClose={onClose} w={340} h={210}>
+    <Modal title={t.name} onClose={onClose} w={340} h={260}>
       <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
         <div style={{ width: 40, display: 'flex', justifyContent: 'center', flex: 'none' }}>
           <MachineArt unlock={unlock} />
         </div>
-        <div className="col" style={{ gap: 5 }} data-tour="machine-saves">
-          <span style={{ lineHeight: '10px' }}>{t.saves}</span>
-          <span>{owned ? 'WORKING ON YOUR FARM' : `COSTS ${ECONOMY.unlocks[unlock].price} COINS`}</span>
-          {owned && (
-            <span style={{ lineHeight: '10px', color: '#2f6f9e' }} data-tour="machine-today">
-              {machineToday(unlock, farm)}
-            </span>
-          )}
-          {owned && unlock === 'hopper' && (
-            <span className="row" style={{ gap: 3 }}>
-              <span>POURS UP TO {cap.toFixed(0)} A BAG</span>
-              <button className="btn" aria-label="Lower the cap" onClick={() => void send({ t: 'setHopperCap', cap: Math.max(1, cap - 5) })}>
-                -
-              </button>
-              <button className="btn" aria-label="Raise the cap" onClick={() => void send({ t: 'setHopperCap', cap: Math.min(1000, cap + 5) })}>
-                +
-              </button>
-            </span>
-          )}
-          <span>{next ? `NEXT MACHINE: ${UNLOCK_TEXT[next].name}, ${ECONOMY.unlocks[next].price} COINS` : 'EVERY MACHINE IS BUILT'}</span>
-        </div>
+        <Paged
+          gap={5}
+          ui="machine-saves"
+          style={{ flex: 1, minWidth: 0 }}
+          items={[
+            <span key="saves" style={{ lineHeight: '10px' }}>
+              {t.saves}
+            </span>,
+            <span key="status">{!owned ? `COSTS ${ECONOMY.unlocks[unlock].price} COINS` : state?.broken ? 'BROKEN DOWN: IT STOPPED' : 'WORKING ON YOUR FARM'}</span>,
+            ...(owned && state ? [<MachineCondition key="condition" unlock={unlock} state={state} cashMilli={farm.cashMilli} send={send} />] : []),
+            ...(owned
+              ? [
+                  <span key="today" style={{ lineHeight: '10px', color: '#2f6f9e' }} data-tour="machine-today">
+                    {machineToday(unlock, farm)}
+                  </span>,
+                ]
+              : []),
+            ...(owned && unlock === 'hopper'
+              ? [
+                  <span key="cap" className="row" style={{ gap: 3 }}>
+                    <span>POURS UP TO {cap.toFixed(0)} A BAG</span>
+                    <button className="btn" aria-label="Lower the cap" onClick={() => void send({ t: 'setHopperCap', cap: Math.max(1, cap - 5) })}>
+                      -
+                    </button>
+                    <button className="btn" aria-label="Raise the cap" onClick={() => void send({ t: 'setHopperCap', cap: Math.min(1000, cap + 5) })}>
+                      +
+                    </button>
+                  </span>,
+                ]
+              : []),
+            <span key="next">{next ? `NEXT MACHINE: ${UNLOCK_TEXT[next].name}, ${ECONOMY.unlocks[next].price} COINS` : 'EVERY MACHINE IS BUILT'}</span>,
+          ]}
+        />
       </div>
       {next && (
         <button className="btn red" style={{ marginTop: 10 }} onClick={onShop}>
