@@ -312,10 +312,12 @@ export function TourBox({ ctx, send }: { ctx: TourCtx; send: (a: Action) => Prom
     };
   }, [t.active, audio]);
 
-  // NEXT shows after a few seconds on a step (at once when the step cannot happen now)
+  // NEXT shows after a few seconds on a step (at once when the step cannot happen now); coming back
+  // to a step starts its few seconds again
   const [waited, setWaited] = useState(-1);
   useEffect(() => {
     if (!t.active) return;
+    setWaited(-1);
     const id = setTimeout(() => setWaited(t.step), NEXT_AFTER_S * 1000);
     return () => clearTimeout(id);
   }, [t.active, t.step]);
