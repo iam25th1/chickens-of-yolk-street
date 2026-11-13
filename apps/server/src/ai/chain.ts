@@ -17,6 +17,8 @@ export const PAUSE_MS = {
 export const CLOSE_BUDGET_MS = 60_000;
 /** Longest one call may take. */
 export const CALL_TIMEOUT_MS = 20_000;
+/** No call starts with less than this left of the close's time budget (it would only time out). */
+export const MIN_CALL_MS = 5000;
 
 export interface ProviderStatus {
   /** off: no key. ready: may be called. answering: its last call answered. paused: skipped for now. */

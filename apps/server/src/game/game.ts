@@ -1121,12 +1121,15 @@ export class Game {
     } finally {
       chain.endClose();
     }
-    // the daily AI spend line, once a real hour
-    if (chain.configured && chain.now() - chain.spendLoggedAt >= 3_600_000) {
-      chain.spendLoggedAt = chain.now();
-      this.log(await this.aiSpendLine());
-    }
     return out;
+  }
+
+  /** The daily AI spend line, once a real hour, after a day close (so the mode counts its answers). */
+  private async logAiSpend(): Promise<void> {
+    const chain = this.brain.chain;
+    if (!chain.configured || chain.now() - chain.spendLoggedAt < 3_600_000) return;
+    chain.spendLoggedAt = chain.now();
+    this.log(await this.aiSpendLine());
   }
 
   /** The daily AI spend line with the agents' mode. */
@@ -1322,6 +1325,7 @@ export class Game {
     if (result.status === 'sent' && result.txHash && result.minted?.length) await this.announceMints(result.minted, result.txHash, closedDay);
     if (result.status === 'sent') await this.catchUpLateDays(closedDay);
     this.emit(null, { t: 'market', market: await this.getMarketState() });
+    await this.logAiSpend();
     // the day close's catch-up: any redeemed ticket whose mint is still waiting goes again
     if (this.chain.collectionFor) this.collection = await this.chain.collectionFor(this.season).catch(() => this.collection);
     this.kickMints();

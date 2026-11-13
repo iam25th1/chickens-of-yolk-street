@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto';
 import type { AiMode } from '@coys/shared';
 import type { Db } from '../db/db';
 import { num } from '../db/db';
-import { CALL_TIMEOUT_MS, type ProviderChain } from '../ai/chain';
+import { CALL_TIMEOUT_MS, MIN_CALL_MS, type ProviderChain } from '../ai/chain';
 import { NEARAI_DEFAULT_CHEAP_MODEL, NEARAI_DEFAULT_MODEL } from '../ai/nearai';
 import { asProviderError, type ChatMessage, type InferenceProvider, type Pricing, type ProviderName } from '../ai/provider';
 import { SERV_PRICES } from '../ai/serv';
@@ -382,11 +382,12 @@ async function ask(c: AgentContext, opts: BrainOptions, a: Ask): Promise<Answer 
       log(`[ai] ${p.name} ${model} ${c.agent.name} ${a.what} (${a.why}): the same prompt today, its decision reused (no call)`);
       return { provider: p, model, key, cached };
     }
-    if (chain.timeLeft() < 2000) {
+    const outOfTime = (): null => {
       const line = chain.outOfTime();
       if (line) log(line);
       return null;
-    }
+    };
+    if (chain.timeLeft() < MIN_CALL_MS) return outOfTime();
     const price = priceOf(opts.pricing, model);
     const prompt = promptTokens(a.messages, a.responseFormat, p.overheadTokens);
     const reserve = reserveUsd(price, prompt, a.maxTokens);
@@ -397,6 +398,7 @@ async function ask(c: AgentContext, opts: BrainOptions, a: Ask): Promise<Answer 
     }
     if (!(await budget.canAgentSpend(c.agent.id, reserve))) return null;
     await chain.pace(p);
+    if (chain.timeLeft() < MIN_CALL_MS) return outOfTime();
     const timeoutMs = Math.min(CALL_TIMEOUT_MS, chain.timeLeft());
     try {
       const reply = await p.chat(a.messages, { model, maxTokens: a.maxTokens, timeoutMs, ...(a.responseFormat ? { responseFormat: a.responseFormat } : {}) });
