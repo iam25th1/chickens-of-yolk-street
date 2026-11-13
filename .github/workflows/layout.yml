@@ -1,0 +1,32 @@
+name: layout
+
+# The browser checks: pull requests only, and not for changes to docs alone.
+on:
+  pull_request:
+    paths-ignore: ['docs/**', '**/*.md', '**/*.png', '**/*.mp4', '**/*.webm']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # No scrollbars and nothing cut off (e2e/no-scroll.test.ts: all 11 window sizes, every screen,
+  # tab, page and tour step) and the naming screen and the tour (e2e/tour.test.ts), in the built
+  # game in a headless browser (the runner's own Chrome, a fresh profile each time). Nothing is
+  # downloaded for it.
+  layout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24.22.3
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Every screen fits at every window size
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+          E2E_PROGRESS: '1'
+        run: npm run test:e2e
