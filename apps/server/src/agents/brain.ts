@@ -150,7 +150,7 @@ export const SYSTEM = (c: AgentContext): string => {
     'Rivals may buy feed on the Loyalist credit (buyFeedOnCredit); it falls due with interest in a few days and an agent always pays in full, even into the red.',
     'Decide for the coming day. Prices you set are shares of the live price (priceShare). Offers become decision cards for players, who may accept, decline or haggle.',
     'Rivals use farmActions and may offer undercut or buyout-offer; suppliers set markup, restock and offer feed-deal or credit-terms; buyers post buyOrders, fill sell orders, and offer standing-contract, premium-order, bulk-order or glut-warning.',
-    `Only offer to farmIds listed and fill orderIds listed. Keep lines in character, under 160 characters. Leave arrays empty when not your role. reason: one public line in character, under ${REASON_MAX} characters, saying why you did what you did today; players read it on the market board.`,
+    `Only offer to farmIds listed and fill orderIds listed. Keep lines in character, under 160 characters. Leave arrays empty when not your role. reason: one public line in character, under ${REASON_MAX} characters, saying why you did what you did today; players read it on the Market page.`,
   ].join('\n');
 };
 

@@ -106,7 +106,7 @@ export const PAINTED: Record<string, PaintedSpec> = {
   '22c-sales-clerk-wear': world('clerk', '22-sales-clerk'),
   '21-feed-hopper': world('hopper', '21-feed-hopper'),
   '22-sales-clerk': world('clerk', '22-sales-clerk'),
-  // the rival farms' signs at the farm's edge (and on the market board)
+  // the rival farms' signs at the farm's edge (and on the Market page)
   '17-sign-upstart': world('sign', '17-sign-upstart'),
   '17-sign-old-money': world('sign', '17-sign-old-money'),
   '04-upstart': { group: 'cards', ratio: 4, use: 'ui' },
