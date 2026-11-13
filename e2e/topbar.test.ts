@@ -6,6 +6,7 @@
 import { chromium, type Browser } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { overflowing } from './overflow';
+import { sizes } from './sizes';
 import { startTestServer, type TestServer } from './server';
 
 const SIZES: [number, number, number][] = [
@@ -31,7 +32,7 @@ afterAll(async () => {
 });
 
 describe('the top bar with long numbers', () => {
-  for (const [w, h, dpr] of SIZES) {
+  for (const [w, h, dpr] of sizes(SIZES)) {
     it(`at ${w}x${h}: fits, nothing cut off, the page cannot scroll`, async () => {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: w < 600, hasTouch: w < 600 });
       const page = await ctx.newPage();
@@ -61,14 +62,20 @@ describe('the top bar with long numbers', () => {
         expect(dims.sh, `${w}x${h}: page height`).toBeLessThanOrEqual(dims.ih);
         expect(dims.sw, `${w}x${h}: page width`).toBeLessThanOrEqual(dims.iw);
         expect(await page.evaluate(overflowing), `${w}x${h}`).toEqual([]);
-        const squeezed = await page.evaluate(() => [...(document.querySelector('[data-ui="topbar"]')?.children ?? [])].filter((c) => c.scrollWidth > c.clientWidth + 1).map((c) => (c as HTMLElement).title || (c as HTMLElement).dataset.ui || c.tagName));
+        const squeezed = await page.evaluate(() =>
+          [...(document.querySelector('[data-ui="topbar"]')?.children ?? [])]
+            .filter((c) => c.scrollWidth > c.clientWidth + 1)
+            .map((c) => (c as HTMLElement).title || (c as HTMLElement).dataset.ui || c.tagName),
+        );
         expect(squeezed, `${w}x${h}: squeezed parts of the bar`).toEqual([]);
         // a rich farm: still nothing squeezed or cut off
         await server.cash(name, 12345.67);
         await page.waitForTimeout(1200);
         expect(await page.evaluate(overflowing), `${w}x${h} rich`).toEqual([]);
         if (process.env.SHOTS_DIR) await page.screenshot({ path: `${process.env.SHOTS_DIR}/topbar-rich-${w}x${h}.png`, clip: { x: 0, y: 0, width: w, height: Math.min(h, 90) } });
-        expect(await page.evaluate(() => [...(document.querySelector('[data-ui="topbar"]')?.children ?? [])].filter((c) => c.scrollWidth > c.clientWidth + 1).length), `${w}x${h} rich: squeezed`).toBe(0);
+        expect(await page.evaluate(() => [...(document.querySelector('[data-ui="topbar"]')?.children ?? [])].filter((c) => c.scrollWidth > c.clientWidth + 1).length), `${w}x${h} rich: squeezed`).toBe(
+          0,
+        );
       } finally {
         await ctx.close();
       }

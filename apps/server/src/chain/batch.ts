@@ -149,7 +149,12 @@ export async function buildLateSettlement(db: Db, season: string, day: number): 
   };
 }
 
-export async function buildDayBatch(db: Db, season: string, day: number, opts: { feathers: FeatherOpts | null; renderer: FeatherRenderer | null }): Promise<BuiltBatch> {
+/**
+ * The egg moves that bring the chain to what every holder really holds now: the trades of the given
+ * days between account holders as transfers (netted per pair and grade), then mints and burns to each
+ * account's real holding, starting from the balances last confirmed on chain.
+ */
+async function eggMoves(db: Db, firstDay: number, lastDay: number): Promise<{ moves: EggMove[]; balances: Map<string, number>; farmAccounts: Map<string, string> }> {
   // who holds what, off chain
   const farmAccounts = await farmAccountMap(db);
   const agentAccounts = new Map<string, string>();
@@ -184,9 +189,9 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
     balances.set(key(account, g), bal(key(account, g)) + n);
   };
 
-  // the day's trades between account holders move as transfers
+  // the trades between account holders (on these days) move as transfers, netted per pair and grade
   const transfers = new Map<string, number>();
-  for (const t of await db.query('SELECT seller_farm, seller_agent, buyer_farm, buyer_agent, grade, qty FROM trades WHERE day = $1', [day])) {
+  for (const t of await db.query('SELECT seller_farm, seller_agent, buyer_farm, buyer_agent, grade, qty FROM trades WHERE day BETWEEN $1 AND $2', [firstDay, lastDay])) {
     const from = t.seller_farm ? farmAccounts.get(String(t.seller_farm)) : t.seller_agent ? agentAccounts.get(String(t.seller_agent)) : undefined;
     const to = t.buyer_farm ? farmAccounts.get(String(t.buyer_farm)) : t.buyer_agent ? agentAccounts.get(String(t.buyer_agent)) : undefined;
     if (!from || !to || from === to) continue;
@@ -212,6 +217,12 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
       balances.set(k, bal(k) + diff);
     }
   }
+
+  return { moves, balances, farmAccounts };
+}
+
+export async function buildDayBatch(db: Db, season: string, day: number, opts: { feathers: FeatherOpts | null; renderer: FeatherRenderer | null }): Promise<BuiltBatch> {
+  const { moves, balances, farmAccounts } = await eggMoves(db, day, day);
 
   // Feathers: redeemed tickets of this season, oldest redemption first, to the player's wallet (the
   // contract mints a Feather only in the season that won it, and only in its live season)
@@ -279,6 +290,120 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
     balances,
     minted,
   };
+}
+
+/** One closed day as the database records it: its supply, its multiplier and every farm's net result (from the ledger). */
+export interface DayRecord {
+  season: string;
+  day: number;
+  supply: number;
+  multiplier_milli: number;
+  farms: { farm: string; net_milli: string }[];
+}
+
+/**
+ * Several closed days settled in one call (SETTLE_EVERY_DAYS): each day's record as the database holds
+ * it, and the egg moves that bring the chain to what every holder holds at the range's last close.
+ * Its SHA-256 is the digest the chain stores.
+ */
+export interface RangeSettlement {
+  season: string;
+  first_day: number;
+  last_day: number;
+  days: DayRecord[];
+  eggs: EggMove[];
+}
+
+/** The call for a range: a day batch for its last day (the contract checks only that it is past the season's head), with its first day alongside. */
+export interface RangeBatch extends DayBatch {
+  first_day: number;
+}
+
+export interface BuiltRange {
+  batch: RangeBatch;
+  settlement: RangeSettlement;
+  balances: Map<string, number>;
+}
+
+/** A closed day's record, as the database holds it (the ledger's nets never change once a day has closed). */
+export async function dayRecord(db: Db, season: string, day: number): Promise<DayRecord> {
+  const [md] = await db.query('SELECT supply, multiplier, closed_at FROM market_days WHERE season = $1 AND day = $2', [season, day]);
+  if (!md || md.closed_at === null || md.closed_at === undefined) throw new Error(`season ${season} day ${day} has not closed`);
+  const nets = await db.query(
+    `SELECT f.id, COALESCE(SUM(l.amount_milli), 0) AS net FROM farms f LEFT JOIN ledger l ON l.farm_id = f.id AND l.season = $1 AND l.day = $2
+     GROUP BY f.id ORDER BY f.id`,
+    [season, day],
+  );
+  return {
+    season,
+    day,
+    supply: num(md.supply),
+    multiplier_milli: Math.round(num(md.multiplier) * 1000),
+    farms: nets.filter((n) => num(n.net) !== 0).map((n) => ({ farm: String(n.id), net_milli: String(num(n.net)) })),
+  };
+}
+
+/** Builds the settlement of closed days first to last of a season, in one call. */
+export async function buildRangeBatch(db: Db, season: string, first: number, last: number): Promise<BuiltRange> {
+  if (last < first) throw new Error(`an empty range: ${first} to ${last}`);
+  const days: DayRecord[] = [];
+  for (let d = first; d <= last; d++) days.push(await dayRecord(db, season, d));
+  const { moves, balances, farmAccounts } = await eggMoves(db, first, last);
+  const settlement: RangeSettlement = { season, first_day: first, last_day: last, days, eggs: moves };
+  // the farms whose tokens move, with their net over the range (the contract only counts them)
+  const moving = new Set(moves.flatMap((m) => [m.from, m.to]).filter((a): a is string => a !== null));
+  const net = new Map<string, number>();
+  for (const d of days) for (const f of d.farms) net.set(f.farm, (net.get(f.farm) ?? 0) + Number(f.net_milli));
+  const farms: FarmNet[] = [...net]
+    .map(([farm, n]) => ({ farm, account: farmAccounts.get(farm) ?? null, net_milli: String(n) }))
+    .filter((f) => f.account !== null && moving.has(f.account))
+    .sort((a, b) => a.farm.localeCompare(b.farm));
+  const lastDay = days[days.length - 1];
+  return {
+    batch: {
+      season,
+      day: last,
+      first_day: first,
+      digest: digestOf(settlement),
+      supply: days.reduce((n, d) => n + d.supply, 0),
+      multiplier_milli: lastDay?.multiplier_milli ?? 1000,
+      farms,
+      eggs: moves,
+      hen_mints: [],
+      hen_moves: [],
+    },
+    settlement,
+    balances,
+  };
+}
+
+/**
+ * Checks a settled range against the database: its kept record hashes to its kept digest (the one the
+ * chain holds), and each day's record in it is still exactly what the database holds for that day.
+ */
+export async function checkRange(db: Db, season: string, lastDay: number): Promise<{ ok: boolean; first: number; last: number; digest: string; problems: string[] }> {
+  const [row] = await db.query('SELECT settlement_json, settlement_digest, settlement_first, settlement_last FROM market_days WHERE season = $1 AND day = $2', [season, lastDay]);
+  const problems: string[] = [];
+  if (!row?.settlement_json) return { ok: false, first: lastDay, last: lastDay, digest: '', problems: [`no settlement kept for day ${lastDay}`] };
+  const kept = (typeof row.settlement_json === 'string' ? JSON.parse(row.settlement_json) : row.settlement_json) as RangeSettlement;
+  const digest = String(row.settlement_digest ?? '');
+  if (digestOf(kept) !== digest) problems.push('the kept record does not hash to the kept digest');
+  if (kept.first_day !== num(row.settlement_first) || kept.last_day !== lastDay) problems.push('the kept range does not match its days');
+  for (const d of kept.days) {
+    const now = await dayRecord(db, season, d.day);
+    if (JSON.stringify(now) !== JSON.stringify(d)) problems.push(`day ${d.day} differs from the database`);
+  }
+  return { ok: problems.length === 0, first: kept.first_day, last: kept.last_day, digest, problems };
+}
+
+/** Stores the egg balances a landed call leaves on chain. */
+export async function commitBalances(db: Db, balances: Map<string, number>): Promise<void> {
+  await db.tx(async (q) => {
+    for (const [k, amount] of balances) {
+      const [account, grade] = k.split('|');
+      await q.query(`INSERT INTO chain_balances (account, grade, amount) VALUES ($1, $2, $3) ON CONFLICT (account, grade) DO UPDATE SET amount = $3`, [account, grade, amount]);
+    }
+  });
 }
 
 /** Stores the balances and the Feathers a landed batch produced. */

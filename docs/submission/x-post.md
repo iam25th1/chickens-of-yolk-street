@@ -19,7 +19,7 @@ Drafts only. Nothing has been posted. Fill the two slots, attach the demo video,
 >
 > The Squeezer prices your hunger into your feed. The Bakery holds you to your contract. The Upstart borrows, overbuilds and goes bust.
 >
-> Built at NEAR HACKATHON with NEAR AI Cloud, NEP-171 and NEP-245.
+> Built at NEAR HACKATHON with NEP-171 and NEP-245. The agents run on rule-based strategies; NEAR AI Cloud is wired in for model decisions once it has credits.
 >
 > [VIDEO]
 > [REPO LINK]

@@ -615,6 +615,50 @@ CREATE INDEX orders_farm ON orders (farm_id);
 -- standing on older days. Badges are then earned from what is known, quietly, as of the boot day.
 `,
   },
+  {
+    id: 15,
+    name: 'inference providers',
+    sql: `
+-- Model calls per provider (nearai, serv) per UTC day: answered and failed calls, the tokens the
+-- provider counted and the estimated spend. The shared cap still reads inference_usage, which every
+-- provider's calls add to.
+CREATE TABLE provider_usage (
+  utc_day text NOT NULL,
+  provider text NOT NULL,
+  calls integer NOT NULL DEFAULT 0,
+  failures integer NOT NULL DEFAULT 0,
+  prompt_tokens bigint NOT NULL DEFAULT 0,
+  completion_tokens bigint NOT NULL DEFAULT 0,
+  spend_micro_usd bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (utc_day, provider)
+);
+
+-- failed calls: they count toward an agent's daily call cap
+ALTER TABLE inference_usage ADD COLUMN failures integer NOT NULL DEFAULT 0;
+ALTER TABLE agent_inference_usage ADD COLUMN failures integer NOT NULL DEFAULT 0;
+
+-- each agent's latest model answer: the provider, the in-game day, and the multiplier it decided at
+-- (a price move past LLM_PRICE_MOVE from it makes the next decision a model one)
+ALTER TABLE agents ADD COLUMN model_provider text;
+ALTER TABLE agents ADD COLUMN model_day integer;
+ALTER TABLE agents ADD COLUMN model_multiplier double precision;
+`,
+  },
+  {
+    id: 17,
+    name: 'settlement ranges',
+    sql: `
+-- Days settle on the chain in ranges (SETTLE_EVERY_DAYS, default 10): a closed day waits as
+-- 'batched' until its range is sent, then every day of the range is 'sent' with the range's one
+-- transaction, its digest and its first and last day. The range's full record (each day's own
+-- record, as the database holds it, and the range's egg moves) is kept on its last day.
+ALTER TABLE market_days DROP CONSTRAINT IF EXISTS market_days_settlement_status_check;
+ALTER TABLE market_days ADD CONSTRAINT market_days_settlement_status_check
+  CHECK (settlement_status IN ('pending', 'batched', 'sent', 'noop', 'failed'));
+ALTER TABLE market_days ADD COLUMN settlement_first integer;
+ALTER TABLE market_days ADD COLUMN settlement_last integer;
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

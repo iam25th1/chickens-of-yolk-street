@@ -7,7 +7,7 @@ import { BADGES, type PublicProfile, type RivalRank } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { openModal } from '../state/ui';
-import { AiBadge } from './AiBadge';
+import { AiBadge, aiFarmLine, useAiMode } from './AiBadge';
 import { Badge, BadgeRow, LEVEL_LABEL } from './Badge';
 import { LOOK } from './cast';
 import { Modal } from './Modal';
@@ -51,6 +51,7 @@ export function PublicProfileModal({ farmId, onClose }: { farmId: string; onClos
   const v = useViewport();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [failed, setFailed] = useState(false);
+  const aiMode = useAiMode();
   useEffect(() => {
     let live = true;
     setProfile(null);
@@ -88,7 +89,7 @@ export function PublicProfileModal({ farmId, onClose }: { farmId: string; onClos
               {p.name.toUpperCase()}
               {p.kind !== 'player' && <AiBadge />}
             </span>
-            <span style={{ lineHeight: '9px' }}>{p.kind === 'player' ? 'A PLAYER FARM' : 'AN AI FARM: AN AGENT MAKES ITS EVERY CHOICE'}</span>
+            <span style={{ lineHeight: '9px' }}>{p.kind === 'player' ? 'A PLAYER FARM' : aiFarmLine(aiMode)}</span>
           </span>
         </div>,
         <div key="stats" className="col" style={{ gap: 2 }} data-ui="public-stats">

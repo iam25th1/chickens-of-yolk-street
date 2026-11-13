@@ -171,6 +171,10 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
   useEffect(() => {
     if (farm) scene.current?.sync(farm);
   }, [farm]);
+  // new hens wait in their eggs while a page or modal covers the farm, and hatch when it is in view
+  useEffect(() => {
+    scene.current?.setHeld(modal !== null);
+  }, [modal, farm]);
 
   // the rival farms' signs at the farm's edge: one per rival, the open farm if there is one
   useEffect(() => {

@@ -13,6 +13,7 @@ import { join } from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { overflowing } from './overflow';
+import { sizes } from './sizes';
 import { startTestServer, type TestServer } from './server';
 
 const TABS = ['prices', 'sell', 'buyers', 'mine', 'trade', 'auction', 'farms'] as const;
@@ -38,12 +39,12 @@ afterAll(async () => {
 const vis = (page: Page, sel: string) => page.locator(`${sel} >> visible=true`).first();
 
 describe('the Market', () => {
-  for (const [w, h, dpr] of [
+  for (const [w, h, dpr] of sizes([
     [1920, 1080, 1],
     [390, 844, 3],
     [1280, 720, 1],
     [360, 640, 2],
-  ] as const) {
+  ] as const)) {
     it(`at ${w}x${h}: the top bar and the farm sign open it, every tab fits with nothing cut off, and its sales, fills and buys work`, async () => {
       const size = `${w}x${h}`;
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: w < 600, hasTouch: w < 600 });

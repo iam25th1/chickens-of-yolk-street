@@ -9,6 +9,7 @@ import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import type { EggGrade } from '@coys/shared';
 import { InferenceBudget } from '../apps/server/src/agents/brain';
+import { ProviderChain } from '../apps/server/src/ai/chain';
 import { createSessionSigner } from '../apps/server/src/auth/session';
 import { NoopChain, type ChainWriter, type MintResult } from '../apps/server/src/chain/chain';
 import { openDb } from '../apps/server/src/db/db';
@@ -43,6 +44,8 @@ export interface TestServer {
   wear(name: string, machines: Record<string, { condition: number; broken?: boolean }>): Promise<void>;
   /** Days close only when closeDays says (true), or on their own again when their time is up (false). */
   hold(on: boolean): void;
+  /** Gives the named farm n more hens (copies of one of its own), as a big flock has, and sends the farm its fresh state. */
+  flock(name: string, n: number): Promise<void>;
   /** Sets the named farm's coins (a rich farm's long numbers) and sends the farm its fresh state. */
   cash(name: string, coins: number): Promise<void>;
   /** Puts these eggs in the named farm's crate and sends the farm its fresh state. */
@@ -96,7 +99,7 @@ export async function startTestServer(): Promise<TestServer> {
     season: 'checks',
     dayLengthMs: DAY_MS,
     provenance: 'bd2daafdc6efe9a68f19d87291d0a41d9ca6cd98a1b1d47568fc06d410ac0651',
-    brain: { client: null, budget: new InferenceBudget(db, 0, now), model: 'none', cheapModel: 'none', pricing: new Map() },
+    brain: { chain: new ProviderChain([]), budget: new InferenceBudget(db, 0, now), pricing: new Map() },
   });
   await game.init();
   const server = createGameServer({
@@ -162,6 +165,18 @@ export async function startTestServer(): Promise<TestServer> {
     },
     hold(on) {
       held = on;
+    },
+    async flock(name, n) {
+      const farm = await farmNamed(name);
+      const [hen] = await db.query<{ id: string }>(`SELECT id FROM hens WHERE farm_id = $1 AND status = 'alive' ORDER BY id LIMIT 1`, [farm.id]);
+      if (!hen) throw new Error(`${name} has no hen to copy`);
+      await db.query(
+        `INSERT INTO hens (id, farm_id, status, body, eyes, comb, accessory, laying_trait, born_day, lay_progress)
+         SELECT id || '-copy-' || g, farm_id, 'alive', body, eyes, comb, accessory, laying_trait, born_day, 0 FROM hens, generate_series(1, $2::int) AS g WHERE id = $1`,
+        [hen.id, n],
+      );
+      const ok = await game.act(farm.player_id, { t: 'setClerkFloor', rid: 'browser-check', floor: Number(farm.clerk_floor) });
+      if (!ok.ok) throw new Error(`could not refresh ${name}: ${ok.message}`);
     },
     async cash(name, coins) {
       const farm = await farmNamed(name);

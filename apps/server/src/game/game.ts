@@ -31,6 +31,7 @@ import {
   toMilli,
   type ActionMessage,
   type AgentKind,
+  type AiMode,
   type ClockState,
   type CoopKind,
   type DaySummary,
@@ -54,11 +55,13 @@ import {
   type ProfileData,
   type PublicProfile,
   topBadges,
+  type Settlement,
 } from '@coys/shared';
 import { num, type Db, type Queryable } from '../db/db';
 import { migrate } from '../db/migrations';
-import { decide, reflect, type BrainOptions, type DecisionResult, type Tokens } from '../agents/brain';
+import { DecisionCache, MODE_WINDOW_DAYS, aiModeOf, decide, reflect, spendLine, type BrainOptions, type DecisionResult, type Tokens } from '../agents/brain';
 import type { FarmAction } from '../agents/decision';
+import type { ProviderStatus } from '../ai/chain';
 import type { MintedFeather } from '../chain/batch';
 import { missedDays, storeLateDays, type ChainWriter, type MintResult } from '../chain/chain';
 import { drawForTicket, type Collection } from '../chain/mint';
@@ -142,6 +145,8 @@ export interface GameOptions {
   season?: string | null;
   /** SHA-256 of founders.json (the 777 Founding Hens the Feathers are planned to hatch into). */
   provenance?: string;
+  /** SETTLE_EVERY_DAYS: days settle on the chain in ranges of this many, one call each (default 1: every day, its own call). */
+  settleEvery?: number;
 }
 
 /** The newest public reason in an agent's stored reasons, or null. */
@@ -154,8 +159,21 @@ function lastReason(raw: unknown): string | null {
 interface Gathered {
   agentId: string;
   result: DecisionResult;
-  reflection: { text: string; brain: string; now: WeekStart; tokens: Tokens | null } | null;
+  /** The multiplier it decided at. */
+  multiplier: number;
+  /** brain: the model that wrote it, or rules; provider: the provider that answered, or null. */
+  reflection: { text: string; brain: string; provider: string | null; now: WeekStart; tokens: Tokens | null } | null;
   firstWeek: WeekStart | null;
+}
+
+/** The AI part of /healthz: no keys, only states and today's numbers. */
+export interface AiStatus {
+  mode: AiMode;
+  providers: Record<'nearai' | 'serv', ProviderStatus>;
+  todayUsd: number;
+  capUsd: number;
+  calls: number;
+  failures: number;
 }
 
 /** A season id for a fresh database started without GAME_SEASON: unique, so it never collides on chain. */
@@ -171,6 +189,7 @@ export class Game {
   private readonly rng: Rng;
   private readonly log: (line: string) => void;
   private readonly withCast: boolean;
+  private readonly settleEvery: number;
   private readonly withEntrants: boolean;
   private readonly provenance: string;
   private readonly wantSeason: string | null;
@@ -195,8 +214,9 @@ export class Game {
     this.now = opts.now ?? Date.now;
     this.rng = opts.rng ?? seededRng(randomSeed());
     this.log = opts.log ?? ((line) => console.log(line));
-    this.brain = { ...opts.brain, log: this.log };
+    this.brain = { cache: new DecisionCache(), ...opts.brain, log: this.log };
     this.withCast = opts.cast ?? true;
+    this.settleEvery = Math.max(1, Math.floor(opts.settleEvery ?? 1));
     this.withEntrants = this.withCast && (opts.entrants ?? true);
     this.provenance = opts.provenance ?? '';
     this.wantSeason = opts.season ?? null;
@@ -585,13 +605,17 @@ export class Game {
       else if (c.owner_kind === 'agent') farms.agents += num(c.n);
       else farms.players += num(c.n);
     }
-    const [settled] = await this.db.query('SELECT day, settlement_status, settlement_tx FROM market_days WHERE closed_at IS NOT NULL ORDER BY day DESC LIMIT 1');
+    const [settled] = await this.db.query('SELECT day, settlement_status, settlement_tx, settlement_first, settlement_last FROM market_days WHERE closed_at IS NOT NULL ORDER BY day DESC LIMIT 1');
     const agentRows = await this.db.query(
       `SELECT a.*, f.cash_milli AS farm_cash, (SELECT count(*) FROM hens h WHERE h.farm_id = a.farm_id AND h.status = 'alive') AS hens
        FROM agents a LEFT JOIN farms f ON f.id = a.farm_id
        WHERE a.status = 'open' OR a.bust_day >= $1 ORDER BY a.kind, a.generation`,
       [day - 3],
     );
+    // the agents' mode, and each agent's own: the rules unless a provider answered lately (aiModeOf)
+    const aiMode = await this.aiMode();
+    const brainOf = (a: Record<string, unknown>): AiMode =>
+      aiMode !== 'rules' && (a.model_provider === 'nearai' || a.model_provider === 'serv') && num(a.model_day ?? -1e9) >= day - MODE_WINDOW_DAYS && this.brain.chain.usable(a.model_provider) ? a.model_provider : 'rules';
     const ranking = await this.db.query(
       `SELECT f.id, f.name, f.owner_kind, f.cash_milli, f.bust_day, a.kind AS agent_kind,
               (SELECT count(*) FROM hens h WHERE h.farm_id = f.id AND h.status = 'alive') AS hens
@@ -630,7 +654,13 @@ export class Game {
       chart,
       farms,
       settlement: settled
-        ? { day: num(settled.day), status: settled.settlement_status as 'pending' | 'sent' | 'noop' | 'failed', txHash: (settled.settlement_tx as string | null) ?? null }
+        ? {
+            day: num(settled.day),
+            status: settled.settlement_status as Settlement['status'],
+            txHash: (settled.settlement_tx as string | null) ?? null,
+            first: settled.settlement_first === null || settled.settlement_first === undefined ? null : num(settled.settlement_first),
+            last: settled.settlement_last === null || settled.settlement_last === undefined ? null : num(settled.settlement_last),
+          }
         : null,
       agents: agentRows.map((a) => ({
         id: String(a.id),
@@ -643,6 +673,7 @@ export class Game {
         hens: a.farm_id ? num(a.hens) : null,
         account: (a.near_account_id as string | null) ?? null,
         reason: lastReason(a.reasons),
+        brain: brainOf(a),
       })),
       book: await this.orderViews('true', [], null),
       trades: recentBig,
@@ -661,6 +692,7 @@ export class Game {
         const c = await featherCount(this.db, this.chain.featherMinted);
         return { max: c.max, minted: c.minted, left: c.left, tickets: c.tickets };
       })(),
+      aiMode,
     };
   }
 
@@ -715,8 +747,14 @@ export class Game {
       `SELECT l.day, l.kind, SUM(l.amount_milli) AS amount FROM ledger l WHERE l.farm_id = $1 AND l.day >= $2 GROUP BY l.day, l.kind ORDER BY l.day DESC`,
       [farmId, this.clock.day - 30],
     );
-    const days = await this.db.query('SELECT day, settlement_status, settlement_tx FROM market_days WHERE day >= $1', [this.clock.day - 30]);
-    const settle = new Map(days.map((d) => [num(d.day), { day: num(d.day), status: d.settlement_status as 'pending', txHash: (d.settlement_tx as string | null) ?? null }]));
+    const days = await this.db.query('SELECT day, settlement_status, settlement_tx, settlement_first, settlement_last FROM market_days WHERE day >= $1', [this.clock.day - 30]);
+    const opt = (v: unknown): number | null => (v === null || v === undefined ? null : num(v));
+    const settle = new Map(
+      days.map((d) => [
+        num(d.day),
+        { day: num(d.day), status: d.settlement_status as Settlement['status'], txHash: (d.settlement_tx as string | null) ?? null, first: opt(d.settlement_first), last: opt(d.settlement_last) },
+      ]),
+    );
     const out = new Map<number, LedgerDay>();
     for (const r of rows) {
       const day = num(r.day);
@@ -1057,7 +1095,7 @@ export class Game {
   /** Tallies a model call's tier and tokens (a call whose reply was unusable still used them). */
   private count(tokens: Tokens | null): void {
     if (!tokens) return;
-    if (tokens.model === this.brain.model) this.stats.mainCalls++;
+    if (tokens.tier === 'main') this.stats.mainCalls++;
     else this.stats.cheapCalls++;
     this.stats.promptTokens += tokens.prompt;
     this.stats.completionTokens += tokens.completion;
@@ -1079,20 +1117,64 @@ export class Game {
     const [auction] = await this.db.query(`SELECT count(*) AS n FROM hens WHERE status = 'auction'`);
     const street = await streetView(ctx);
     const out: Gathered[] = [];
-    // one at a time keeps model calls polite; each is bounded by its own timeout
-    for (const agent of agents) {
-      const c = await buildContext(ctx, agent, history, num(auction?.n), street);
-      const due = await weekToReflect(ctx, agent);
-      let reflection: Gathered['reflection'] = null;
-      if (due) {
-        const r = await reflect(c, due.week, this.brain);
-        reflection = { text: r.text, brain: r.model ?? 'rules', now: due.now, tokens: r.tokens ?? null };
-        c.agent.reflection = r.text;
+    // one at a time keeps model calls polite; each is bounded by its own timeout and all of them by the close's time budget
+    const chain = this.brain.chain;
+    chain.beginClose();
+    try {
+      for (const agent of agents) {
+        const c = await buildContext(ctx, agent, history, num(auction?.n), street);
+        const due = await weekToReflect(ctx, agent);
+        let reflection: Gathered['reflection'] = null;
+        if (due) {
+          const r = await reflect(c, due.week, this.brain);
+          reflection = { text: r.text, brain: r.model ?? 'rules', provider: r.brain === 'rules' ? null : r.brain, now: due.now, tokens: r.tokens ?? null };
+          c.agent.reflection = r.text;
+        }
+        // a reflection by a model just now counts as its latest model answer
+        const lastModelDay = reflection?.provider ? ctx.day : agent.modelDay;
+        const result = await decide(c, this.brain, { lastModelMultiplier: agent.modelMultiplier, lastModelDay });
+        out.push({ agentId: agent.id, result, multiplier: c.market.multiplier, reflection, firstWeek: !due && !agent.weekStart ? await weekNow(ctx, agent) : null });
       }
-      const result = await decide(c, this.brain);
-      out.push({ agentId: agent.id, result, reflection, firstWeek: !due && !agent.weekStart ? await weekNow(ctx, agent) : null });
+    } finally {
+      chain.endClose();
     }
     return out;
+  }
+
+  /** The daily AI spend line, once a real hour, after a day close (so the mode counts its answers). */
+  private async logAiSpend(): Promise<void> {
+    const chain = this.brain.chain;
+    if (!chain.configured || chain.now() - chain.spendLoggedAt < 3_600_000) return;
+    chain.spendLoggedAt = chain.now();
+    this.log(await this.aiSpendLine());
+  }
+
+  /** The daily AI spend line with the agents' mode. */
+  async aiSpendLine(): Promise<string> {
+    return `${await spendLine(this.brain.budget)}; mode ${await this.aiMode()}`;
+  }
+
+  private capReached(): boolean {
+    return this.brain.chain.capReachedOn === this.brain.budget.today();
+  }
+
+  /** The agents' mode now (see aiModeOf). */
+  async aiMode(): Promise<AiMode> {
+    const rows = await this.db.query('SELECT model_provider AS provider, model_day AS day FROM agents WHERE model_day >= $1', [this.clock.day - MODE_WINDOW_DAYS]);
+    return aiModeOf(rows, this.clock.day, this.brain.chain, this.capReached());
+  }
+
+  /** The AI part of /healthz. */
+  async aiStatus(): Promise<AiStatus> {
+    const u = await this.brain.budget.usage();
+    return {
+      mode: await this.aiMode(),
+      providers: this.brain.chain.status(),
+      todayUsd: Math.round(u.spendUsd * 1e6) / 1e6,
+      capUsd: this.brain.budget.capUsd,
+      calls: u.calls,
+      failures: u.failures,
+    };
   }
 
   /**
@@ -1135,12 +1217,13 @@ export class Game {
         await expireOrders(ctx);
         // 3. the cast acts
         const acted: { agentId: string; result: DecisionResult }[] = [];
-        for (const { agentId, result, reflection, firstWeek } of decisions) {
+        for (const { agentId, result, multiplier, reflection, firstWeek } of decisions) {
           const [row] = await q.query(`SELECT ${AGENT_COLUMNS} FROM agents WHERE id = $1 AND status = 'open'`, [agentId]);
           if (!row) continue;
           const agent = toAgent(row);
           if (reflection) {
             await storeReflection(ctx, agent, reflection.text, reflection.now, reflection.brain);
+            if (reflection.provider) await q.query('UPDATE agents SET model_provider = $2, model_day = $3 WHERE id = $1', [agent.id, reflection.provider, day]);
             this.stats.reflections++;
             if (reflection.brain !== 'rules') this.stats.reflectionCalls++;
             this.count(reflection.tokens);
@@ -1153,7 +1236,10 @@ export class Game {
             await chargeForThinking(ctx, agent);
           }
           this.stats.decisions += result.brain === 'skipped' ? 0 : 1;
-          if (result.brain === 'nearai') this.stats.modelCalls++;
+          if (result.brain !== 'rules' && result.brain !== 'skipped') {
+            this.stats.modelCalls++;
+            await q.query('UPDATE agents SET model_provider = $2, model_day = $3, model_multiplier = $4 WHERE id = $1', [agent.id, result.brain, day, multiplier]);
+          }
           if (result.fallback) this.stats.fallbacks++;
           if (result.brain === 'skipped') this.stats.skipped++;
           this.count(result.tokens ?? null);
@@ -1248,6 +1334,13 @@ export class Game {
       return outcome.day;
     });
 
+    if (this.settleEvery > 1 && this.chain.settleRange) {
+      await this.settleInRanges(closedDay, false);
+      this.emit(null, { t: 'market', market: await this.getMarketState() });
+      if (this.chain.collectionFor) this.collection = await this.chain.collectionFor(this.season).catch(() => this.collection);
+      this.kickMints();
+      return;
+    }
     const result = await this.chain.settleDay(this.db, this.season, closedDay);
     await this.db.query(
       'UPDATE market_days SET settlement_status = $3, settlement_tx = $4, settlement_error = $5, settlement_json = COALESCE($6, settlement_json), settlement_digest = COALESCE($7, settlement_digest) WHERE season = $1 AND day = $2',
@@ -1256,6 +1349,7 @@ export class Game {
     if (result.status === 'sent' && result.txHash && result.minted?.length) await this.announceMints(result.minted, result.txHash, closedDay);
     if (result.status === 'sent') await this.catchUpLateDays(closedDay);
     this.emit(null, { t: 'market', market: await this.getMarketState() });
+    await this.logAiSpend();
     // the day close's catch-up: any redeemed ticket whose mint is still waiting goes again
     if (this.chain.collectionFor) this.collection = await this.chain.collectionFor(this.season).catch(() => this.collection);
     this.kickMints();
@@ -1380,6 +1474,45 @@ export class Game {
     );
     this.log(`[mint] ticket ${ticketId} did not mint (${note}): held again, fee refunded`);
     if (playerId) this.emit(playerId, { t: 'event', event: { kind: 'mintFailed', ticketId, note, refundMilli: feeMilli } });
+  }
+
+  /**
+   * Settlement in ranges (SETTLE_EVERY_DAYS above 1): the closed day waits as 'batched'; once that many
+   * wait (or on a flush, at shutdown), one call settles them all, the range from the first waiting day
+   * to the last. A failed call leaves them waiting, and the next close tries the whole range again
+   * with the days since (catch-up by range, at most 100 days a call).
+   */
+  private async settleInRanges(closedDay: number | null, flush: boolean): Promise<void> {
+    const settleRange = this.chain.settleRange?.bind(this.chain);
+    if (!settleRange) return;
+    if (closedDay !== null) {
+      await this.db.query(`UPDATE market_days SET settlement_status = 'batched' WHERE season = $1 AND day = $2 AND settlement_status = 'pending'`, [this.season, closedDay]);
+    }
+    const waiting = (
+      await this.db.query<{ day: number }>(`SELECT day FROM market_days WHERE season = $1 AND closed_at IS NOT NULL AND settlement_status = 'batched' ORDER BY day LIMIT 100`, [this.season])
+    ).map((r) => num(r.day));
+    if (!waiting.length || (!flush && waiting.length < this.settleEvery)) return;
+    const first = waiting[0] ?? 0;
+    const last = waiting[waiting.length - 1] ?? first;
+    const r = await settleRange(this.db, this.season, first, last);
+    if (r.status === 'failed') {
+      await this.db.query('UPDATE market_days SET settlement_error = $3 WHERE season = $1 AND day = $2', [this.season, last, r.error ?? 'failed']);
+      return;
+    }
+    await this.db.tx(async (q) => {
+      await q.query(
+        `UPDATE market_days SET settlement_status = $4, settlement_tx = $5, settlement_error = $6, settlement_digest = $7, settlement_first = $2, settlement_last = $3
+         WHERE season = $1 AND day BETWEEN $2 AND $3 AND settlement_status = 'batched'`,
+        [this.season, first, last, r.status, r.txHash, r.error ?? null, r.digest ?? null],
+      );
+      if (r.settlement) await q.query('UPDATE market_days SET settlement_json = $3 WHERE season = $1 AND day = $2', [this.season, last, JSON.stringify(r.settlement)]);
+    });
+    if (r.status === 'sent') await this.catchUpLateDays(last + 1);
+  }
+
+  /** Settles the days still waiting for their range (at shutdown, or at a season's end). */
+  async flushSettlement(): Promise<void> {
+    if (this.settleEvery > 1) await this.serial(() => this.settleInRanges(null, true));
   }
 
   /**

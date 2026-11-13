@@ -58,15 +58,18 @@ Set these on the service. Values marked secret never go in the repo, a chat or a
 | `PRIVY_VERIFICATION_KEY` | Privy verification key (PEM) | optional; without it the server fetches Privy's JWKS |
 | `NEAR_TESTNET_ACCOUNT_ID` | `play.coys-game.testnet` | the production contract account ([deploy/testnet.md](../testnet.md)) |
 | `NEAR_TESTNET_PRIVATE_KEY` | secret: `ed25519:...` | testnet only |
-| `NEARAI_API_KEY` | secret | agents use their rules until the NEAR AI account has credits |
-| `NEARAI_DAILY_SPEND_CAP_USD` | for example `2` | hard cap per UTC day |
+| `NEARAI_API_KEY` | secret | first provider; answers 402 until the NEAR AI account has credits |
+| `SERV_API_KEY` | secret | SERV Reasoning, the fallback provider; without either key the agents run on their rules |
+| `LLM_DAILY_CAP_USD` | `1.5` (the default) | hard cap per UTC day, every provider together; the old `NEARAI_DAILY_SPEND_CAP_USD` is still read when this is unset |
 
 Leave unset in production: `ALLOW_DEV_LOGIN`, `DEMO_DAY_SECONDS`, `DEMO_MODE`,
 `ALLOW_PGLITE_IN_PRODUCTION`. Optional with defaults: `NEAR_TESTNET_RPC_URL`,
 `NEAR_GAME_CONTRACT_ID`, `CHAIN_MINT_NEAR`, `CHAIN_MIN_BALANCE_NEAR`,
 `AGENT_ACCOUNT_FUNDING_NEAR`, `NEARAI_BASE_URL`, `NEARAI_MODEL`, `NEARAI_CHEAP_MODEL`,
-`NEARAI_AGENT_DAILY_CAP_USD`, `NEARAI_AGENT_DAILY_CALLS`, `NEARAI_MAIN_PRICE`, `NEARAI_CHEAP_PRICE`
-(see [docs/agents.md](../../docs/agents.md) for the credits they imply). Every variable is described
+`NEARAI_MAIN_PRICE`, `NEARAI_CHEAP_PRICE`, `SERV_BASE_URL`, `SERV_MODEL`, `SERV_CHEAP_MODEL`,
+`SERV_REASONING_EFFORT`, `SERV_MAIN_PRICE`, `SERV_CHEAP_PRICE`, `LLM_AGENT_DAILY_CAP_USD`,
+`LLM_AGENT_DAILY_CALLS`, `LLM_PRICE_MOVE`, `LLM_DECISION_GAP_DAYS`, `LLM_CLOSE_BUDGET_SECONDS`
+(see [docs/agents.md](../../docs/agents.md) for what they cost). Every variable is described
 in [.env.example](../../.env.example).
 
 The boot log lists every variable as `set` or `unset` (never a value) and warns loudly about

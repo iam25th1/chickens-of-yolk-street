@@ -206,10 +206,14 @@ describe('missed days', () => {
   });
 
   it('are not sent when the contract counts a different number of settled days (a failed day may have landed)', () => {
-    expect(settledCountsAgree(head, sent, [])).toBe(true);
-    expect(settledCountsAgree({ ...head, days_settled: 47 }, sent, [])).toBe(false);
+    const rows = (days: number[]) => days.map((day) => ({ day, tx: `tx-${day}` }));
+    expect(settledCountsAgree(head, rows(sent), [])).toBe(true);
+    expect(settledCountsAgree({ ...head, days_settled: 47 }, rows(sent), [])).toBe(false);
     // once recorded late and marked sent, they are not counted as days the head settled
-    expect(settledCountsAgree(head, [...sent, 509, 510], [509, 510])).toBe(true);
+    expect(settledCountsAgree(head, rows([...sent, 509, 510]), [509, 510])).toBe(true);
+    // a range of days settled in one call counts once, as the contract counts it
+    const ranged = [...rows(sent.slice(0, 36)), ...sent.slice(36).map((day) => ({ day, tx: 'tx-range' }))];
+    expect(settledCountsAgree({ ...head, days_settled: 37 }, ranged, [])).toBe(true);
   });
 
   it('are caught up at the next day close from the database records, by their digests, and marked settled', async () => {

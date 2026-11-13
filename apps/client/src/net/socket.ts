@@ -4,6 +4,9 @@ import { PROTOCOL_VERSION, isCrash, type ActionMessage, type ServerMessage } fro
 import { events, game } from '../state/game';
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+/** The server build this page was loaded against (from the first welcome). */
+let loadedBuild: string | null = null;
 export type Action = DistributiveOmit<ActionMessage, 'rid'>;
 export type Ack = Extract<ServerMessage, { t: 'ack' }>;
 
@@ -61,6 +64,11 @@ export class GameSocket {
       case 'welcome':
         this.attempt = 0;
         this.welcomed = true;
+        // the first build this page heard is its own; a different one later means a deploy happened
+        if (m.build) {
+          if (loadedBuild === null) loadedBuild = m.build;
+          else if (m.build !== loadedBuild) game.set({ newVersion: true });
+        }
         game.set({
           status: 'online',
           playerName: m.name,

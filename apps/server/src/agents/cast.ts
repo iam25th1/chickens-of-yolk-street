@@ -208,5 +208,5 @@ const BROKE: Record<AgentKind, string> = {
   wholesaler: 'Cart stays home today.',
 };
 
-/** The public reason of an agent too broke to think today. */
+/** The public reason of an agent too broke to pay for a decision today (it sits the day out). */
 export const brokeLine = (kind: AgentKind): string => BROKE[kind];

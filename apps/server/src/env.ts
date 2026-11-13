@@ -2,6 +2,9 @@
 import { randomBytes } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import { ECONOMY } from '@coys/shared';
+import { AGENT_DAILY_CALLS, DECISION_GAP_DAYS, PRICE_MOVE } from './agents/brain';
+import { CLOSE_BUDGET_MS } from './ai/chain';
+import { SERV_REASONING_EFFORTS, type ServReasoningEffort } from './ai/serv';
 
 export interface ServerConfig {
   production: boolean;
@@ -21,6 +24,8 @@ export interface ServerConfig {
   dayLengthMs: number;
   /** DEMO_DAY_SECONDS was set but production ignores it (DEMO_MODE is not 1). */
   demoDayIgnored: boolean;
+  /** SETTLE_EVERY_DAYS: days settle on the chain in ranges of this many, one call each (default 10). */
+  settleEvery: number;
 }
 
 /** Season ids as the game contract accepts them. */
@@ -68,18 +73,47 @@ export function readConfig(env: NodeJS.ProcessEnv, repoRoot: string): ServerConf
     season,
     dayLengthMs: demoSeconds !== null && demoAllowed ? demoSeconds * 1000 : ECONOMY.day.lengthMs,
     demoDayIgnored: demoSeconds !== null && !demoAllowed,
+    settleEvery: settleEveryDays(env.SETTLE_EVERY_DAYS),
   };
 }
 
+/** SETTLE_EVERY_DAYS as a whole number of days from 1 (every day its own call) to 100; 10 when unset. */
+export function settleEveryDays(raw: string | undefined): number {
+  if (!raw) return 10;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 100) throw new Error('SETTLE_EVERY_DAYS must be a whole number from 1 to 100');
+  return n;
+}
+
 export interface InferenceConfig {
-  /** NEARAI_DAILY_SPEND_CAP_USD: every agent together, per UTC day. */
+  /** LLM_DAILY_CAP_USD (default 1.50): every provider and agent together, per UTC day. NEARAI_DAILY_SPEND_CAP_USD is its old name, still read when it is unset. */
   capUsd: number;
-  /** NEARAI_AGENT_DAILY_CAP_USD (default a quarter of the global cap) and NEARAI_AGENT_DAILY_CALLS (default 40): one agent, per UTC day. */
+  /** Which name the cap came from, for the boot log. */
+  capFrom: 'LLM_DAILY_CAP_USD' | 'NEARAI_DAILY_SPEND_CAP_USD' | 'default';
+  /**
+   * LLM_AGENT_DAILY_CAP_USD (default a quarter of the shared cap) and LLM_AGENT_DAILY_CALLS (default
+   * AGENT_DAILY_CALLS, failed calls included): one agent, per UTC day. The NEARAI_AGENT_DAILY_ names
+   * are still read when these are unset.
+   */
   agentCap: { usd: number; calls: number };
   /** NEARAI_MAIN_PRICE and NEARAI_CHEAP_PRICE as "input,output" USD per million tokens; absent ones come from /v1/models or the assumed prices. */
   mainPrice: { input: number; output: number } | null;
   cheapPrice: { input: number; output: number } | null;
+  /** SERV_MAIN_PRICE and SERV_CHEAP_PRICE, the same way; absent ones are SERV's published prices. */
+  servMainPrice: { input: number; output: number } | null;
+  servCheapPrice: { input: number; output: number } | null;
+  /** LLM_PRICE_MOVE (default 0.15): a model decision is due once the multiplier moved this share since the agent's last one. */
+  priceMove: number;
+  /** LLM_DECISION_GAP_DAYS (default 3): an agent asks a model at most once in this many in-game days, its first look and weekly reflection aside. */
+  gapDays: number;
+  /** LLM_CLOSE_BUDGET_SECONDS (default 60): all model calls of one day close together, in ms. */
+  closeBudgetMs: number;
+  /** SERV_REASONING_EFFORT (default none). */
+  servReasoningEffort: ServReasoningEffort;
 }
+
+/** The shared daily cap on model spend, every provider together, by default (USD). */
+export const DEFAULT_DAILY_CAP_USD = 1.5;
 
 const nonNegative = (name: string, raw: string | undefined, fallback: number): number => {
   if (raw === undefined || raw === '') return fallback;
@@ -95,16 +129,36 @@ const price = (name: string, raw: string | undefined): { input: number; output: 
   return { input, output };
 };
 
-/** The NEAR AI spend caps and prices. */
+/** The new name if it is set, else the old one (a deprecated alias). */
+const either = (env: NodeJS.ProcessEnv, name: string, old: string): { name: string; raw: string | undefined } =>
+  env[name] !== undefined && env[name] !== '' ? { name, raw: env[name] } : { name: old, raw: env[old] };
+
+/** The model spend caps (shared by every provider), prices and pacing. */
 export function readInferenceConfig(env: NodeJS.ProcessEnv): InferenceConfig {
-  const capUsd = nonNegative('NEARAI_DAILY_SPEND_CAP_USD', env.NEARAI_DAILY_SPEND_CAP_USD, 1);
-  const calls = nonNegative('NEARAI_AGENT_DAILY_CALLS', env.NEARAI_AGENT_DAILY_CALLS, 40);
-  if (!Number.isInteger(calls)) throw new Error('NEARAI_AGENT_DAILY_CALLS must be a whole number');
+  const cap = either(env, 'LLM_DAILY_CAP_USD', 'NEARAI_DAILY_SPEND_CAP_USD');
+  const capUsd = nonNegative(cap.name, cap.raw, DEFAULT_DAILY_CAP_USD);
+  const callsVar = either(env, 'LLM_AGENT_DAILY_CALLS', 'NEARAI_AGENT_DAILY_CALLS');
+  const calls = nonNegative(callsVar.name, callsVar.raw, AGENT_DAILY_CALLS);
+  if (!Number.isInteger(calls)) throw new Error(`${callsVar.name} must be a whole number`);
+  const agentUsd = either(env, 'LLM_AGENT_DAILY_CAP_USD', 'NEARAI_AGENT_DAILY_CAP_USD');
+  const priceMove = nonNegative('LLM_PRICE_MOVE', env.LLM_PRICE_MOVE, PRICE_MOVE);
+  const gapDays = nonNegative('LLM_DECISION_GAP_DAYS', env.LLM_DECISION_GAP_DAYS, DECISION_GAP_DAYS);
+  if (!Number.isInteger(gapDays)) throw new Error('LLM_DECISION_GAP_DAYS must be a whole number');
+  const closeSeconds = nonNegative('LLM_CLOSE_BUDGET_SECONDS', env.LLM_CLOSE_BUDGET_SECONDS, CLOSE_BUDGET_MS / 1000);
+  const effort = env.SERV_REASONING_EFFORT || 'none';
+  if (!(SERV_REASONING_EFFORTS as readonly string[]).includes(effort)) throw new Error(`SERV_REASONING_EFFORT must be one of ${SERV_REASONING_EFFORTS.join(', ')}`);
   return {
     capUsd,
-    agentCap: { usd: nonNegative('NEARAI_AGENT_DAILY_CAP_USD', env.NEARAI_AGENT_DAILY_CAP_USD, capUsd / 4), calls },
+    capFrom: cap.raw === undefined || cap.raw === '' ? 'default' : (cap.name as InferenceConfig['capFrom']),
+    agentCap: { usd: nonNegative(agentUsd.name, agentUsd.raw, capUsd / 4), calls },
     mainPrice: price('NEARAI_MAIN_PRICE', env.NEARAI_MAIN_PRICE),
     cheapPrice: price('NEARAI_CHEAP_PRICE', env.NEARAI_CHEAP_PRICE),
+    servMainPrice: price('SERV_MAIN_PRICE', env.SERV_MAIN_PRICE),
+    servCheapPrice: price('SERV_CHEAP_PRICE', env.SERV_CHEAP_PRICE),
+    priceMove,
+    gapDays,
+    closeBudgetMs: Math.round(closeSeconds * 1000),
+    servReasoningEffort: effort as ServReasoningEffort,
   };
 }
 
@@ -116,6 +170,7 @@ export const ENV_NAMES = [
   'ALLOW_PGLITE_IN_PRODUCTION',
   'GAME_SEASON',
   'DEMO_DAY_SECONDS',
+  'SETTLE_EVERY_DAYS',
   'DEMO_MODE',
   'SESSION_SECRET',
   'ALLOW_DEV_LOGIN',
@@ -137,6 +192,19 @@ export const ENV_NAMES = [
   'NEARAI_AGENT_DAILY_CALLS',
   'NEARAI_MAIN_PRICE',
   'NEARAI_CHEAP_PRICE',
+  'SERV_API_KEY',
+  'SERV_BASE_URL',
+  'SERV_MODEL',
+  'SERV_CHEAP_MODEL',
+  'SERV_REASONING_EFFORT',
+  'SERV_MAIN_PRICE',
+  'SERV_CHEAP_PRICE',
+  'LLM_DAILY_CAP_USD',
+  'LLM_AGENT_DAILY_CAP_USD',
+  'LLM_AGENT_DAILY_CALLS',
+  'LLM_PRICE_MOVE',
+  'LLM_DECISION_GAP_DAYS',
+  'LLM_CLOSE_BUDGET_SECONDS',
 ] as const;
 
 /** One line per variable: present or missing. Never prints a value. */

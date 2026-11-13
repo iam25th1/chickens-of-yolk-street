@@ -16,6 +16,8 @@ export interface GameView {
   ledger: LedgerDay[] | null;
   /** The player's own profile, once asked for (getProfile). */
   profile: ProfileData | null;
+  /** The server came back on a newer build than this page was loaded with: offer a reload. */
+  newVersion?: boolean;
 }
 
 export const game = createStore<GameView>({ status: 'idle', playerName: '', farm: null, market: null, clock: null, offset: 0, ledger: null, profile: null });

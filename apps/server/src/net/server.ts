@@ -9,7 +9,7 @@ import { PROTOCOL_VERSION, parseClientMessage, type ServerMessage } from '@coys/
 import { BUILD } from '../build-info';
 import type { PrivyVerifier } from '../auth/privy';
 import type { SessionSigner } from '../auth/session';
-import type { ActionResult, Game } from '../game/game';
+import type { ActionResult, AiStatus, Game } from '../game/game';
 import { RateLimiter } from './ratelimit';
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -51,6 +51,8 @@ export interface HealthReport {
   db: { kind: string; ok: boolean; ms: number };
   settlement: string;
   uptimeS: number;
+  /** The agents' mode, each provider's state and today's AI spend (no keys); null when the database did not answer. */
+  ai: AiStatus | null;
 }
 
 const MIME: Record<string, string> = {
@@ -151,6 +153,7 @@ export function createGameServer(opts: GameServerOptions): Server {
       db: { kind: opts.dbKind, ok, ms: Date.now() - started },
       settlement: opts.settlementMode,
       uptimeS: Math.round(process.uptime()),
+      ai: ok ? await game.aiStatus().catch(() => null) : null,
     };
   };
 
@@ -309,6 +312,7 @@ export function createGameServer(opts: GameServerOptions): Server {
             farm: await game.getFarmState(info.farmId),
             market: await game.getMarketState(),
             clock: game.getClock(),
+            build: BUILD.commit,
           });
         }
         if (!playerId) return send(ws, { t: 'ack', rid: msg.rid, ok: false, code: 'unauthenticated', message: 'say hello first' });

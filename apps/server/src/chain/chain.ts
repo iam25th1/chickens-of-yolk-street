@@ -26,7 +26,7 @@ import { Account, JsonRpcProvider, KeyPairSigner, baseEncode, nearToYocto, teraT
 import type { KeyPairString } from 'near-api-js';
 import { num, type Db, type Queryable } from '../db/db';
 import { ECONOMY, type FeatherGrade, type MilestoneId } from '@coys/shared';
-import { buildDayBatch, buildLateSettlement, commitBatch, digestOf, featherToken, type FullSettlement, type MintedFeather } from './batch';
+import { buildDayBatch, buildLateSettlement, buildRangeBatch, commitBatch, commitBalances, digestOf, featherToken, type FullSettlement, type MintedFeather, type RangeSettlement } from './batch';
 import type { FeatherRenderer } from './feather-image';
 import { testFeatherToken, type Collection } from './mint';
 
@@ -38,6 +38,17 @@ export interface SettleResult {
   minted?: MintedFeather[];
   /** The day's full settlement and its SHA-256 (the digest the chain stores). */
   settlement?: FullSettlement;
+  digest?: string;
+}
+
+/** The outcome of settling a range of days in one call. */
+export interface RangeResult {
+  status: 'sent' | 'noop' | 'failed';
+  txHash: string | null;
+  error?: string;
+  first: number;
+  last: number;
+  settlement?: RangeSettlement;
   digest?: string;
 }
 
@@ -55,6 +66,8 @@ export interface ChainWriter {
   readonly contractId: string | null;
   /** Settles one closed day of a season. */
   settleDay(db: Db, season: string, day: number): Promise<SettleResult>;
+  /** Settles closed days first to last of a season in one call (SETTLE_EVERY_DAYS above 1). */
+  settleRange?(db: Db, season: string, first: number, last: number): Promise<RangeResult>;
   /** Every Feather on the contract (any season), as last read; absent without a chain. */
   featherTokens?(): Promise<ChainFeather[]>;
   /** Records closed days of a season that failed to settle, once the season has moved past them; absent without a chain. */
@@ -137,12 +150,14 @@ export function lateDaysToSend(days: number[], head: SeasonHead, recorded: numbe
 }
 
 /**
- * Whether the database and the contract agree on which days settled: the contract's count of settled
- * days since its version 2 days equals the database's sent days in that range, less the days recorded
+ * Whether the database and the contract agree on what settled: the contract counts one per settle
+ * call since its version 2 days, so that count equals the database's distinct settle transactions of
+ * the days in that range (one per day before ranges, one per range after), less the days recorded
  * late. If they differ, a day marked failed may have landed after all, and nothing is sent late.
  */
-export function settledCountsAgree(head: SeasonHead, sentDays: number[], recorded: number[]): boolean {
-  return sentDays.filter((d) => d > head.v2_through && d <= head.last_day && !recorded.includes(d)).length === head.days_settled;
+export function settledCountsAgree(head: SeasonHead, sent: { day: number; tx: string | null }[], recorded: number[]): boolean {
+  const calls = new Set(sent.filter((r) => r.day > head.v2_through && r.day <= head.last_day && !recorded.includes(r.day)).map((r) => r.tx ?? `day-${r.day}`));
+  return calls.size === head.days_settled;
 }
 
 /** A Feather as the contract holds it: its number, grade, milestone, season, day and owner. */
@@ -285,6 +300,12 @@ export class NoopChain implements ChainWriter {
         `digest ${built.batch.digest.slice(0, 12)}) and recorded in market_days only, not on NEAR testnet.`,
     );
     return { status: 'noop', txHash: null, settlement: built.settlement, digest: built.batch.digest };
+  }
+
+  async settleRange(db: Db, season: string, first: number, last: number): Promise<RangeResult> {
+    const built = await buildRangeBatch(db, season, first, last);
+    this.log(`[chain] !!! NO-OP for season ${season} days ${first} to ${last}: ${this.reason}. Range built (digest ${built.batch.digest.slice(0, 12)}) and recorded in market_days only.`);
+    return { status: 'noop', txHash: null, first, last, settlement: built.settlement, digest: built.batch.digest };
   }
 }
 
@@ -470,6 +491,39 @@ export class TestnetChain implements ChainWriter {
     }
   }
 
+  /**
+   * Settles closed days first to last in one settle_day call: the call names its last day (the
+   * contract checks only that it is past the season's head) and carries its first day alongside, the
+   * SHA-256 of the range's full record, and the range's egg moves netted. Agent wallets wait to be
+   * made until a range goes out, all at once. 60 Tgas is attached (a range burns well under 20).
+   */
+  async settleRange(db: Db, season: string, first: number, last: number): Promise<RangeResult> {
+    try {
+      await pause(PACE_MS);
+      const blocked = await withBackoff(() => this.preflight());
+      if (blocked) {
+        this.log(`[chain] !!! NO-OP for season ${season} days ${first} to ${last}: ${blocked}`);
+        return { status: 'noop', txHash: null, first, last, error: blocked };
+      }
+      await this.ensureAgentAccounts(db);
+      const built = await buildRangeBatch(db, season, first, last);
+      await pause(PACE_MS);
+      const outcome = await withBackoff(() =>
+        this.account.callFunctionRaw({ contractId: this.cfg.contractId, methodName: 'settle_day', args: { batch: built.batch }, gas: teraToGas('60'), deposit: 0n }),
+      );
+      const txHash = outcome.transaction_outcome.id;
+      await commitBalances(db, built.balances);
+      this.log(
+        `[chain] season ${season} days ${first} to ${last} settled on NEAR testnet in one call: ${txHash} (digest ${built.batch.digest.slice(0, 12)}, ${built.batch.eggs.length} egg moves, ${built.batch.farms.length} farms moving)`,
+      );
+      return { status: 'sent', txHash, first, last, settlement: built.settlement, digest: built.batch.digest };
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      this.log(`[chain] season ${season} days ${first} to ${last} FAILED on NEAR testnet: ${error.slice(0, 300)}`);
+      return { status: 'failed', txHash: null, first, last, error: error.slice(0, 500) };
+    }
+  }
+
   /** The live season's collection or a test one, from the contract (read once, then at each day close). */
   async collectionFor(season: string): Promise<Collection> {
     if (this.feathers === null) this.feathers = await withBackoff(() => this.readFeathers());
@@ -571,8 +625,8 @@ export class TestnetChain implements ChainWriter {
         throw err;
       });
       if (!late) return { status: 'skipped', txHash: null, error: 'the contract cannot record days late (upgrade to version 5)', days: [] };
-      const sent = await db.query<{ day: number }>(`SELECT day FROM market_days WHERE season = $1 AND settlement_status = 'sent'`, [season]);
-      if (!settledCountsAgree(head, sent.map((r) => num(r.day)), late.days)) {
+      const sent = await db.query<{ day: number; settlement_tx: string | null }>(`SELECT day, settlement_tx FROM market_days WHERE season = $1 AND settlement_status = 'sent'`, [season]);
+      if (!settledCountsAgree(head, sent.map((r) => ({ day: num(r.day), tx: r.settlement_tx ?? null })), late.days)) {
         return {
           status: 'skipped',
           txHash: null,

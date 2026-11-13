@@ -284,6 +284,12 @@ export interface TradeView {
   buyerAi?: boolean;
 }
 
+/**
+ * Who makes the agents' choices now: the rules (each agent's own rule-based strategy), or a model
+ * provider that answered within the last few in-game days (NEAR AI Cloud, or SERV Reasoning).
+ */
+export type AiMode = 'nearai' | 'serv' | 'rules';
+
 export interface AgentView {
   id: string;
   kind: AgentKind;
@@ -298,6 +304,8 @@ export interface AgentView {
   account: string | null;
   /** Its latest public one-line reason (under 80 characters), or null before its first decision. */
   reason: string | null;
+  /** The provider of its latest model answer while that is recent and the mode is not the rules; else the rules. */
+  brain: AiMode;
 }
 
 export interface MachineView {
@@ -398,8 +406,12 @@ export interface MarketChartDay {
 
 export interface Settlement {
   day: number;
-  status: 'pending' | 'sent' | 'noop' | 'failed';
+  /** batched: waiting for its range of days to settle in one call. */
+  status: 'pending' | 'batched' | 'sent' | 'noop' | 'failed';
   txHash: string | null;
+  /** The range of days its call settled (the same day twice when it settled alone). */
+  first?: number | null;
+  last?: number | null;
 }
 
 export interface RivalRank {
@@ -443,6 +455,8 @@ export interface MarketState {
   minting: 'live' | 'paused' | 'off';
   /** The Feathers: 777 ever; minted, left to mint, and tickets won and not yet minted. */
   feathers: { max: number; minted: number; left: number; tickets: number };
+  /** Who makes the agents' choices now: the rules, or the model provider answering lately. */
+  aiMode: AiMode;
 }
 
 export interface DaySummary {
@@ -633,7 +647,8 @@ export type GameEvent =
   | { kind: 'badgeEarned'; badge: string; level: BadgeLevel; day: number };
 
 export type ServerMessage =
-  | { t: 'welcome'; v: number; playerId: string; name: string; farm: FarmState; market: MarketState; clock: ClockState }
+  /** build: the server's commit, so a client open across a deploy can offer a reload. */
+  | { t: 'welcome'; v: number; playerId: string; name: string; farm: FarmState; market: MarketState; clock: ClockState; build?: string | null }
   | { t: 'farm'; farm: FarmState }
   | { t: 'market'; market: MarketState }
   | { t: 'clock'; clock: ClockState }

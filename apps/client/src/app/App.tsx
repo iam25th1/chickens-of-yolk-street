@@ -19,6 +19,7 @@ import { settings } from '../state/settings';
 import { Ticker } from '../ui/Hud';
 import { HowToPlay } from '../ui/HowToPlay';
 import { SettingsPanel } from '../ui/Panels';
+import { UpdatePrompt } from '../ui/UpdatePrompt';
 import { ServicesContext, type Services } from './services';
 import { Stage, useViewport } from './Stage';
 import { viewport } from './viewport';
@@ -226,6 +227,10 @@ export function App() {
               <HowToPlay onClose={() => setGuideOpen(false)} />
             </div>
           )}
+          {/* a deploy while the page was open: offer the new version */}
+          <div className="stage640" style={{ zIndex: 75, pointerEvents: 'none' }}>
+            <UpdatePrompt />
+          </div>
           {settingsOpen && (
             <div className="stage640" style={{ zIndex: 60 }}>
               <SettingsPanel
