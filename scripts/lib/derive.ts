@@ -152,6 +152,10 @@ export const EXACT_GROUP: Record<string, Group> = {
   'x-founders-frame-epic': 'cards',
   'x-founders-frame-legendary': 'cards',
   'x-founders-frame-unminted': 'cards',
+  // badges (profile, market, unlock moment) and the egg a new hen hatches from, in the world's PICO direction
+  'x-badge-frames': 'ui',
+  'x-badge-icons': 'ui',
+  'x-hatch-egg': 'farm',
   '29-card-bulk-order': 'cards',
   '29-card-feed-deal': 'cards',
   '29-card-glut-warning': 'cards',

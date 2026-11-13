@@ -2,8 +2,8 @@
   "version": 1,
   "source": {
     "repo": "iam25th1/coys-assets",
-    "commit": "18264d2d225f4678dd70c2b53e6979e91c793cc4",
-    "manifestSha256": "41248046ae2c88c58f505e8aebdaa01bd888a2a1a3a8115a63255ca653028652"
+    "commit": "7d871650deab40e455a86a8e1707d7284441570f",
+    "manifestSha256": "fdda7ea1836d20db48be8de8246736806b9c32ab27c5579b9096631670430417"
   },
   "sprites": {
     "01-hen-base": {
@@ -3143,6 +3143,354 @@
           "vanish": false,
           "frameCount": 4,
           "totalMs": 600
+        }
+      }
+    },
+    "x-badge-frames": {
+      "json": "sprites/x-badge-frames.json",
+      "png": "sprites/x-badge-frames.png",
+      "sha256": "ed03e76e314984dc27df7cba4069ff330fccf9f3526d8b0fc085f9ab9abc32a0",
+      "source": "art/x-badge-frames/x-badge-frames.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "badge frames",
+      "width": 1024,
+      "height": 1280,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "bronze": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1270
+        },
+        "silver": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1270
+        },
+        "gold": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1270
+        },
+        "plain": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1270
+        },
+        "locked": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 1270
+        }
+      }
+    },
+    "x-badge-icons": {
+      "json": "sprites/x-badge-icons.json",
+      "png": "sprites/x-badge-icons.png",
+      "sha256": "cb194ca476e947b6ec46374e4a585e74edd2b2e1858237f8bedbaf83a3503f5b",
+      "source": "art/x-badge-icons/x-badge-icons.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "badge icons",
+      "width": 128,
+      "height": 5120,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "egg": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "egg-golden": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "eggs-crate": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "egg-cracked": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "coin": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "cash-burst": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "market": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "shop": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "feed": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "hen": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "clock": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "ledger": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "glut": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "peak": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "haggle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "contract": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "coop": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "tophat": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "old-hen": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "conveyor": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "grader": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "cart": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "hopper": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "clerk": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "repair": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "gear": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "bust": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "rank": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "number-one": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "ticket": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "feather-fluff": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "feather-plume": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "feather-quill": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "feather-golden-quill": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "good-standing": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "night-owl": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "crow": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "mystery": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "chick": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "sparkle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        }
+      }
+    },
+    "x-hatch-egg": {
+      "json": "sprites/x-hatch-egg.json",
+      "png": "sprites/x-hatch-egg.png",
+      "sha256": "b5a3919bed5ae9184092b79a3eff4c4bac200d949549b2f0b559004ff189cfdd",
+      "source": "art/x-hatch-egg/x-hatch-egg.png",
+      "role": "extra",
+      "docTracker": null,
+      "label": "hatching egg",
+      "width": 1024,
+      "height": 1280,
+      "grid": 8,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "land": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 320
+        },
+        "wobble": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 440
+        },
+        "crack": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 580
+        },
+        "burst": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 460
+        },
+        "shell-bits": {
+          "mode": "once",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 430
         }
       }
     }

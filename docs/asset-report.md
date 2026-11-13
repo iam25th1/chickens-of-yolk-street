@@ -80,6 +80,8 @@ Factor 1 means no downscale passes: the art keeps its original resolution, and t
 | 33-split-flap | exact | 832x384 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 49.89% | 8 | 0.00% | 8 | 0.00% |
 | 34-cursor | exact | 512x384 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 55.96% | 8 | 0.00% | 8 | 0.00% |
 | 35-particles | exact | 768x1024 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 57.23% | 8 | 0.00% | 8 | 0.00% |
+| x-badge-frames | exact | 1024x1280 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 23.28% | 8 | 0.00% | 8 | 0.00% |
+| x-badge-icons | exact | 128x5120 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 42.62% | 8 | 0.00% | 8 | 0.00% |
 | x-feather-fluff | exact | 1024x768 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 39.29% | 8 | 0.00% | 8 | 0.00% |
 | x-feather-golden-quill | exact | 1024x768 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 49.79% | 8 | 0.00% | 8 | 0.00% |
 | x-feather-plume | exact | 1024x768 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 37.56% | 8 | 0.00% | 8 | 0.00% |
@@ -89,6 +91,7 @@ Factor 1 means no downscale passes: the art keeps its original resolution, and t
 | x-founders-frame-legendary | exact | 384x544 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 39.27% | 8 | 0.00% | 8 | 0.00% |
 | x-founders-frame-rare | exact | 384x544 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 37.81% | 8 | 0.00% | 8 | 0.00% |
 | x-founders-frame-unminted | exact | 384x544 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 42.06% | 8 | 0.00% | 8 | 0.00% |
+| x-hatch-egg | exact | 1024x1280 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 36.92% | 8 | 0.00% | 8 | 0.00% |
 | x-hen-portrait | painted | 1024x1536 | 2: 11.43% | 1 | 0.00% | 8 | 28.45% |
 | x-mint-press | painted | 1024x1536 | 2: 18.85% | 1 | 0.00% | 1 | 0.00% |
 
@@ -105,7 +108,7 @@ Painted pages are WebP (quality 90, alpha lossless); exact pages are lossless PN
 | title@4 | 2683x127 | 142.9 KB |
 | title@6 | 4008x189 | 257.7 KB |
 | title@8 | 4029x479 | 391.0 KB |
-| farm | 325x130 | 6.3 KB |
+| farm | 454x162 | 8.9 KB |
 | farm@2 | 4091x228 | 337.5 KB |
 | farm@3 | 4095x456 | 602.0 KB |
 | farm@4 | 4091x775 | 877.6 KB |
@@ -120,5 +123,5 @@ Painted pages are WebP (quality 90, alpha lossless); exact pages are lossless PN
 | cards.wide@2 | 4076x716 | 1084.2 KB |
 | cards.wide@3 | 4096x1430 | 1945.6 KB |
 | cards.wide@4 | 4082x1896 | 2553.1 KB |
-| ui | 364x162 | 3.5 KB |
+| ui | 510x642 | 8.7 KB |
 | fx | 355x130 | 5.0 KB |

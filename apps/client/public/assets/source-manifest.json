@@ -9,7 +9,7 @@
   },
   "counts": {
     "easels": 65,
-    "artFolders": 83,
+    "artFolders": 86,
     "easelSheets": 65,
     "traitLayers": 10,
     "soundNumbers": 45,
@@ -17,7 +17,7 @@
     "audioTakes": 124,
     "unmappedEasels": 0,
     "unmappedUploads": 37,
-    "totalBytes": 104196405,
+    "totalBytes": 104279196,
     "loopOggs": 12
   },
   "known_issues": [
@@ -2504,6 +2504,90 @@
           "path": "art/x-mint-press/anim.json",
           "sha256": "68ac131fc2edf1d9d090f21231bd62cfcb2c4f32686f6f3a9baff01a234fdfa8",
           "bytes": 3873,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "x-badge-frames",
+      "number": "x",
+      "doc_tracker": null,
+      "role": "extra",
+      "name": "badge-frames",
+      "label": "badge frames",
+      "sourceEasel": null,
+      "spawnAsset": "badge-frames",
+      "folder": "art/x-badge-frames",
+      "files": [
+        {
+          "path": "art/x-badge-frames/x-badge-frames.png",
+          "sha256": "ed03e76e314984dc27df7cba4069ff330fccf9f3526d8b0fc085f9ab9abc32a0",
+          "bytes": 21869,
+          "source": "/cdn/value.ed03e76e314984dc27df7cba4069ff330fccf9f3526d8b0fc085f9ab9abc32a0.png",
+          "width": 1024,
+          "height": 1280,
+          "role": "sheet"
+        },
+        {
+          "path": "art/x-badge-frames/anim.json",
+          "sha256": "525be35d4bc8179e9f06840146603bbef5eb18bd2602abbbcf1057bfbedb8a38",
+          "bytes": 4725,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "x-badge-icons",
+      "number": "x",
+      "doc_tracker": null,
+      "role": "extra",
+      "name": "badge-icons",
+      "label": "badge icons",
+      "sourceEasel": null,
+      "spawnAsset": "badge-icons",
+      "folder": "art/x-badge-icons",
+      "files": [
+        {
+          "path": "art/x-badge-icons/x-badge-icons.png",
+          "sha256": "cb194ca476e947b6ec46374e4a585e74edd2b2e1858237f8bedbaf83a3503f5b",
+          "bytes": 14360,
+          "source": "/cdn/value.cb194ca476e947b6ec46374e4a585e74edd2b2e1858237f8bedbaf83a3503f5b.png",
+          "width": 128,
+          "height": 5120,
+          "role": "sheet"
+        },
+        {
+          "path": "art/x-badge-icons/anim.json",
+          "sha256": "3a1472b6e123d410aabff79850069e474ed5d16ed28f0698825a628583510d2d",
+          "bytes": 15748,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "x-hatch-egg",
+      "number": "x",
+      "doc_tracker": null,
+      "role": "extra",
+      "name": "hatch-egg",
+      "label": "hatching egg",
+      "sourceEasel": null,
+      "spawnAsset": "hatch-egg",
+      "folder": "art/x-hatch-egg",
+      "files": [
+        {
+          "path": "art/x-hatch-egg/x-hatch-egg.png",
+          "sha256": "b5a3919bed5ae9184092b79a3eff4c4bac200d949549b2f0b559004ff189cfdd",
+          "bytes": 21386,
+          "source": "/cdn/value.b5a3919bed5ae9184092b79a3eff4c4bac200d949549b2f0b559004ff189cfdd.png",
+          "width": 1024,
+          "height": 1280,
+          "role": "sheet"
+        },
+        {
+          "path": "art/x-hatch-egg/anim.json",
+          "sha256": "7b7ced79685da83b36bac96b892e7a470a6547d04a6e495eefde63c314cc7dab",
+          "bytes": 4703,
           "role": "anim"
         }
       ]
