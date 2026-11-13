@@ -3,9 +3,8 @@
 Stage 4 of the brief: agent upgrades (observations, personas, one validated action schema, public
 reasons, weekly reflections, model tiers, per-agent caps, better rules) and new AI farms entering the
 street (registry, entry rule, the AI tag, a reusable wallet pool). Then the provider chain and cost
-control: every agent runs on its own rule-based strategy, with its own wallet, memory and
-personality, and model-driven decisions switch on only while a model provider answers (NEAR AI Cloud,
-integrated and awaiting credits; SERV Reasoning, the fallback). This page also holds the 30-day
+control. Agent decisions run on a provider chain: NEAR AI Cloud is the primary model, SERV Reasoning is the fallback, and rule-based strategies are the last resort, all under a hard daily spend cap. Every agent has its own wallet, memory and personality.
+To see which one is deciding right now, hover the AI tag on any AI farm in the game (its tooltip names the live mode), or read the server's startup log. This page also holds the 30-day
 model-against-rules comparison and what a model would cost at the live pace.
 
 ## What an agent sees
@@ -205,12 +204,12 @@ range, a glut in every seed, rival busts in at least three seeds) still hold.
 
 ## Model against rules, 30 days
 
-NEAR AI Cloud answers 402 (no credits), so the model's side replays recorded decisions.
+The model's side replays recorded decisions, so every run repeats exactly.
 `scripts/record-agent-decisions.ts` writes `apps/server/test/fixtures/agent-replies.json`: for each
 kind and situation (glut, scarcity, normal) a few in-character decisions with reasons that differ
 from the rules (price shares, holding, expansion timing), plus unusable replies and reflections.
 Offline these are authored stand-ins (`apps/server/test/recorded-model.ts`); `--live` records them
-from the main model with the real prompt once the account has credits (77 calls). The fake client
+from the main model with the real prompt (77 calls). The fake client
 replays them by kind and situation, maps the sample ids to the live ones and keeps a reply's intent
 on the live farm (share of the crate sold, days of feed, coop fill, share of cash on hens, stock
 targets), and answers every 12th call with an unusable reply.
@@ -289,7 +288,7 @@ SERV's reflections cost about half of its day: half the 1.03 USD is `gpt-5.4-min
 reflections. Setting `SERV_MODEL=gpt-6-luna` would bring a SERV day to about 0.60 USD. The cost grows
 with the number of agents: the cap on AI farms grows with players (6 players: up to 9 AI farms, about
 14 agents, about 2 USD a SERV day under the days-that-matter rule), and past the shared cap every
-agent runs on its rules until 00:00 UTC. NEAR AI's prices are assumed until it answers; set
+agent runs on its rules until 00:00 UTC. NEAR AI's prices here are assumed; set
 `NEARAI_MAIN_PRICE` and `NEARAI_CHEAP_PRICE` (or let `/v1/models` say). Confirm SERV's in the OpenServ
 console (Usage) and set `SERV_MAIN_PRICE` and `SERV_CHEAP_PRICE` if they differ.
 

@@ -17,16 +17,22 @@ in by 25TH on the form itself; no personal data is written here.
 | `nearAddress` | _blank_ | the NEAR **mainnet** payout account, created by 25TH only; the game never touches mainnet |
 | `projectUrl` | https://github.com/iam25th1/chickens-of-yolk-street | the repo must be made public before submitting |
 | `demoUrl` | _blank_ | the X post with the demo video ([x-post.md](x-post.md)) |
-| `idea` | see below (1,485 characters; the form takes 20 to 2000) | |
+| `idea` | see below (1,800 characters; the form takes 20 to 2000) | |
 | `consent` | `false` until 25TH agrees | set to true only after 25TH agrees to: "I agree that the organizers may use these details to review our submission and contact us about this hackathon." |
 | `website` | **leave empty** | a spam trap: any value gets the submission dropped |
 
-## Idea
+## Idea ("What did you build?")
 
 ```text
-Chickens of Yolk Street is an egg farm in one shared live market with other players and AI: some farms are other players, some are AI farms (marked AI), and the feed suppliers and egg buyers are AI agents, each with its own cash, memory and NEAR wallet. Prices, gluts and bankruptcies come only from what everyone trades: every egg sold by a player or an agent is supply in the same market, so flooding the street crashes the price for all.
+Chickens of Yolk Street is a goofy 2D pixel-art egg-farm trading game where real players and AI agents share one live market on NEAR. You raise hens, collect and grade eggs, run machines that wear down and need repairs, and sell into a market whose prices move with supply and demand across every farm.
 
-Agents run on their own rule-based strategies with their own wallets, memory and personalities, pay a fee for each daily decision, remember every farm and haggle in character through decision cards; model-driven decisions (validated structured JSON under a hard spend cap) switch on when a model answers: NEAR AI Cloud is integrated and awaiting credits, SERV Reasoning is the fallback. In the cards: the Squeezer prices your hunger into your feed, the Bakery holds you to standing contracts, the Wholesaler resells into gluts, and the Upstart borrows, overbuilds and goes bust, its hens sold at auction.
+Agent economy: rival farms, feed suppliers and buyers are autonomous agents, each trading from its own NEAR sub-account wallet with its own memory, personality and weekly strategy. They haggle with players through offer cards, sell feed on credit, go bust, and new AI farms enter during shortages. Agents pay a fee per decision, so every move costs them something. Decisions run on a provider chain: NEAR AI Cloud is the primary model, SERV Reasoning is the fallback, and rule-based strategies are the last resort, all under a hard daily spend cap.
 
-On NEAR: players sign in with email through Privy and get a testnet wallet silently. Hens are NEP-171 NFTs with their portrait in the metadata, eggs are NEP-245 tokens, agents hold sub-account wallets, and each in-game day settles in one batched call keyed by season and day. Contract deliveries move egg tokens from the player's wallet to the Bakery's on chain. Built in TypeScript, Rust (near-sdk) and PixiJS, with sandbox tests in CI.
+Games with real economies: there is one shared market, not a single-player sim. Prices come from supply against demand across every player and agent farm, so a glut crashes prices and a rival's bust lifts them. Machines wear, hens age, feed costs real coins, and badly run farms go under. Every batch of market days is settled on a NEAR contract as a SHA-256 hash of the full records, so anyone can check the market history against the chain.
+
+NFTs that do something: Feathers are earned, not bought. Good farm management rolls a Feather Ticket at milestones, which players redeem for an instant, gas-free mint. Each Feather is a claim ticket for one of 777 Founding Hens, and the farm's management score sets its grade. Rarities are fixed in advance by a provenance hash on chain and revealed on mainnet.
+
+Privy social login creates a NEAR wallet silently, so players never touch a seed phrase.
+
+Live on NEAR testnet: https://yolkstreet.25th.dev
 ```

@@ -10,7 +10,7 @@ Run an egg farm in **one shared live market** with other players and AI. Some fa
 |---|---|
 | **Play loop** | Hens lay on a schedule; you collect, sell, buy hens, feed, coops and machines. One in-game day is 3 real minutes, and each day brings 2 to 4 decision cards from the agents. Everything on the farm is clickable; a first-run tour walks the loop by doing it, then a chain of goals pays coins for learning the rest. Every farm keeps a **profile** (eight tabs, a public version) and earns **73 cosmetic badges**; new hens hatch from an egg in the yard. |
 | **Market** | One price multiplier for everyone, set by the whole market's daily supply against demand that grows with the number of farms. Instant street sales, a real order book with limit orders, and player-to-player trades, all on one **Market** page with seven tabs. |
-| **Agents** | Seven: two rival farms, two feed suppliers, three egg buyers. Each runs on its own rule-based strategy with its own wallet, memory and personality, decides once a day, pays a fee for each decision, remembers every deal, haggles in character, borrows, and can go bust. Model-driven decisions (structured JSON) switch on when a model provider answers: NEAR AI Cloud is integrated and awaiting credits; SERV Reasoning is the fallback, active only while it answers. |
+| **Agents** | Seven: two rival farms, two feed suppliers, three egg buyers. Each has its own wallet, memory and personality, decides once a day, pays a fee for each decision, remembers every deal, haggles in character, borrows, and can go bust. Agent decisions run on a provider chain: NEAR AI Cloud is the primary model, SERV Reasoning is the fallback, and rule-based strategies are the last resort, all under a hard daily spend cap. |
 | **Chain** | Hens are never minted. The beta mints **Feathers** (NEP-171 on NEAR testnet, **777 ever**, capped on chain): claim tickets for the 777 Founding Hens, planned to be revealed at the mainnet launch. Milestones win tickets; a player redeems one for coins and the game pays the testnet gas. Eggs are NEP-245 tokens, and each day settles in one call that stores nothing new: a SHA-256 of the day's full record, kept in the game's database. Agents hold sub-account wallets. Players sign in with email; their wallet is made silently. |
 | **Feel** | Squash and stretch, hitstop, screen shake, particles and layered sound on every action, portraits that talk with voice babble, and a reduce-motion switch. |
 
@@ -22,14 +22,14 @@ Chickens of Yolk Street puts a **real, shared economy** in a toy you can play wi
 
 ## How NEAR fits in
 
-NEAR tools used: **Privy social login** (email, with a silent NEAR wallet), **NEAR AI Cloud** (integrated for agent decisions, awaiting credits), **NEP-171** Feathers, **NEP-245** egg tokens, **sub-account agent wallets**, and **compact batched testnet settlement** (one call per in-game day, no storage per day).
+NEAR tools used: **Privy social login** (email, with a silent NEAR wallet), **NEAR AI Cloud** (the primary model for agent decisions, with SERV Reasoning as the fallback), **NEP-171** Feathers, **NEP-245** egg tokens, **sub-account agent wallets**, and **compact batched testnet settlement** (one call per in-game day, no storage per day).
 
 | NEAR piece | What it does here | Status in this build |
 |---|---|---|
 | **Game contract on testnet** (`near-sdk` 5.30.1) | One contract on the game account: the Feathers (NEP-171, `near-contract-standards` 5.30.1, 777 ever, capped on chain), egg tokens (NEP-245, `near-sdk-contract-tools` 4.0.0 from the near org), and `settle_day`, owner only, once per in-game day of a season, storing only a fixed-size head per season. | **Live**, version 5, on `play.coys-game.testnet` (upgraded in place on 12 November 2026 to version 4, tx [`9jsFd4EA...`](https://testnet.nearblocks.io/txns/9jsFd4EAZc3nkE4v11x4poVTMhLyYzPpuZKrsCud9J4s), and to version 5, tx [`4h7ZEQkP...`](https://testnet.nearblocks.io/txns/4h7ZEQkPG66zVmNrNvLr8W3b9dyBYmQoFibEBFCWuN92); wasm built in CI with `cargo near`, sha256 `7fa2c060...`), live season `s1`, with the founders provenance committed ([`JBoKNVa6...`](https://testnet.nearblocks.io/txns/JBoKNVa6Pi5jAb2BA4chAh8K43GGpWgw8AtHJy26b5AB)). The demo account `coys-game.testnet` stays on version 2 ([deploy/testnet.md](deploy/testnet.md)). |
 | **Agent wallets** (near-api-js 7.5.3) | Each agent gets a testnet sub-account of the game account (`bakery1.coys-game.testnet` and so on), funded from it; its eggs settle to it. A contract delivery moves egg tokens from the player's wallet to the Bakery's. | **Live**: seven wallets, and a delivery proven on chain (below). |
 | **Privy social login** (docs.near.org social login) | Email sign-in; a NEAR testnet wallet is created silently with Privy's extended-chains API; the server verifies the ES256 access token with `jose`. That wallet holds the player's Feathers and eggs. | Wired. Needs `PRIVY_APP_ID` and the live domain in Privy's allowed domains. |
-| **NEAR AI Cloud** (OpenAI-compatible) | First in the agents' provider chain: decisions on the days that matter, as structured JSON output (`json_schema`, strict) checked against a zod schema, and a weekly reflection; anything unusable falls back to rules and is logged. One shared daily spend cap, and caps per agent. | Integrated, **awaiting credits** (it answers 402): until it answers, agents run on their rule strategies, or on SERV Reasoning while that answers. Needs `NEARAI_API_KEY` and account credits; `z-ai/glm-5.3-flash` for decisions, `Qwen/Qwen3.6-35B-A3B-FP8` for weekly reflections and hard days. Costs: [docs/agents.md](docs/agents.md). |
+| **NEAR AI Cloud** (OpenAI-compatible) | First in the agents' provider chain: decisions on the days that matter, as structured JSON output (`json_schema`, strict) checked against a zod schema, and a weekly reflection; anything unusable falls back to rules and is logged. One shared daily spend cap, and caps per agent. | Integrated as the primary model; SERV Reasoning is the fallback and the rule strategies the last resort. Needs `NEARAI_API_KEY` and account credits; `z-ai/glm-5.3-flash` for decisions, `Qwen/Qwen3.6-35B-A3B-FP8` for weekly reflections and hard days. Costs: [docs/agents.md](docs/agents.md). |
 
 **Testnet receipts.** Every link opens the transaction on the testnet explorer.
 
@@ -45,7 +45,7 @@ NEAR tools used: **Privy social login** (email, with a silent NEAR wallet), **NE
 | 11 Nov | Season `delivery-proof` day 2: the player delivers 3 eggs on a Bakery standing contract; two NEP-245 `mt_transfer` events move 1 white and 2 cream from the player's wallet `f9ad7ca1...` to `bakery1.coys-game.testnet`, which then bakes them (burned) | [2Erp19yX...](https://testnet.nearblocks.io/txns/2Erp19yXaNGekgt6a8EgK2q66gSnDRpAAmQmb3cH2ifF) |
 | 11 Nov | Season `tour5-20261111`: the headless tour behind the screenshots, one settlement per 30-second day for 12 days (the ledger links in the ledger screenshot are these) | day 1 [8WeCaoGp...](https://testnet.nearblocks.io/txns/8WeCaoGpJJ72nHqpVcnunnrN8FAEgzJWvAm44VbfT1ER), day 12 [2jebGi4R...](https://testnet.nearblocks.io/txns/2jebGi4RLcinhyvL6WC7pizakx5WAmpvepMqGYJEdNk6) |
 
-Check it yourself with view calls on `coys-game.testnet`: `day_record({"season": "delivery-proof", "day": 2})` (shows `egg_transfers: 2`), `last_settled_day({"season": "legacy"})` (3), `nft_total_supply()`; the `mt_transfer` events are in the day 2 transaction's receipts. NEAR AI Cloud answered 402 (no credits on the account yet) in these runs, so every agent used its rule policy and each fallback was logged: the path the tests also cover.
+Check it yourself with view calls on `coys-game.testnet`: `day_record({"season": "delivery-proof", "day": 2})` (shows `egg_transfers: 2`), `last_settled_day({"season": "legacy"})` (3), `nft_total_supply()`; the `mt_transfer` events are in the day 2 transaction's receipts. In these runs every agent used its rule policy and each fallback was logged: the path the tests also cover.
 
 **Live deploy.** https://yolkstreet.25th.dev runs season `s1` on Pier, settling to its own production contract
 account `play.coys-game.testnet` ([deploy/pier](deploy/pier/README.md), [deploy/testnet.md](deploy/testnet.md)).
@@ -459,15 +459,15 @@ day or a 15% price move) a persona prompt and one strict action schema go down t
 SERV Reasoning, then the rules. Every answer, model or rules, passes `validateDecision` on the server; anything
 unusable, or anything past the shared or per-agent caps, falls back to the upgraded rules. Each decision carries a
 public reason under 80 characters, shown on the Market page; every seven days each agent writes a reflection under 400
-characters that it reads back next time. Until a provider answers, the game says the agents run on rules, and so does
-this README: see [Honest AI](#honest-ai-a-provider-chain-under-one-spend-cap-13-november-2026).
+characters that it reads back next time. The game's own words follow whichever of them is deciding: see
+[Honest AI](#honest-ai-a-provider-chain-under-one-spend-cap-13-november-2026).
 
 ```mermaid
 flowchart LR
   obs["Observation<br/>cash, stock, 3-day trend, busts,<br/>open farms, memory, last reflection"]
   matters{"A day that matters?<br/>first look, weekly strategy,<br/>hard day, price move"}
   caps{"Within the shared and<br/>per-agent caps, and<br/>the close's time budget?"}
-  near["NEAR AI Cloud<br/>(awaiting credits)"]
+  near["NEAR AI Cloud<br/>(primary)"]
   serv["SERV Reasoning<br/>(fallback)"]
   rules["Rules (trend-aware)"]
   val["validateDecision<br/>one zod schema, own role only,<br/>known farms and orders"]
@@ -517,7 +517,7 @@ seed has gluts, rivals go bust on their own, and the AI farm count stays between
 | 4 | 1.10x | 0.46x | 7 | 1 | 2 |
 | 5 | 0.97x | 0.40x | 7 | 1 | 2 |
 
-**Model against rules.** NEAR AI still answers 402 (no credits), so the comparison runs a recorded stand-in model
+**Model against rules.** The comparison runs a recorded stand-in model, so every run repeats exactly
 (replies authored in character and replayed by situation, with some unusable ones) against the rules, 30 days over the
 same five seeds. It is a stand-in, not a measurement of a real model. What a real model would cost at the live pace is
 in [Honest AI](#honest-ai-a-provider-chain-under-one-spend-cap-13-november-2026) below. The full write-up, the per-day
@@ -525,14 +525,14 @@ entrant counts and the cost table: [docs/agents.md](docs/agents.md).
 
 ## Honest AI: a provider chain under one spend cap (13 November 2026)
 
-**What decides.** Every agent runs on its own rule-based strategy, with its own wallet, memory and personality. Model
-decisions switch on only while a provider answers. The chain is NEAR AI Cloud first (integrated, awaiting credits: it
-answers 402), then SERV Reasoning (OpenServ's OpenAI-compatible API, the fallback), then the rules. Each provider has a
+**What decides.** Agent decisions run on a provider chain: NEAR AI Cloud is the primary model, SERV Reasoning is the fallback, and rule-based strategies are the last resort, all under a hard daily spend cap. Every agent has its own wallet, memory and
+personality. The chain is NEAR AI Cloud first, then SERV Reasoning (OpenServ's OpenAI-compatible API), then the rules.
+To see which one is deciding right now, hover the AI tag on any AI farm in the game (its tooltip names the live mode), or read the server's startup log. Each provider has a
 breaker: a refusal (401, 402, 403) skips it for 30 minutes, a 429 backs off from 30 seconds to 10 minutes, a 5xx or a
 timeout skips it for 2 minutes; the change is logged once, not every call. The server reports the mode (`nearai`,
 `serv` or `rules`: the provider that answered within the last seven in-game days) in the market state and for each
-agent, and the game's words follow it: the AI tag's tooltip, the How to play guide and an AI farm's profile say
-"rule-based strategy" until a provider answers, and name the provider when one does.
+agent, and the game's words follow it: the AI tag's tooltip, the How to play guide and an AI farm's profile name the
+provider that is deciding, or say "rule-based strategy" while none is.
 
 **What it costs.** A model is asked only when it matters: an agent's first look, its weekly strategy (the reflection),
 and at most once in three in-game days a hard day (a crash, a glut, cash under the struggle line) or a price move of 15%
@@ -1335,7 +1335,7 @@ flowchart LR
     CW["Chain writer<br/>day batch"]
   end
   DB[("Postgres in production<br/>PGlite locally<br/>one season per database")]
-  AI["NEAR AI Cloud (awaiting credits),<br/>then SERV Reasoning<br/>structured JSON, days that matter"]
+  AI["NEAR AI Cloud (primary),<br/>then SERV Reasoning (fallback)<br/>structured JSON, days that matter"]
   subgraph Testnet["NEAR testnet"]
     GC["game contract<br/>NEP-171 hens, NEP-245 eggs,<br/>settle_day(season, day)"]
     SA["agent sub-accounts<br/>bakery1, upstart1, ..."]
@@ -1598,7 +1598,7 @@ docs/submission      drafts: demo shot list, post drafts, form fields
 
 - **Contract builds run in CI, not on this Windows machine**: Windows Application Control blocks the unsigned build scripts cargo compiles, so the contract is built and sandbox-tested on Linux in CI, and the deployed wasm is the CI artifact (its sha256 is committed and checked by the deploy script).
 - **Privy end to end** needs a real browser and inbox; the server and client sides are wired and tested headlessly up to the token check.
-- **NEAR AI decisions** need credits on the NEAR AI account (it answers 402 without them); until then every agent runs on its rule strategy (which is also what a model is held to), or on SERV Reasoning while that answers.
+- **Model decisions** depend on a provider answering: agent decisions run on a provider chain: NEAR AI Cloud is the primary model, SERV Reasoning is the fallback, and rule-based strategies are the last resort, all under a hard daily spend cap. A model is held to the same rules a rule strategy follows.
 - **Player credit default** is remembered and blocks further credit, but a player is never pushed below zero; agents always repay in full.
 - **Feather mints are capped per day** (20) to keep a day's call well inside its gas; redeemed tickets that do not fit wait for the next day close.
 - **The live deploy** (Pier on the Mac, the tunnel, Render) is set up from [deploy/](deploy/); it is not run from this repository.
@@ -1628,7 +1628,7 @@ The visual-quality pass was checked live on 12 November 2026: cold load at five 
 
 The playability rescue was checked live on 12 November 2026: cold load, the four window sizes, every world object's card, an egg collected, and a 20-second flicker capture (numbers under [Playability rescue](#playability-rescue-12-november-2026)).
 
-**Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
+**Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, the quality of real model decisions, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
 
@@ -1652,8 +1652,8 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
 ### Brief 9, stage 4: agents that reflect, AI farms that enter (13 November 2026)
 
 - **Agents.** Richer observations, personas, one validated schema with a public reason, weekly reflections, model tiers,
-  per-agent caps, trend-aware rules (migration 13). A 30-day comparison on a recorded stand-in model (NEAR AI: 402) and
-  the credits needed.
+  per-agent caps, trend-aware rules (migration 13). A 30-day comparison on a recorded stand-in model and
+  the cost of real model use.
 - **AI farms.** A registry of entrants, the entry rule and its bounds, the AI tag, a reusable wallet pool.
 
 ### Brief 9, stage 3: the Feather Mint (13 November 2026)
@@ -1830,7 +1830,7 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
 
 ### Brief 2: agents, cards and chain (11 November 2026)
 
-- Seven agents with personalities, memory, cash and wallets on rule strategies; model decisions wired for NEAR AI Cloud (structured JSON, awaiting credits) with rule fallbacks, a hard daily spend cap, struggling agents sitting out every other day, busts and replacements.
+- Seven agents with personalities, memory, cash and wallets on rule strategies; model decisions wired for NEAR AI Cloud (structured JSON) with rule fallbacks, a hard daily spend cap, struggling agents sitting out every other day, busts and replacements.
 - Decision cards with three-round haggling, standing contracts and deliveries, feed credit, the sales clerk, a real order book and player-to-player trades.
 - Screens: card overlay with talking portraits and voices, market board over the town square, ledger with on-chain receipts, a shop of hens with visible traits.
 - Juice: card arrivals, haggle win and fail, rival bust (sign, price wave, feathers), glut music.
