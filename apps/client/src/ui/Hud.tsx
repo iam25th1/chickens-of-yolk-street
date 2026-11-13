@@ -217,7 +217,22 @@ export function TopBar({
         MINT
         {farm.tickets.some((t) => t.status === 'held') && <span className="dot" aria-hidden="true" />}
       </button>
-      {button('market', 'Market board: prices and rivals', onMarket, 'market')}
+      <button
+        className="btn"
+        style={{ height: 16, padding: '0 3px' }}
+        data-tour="market"
+        data-ui="market-button"
+        aria-label="Market: prices, orders, trades and the hen auction"
+        title="Market: prices, orders, trades and the hen auction"
+        data-tip="MARKET: PRICES, SELLING, ORDERS, TRADES, THE HEN AUCTION AND THE FARMS"
+        onMouseEnter={() => uiSound(audio, 'hover')}
+        onClick={() => {
+          uiSound(audio, 'click');
+          onMarket();
+        }}
+      >
+        MARKET
+      </button>
       {button('ledger', 'Ledger: your days in coins', onLedger, 'ledger')}
       {button('shop', 'Shop: hens, feed, coops, machines', onShop, 'shop')}
       <button

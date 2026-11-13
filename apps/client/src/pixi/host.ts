@@ -74,7 +74,7 @@ export class PixiHost {
     this.scene?.resize?.({ x: -view.offX / view.k, y: -view.offY / view.k, w: v.devW / view.k, h: v.devH / view.k }, v);
   }
 
-  /** Swaps scenes; keep leaves the old one alive (the farm keeps running behind the market board). */
+  /** Swaps scenes; keep leaves the old one alive (the farm keeps running behind the Market). */
   setScene(scene: Scene | null, opts: { keep?: boolean } = {}): void {
     if (this.scene && this.scene !== scene) {
       this.world.removeChild(this.scene.root);

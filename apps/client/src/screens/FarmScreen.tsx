@@ -1,7 +1,7 @@
 // The farm: the world on the canvas and the UI in fixed zones that never overlap (app/viewport.ts):
 // the top bar, the side panel (crate, waiting cards, desk), the goal tracker with the toast area
-// above it, and one modal at a time over a dimmed backdrop (shop, ledger, market board, a card, a
-// hen, a machine, the crate, a hen's certificate, settings). Server state flows in through the
+// above it, and one modal at a time over a dimmed backdrop (shop, ledger, a card, a hen, a machine,
+// the crate, a hen's certificate, settings), or a page of its own (the Market, the Feather Mint). Server state flows in through the
 // socket; player choices go out as actions and come back as events with juice.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ECONOMY, isCrash, type CardView } from '@coys/shared';
@@ -22,7 +22,7 @@ import { FxLayer, uiFx } from '../ui/FxLayer';
 import { ToastArea, Tracker } from '../ui/Guide';
 import { TopBar } from '../ui/Hud';
 import { LedgerPanel } from '../ui/Ledger';
-import { MarketBoard } from '../ui/MarketBoard';
+import { MarketPage } from '../ui/Market';
 import { HowToPlay, MILESTONE_TEXT } from '../ui/HowToPlay';
 import { Modal } from '../ui/Modal';
 import { SettingsBody, ShopPanel } from '../ui/Panels';
@@ -54,7 +54,7 @@ function modalFor(t: WorldTarget): ModalState {
     case 'farmhouse':
       return { kind: 'ledger' };
     case 'sign':
-      return { kind: 'market', tab: 'board' };
+      return { kind: 'market', tab: 'prices' };
     case 'machine':
       return { kind: 'machine', unlock: t.unlock };
   }
@@ -181,11 +181,11 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     scene.current?.setRivals([...byKind.values()]);
   }, [market, farm]);
 
-  // the market board swaps the canvas to the town square (on a phone the farm stays behind it);
-  // the farm keeps running either way
+  // the Market swaps the canvas to the town square (on a phone the farm stays behind it); the farm
+  // keeps running either way
   const marketOpen = modal?.kind === 'market' && !v.portrait;
-  // the town square's art comes with the later groups: a board opened before they arrive loads them
-  // first (the farm stays behind the board meanwhile) instead of drawing art that is not there
+  // the town square's art comes with the later groups: a Market opened before they arrive loads them
+  // first (the farm stays behind the page meanwhile) instead of drawing art that is not there
   const townReady = () => assets.has('27-town-square-plate') && assets.has('27-town-square-anim');
   const [townArt, setTownArt] = useState(townReady);
   useEffect(() => {
@@ -380,7 +380,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         rect={z.top}
         onShop={() => openModal({ kind: 'shop', tab: 'hens' })}
         onSettings={() => openModal({ kind: 'settings' })}
-        onMarket={() => openModal({ kind: 'market', tab: 'board' })}
+        onMarket={() => openModal({ kind: 'market', tab: 'prices' })}
         onLedger={() => openModal({ kind: 'ledger' })}
         onHelp={() => openModal({ kind: 'guide' })}
         onFeathers={() => openModal({ kind: 'feathers' })}
@@ -420,15 +420,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         />
       )}
       {modal?.kind === 'market' && (
-        <MarketBoard
-          farm={farm}
-          market={market}
-          send={send}
-          tab={modal.tab}
-          onTab={(tab) => ui.set({ modal: { kind: 'market', tab } })}
-          onFeathers={() => openModal({ kind: 'feathers' })}
-          onClose={closeModal}
-        />
+        <MarketPage farm={farm} market={market} send={send} tab={modal.tab} onTab={(tab) => ui.set({ modal: { kind: 'market', tab } })} onClose={closeModal} />
       )}
       {modal?.kind === 'card' && card && (
         <CardOverlay

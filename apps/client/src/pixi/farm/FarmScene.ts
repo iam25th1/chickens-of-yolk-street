@@ -71,6 +71,8 @@ function labelOf(t: WorldTarget): { name: string; text: string } | null {
   if (t.kind === 'crate') return { name: 'crate', text: 'CRATE' };
   if (t.kind === 'feed') return { name: 'trough', text: 'TROUGH AND FEED' };
   if (t.kind === 'farmhouse') return { name: 'farmhouse', text: 'FARMHOUSE' };
+  // the farm's own sign by the path opens the Market
+  if (t.kind === 'sign') return { name: 'sign', text: 'MARKET' };
   return null;
 }
 

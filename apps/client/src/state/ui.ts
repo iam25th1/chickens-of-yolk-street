@@ -4,7 +4,8 @@ import type { FeatherGrade, MilestoneId, UnlockId } from '@coys/shared';
 import { Emitter, createStore } from './store';
 
 export type ShopTab = 'hens' | 'feed' | 'coops' | 'machines';
-export type MarketTab = 'board' | 'farms' | 'orders' | 'trades';
+/** The Market page's tabs: prices, sell, buy orders, your orders, trade, hen auction, farms. */
+export type MarketTab = 'prices' | 'sell' | 'buyers' | 'mine' | 'trade' | 'auction' | 'farms';
 
 export type ModalState =
   | { kind: 'shop'; tab: ShopTab }
