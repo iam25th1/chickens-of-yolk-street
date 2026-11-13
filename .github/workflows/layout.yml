@@ -10,10 +10,11 @@ permissions:
   contents: read
 
 jobs:
-  # No scrollbars and nothing cut off (e2e/no-scroll.test.ts: all 11 window sizes, every screen,
-  # tab, page and tour step) and the naming screen and the tour (e2e/tour.test.ts), in the built
-  # game in a headless browser (the runner's own Chrome, a fresh profile each time). Nothing is
-  # downloaded for it.
+  # The browser checks (e2e/) at three window sizes, 1280x720, 1920x1080 and 390x844: no scrollbars
+  # and nothing cut off on every screen, tab, page and tour step, the tour, the Market, the profile,
+  # hatching, the mint and the top bar, in the built game in a headless browser (the runner's own
+  # Chrome, a fresh profile each time). Nothing is downloaded for it. The full sweep (every size)
+  # stays a local run before merging: npm run test:e2e.
   layout:
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -25,8 +26,9 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Every screen fits at every window size
+      - name: Every screen fits at three window sizes
         env:
           CHROME_PATH: /usr/bin/google-chrome
           E2E_PROGRESS: '1'
+          E2E_SIZES: 1280x720,1920x1080,390x844
         run: npm run test:e2e

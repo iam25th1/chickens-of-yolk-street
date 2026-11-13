@@ -7,6 +7,7 @@
 import { mkdirSync } from 'node:fs';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { sizes } from './sizes';
 import { startTestServer, type TestServer } from './server';
 
 interface Box {
@@ -113,10 +114,10 @@ async function buyAndHatch(page: Page, how: How, count: number, size: string): P
 }
 
 describe('new hens hatch', () => {
-  for (const [w, h, dpr] of [
+  for (const [w, h, dpr] of sizes([
     [1280, 720, 1],
     [390, 844, 3],
-  ] as const) {
+  ] as const)) {
     it(`at ${w}x${h}: from the shop's list, at random and from the hen auction, and on a farm bigger than the screen shows`, async () => {
       const size = `${w}x${h}`;
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: w < 600, hasTouch: w < 600 });
@@ -148,10 +149,14 @@ describe('new hens hatch', () => {
         // (they are new to the farm too, so they hatch first: forty eggs, a beat apart)
         await server.flock(name, 45);
         await page.waitForFunction(() => (window as unknown as { __coysFarm: FarmHook }).__coysFarm.hatching().length > 0, undefined, { timeout: 15_000 });
-        await page.waitForFunction(() => {
-          const f = (window as unknown as { __coysFarm: FarmHook }).__coysFarm;
-          return f.hatching().length === 0 && f.targets().filter((t) => t.kind === 'hen').length >= 40;
-        }, undefined, { timeout: 120_000 });
+        await page.waitForFunction(
+          () => {
+            const f = (window as unknown as { __coysFarm: FarmHook }).__coysFarm;
+            return f.hatching().length === 0 && f.targets().filter((t) => t.kind === 'hen').length >= 40;
+          },
+          undefined,
+          { timeout: 120_000 },
+        );
         await buyAndHatch(page, 'random', 1, size);
       } finally {
         await ctx.close();

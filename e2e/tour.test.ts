@@ -11,6 +11,7 @@ import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { sizes } from './sizes';
 import { startTestServer, type TestServer } from './server';
 
 const shotsDir = fileURLToPath(new URL('../docs/screenshots/', import.meta.url));
@@ -124,12 +125,12 @@ describe('naming the farm', () => {
 });
 
 describe('the tour', () => {
-  for (const [w, h, dpr] of [
+  for (const [w, h, dpr] of sizes([
     [1280, 720, 1],
     [1920, 1080, 1],
     [390, 844, 3],
     [360, 640, 2],
-  ] as const) {
+  ] as const)) {
     it(`at ${w}x${h}: beside its target on every step, clear of the UI, every control working`, async () => {
       const size = `${w}x${h}`;
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: w < 600, hasTouch: w < 600 });

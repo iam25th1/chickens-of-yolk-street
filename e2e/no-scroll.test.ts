@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium, type Browser } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { overflowing } from './overflow';
+import { sizes } from './sizes';
 import { startTestServer, type TestServer } from './server';
 
 const ALL_SIZES: [number, number, number][] = [
@@ -26,8 +27,8 @@ const ALL_SIZES: [number, number, number][] = [
   [1180, 820, 2],
   [412, 915, 2],
 ];
-/** E2E_SIZES=1280x720,360x640 checks only those (a quick run); every size by default. */
-const SIZES = process.env.E2E_SIZES ? ALL_SIZES.filter(([w, h]) => process.env.E2E_SIZES?.split(',').includes(`${w}x${h}`)) : ALL_SIZES;
+/** E2E_SIZES=1280x720,360x640 checks only those (e2e/sizes.ts); every size by default. */
+const SIZES = sizes(ALL_SIZES);
 /** The sizes whose screens are saved as screenshots (desktop and phone). */
 const SHOTS = new Set(['1280x720', '390x844']);
 const shotsDir = fileURLToPath(new URL('../docs/screenshots/', import.meta.url));

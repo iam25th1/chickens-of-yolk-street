@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { overflowing } from './overflow';
+import { sizes } from './sizes';
 import { startTestServer, type TestServer } from './server';
 
 const shotsDir = process.env.SHOTS_DIR ?? fileURLToPath(new URL('../docs/screenshots/', import.meta.url));
@@ -52,12 +53,12 @@ async function partsInOrder(page: Page): Promise<string[]> {
 const vis = (page: Page, sel: string) => page.locator(`${sel} >> visible=true`).first();
 
 describe('the Feather Mint', () => {
-  for (const [w, h, dpr] of [
+  for (const [w, h, dpr] of sizes([
     [1920, 1080, 1],
     [390, 844, 3],
     [1280, 720, 1],
     [360, 640, 2],
-  ] as const) {
+  ] as const)) {
     it(`/mint opens without signing in at ${w}x${h}: every part in order, nothing cut off`, async () => {
       const size = `${w}x${h}`;
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: w < 600, hasTouch: w < 600 });
@@ -103,10 +104,10 @@ describe('the Feather Mint', () => {
     }, 300_000);
   }
 
-  for (const [w, h, dpr] of [
+  for (const [w, h, dpr] of sizes([
     [1920, 1080, 1],
     [390, 844, 3],
-  ] as const) {
+  ] as const)) {
     it(`at ${w}x${h}, MINT plays the minting moment to a confirmed Feather; a failed mint gives the ticket and coins back, and RETRY mints it`, async () => {
       const size = `${w}x${h}`;
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: w < 600, hasTouch: w < 600 });

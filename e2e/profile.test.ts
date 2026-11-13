@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium, type Browser, type Page } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { overflowing } from './overflow';
+import { sizes } from './sizes';
 import { startTestServer, type TestServer } from './server';
 
 const shotsDir = `${resolve(process.env.SHOTS_DIR ?? fileURLToPath(new URL('../.data/screenshots/profile/', import.meta.url)))}/`;
@@ -64,12 +65,12 @@ async function drainMoments(page: Page): Promise<void> {
 }
 
 describe('the profile', () => {
-  for (const [w, h, dpr] of [
+  for (const [w, h, dpr] of sizes([
     [1920, 1080, 1],
     [390, 844, 3],
     [1280, 720, 1],
     [360, 640, 2],
-  ] as const) {
+  ] as const)) {
     it(`at ${w}x${h}: every tab and page fits, the public profiles open, and badge moments queue`, async () => {
       const size = `${w}x${h}`;
       const name = `Profile ${size}`;
