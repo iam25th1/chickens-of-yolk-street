@@ -7,6 +7,7 @@ import { dayElapsed, events, game, gameTime, sameDay } from '../state/game';
 import { useStore } from '../state/store';
 import type { Rect } from '../app/viewport';
 import { AiBadge } from './AiBadge';
+import { ProfileIcon } from './Badge';
 import { SheetSprite, flapRect } from './SheetSprite';
 
 /** A number that counts to its new value and pops when it goes up. */
@@ -150,6 +151,7 @@ export function TopBar({
   onLedger,
   onHelp,
   onFeathers,
+  onProfile,
 }: {
   farm: FarmState;
   rect: Rect;
@@ -159,6 +161,7 @@ export function TopBar({
   onLedger: () => void;
   onHelp: () => void;
   onFeathers: () => void;
+  onProfile: () => void;
 }) {
   const { audio } = useServices();
   const capacity = coopCapacity(farm.coops.map((c) => c.kind));
@@ -182,7 +185,12 @@ export function TopBar({
     </button>
   );
   return (
-    <div className="topbar zone" data-ui="topbar" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, flexWrap: rect.h > 24 ? 'wrap' : 'nowrap', alignContent: 'center' }}>
+    // on one row (a window 640 UI pixels wide) the bar is full: tighter gaps keep room for the coins to grow
+    <div
+      className="topbar zone"
+      data-ui="topbar"
+      style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, flexWrap: rect.h > 24 ? 'wrap' : 'nowrap', alignContent: 'center', columnGap: rect.h > 24 ? undefined : 2 }}
+    >
       <Stat icon="cash" title="Coins to spend">
         <Counter id="cash-counter" value={farm.cashMilli} format={(v) => coins(Math.round(v))} />
       </Stat>
@@ -216,6 +224,23 @@ export function TopBar({
       >
         MINT
         {farm.tickets.some((t) => t.status === 'held') && <span className="dot" aria-hidden="true" />}
+      </button>
+      {/* the profile: an icon, as the bar has no room for another word at its narrowest one-row width */}
+      <button
+        className="btn"
+        style={{ height: 16, padding: '0 1px' }}
+        data-tour="profile"
+        data-ui="profile-button"
+        aria-label="Profile: your farm's record and badges"
+        title="Profile: your farm's record and badges"
+        data-tip="PROFILE: YOUR FARM'S RECORD AND BADGES"
+        onMouseEnter={() => uiSound(audio, 'hover')}
+        onClick={() => {
+          uiSound(audio, 'click');
+          onProfile();
+        }}
+      >
+        <ProfileIcon />
       </button>
       {button('market', 'Market board: prices and rivals', onMarket, 'market')}
       {button('ledger', 'Ledger: your days in coins', onLedger, 'ledger')}

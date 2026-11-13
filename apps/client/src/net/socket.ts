@@ -102,6 +102,9 @@ export class GameSocket {
       case 'ledger':
         game.set({ ledger: m.days });
         break;
+      case 'profile':
+        game.set({ profile: m.profile });
+        break;
       case 'pong':
         break;
     }

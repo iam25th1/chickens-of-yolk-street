@@ -5,6 +5,8 @@ import { Emitter, createStore } from './store';
 
 export type ShopTab = 'hens' | 'feed' | 'coops' | 'machines';
 export type MarketTab = 'board' | 'farms' | 'orders' | 'trades';
+export const PROFILE_TABS = ['overview', 'eggs', 'money', 'flock', 'machines', 'market', 'mint', 'badges'] as const;
+export type ProfileTab = (typeof PROFILE_TABS)[number];
 
 export type ModalState =
   | { kind: 'shop'; tab: ShopTab }
@@ -19,7 +21,11 @@ export type ModalState =
   | { kind: 'minting'; ticketId: string; attempt: number }
   | { kind: 'settings' }
   | { kind: 'guide' }
-  | { kind: 'name'; mode: 'first' | 'rename' };
+  | { kind: 'name'; mode: 'first' | 'rename' }
+  /** The player's own profile page (private), on a tab. */
+  | { kind: 'profile'; tab: ProfileTab }
+  /** A farm's public profile, opened from the farms ranking or the profile's own link. */
+  | { kind: 'publicProfile'; farmId: string; back: ProfileTab | null };
 
 export const ui = createStore<{ modal: ModalState | null }>({ modal: null });
 
@@ -27,7 +33,7 @@ export const ui = createStore<{ modal: ModalState | null }>({ modal: null });
 export const OPEN_MINT_KEY = 'coys.openMint';
 
 /** Things the player did in the UI that the tour waits for (opened a modal, switched a tab, tapped an explainer). */
-export type UiEvent = { kind: 'opened'; modal: ModalState } | { kind: 'tab'; modal: 'shop' | 'market'; tab: string } | { kind: 'tapped'; what: string };
+export type UiEvent = { kind: 'opened'; modal: ModalState } | { kind: 'tab'; modal: 'shop' | 'market' | 'profile'; tab: string } | { kind: 'tapped'; what: string };
 export const uiEvents = new Emitter<UiEvent>();
 
 export function openModal(modal: ModalState): void {
