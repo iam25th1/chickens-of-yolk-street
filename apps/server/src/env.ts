@@ -71,6 +71,43 @@ export function readConfig(env: NodeJS.ProcessEnv, repoRoot: string): ServerConf
   };
 }
 
+export interface InferenceConfig {
+  /** NEARAI_DAILY_SPEND_CAP_USD: every agent together, per UTC day. */
+  capUsd: number;
+  /** NEARAI_AGENT_DAILY_CAP_USD (default a quarter of the global cap) and NEARAI_AGENT_DAILY_CALLS (default 40): one agent, per UTC day. */
+  agentCap: { usd: number; calls: number };
+  /** NEARAI_MAIN_PRICE and NEARAI_CHEAP_PRICE as "input,output" USD per million tokens; absent ones come from /v1/models or the assumed prices. */
+  mainPrice: { input: number; output: number } | null;
+  cheapPrice: { input: number; output: number } | null;
+}
+
+const nonNegative = (name: string, raw: string | undefined, fallback: number): number => {
+  if (raw === undefined || raw === '') return fallback;
+  const v = Number(raw);
+  if (!Number.isFinite(v) || v < 0) throw new Error(`${name} must be a number of 0 or more`);
+  return v;
+};
+
+const price = (name: string, raw: string | undefined): { input: number; output: number } | null => {
+  if (!raw) return null;
+  const [input, output] = raw.split(',').map((x) => Number(x.trim()));
+  if (input === undefined || output === undefined || !(input >= 0) || !(output >= 0)) throw new Error(`${name} must be "input,output" in USD per million tokens, for example 0.2,0.8`);
+  return { input, output };
+};
+
+/** The NEAR AI spend caps and prices. */
+export function readInferenceConfig(env: NodeJS.ProcessEnv): InferenceConfig {
+  const capUsd = nonNegative('NEARAI_DAILY_SPEND_CAP_USD', env.NEARAI_DAILY_SPEND_CAP_USD, 1);
+  const calls = nonNegative('NEARAI_AGENT_DAILY_CALLS', env.NEARAI_AGENT_DAILY_CALLS, 40);
+  if (!Number.isInteger(calls)) throw new Error('NEARAI_AGENT_DAILY_CALLS must be a whole number');
+  return {
+    capUsd,
+    agentCap: { usd: nonNegative('NEARAI_AGENT_DAILY_CAP_USD', env.NEARAI_AGENT_DAILY_CAP_USD, capUsd / 4), calls },
+    mainPrice: price('NEARAI_MAIN_PRICE', env.NEARAI_MAIN_PRICE),
+    cheapPrice: price('NEARAI_CHEAP_PRICE', env.NEARAI_CHEAP_PRICE),
+  };
+}
+
 export const ENV_NAMES = [
   'NODE_ENV',
   'PORT',
@@ -96,6 +133,10 @@ export const ENV_NAMES = [
   'NEARAI_MODEL',
   'NEARAI_CHEAP_MODEL',
   'NEARAI_DAILY_SPEND_CAP_USD',
+  'NEARAI_AGENT_DAILY_CAP_USD',
+  'NEARAI_AGENT_DAILY_CALLS',
+  'NEARAI_MAIN_PRICE',
+  'NEARAI_CHEAP_PRICE',
 ] as const;
 
 /** One line per variable: present or missing. Never prints a value. */

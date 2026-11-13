@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ECONOMY } from '@coys/shared';
-import { readConfig } from '../src/env';
+import { readConfig, readInferenceConfig } from '../src/env';
 
 const prod = { NODE_ENV: 'production', DATABASE_URL: 'postgres://coys@db/coys', GAME_SEASON: 's1', SESSION_SECRET: 'x'.repeat(32) };
 
@@ -29,5 +29,15 @@ describe('configuration', () => {
     expect(readConfig({ ...prod, DEMO_DAY_SECONDS: '45', DEMO_MODE: '1' }, '/repo')).toMatchObject({ dayLengthMs: 45_000, demoDayIgnored: false });
     expect(() => readConfig({ DEMO_DAY_SECONDS: '5' }, '/repo')).toThrow(/20 to 3600/);
     expect(() => readConfig({ DEMO_DAY_SECONDS: 'fast' }, '/repo')).toThrow(/20 to 3600/);
+  });
+
+  it('NEAR AI caps: the global cap, a per-agent cap (a quarter of it and 40 calls by default), and prices per million tokens', () => {
+    expect(readInferenceConfig({})).toEqual({ capUsd: 1, agentCap: { usd: 0.25, calls: 40 }, mainPrice: null, cheapPrice: null });
+    expect(readInferenceConfig({ NEARAI_DAILY_SPEND_CAP_USD: '2' }).agentCap).toEqual({ usd: 0.5, calls: 40 });
+    const c = readInferenceConfig({ NEARAI_AGENT_DAILY_CAP_USD: '0.1', NEARAI_AGENT_DAILY_CALLS: '12', NEARAI_MAIN_PRICE: '0.3, 1.2', NEARAI_CHEAP_PRICE: '0.05,0.2' });
+    expect(c).toMatchObject({ agentCap: { usd: 0.1, calls: 12 }, mainPrice: { input: 0.3, output: 1.2 }, cheapPrice: { input: 0.05, output: 0.2 } });
+    expect(() => readInferenceConfig({ NEARAI_AGENT_DAILY_CALLS: '2.5' })).toThrow(/whole number/);
+    expect(() => readInferenceConfig({ NEARAI_DAILY_SPEND_CAP_USD: '-1' })).toThrow(/0 or more/);
+    expect(() => readInferenceConfig({ NEARAI_MAIN_PRICE: 'cheap' })).toThrow(/input,output/);
   });
 });

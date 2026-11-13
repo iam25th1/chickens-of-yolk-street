@@ -4,14 +4,14 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ECONOMY } from '@coys/shared';
 import { NEARAI_DEFAULT_CHEAP_MODEL, NearAiClient } from './ai/nearai';
-import { InferenceBudget } from './agents/brain';
+import { InferenceBudget, priceOf, type Pricing } from './agents/brain';
 import { createPrivyVerifier } from './auth/privy';
 import { createSessionSigner } from './auth/session';
 import { BUILD } from './build-info';
 import { createChainWriter } from './chain/chain';
 import { FeatherRenderer } from './chain/feather-image';
 import { openDb } from './db/db';
-import { describeEnv, readConfig } from './env';
+import { describeEnv, readConfig, readInferenceConfig } from './env';
 import { Game } from './game/game';
 import { createGameServer, DRAIN } from './net/server';
 import { redactEmails } from './redact';
@@ -45,10 +45,17 @@ const nearAi = process.env.NEARAI_API_KEY
   ? new NearAiClient({ apiKey: process.env.NEARAI_API_KEY, baseUrl: process.env.NEARAI_BASE_URL, model: process.env.NEARAI_MODEL })
   : null;
 const cheapModel = process.env.NEARAI_CHEAP_MODEL || NEARAI_DEFAULT_CHEAP_MODEL;
-const capUsd = Number(process.env.NEARAI_DAILY_SPEND_CAP_USD || 1);
+const inference = readInferenceConfig(process.env);
+// prices: NEARAI_MAIN_PRICE and NEARAI_CHEAP_PRICE first, then /v1/models, then the assumed ones (brain.ts)
+const pricing = nearAi ? await nearAi.pricing() : new Map<string, Pricing>();
+if (nearAi && inference.mainPrice) pricing.set(nearAi.model, inference.mainPrice);
+if (inference.cheapPrice) pricing.set(cheapModel, inference.cheapPrice);
 log(
   nearAi
-    ? `[agents] agents decide on NEAR AI Cloud (${nearAi.model}, ${cheapModel} when struggling), capped at ${capUsd} USD per UTC day`
+    ? `[agents] agents decide on NEAR AI Cloud (${cheapModel} on routine days; ${nearAi.model} for weekly reflections and hard days), capped at ${inference.capUsd} USD per UTC day, ` +
+        `each agent at ${inference.agentCap.calls} calls and ${inference.agentCap.usd} USD; prices per million tokens: ${[nearAi.model, cheapModel]
+          .map((m) => `${m} ${priceOf(pricing, m).input}/${priceOf(pricing, m).output}`)
+          .join(', ')}`
     : '[agents] NEARAI_API_KEY unset: agents use their rule policies',
 );
 
@@ -61,10 +68,10 @@ const game = new Game({
   provenance,
   brain: {
     client: nearAi,
-    budget: new InferenceBudget(db, capUsd),
+    budget: new InferenceBudget(db, inference.capUsd, Date.now, inference.agentCap),
     model: nearAi?.model ?? '',
     cheapModel,
-    pricing: nearAi ? await nearAi.pricing() : new Map(),
+    pricing,
   },
 });
 await game.init();
