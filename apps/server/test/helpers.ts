@@ -1,6 +1,6 @@
 import { openDb, type Db } from '../src/db/db';
 import { InferenceBudget } from '../src/agents/brain';
-import type { NearAiClient } from '../src/ai/nearai';
+import { NEARAI_DEFAULT_CHEAP_MODEL, NEARAI_DEFAULT_MODEL, type NearAiClient } from '../src/ai/nearai';
 import { buildDayBatch, buildLateSettlement, commitBatch, digestOf, type DayBatch } from '../src/chain/batch';
 import { NoopChain, assignAgentWallets, type ChainWriter, type LateResult, type MintRequest, type MintResult, type SettleResult } from '../src/chain/chain';
 import { tokenFor, type Collection } from '../src/chain/mint';
@@ -110,7 +110,17 @@ export class RecordingChain implements ChainWriter {
 }
 
 export async function makeGame(
-  opts: { cast?: boolean; seed?: number; client?: NearAiClient | null; capUsd?: number; season?: string; db?: Db; chain?: ChainWriter } = {},
+  opts: {
+    cast?: boolean;
+    seed?: number;
+    client?: NearAiClient | null;
+    capUsd?: number;
+    season?: string;
+    db?: Db;
+    chain?: ChainWriter;
+    /** The real model names, priced as the server prices them (ASSUMED_PRICING), instead of the test pair. */
+    realModels?: boolean;
+  } = {},
 ): Promise<TestGame> {
   const db = opts.db ?? (await openDb('memory://'));
   const clock = { t: Date.UTC(2026, 10, 11, 12) };
@@ -127,12 +137,14 @@ export async function makeGame(
     brain: {
       client: opts.client ?? null,
       budget: new InferenceBudget(db, opts.capUsd ?? 1, () => clock.t),
-      model: 'test/main',
-      cheapModel: 'test/cheap',
-      pricing: new Map([
-        ['test/main', { input: 1, output: 5 }],
-        ['test/cheap', { input: 0.1, output: 0.5 }],
-      ]),
+      model: opts.realModels ? NEARAI_DEFAULT_MODEL : 'test/main',
+      cheapModel: opts.realModels ? NEARAI_DEFAULT_CHEAP_MODEL : 'test/cheap',
+      pricing: opts.realModels
+        ? new Map()
+        : new Map([
+            ['test/main', { input: 1, output: 5 }],
+            ['test/cheap', { input: 0.1, output: 0.5 }],
+          ]),
     },
   });
   await game.init();
