@@ -97,7 +97,7 @@ describe('the provider chain', () => {
     expect(r.decision.buyOrders.length).toBeGreaterThan(0);
     expect(s.near).toHaveLength(1);
     const body = s.serv[0];
-    expect(body).toMatchObject({ model: 'gpt-6-luna', max_completion_tokens: 300, reasoning_effort: 'none', response_format: { type: 'json_schema', json_schema: { name: 'decision', strict: true } } });
+    expect(body).toMatchObject({ model: 'gpt-6-luna', max_completion_tokens: 400, reasoning_effort: 'none', response_format: { type: 'json_schema', json_schema: { name: 'decision', strict: true } } });
     expect(body?.max_tokens).toBeUndefined();
     expect(body?.messages[0]?.role).toBe('system');
     // strict modes take anyOf, not oneOf, and no $schema

@@ -81,8 +81,9 @@ interface ProviderCost {
  * The credits-needed report from the model runs, at the live server's pace: calls measured here under
  * the days-that-matter rule (brain.ts modelMoment), tokens as the server estimates them (4 characters a
  * token, the response schema counted as prompt, SERV's 200 tokens of its own; replies at least what
- * real models answered: 150 tokens a decision, 100 a reflection), each provider's default models and
- * prices, 480 in-game days a real day. Full use is a model decision on every agent day.
+ * real models answered: 260 tokens a decision, as SERV's gpt-6-luna did live, and 100 a reflection),
+ * each provider's default models and prices, 480 in-game days a real day. Full use is a model decision
+ * on every agent day.
  */
 function creditsReport(runs: Run[]): { lines: string[]; numbers: { callsPerAgentDay: number; callsDay: number; providers: ProviderCost[] } } {
   const model = runs.filter((r) => r.brain === 'model');
@@ -101,7 +102,7 @@ function creditsReport(runs: Run[]): { lines: string[]; numbers: { callsPerAgent
   const t4 = (chars: number): number => Math.ceil(chars / 4);
   const schema = JSON.stringify(decisionFormat()).length;
   const decisionIn = t4(sum((r) => r.tally?.decisionPromptChars ?? 0) / Math.max(1, decisions) + schema);
-  const decisionOut = Math.max(150, t4(sum((r) => r.tally?.decisionReplyChars ?? 0) / Math.max(1, decisions)));
+  const decisionOut = Math.max(260, t4(sum((r) => r.tally?.decisionReplyChars ?? 0) / Math.max(1, decisions)));
   const reflectIn = t4(sum((r) => (r.tally?.promptChars ?? 0) - (r.tally?.decisionPromptChars ?? 0)) / Math.max(1, reflections));
   const reflectOut = Math.max(100, t4(sum((r) => (r.tally?.replyChars ?? 0) - (r.tally?.decisionReplyChars ?? 0)) / Math.max(1, reflections)));
   const cost = (price: { input: number; output: number }, prompt: number, completion: number): number => (prompt * price.input + completion * price.output) / 1e6;
