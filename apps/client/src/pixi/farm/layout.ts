@@ -483,7 +483,8 @@ function layLand(id: LandId, home: Home, objects: Record<string, SpecObject>, ar
     feetY = houseGround;
     xs = [box.left + 24 + half, box.right - 24 - half];
     // (props stand outside the pasture, so a hen in it can always walk round them)
-    pasture = { left: box.left + 24, top: houseGround + 6, right: box.right - 24, bottom: fenceY - 46 };
+    // (grass between the pasture and the fence posts on the far side)
+    pasture = id === 'east' ? { left: box.left + 24, top: houseGround + 6, right: box.right - 44, bottom: fenceY - 46 } : { left: box.left + 44, top: houseGround + 6, right: box.right - 24, bottom: fenceY - 46 };
     const mid = Math.round((box.left + box.right) / 2);
     // flowers between the coops; the hay bale and a puddle in the grass by the fence, far and near
     const far = id === 'east' ? box.right - 44 : box.left + 44;
