@@ -379,7 +379,7 @@ async function ask(c: AgentContext, opts: BrainOptions, a: Ask): Promise<Answer 
     const key = opts.cache ? DecisionCache.key(model, `${c.agent.role} ${a.what}`, a.messages) : null;
     const cached = key ? opts.cache?.get(key, today) : null;
     if (key && cached) {
-      log(`[ai] ${p.name} ${model} ${c.agent.name} ${a.what} (${a.why}): the same prompt today, its decision reused (no call)`);
+      log(`[ai] ${p.name} ${model} ${c.agent.name} ${a.what} (${a.why}): the same prompt today, its ${a.what} reused (no call)`);
       return { provider: p, model, key, cached };
     }
     const outOfTime = (): null => {
