@@ -86,7 +86,7 @@ export function Paged({
     setAt(0);
   }, [resetKey]);
   // an item that changes size without a new render (a font arriving, a sprite loading) fits again
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     const m = measure.current;
     if (!m || typeof ResizeObserver === 'undefined') return;
@@ -103,16 +103,21 @@ export function Paged({
   useLayoutEffect(() => {
     const el = self.current;
     const m = measure.current;
-    if (!el || !m) return;
+    if (!el || !m) return undefined;
     const now = performance.now();
     changes.current = changes.current.filter((t) => now - t < 1000);
-    if (changes.current.length >= 6) return;
+    if (changes.current.length >= 6) {
+      // waits, then tries again (a list that changed many times in a second still fits in the end)
+      const wait = Math.ceil(1000 - (now - (changes.current[0] ?? now))) + 20;
+      const t = setTimeout(() => setTick((n) => n + 1), wait);
+      return () => clearTimeout(t);
+    }
     const budget = fill ? el.clientHeight : el.offsetHeight + freeRoom(el);
     let next: number[][];
     if (cell) {
       const first = el.firstElementChild?.firstElementChild as HTMLElement | null | undefined;
       const size = cell === 'auto' ? (first ? { w: first.offsetWidth, h: first.offsetHeight } : null) : cell;
-      if (!size || !size.w || !size.h) return;
+      if (!size || !size.w || !size.h) return undefined;
       const width = el.clientWidth;
       const all = gridPage(size, gap, width, Infinity);
       const rowsAll = Math.ceil(items.length / all.cols);
@@ -135,7 +140,8 @@ export function Paged({
       changes.current.push(now);
       setPages(next);
     }
-  }, [cell, pages, gap, items, onPrevEdge, onNextEdge, fill, v.uiW, v.uiH]);
+    return undefined;
+  }, [cell, pages, gap, items, onPrevEdge, onNextEdge, fill, v.uiW, v.uiH, tick]);
 
   const n = pages.length;
   const page = Math.min(at, n - 1);
