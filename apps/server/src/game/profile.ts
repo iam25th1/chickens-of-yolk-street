@@ -118,29 +118,33 @@ export interface WorthParts {
   hensMilli: number;
   coopsMilli: number;
   machinesMilli: number;
+  landMilli: number;
 }
 
-/** Net worth: coins, plus hens at the hen price, coops at their price and machines at their price times their condition. */
-export function worthOf(cashMilli: number, hens: number, coops: CoopKind[], machines: { unlock: UnlockId; condition: number }[]): WorthParts & { totalMilli: number } {
+/** Net worth: coins, plus hens at the hen price, coops at their price, machines at their price times their condition, and land at what it cost. */
+export function worthOf(cashMilli: number, hens: number, coops: CoopKind[], machines: { unlock: UnlockId; condition: number }[], landMilli = 0): WorthParts & { totalMilli: number } {
   const hensMilli = hens * toMilli(ECONOMY.hen.price);
   const coopsMilli = coops.reduce((s, k) => s + toMilli(ECONOMY.coops.kinds[k].price), 0);
   const machinesMilli = machines.reduce((s, m) => s + Math.round(toMilli(ECONOMY.unlocks[m.unlock].price) * Math.max(0, Math.min(1, m.condition))), 0);
-  return { cashMilli, hensMilli, coopsMilli, machinesMilli, totalMilli: cashMilli + hensMilli + coopsMilli + machinesMilli };
+  return { cashMilli, hensMilli, coopsMilli, machinesMilli, landMilli, totalMilli: cashMilli + hensMilli + coopsMilli + machinesMilli + landMilli };
 }
 
-/** Every farm's hens, coops and machines, for net worth. */
-async function holdings(q: Queryable, farmIds: string[] | null): Promise<Map<string, { hens: number; coops: CoopKind[]; machines: { unlock: UnlockId; condition: number }[] }>> {
+type Holding = { hens: number; coops: CoopKind[]; machines: { unlock: UnlockId; condition: number }[]; landMilli: number };
+
+/** Every farm's hens, coops, machines and land, for net worth. */
+async function holdings(q: Queryable, farmIds: string[] | null): Promise<Map<string, Holding>> {
   const where = farmIds ? 'AND farm_id = ANY($1::text[])' : '';
   const args = farmIds ? [farmIds] : [];
-  const out = new Map<string, { hens: number; coops: CoopKind[]; machines: { unlock: UnlockId; condition: number }[] }>();
+  const out = new Map<string, Holding>();
   const get = (id: string) => {
     let h = out.get(id);
-    if (!h) out.set(id, (h = { hens: 0, coops: [], machines: [] }));
+    if (!h) out.set(id, (h = { hens: 0, coops: [], machines: [], landMilli: 0 }));
     return h;
   };
   for (const r of await q.query(`SELECT farm_id, count(*) AS n FROM hens WHERE status = 'alive' ${where} GROUP BY farm_id`, args)) get(String(r.farm_id)).hens = num(r.n);
   for (const r of await q.query(`SELECT farm_id, kind FROM coops WHERE true ${where}`, args)) get(String(r.farm_id)).coops.push(r.kind as CoopKind);
   for (const r of await q.query(`SELECT farm_id, unlock_id, condition FROM unlocks WHERE true ${where}`, args)) get(String(r.farm_id)).machines.push({ unlock: r.unlock_id as UnlockId, condition: num(r.condition) });
+  for (const r of await q.query(`SELECT farm_id, SUM(price_milli) AS paid FROM farm_land WHERE true ${where} GROUP BY farm_id`, args)) get(String(r.farm_id)).landMilli = num(r.paid);
   return out;
 }
 
@@ -216,8 +220,8 @@ export async function snapshotDay(ctx: Ctx, day: number, lay: Map<string, LayTal
   const rows: unknown[][] = [];
   for (const f of farms) {
     const id = String(f.id);
-    const h = held.get(id) ?? { hens: 0, coops: [], machines: [] };
-    const worth = worthOf(num(f.cash_milli), h.hens, h.coops, h.machines);
+    const h = held.get(id) ?? { hens: 0, coops: [], machines: [], landMilli: 0 };
+    const worth = worthOf(num(f.cash_milli), h.hens, h.coops, h.machines, h.landMilli);
     const t = lay.get(id);
     const s = sold.get(id) ?? {};
     const soldN = total(s);
@@ -509,8 +513,8 @@ export async function profileFor(q: Queryable, farmId: string, day: number, fact
   const [f] = await q.query('SELECT id, name, cash_milli, created_day, good_days, eggs_sold, haggles_won FROM farms WHERE id = $1', [farmId]);
   if (!f) throw new Error('farm not found');
   const [st] = await q.query('SELECT * FROM farm_stats WHERE farm_id = $1', [farmId]);
-  const h = (await holdings(q, [farmId])).get(farmId) ?? { hens: 0, coops: [], machines: [] };
-  const worth = worthOf(num(f.cash_milli), h.hens, h.coops, h.machines);
+  const h = (await holdings(q, [farmId])).get(farmId) ?? { hens: 0, coops: [], machines: [], landMilli: 0 };
+  const worth = worthOf(num(f.cash_milli), h.hens, h.coops, h.machines, h.landMilli);
   const ranks = await liveRanks(q);
 
   const all = await q.query('SELECT * FROM farm_days WHERE farm_id = $1 ORDER BY day', [farmId]);
@@ -573,7 +577,7 @@ export async function profileFor(q: Queryable, farmId: string, day: number, fact
     daysPlayed: Math.max(0, day - num(f.created_day)),
     cashMilli: num(f.cash_milli),
     netWorthMilli: worth.totalMilli,
-    netWorth: { cashMilli: worth.cashMilli, hensMilli: worth.hensMilli, coopsMilli: worth.coopsMilli, machinesMilli: worth.machinesMilli },
+    netWorth: { cashMilli: worth.cashMilli, hensMilli: worth.hensMilli, coopsMilli: worth.coopsMilli, machinesMilli: worth.machinesMilli, landMilli: worth.landMilli },
     rank: ranks.get(farmId) ?? null,
     farms: ranks.size,
     goodDays: num(f.good_days),

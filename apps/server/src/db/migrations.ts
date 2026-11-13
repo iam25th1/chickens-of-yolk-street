@@ -616,6 +616,22 @@ CREATE INDEX orders_farm ON orders (farm_id);
 `,
   },
   {
+    id: 16,
+    name: 'land plots',
+    sql: `
+-- Land: the plots a farm has bought around its home plot (east, west, north, south), the day each
+-- was bought and what it cost. A plot adds coop plots numbered after the home plot's four (0 to 3),
+-- in the fixed order of ECONOMY.land, so coops already built keep their numbers and stay valid.
+CREATE TABLE farm_land (
+  farm_id text NOT NULL REFERENCES farms(id),
+  plot text NOT NULL CHECK (plot IN ('east', 'west', 'north', 'south')),
+  bought_day integer NOT NULL,
+  price_milli bigint NOT NULL,
+  PRIMARY KEY (farm_id, plot)
+);
+`,
+  },
+  {
     id: 17,
     name: 'settlement ranges',
     sql: `

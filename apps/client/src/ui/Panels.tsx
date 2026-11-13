@@ -5,6 +5,7 @@ import {
   ECONOMY,
   FEED_TIERS,
   UNLOCK_IDS,
+  coopPlots,
   coopUpgradeCost,
   desperation,
   feedGramsPerHenDay,
@@ -129,7 +130,7 @@ export function ShopPanel({
     uiSound(audio, 'click');
     fn();
   };
-  const freePlots = ECONOMY.coops.plots - farm.coops.length;
+  const freePlots = coopPlots(farm.land).length - farm.coops.length;
   const feed = farm.feedGrams.cheap + farm.feedGrams.standard + farm.feedGrams.premium;
   const feedDays = farm.hens.length ? feed / (farm.hens.length * feedGramsPerHenDay()) : 99;
   const quote = (farm.supplier === 'squeezer' ? squeezerBagPrice(tier, desperation(feedDays, cash)) : loyalistBagPrice(tier, 0)) * (farm.unlocks.includes('hopper') ? 0.9 : 1);

@@ -3,7 +3,7 @@
 // for a badge with levels (bronze, silver, gold), or one for a plain badge. A secret badge shows as a
 // mystery until it is earned. The server evaluates them (apps/server/src/game/badges.ts) after the
 // actions that can move them and at every day close; the client draws them from the badge sheets.
-import { ECONOMY } from './economy';
+import { ECONOMY, LAND_IDS } from './economy';
 
 /** Row names of the x-badge-icons sheet (16x16 art px, drawn centred on the 32x32 frame). */
 export const BADGE_ICONS = [
@@ -134,6 +134,8 @@ export const BADGE_METRICS = [
   'bestCrowStreak',
   'shoestringDays',
   'renamed',
+  'landPlots',
+  'landCoops',
 ] as const;
 export type BadgeMetric = (typeof BADGE_METRICS)[number];
 
@@ -223,6 +225,9 @@ export const BADGES: readonly BadgeDef[] = [
     { id: 'builder', name: 'BUILDER', icon: 'coop', metric: 'coops', levels: [2, 3, ECONOMY.coops.plots], text: (n) => `OWN ${n} COOPS.` },
     { id: 'deluxe-living', name: 'DELUXE LIVING', icon: 'coop', metric: 'deluxeCoops', levels: [1], text: () => 'OWN A DELUXE COOP.' },
     { id: 'auction-find', name: 'AUCTION FIND', icon: 'bust', metric: 'auctionHens', levels: [1, 10, 30], text: (n) => `BUY ${s(n, 'HEN')} AT AUCTION.` },
+    { id: 'new-ground', name: 'NEW GROUND', icon: 'sparkle', metric: 'landPlots', levels: [1], text: () => 'BUY A PLOT OF LAND BESIDE YOUR FARM.' },
+    { id: 'four-corners', name: 'FOUR CORNERS', icon: 'rank', metric: 'landPlots', levels: [LAND_IDS.length], text: () => 'OWN ALL FOUR PLOTS AROUND YOUR FARM: EAST, WEST, NORTH AND SOUTH.' },
+    { id: 'room-to-roost', name: 'ROOM TO ROOST', icon: 'coop', metric: 'landCoops', levels: [1], text: () => 'BUILD A COOP ON LAND YOU BOUGHT.' },
   ]),
   ...group('machines', [
     { id: 'on-the-belt', name: 'ON THE BELT', icon: 'conveyor', metric: 'ownsConveyor', levels: [1], text: () => 'BUY THE CONVEYOR.' },

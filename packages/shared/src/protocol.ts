@@ -3,8 +3,8 @@
 // limit order), which the server bounds, and which an agent or a counterparty must accept.
 // Schemas are strict, so unknown fields are rejected.
 import { z } from 'zod';
-import { COOP_KINDS, ECONOMY, EGG_GRADES, FEED_TIERS, GOAL_IDS, UNLOCK_IDS, type GoalId } from './economy';
-import type { BodyColour, CoopKind, EggGrade, FeatherGrade, FeedTier, MilestoneId, Rarity, UnlockId } from './economy';
+import { COOP_KINDS, ECONOMY, EGG_GRADES, FEED_TIERS, GOAL_IDS, LAND_IDS, UNLOCK_IDS, type GoalId } from './economy';
+import type { BodyColour, CoopKind, EggGrade, FeatherGrade, FeedTier, LandId, MilestoneId, Rarity, UnlockId } from './economy';
 import type { AgentKind, AgentRole, CardKind } from './market';
 import type { BadgeLevel } from './badges';
 
@@ -47,6 +47,8 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('buildCoop'), rid, kind: z.enum(COOP_KINDS).exclude(['starter']) }).strict(),
   z.object({ t: z.literal('upgradeCoop'), rid, coopId: id }).strict(),
   z.object({ t: z.literal('buyUnlock'), rid, unlock: z.enum(UNLOCK_IDS) }).strict(),
+  /** Buy a neighbouring plot of land at the next land price (the server checks it is not owned and affordable). */
+  z.object({ t: z.literal('buyLand'), rid, plot: z.enum(LAND_IDS) }).strict(),
   z
     .object({
       t: z.literal('sell'),
@@ -323,6 +325,8 @@ export interface FarmState {
   fedToday: number;
   hens: HenView[];
   coops: CoopView[];
+  /** The plots of land the farm owns beside its home plot, in LAND_IDS order. */
+  land: LandId[];
   crate: EggStock;
   unlocks: UnlockId[];
   /** Today's lay plan for this farm, revealed to the owner so hens animate on time. */
@@ -498,7 +502,7 @@ export interface BadgeView {
 export interface ProfileDay {
   day: number;
   cashMilli: number;
-  /** Coins plus hens at the hen price, coops at their price and machines at their price times their condition. */
+  /** Coins plus hens at the hen price, coops at their price, machines at their price times their condition, and land at what it cost. */
   netWorthMilli: number;
   /** Place among the open farms by coins (1 is the richest), or null when the farm was not open. */
   rank: number | null;
@@ -521,7 +525,7 @@ export interface ProfileData {
   daysPlayed: number;
   cashMilli: number;
   netWorthMilli: number;
-  netWorth: { cashMilli: number; hensMilli: number; coopsMilli: number; machinesMilli: number };
+  netWorth: { cashMilli: number; hensMilli: number; coopsMilli: number; machinesMilli: number; landMilli: number };
   rank: number | null;
   farms: number;
   goodDays: number;
@@ -616,6 +620,7 @@ export type GameEvent =
   | { kind: 'coopBuilt'; coopId: string; coopKind: CoopKind; plot: number; costMilli: number }
   | { kind: 'coopUpgraded'; coopId: string; coopKind: CoopKind; costMilli: number }
   | { kind: 'unlockBought'; unlock: UnlockId; costMilli: number }
+  | { kind: 'landBought'; plot: LandId; costMilli: number }
   /** A worn machine broke down at the day close: it stops until repaired. */
   | { kind: 'machineBroke'; unlock: UnlockId }
   | { kind: 'machineRepaired'; unlock: UnlockId; costMilli: number }
