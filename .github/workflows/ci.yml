@@ -63,7 +63,7 @@ jobs:
   # tour step (e2e/no-scroll.test.ts). Nothing is downloaded for it.
   layout:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:

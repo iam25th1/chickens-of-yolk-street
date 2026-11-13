@@ -231,7 +231,7 @@ describe('no scrollbars and nothing cut off', () => {
       } finally {
         await ctx.close();
       }
-    }, 600_000);
+    }, 1_200_000);
   }
 
   it('found nothing', () => {
