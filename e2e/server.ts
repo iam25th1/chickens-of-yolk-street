@@ -43,6 +43,8 @@ export interface TestServer {
   wear(name: string, machines: Record<string, { condition: number; broken?: boolean }>): Promise<void>;
   /** Days close only when closeDays says (true), or on their own again when their time is up (false). */
   hold(on: boolean): void;
+  /** Sets the named farm's coins (a rich farm's long numbers) and sends the farm its fresh state. */
+  cash(name: string, coins: number): Promise<void>;
   /** Puts these eggs in the named farm's crate and sends the farm its fresh state. */
   crate(name: string, eggs: Partial<Record<EggGrade, number>>): Promise<void>;
   /** An AI buyer's order for eggs at this share of today's price, open for three days; the browsers see it with the next market. Returns its id. */
@@ -160,6 +162,12 @@ export async function startTestServer(): Promise<TestServer> {
     },
     hold(on) {
       held = on;
+    },
+    async cash(name, coins) {
+      const farm = await farmNamed(name);
+      await db.query('UPDATE farms SET cash_milli = $2 WHERE id = $1', [farm.id, Math.round(coins * 1000)]);
+      const ok = await game.act(farm.player_id, { t: 'setClerkFloor', rid: 'browser-check', floor: Number(farm.clerk_floor) });
+      if (!ok.ok) throw new Error(`could not refresh ${name}: ${ok.message}`);
     },
     async crate(name, eggs) {
       const farm = await farmNamed(name);

@@ -922,3 +922,9 @@ input[type='range'].slider::-moz-range-thumb {
   color: var(--ink);
   box-shadow: 0 0 0 1px var(--ink);
 }
+
+/* the full one-row top bar: no DAY word; with long numbers the COLLECT and SELL words step aside too */
+.topbar.one-row .day-label,
+.topbar.compact .stat-label {
+  display: none;
+}

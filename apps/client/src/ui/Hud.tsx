@@ -82,10 +82,10 @@ export function SplitFlap({ text }: { text: string }) {
   );
 }
 
-function Stat({ icon, children, title }: { icon: string; children: ReactNode; title: string }) {
+function Stat({ icon, sheet = '32-icons', children, title }: { icon: string; sheet?: string; children: ReactNode; title: string }) {
   return (
     <div className="stat" title={title} data-tip={title.toUpperCase()} tabIndex={0}>
-      <SheetSprite id="32-icons" row={icon} />
+      <SheetSprite id={sheet} row={icon} />
       {children}
     </div>
   );
@@ -113,7 +113,8 @@ function EggStats({ farm }: { farm: FarmState }) {
         <span className="stat-label">COLLECT</span>
         <Counter value={ground} />
       </Stat>
-      <Stat icon="egg" title="Eggs in the crate: ready to sell">
+      {/* the crate's own icon, so the two egg numbers read apart even without their words */}
+      <Stat icon="eggs-crate" sheet="x-badge-icons" title="Eggs in the crate: ready to sell">
         <span className="stat-label">SELL</span>
         <Counter value={crate} />
       </Stat>
@@ -133,7 +134,9 @@ function DayClock() {
   const minute = Math.floor(time.m / 10) * 10;
   return (
     <div className="stat" title="Day and time" data-tip="DAY AND TIME: AT MIDNIGHT THE DAY CLOSES AND THE MARKET SETTLES" tabIndex={0}>
-      <SplitFlap text={`DAY${pad(clock?.day ?? 1, 3)}`} />
+      {/* "DAY" in plain letters (the full one-row bar leaves it out) and only the number on flaps */}
+      <span className="stat-label day-label">DAY</span>
+      <SplitFlap text={pad(clock?.day ?? 1, 3)} />
       <SheetSprite id="32-icons" row="clock" frame={Math.floor(time.h / 6) % 4} />
       <SplitFlap text={`${pad(time.h, 2)}.${pad(minute, 2)}`} />
     </div>
@@ -141,6 +144,25 @@ function DayClock() {
 }
 
 export const coins = (milli: number): string => (milli / 1000).toFixed(2);
+
+/** Coins in the top bar, which has no room to spare: whole coins from 1,000 up, millions as 1.2M. */
+export const barCoins = (milli: number): string => {
+  const v = milli / 1000;
+  if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  return Math.abs(v) >= 1000 ? String(Math.floor(v)) : v.toFixed(2);
+};
+
+/**
+ * The full one-row top bar (640 UI pixels) has room for the words COLLECT and SELL only while the
+ * numbers stay short. A rough width of the numbers in UI pixels (a letter 6, a counter at least 16, a
+ * day flap 9); past ROW_BUDGET the words step aside and the icons and tooltips carry on. Measured by
+ * e2e/topbar.test.ts, which checks nothing is ever squeezed or cut off.
+ */
+export const ROW_BUDGET = 169;
+export function barNumbersWidth(parts: { coins: string; ground: number; crate: number; hens: string; feed: string; day: number }): number {
+  const counter = (t: string) => Math.max(16, 6 * t.length);
+  return counter(parts.coins) + counter(String(parts.ground)) + counter(String(parts.crate)) + 6 * parts.hens.length + 6 * parts.feed.length + 9 * Math.max(3, String(parts.day).length);
+}
 
 export function TopBar({
   farm,
@@ -164,6 +186,7 @@ export function TopBar({
   onProfile: () => void;
 }) {
   const { audio } = useServices();
+  const clock = useStore(game, (s) => s.clock);
   const capacity = coopCapacity(farm.coops.map((c) => c.kind));
   const feed = farm.feedGrams.cheap + farm.feedGrams.standard + farm.feedGrams.premium;
   const days = farm.hens.length ? feed / (farm.hens.length * feedGramsPerHenDay()) : 0;
@@ -184,15 +207,22 @@ export function TopBar({
       <SheetSprite id="32-icons" row={row} />
     </button>
   );
+  const oneRow = rect.h <= 24;
+  const crate = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
+  const numbers = barNumbersWidth({ coins: barCoins(farm.cashMilli), ground: groundEggs(farm), crate, hens: `${farm.hens.length}/${capacity}`, feed: `${days.toFixed(1)}D`, day: clock?.day ?? 1 });
+  const compact = oneRow && numbers > ROW_BUDGET;
   return (
-    // on one row (a window 640 UI pixels wide) the bar is full: tighter gaps keep room for the coins to grow
+    // on one row (a window 640 UI pixels wide) the bar is full: tighter gaps, no DAY word, and the
+    // COLLECT and SELL words step aside when the numbers grow long
     <div
-      className="topbar zone"
+      className={`topbar zone${oneRow ? ' one-row' : ''}${compact ? ' compact' : ''}`}
       data-ui="topbar"
+      data-compact={compact ? '1' : '0'}
+      data-numbers={numbers}
       style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, flexWrap: rect.h > 24 ? 'wrap' : 'nowrap', alignContent: 'center', columnGap: rect.h > 24 ? undefined : 2 }}
     >
       <Stat icon="cash" title="Coins to spend">
-        <Counter id="cash-counter" value={farm.cashMilli} format={(v) => coins(Math.round(v))} />
+        <Counter id="cash-counter" value={farm.cashMilli} format={(v) => barCoins(Math.round(v))} />
       </Stat>
       <EggStats farm={farm} />
       <Stat icon="hen" title="Hens, and room in your coops">

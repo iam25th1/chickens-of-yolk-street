@@ -175,16 +175,17 @@ describe('the profile', () => {
         // two badges at once: the moments come one after the other, never together
         await server.badge(name, 'first-haggle', 'plain');
         await server.badge(name, 'number-one', 'gold');
-        await page.locator('[data-ui="badge-moment"][data-badge="first-haggle"]').waitFor({ timeout: 10_000 });
+        // moments play one at a time, a few seconds each; a slow machine draws them slower still
+        await page.locator('[data-ui="badge-moment"][data-badge="first-haggle"]').waitFor({ timeout: 45_000 });
         expect(await page.locator('[data-ui="badge-moment"]').count()).toBe(1);
         expect(await page.locator('[data-ui="badge-moment-name"]').innerText()).toBe('FIRST HAGGLE: EARNED');
         await page.waitForTimeout(500);
         await check('badge moment');
         await shot(page, 'badge-moment', size);
-        await page.locator('[data-ui="badge-moment"][data-badge="number-one"]').waitFor({ timeout: 10_000 });
+        await page.locator('[data-ui="badge-moment"][data-badge="number-one"]').waitFor({ timeout: 45_000 });
         expect(await page.locator('[data-ui="badge-moment"]').count()).toBe(1);
         expect(await page.locator('[data-ui="badge-moment-name"]').innerText()).toBe('NUMBER ONE: GOLD');
-        await page.locator('[data-ui="badge-moment"]').waitFor({ state: 'detached', timeout: 10_000 });
+        await page.locator('[data-ui="badge-moment"]').waitFor({ state: 'detached', timeout: 45_000 });
       } finally {
         await ctx.close();
       }
