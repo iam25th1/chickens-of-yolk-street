@@ -102,7 +102,7 @@ import { claimGoal, goalViews, markGoal, markToured, toured } from './goals';
 import { checkChosenName, nameTaken, renameLegacyFarms, setFarmName, uniqueFarmName } from './names';
 import { conveyorCarry, hopperRefill, loadMachines, logMachine, logSale, machineDay, machineViews, repairMachine, wearMachines, type Machines } from './machines';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
-import { ACTION_BADGES, badgeViews, evaluateBadges, loadFacts } from './badges';
+import { ACTION_BADGES, CARRY_BADGES, MINT_BADGES, NOTE_BADGES, badgeViews, evaluateBadges, loadFacts } from './badges';
 import { backfillProfiles, bumpStats, earnedBadges, layTally, noteAction, profileFor, publicProfileFor, rememberTraits, snapshotDay, statBrokeDown, statRepaired } from './profile';
 
 export { ActionError } from './ctx';
@@ -312,7 +312,7 @@ export class Game {
       this.inTx(async (ctx) => {
         await arriveCards(ctx);
         const carried = await conveyorCarry(ctx);
-        if (carried.length) await evaluateBadges(ctx, carried, { categories: ['eggs'] });
+        if (carried.length) await evaluateBadges(ctx, carried, { metrics: CARRY_BADGES });
       }),
     );
   }
@@ -765,9 +765,9 @@ export class Game {
           await this.applyPlayerAction(ctx, farm, rest as PlayerAction);
           ctx.touched.add(farm.id);
           // the badges this action can move (and the night owl and the rooster crow, for business)
-          const cats = [...(ACTION_BADGES[action.t] ?? [])];
-          if (BUSINESS.has(action.t) && (await noteAction(ctx, farm.id))) cats.push('fun');
-          if (cats.length) await evaluateBadges(ctx, [farm.id], { categories: cats });
+          const metrics = [...(ACTION_BADGES[action.t] ?? [])];
+          if (BUSINESS.has(action.t) && (await noteAction(ctx, farm.id))) metrics.push(...NOTE_BADGES);
+          if (metrics.length) await evaluateBadges(ctx, [farm.id], { metrics });
         });
         return { ok: true, events: [] };
       } catch (err) {
@@ -1339,6 +1339,7 @@ export class Game {
         );
         ctx.touched.add(farmId);
         ctx.marketChanged = true;
+        await evaluateBadges(ctx, [farmId], { metrics: MINT_BADGES });
         return ctx.q.query('SELECT grade, milestone, token_id FROM feather_tickets WHERE id = $1', [ticketId]);
       }),
     );

@@ -290,28 +290,43 @@ export async function loadFacts(q: Queryable, farmIds: string[], day: number, me
   return out;
 }
 
-/** What each player action can move, so an action reads only those badges' numbers. */
-export const ACTION_BADGES: Partial<Record<string, BadgeCategory[]>> = {
-  collect: ['eggs'],
-  sell: ['market', 'eggs', 'fun'],
-  placeOrder: ['market'],
-  fillOrder: ['market', 'eggs'],
-  respondCard: ['haggling', 'market', 'contracts', 'flock'],
-  deliverContract: ['contracts', 'market'],
-  buyHen: ['flock'],
-  buyHens: ['flock'],
-  buildCoop: ['flock'],
-  upgradeCoop: ['flock'],
-  buyUnlock: ['machines'],
-  repairMachine: ['machines'],
-  claimGoal: ['market'],
-  redeemTicket: ['feathers'],
-  setFarmName: ['fun'],
+/** The numbers a sale can move. */
+const SALE: BadgeMetric[] = ['eggsSold', 'bigTrades', 'cashNow'];
+const FLOCK: BadgeMetric[] = ['hens', 'fullCoops', 'tophats', 'traitsSeen', 'oldestHen'];
+
+/**
+ * The numbers each player action can move, so an action reads only those (a few grouped queries).
+ * Everything else (days, ranks, profit, standing, milestones) moves at the day close, which reads them all.
+ */
+export const ACTION_BADGES: Partial<Record<string, BadgeMetric[]>> = {
+  collect: ['eggsCollected', 'eggsPicked', 'goldenCollected', 'crateNow'],
+  sell: [...SALE, 'glutSales', 'peakSales', 'goldenPeakSales', 'biggestSale'],
+  placeOrder: SALE,
+  fillOrder: [...SALE, 'ordersFilled', 'crateNow'],
+  respondCard: [...SALE, 'hagglesWon', 'haggleKinds', 'hagglesLost', 'refusals', 'contractsTaken', 'glutSales', 'peakSales', 'goldenPeakSales', 'biggestSale', ...FLOCK],
+  deliverContract: [...SALE, 'deliveries', 'bestDeliveryStreak', 'contractsTaken'],
+  buyHen: [...FLOCK, 'auctionHens'],
+  buyHens: [...FLOCK, 'auctionHens'],
+  buildCoop: ['coops', 'deluxeCoops', 'fullCoops'],
+  upgradeCoop: ['coops', 'deluxeCoops', 'fullCoops'],
+  buyUnlock: ['ownsConveyor', 'ownsGrader', 'ownsCart', 'ownsHopper', 'ownsClerk', 'machinesOwned'],
+  repairMachine: ['repairs', 'bestRepairStreak'],
+  claimGoal: ['cashNow'],
+  setFarmName: ['renamed'],
 };
+
+/** What business at night or at dawn moves (game/profile.ts noteAction). */
+export const NOTE_BADGES: BadgeMetric[] = ['nightActions', 'bestCrowStreak'];
+/** What a Feather minted moves. */
+export const MINT_BADGES: BadgeMetric[] = ['ticketsWon', 'mintedFluff', 'mintedPlume', 'mintedQuill', 'mintedGoldenQuill', 'mintedGrades'];
+/** What the conveyor's carry moves. */
+export const CARRY_BADGES: BadgeMetric[] = ['eggsCollected', 'goldenCollected', 'crateNow'];
 
 export interface EvaluateOptions {
   /** Only these categories (default: every badge). */
   categories?: Iterable<BadgeCategory>;
+  /** Only the badges that count these numbers. */
+  metrics?: Iterable<BadgeMetric>;
   /** Earn without telling the player (the fill from history). */
   quiet?: boolean;
   /** Mark what is earned as filled in from history. */
@@ -332,11 +347,12 @@ export async function evaluateBadges(ctx: Ctx, farmIds: string[], opts: Evaluate
   if (!players.length) return [];
   const ids = players.map((p) => String(p.id));
   const cats = opts.categories ? new Set(opts.categories) : null;
-  const defs = BADGES.filter((b) => !cats || cats.has(b.category));
+  const only = opts.metrics ? new Set(opts.metrics) : null;
+  const defs = BADGES.filter((b) => (!cats || cats.has(b.category)) && (!only || only.has(b.metric)));
   if (!defs.length) return [];
   const facts = await loadFacts(q, ids, ctx.day, new Set(defs.map((b) => b.metric)), opts.atClose ? ctx.day : ctx.day - 1);
   const held = new Map<string, { level: BadgeLevel | null; day: number | null; progress: number }>();
-  for (const r of await q.query('SELECT farm_id, badge, tier, earned_day, progress FROM badges WHERE farm_id = ANY($1::text[])', [ids])) {
+  for (const r of await q.query('SELECT farm_id, badge, tier, earned_day, progress FROM badges WHERE farm_id = ANY($1::text[]) AND badge = ANY($2::text[])', [ids, defs.map((b) => b.id)])) {
     held.set(`${String(r.farm_id)}|${String(r.badge)}`, {
       level: (r.tier as BadgeLevel | null) ?? null,
       day: r.earned_day === null || r.earned_day === undefined ? null : num(r.earned_day),

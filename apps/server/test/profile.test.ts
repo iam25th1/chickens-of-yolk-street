@@ -107,7 +107,9 @@ describe('the day record', () => {
     expect(p.flock.traitsSeen.length).toBeGreaterThanOrEqual(4);
     expect(p.machines).toMatchObject({ repairs: 1, breakdowns: 0, repairStreak: 1, bestRepairStreak: 1, daysNoBreakdown: 2 });
     expect(p.market).toMatchObject({ contractsTaken: 1, contractsKept: 1, contractMisses: 0, deliveries: 1, deliveryStreak: 1, ordersFilled: 1, eggsSold: 11 });
-    expect(p.mint).toMatchObject({ ticketsWon: 0 });
+    // (a milestone's roll depends on the season's random name: any tickets won are counted)
+    expect(p.mint.ticketsWon).toBe(farm.tickets.length);
+    expect(p.mint.milestones).toBe(farm.milestones.filter((m) => m.state !== 'open').length);
     expect(p.badges.length).toBeGreaterThanOrEqual(60);
     expect(p.badges.find((b) => b.id === 'first-sale')).toMatchObject({ level: 'plain', earnedDay: 1 });
     expect(p.badges.find((b) => b.id === 'market-stall')).toMatchObject({ level: null, progress: 11 });
