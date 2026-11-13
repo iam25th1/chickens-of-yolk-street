@@ -4,7 +4,7 @@
 // AI trader last said. SELL: sell from the crate at today's price, or post an order at your own
 // price. BUY ORDERS: what the AI buyers want, each filled from the crate in one tap. YOUR ORDERS:
 // your open orders, with cancel. TRADE: other farms' offers to buy, and your own offers as everyone
-// sees them. HEN AUCTION: hens from bust farms. FARMS: the street's farms ranked, with their signs.
+// sees them. HEN AUCTION: hens from bust farms. FARMS: the street's farms ranked, with their signs and best badges; a farm opens its public profile.
 // Every tab opens with one plain line; every list is paged to fit the window (never a scrollbar).
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ECONOMY, EGG_GRADES, MARKET_CHART_DAYS, coopCapacity, eggPrice, saleValue, type EggGrade, type FarmState, type MarketChartDay, type MarketState, type OrderView } from '@coys/shared';
@@ -15,11 +15,13 @@ import type { Action } from '../net/socket';
 import { useStore } from '../state/store';
 import { uiEvents, type MarketTab } from '../state/ui';
 import { AiBadge } from './AiBadge';
+import { BadgeRow } from './Badge';
 import { LOOK } from './cast';
 import { toasts, uiFx } from './FxLayer';
 import { SplitFlap } from './Hud';
 import { Paged } from './Paged';
 import { HenArt } from './Panels';
+import { openPublicProfile } from './PublicProfile';
 import { SheetSprite } from './SheetSprite';
 
 type Send = (a: Action) => Promise<boolean>;
@@ -38,7 +40,7 @@ export const MARKET_TABS: { id: MarketTab; label: string; line: string }[] = [
   { id: 'mine', label: 'YOUR ORDERS', line: 'YOUR EGGS WAITING FOR A BUYER AT YOUR PRICE. CANCEL ONE TO PUT ITS EGGS BACK IN YOUR CRATE.' },
   { id: 'trade', label: 'TRADE', line: 'EGGS OTHER FARMS OFFER AT THEIR OWN PRICE, AND THE OFFERS YOU HAVE OUT FOR EVERYONE TO SEE.' },
   { id: 'auction', label: 'HEN AUCTION', line: "HENS FROM FARMS THAT WENT BUST, AT HALF THE BREEDER'S PRICE. EACH ONE IS ONE OF A KIND." },
-  { id: 'farms', label: 'FARMS', line: 'EVERY FARM ON THE STREET, RICHEST FIRST. A FARM THAT RUNS OUT OF COINS GOES BUST.' },
+  { id: 'farms', label: 'FARMS', line: 'EVERY FARM ON THE STREET, RICHEST FIRST. TAP A FARM FOR ITS PUBLIC PROFILE AND BADGES.' },
 ];
 
 /** A price against today's street price for its grade, in words. */
@@ -663,6 +665,7 @@ function AuctionTab({ farm, send }: TabProps) {
 
 function FarmsTab({ farm, market, wide, side }: TabProps) {
   const v = useViewport();
+  const { audio } = useServices();
   const signs = (
     <button
       className="col"
@@ -683,15 +686,28 @@ function FarmsTab({ farm, market, wide, side }: TabProps) {
       <span style={{ lineHeight: '10px', color: '#8b5a2b' }}>A FARM THAT RUNS OUT OF COINS GOES BUST. ITS SIGN FALLS AND ITS HENS GO TO THE HEN AUCTION.</span>
     </button>
   );
+  // each farm opens its public profile; its best badges sit beside its name
   const rows = market.ranking.map((r, i) => (
-    <span key={`${r.name}-${i}`} className="row spread" data-ui="ranking-row" style={{ opacity: r.bust ? 0.6 : 1, width: '100%', gap: 6, alignItems: 'flex-start' }}>
+    <button
+      key={`${r.farmId}-${i}`}
+      className="row spread"
+      data-ui="ranking-row"
+      data-farm={r.farmId}
+      title={`${r.name}: public profile`}
+      style={{ opacity: r.bust ? 0.6 : 1, width: '100%', gap: 6, alignItems: 'flex-start', border: 0, padding: 0, background: 'transparent', font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
+      onClick={() => {
+        uiSound(audio, 'click');
+        openPublicProfile(r.farmId, 'market');
+      }}
+    >
       <span style={{ flex: 1, minWidth: 0, lineHeight: '9px', color: r.name === farm.name ? '#2f6f9e' : undefined }}>
         {i + 1}. {r.name.toUpperCase()}
         {r.kind !== 'player' && <AiBadge />}
         {r.name === farm.name ? ' (YOU)' : ''}
       </span>
+      <BadgeRow badges={r.badges} max={3} />
       <span style={{ flex: 'none' }}>{r.bust ? 'BUST' : `${r.hens} HENS, ${coins(r.cashMilli)}`}</span>
-    </span>
+    </button>
   ));
   return (
     <>

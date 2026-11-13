@@ -26,7 +26,8 @@ export type ModalState =
   /** The player's own profile page (private), on a tab. */
   | { kind: 'profile'; tab: ProfileTab }
   /** A farm's public profile, opened from the farms ranking or the profile's own link. */
-  | { kind: 'publicProfile'; farmId: string; back: ProfileTab | null };
+  /** back: the profile tab (or the Market's FARMS tab) it was opened from, reopened on close. */
+  | { kind: 'publicProfile'; farmId: string; back: ProfileTab | 'market' | null };
 
 export const ui = createStore<{ modal: ModalState | null }>({ modal: null });
 

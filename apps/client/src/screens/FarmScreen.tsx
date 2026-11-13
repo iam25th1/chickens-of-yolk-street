@@ -438,7 +438,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         />
       )}
       {modal?.kind === 'publicProfile' && (
-        <PublicProfileModal key={modal.farmId} farmId={modal.farmId} onClose={() => (modal.back ? openModal({ kind: 'profile', tab: modal.back }) : closeModal())} />
+        <PublicProfileModal key={modal.farmId} farmId={modal.farmId} onClose={() => (modal.back === 'market' ? openModal({ kind: 'market', tab: 'farms' }) : modal.back ? openModal({ kind: 'profile', tab: modal.back }) : closeModal())} />
       )}
       {modal?.kind === 'minting' && (
         <MintMoment

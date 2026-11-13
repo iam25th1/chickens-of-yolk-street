@@ -14,9 +14,9 @@ import { Modal } from './Modal';
 import { Paged } from './Paged';
 import { SheetSprite } from './SheetSprite';
 
-/** Opens a farm's public profile (from any ranking). */
-export function openPublicProfile(farmId: string): void {
-  openModal({ kind: 'publicProfile', farmId, back: null });
+/** Opens a farm's public profile (from any ranking); from the Market, closing it goes back to the Market's farms. */
+export function openPublicProfile(farmId: string, back: 'market' | null = null): void {
+  openModal({ kind: 'publicProfile', farmId, back });
 }
 
 /** The sign a farm stands behind: a player's farm sign, or its rival's own. */

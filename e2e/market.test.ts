@@ -168,6 +168,19 @@ describe('the Market', () => {
         await vis(page, '[data-ui="auction-buy"]:not([disabled])').click();
         await expect.poll(taken).toBe(before + 1);
 
+        // FARMS: a farm in the ranking opens its public profile, and closing it comes back to the farms
+        await tab('farms');
+        const row = page.locator('[data-ui="ranking-row"] >> visible=true').first();
+        const farmId = await row.getAttribute('data-farm');
+        expect(farmId).toBeTruthy();
+        await row.click();
+        await page.locator('[data-ui="public-profile"][data-loaded="1"]').waitFor({ timeout: 10_000 });
+        expect(await page.locator('[data-ui="public-profile"]').getAttribute('data-farm')).toBe(farmId);
+        await check('a public profile from the farms');
+        await shot('public-profile');
+        await page.keyboard.press('Escape');
+        await page.locator('[data-ui="market-farms-tab"]').waitFor({ timeout: 5000 });
+
         // BACK TO THE FARM, and the farm's own sign opens it again
         await page.locator('[data-ui="market-close"]').click();
         await market.waitFor({ state: 'detached' });
