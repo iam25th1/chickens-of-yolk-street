@@ -73,7 +73,15 @@ const displayName = z
   .max(40)
   .transform((s) => s.replace(/[^\p{L}\p{N} '-]/gu, '').trim().slice(0, 20) || 'Farmer');
 const devLoginBody = z.object({ name: displayName, deviceId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/) }).strict();
-const privyLoginBody = z.object({ accessToken: z.string().min(20).max(4096), name: displayName.optional() }).strict();
+// An email sign-in never names the farm: `name` is accepted from older clients and ignored. The
+// email-name guard is the SHA-256 of the email name's letters and digits, and their count.
+const privyLoginBody = z
+  .object({
+    accessToken: z.string().min(20).max(4096),
+    name: displayName.optional(),
+    nameGuard: z.object({ sha256: z.string().regex(/^[0-9a-f]{64}$/), len: z.number().int().min(3).max(64) }).strict().optional(),
+  })
+  .strict();
 
 export function createGameServer(opts: GameServerOptions): Server {
   const log = opts.log ?? ((line: string) => console.log(line));
@@ -225,7 +233,7 @@ export function createGameServer(opts: GameServerOptions): Server {
           } catch {
             return json(res, 401, { error: 'unauthenticated' });
           }
-          const who = await game.ensurePlayer('privy', did, body.data.name ?? 'Farmer');
+          const who = await game.ensurePlayer('privy', did, null, body.data.nameGuard ?? null);
           if (who.created) log(`[login] privy player ${who.playerId} joined`);
           return issue(res, who);
         }

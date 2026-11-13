@@ -7,7 +7,19 @@ import type { Rng } from './rng';
 
 export class ActionError extends Error {
   constructor(
-    readonly code: 'insufficient_funds' | 'insufficient_stock' | 'invalid_action' | 'not_found' | 'farm_bust',
+    readonly code:
+      | 'insufficient_funds'
+      | 'insufficient_stock'
+      | 'invalid_action'
+      | 'not_found'
+      | 'farm_bust'
+      | 'name_length'
+      | 'name_characters'
+      | 'name_letters'
+      | 'name_rude'
+      | 'name_email'
+      | 'name_taken'
+      | 'name_wait',
     message: string,
   ) {
     super(message);

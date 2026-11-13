@@ -108,7 +108,7 @@ describe('the order book', () => {
     const grade = (['white', 'cream', 'brown'] as const).find((g) => fa.crate[g] > 0) ?? 'white';
     const price = (await t.game.getMarketState()).pricesMilli[grade] / 1000;
     expect(await t.game.act(a.playerId, { t: 'placeOrder', rid: rid(), grade, qty: 1, price })).toMatchObject({ ok: true });
-    const order = (await t.game.getMarketState()).book.find((o) => o.side === 'sell' && o.owner === "Ada's Farm");
+    const order = (await t.game.getMarketState()).book.find((o) => o.side === 'sell' && o.owner === 'Ada');
     expect(order).toBeDefined();
     if (!order) return;
     const cashA = (await t.game.getFarmState(a.farmId)).cashMilli;
