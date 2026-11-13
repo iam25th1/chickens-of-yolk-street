@@ -315,7 +315,6 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
   }
 
   const z = v.zones;
-  const guideBox = { x: z.tracker.x, y: z.toasts.y, w: z.tracker.w, h: z.tracker.y + z.tracker.h - z.toasts.y };
   const ctx = { modal, farm, market };
   const card = modal?.kind === 'card' ? (cardState?.card.id === modal.cardId ? cardState.card : farm.cards.find((c) => c.id === modal.cardId)) : null;
   const hen = modal?.kind === 'hen' ? farm.hens.find((h) => h.id === modal.henId) : null;
@@ -333,14 +332,9 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         onFeathers={() => openModal({ kind: 'feathers' })}
       />
       {!(v.portrait && modal) && <SidePanel farm={farm} market={market} rect={z.side} send={send} onOpen={openCard} />}
-      {touring ? (
-        <TourBox ctx={ctx} rect={guideBox} send={send} />
-      ) : (
-        <>
-          <ToastArea farm={farm} rect={z.toasts} offline={status === 'offline'} />
-          <Tracker farm={farm} rect={z.tracker} send={send} />
-        </>
-      )}
+      <ToastArea farm={farm} rect={z.toasts} offline={status === 'offline'} />
+      <Tracker farm={farm} rect={z.tracker} send={send} />
+      {touring && <TourBox ctx={ctx} send={send} />}
       {modal?.kind === 'shop' && (
         <ShopPanel
           farm={farm}

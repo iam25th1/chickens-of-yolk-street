@@ -1,15 +1,19 @@
-// The how-to-play tour: ten steps that teach the whole game by doing it. Each step dims everything
-// but the thing to do (a spotlight that follows it, even a hen or an egg on the farm), says what it
-// is in a line or two in the guide zone, and moves on only when the player does it. Back, Skip and
-// progress dots; replayable from Settings. The goal tracker takes over when it ends.
-import { useEffect, useRef, useState } from 'react';
+// The how-to-play tour: eleven steps that teach the whole game by doing it. Each step dims
+// everything but the thing to do (a spotlight that follows it, even a hen or an egg on the farm),
+// and its box sits beside it with a pointer (never over it; centred when there is no target).
+// A step moves on when the player does the thing; NEXT appears after a few seconds so nobody is
+// stuck. BACK, NEXT, SKIP STEP and END TOUR (asked once more) on every step, "STEP 3 OF 11" with
+// dots; replayable from Settings.
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { feedGramsPerHenDay, loyalistBagPrice, squeezerBagPrice, desperation, type FarmState, type GameEvent, type MarketState } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import type { Rect } from '../app/viewport';
 import type { Action } from '../net/socket';
 import { events } from '../state/game';
-import { useStore } from '../state/store';
+import { createStore, useStore } from '../state/store';
+import { motion } from '../motion/ui';
+import { placeTourBox, type Placement } from './tourPlace';
 import { finishTour, tour, tourStep } from '../state/tour';
 import { closeModal, openModal, ui, uiEvents, type ModalState, type UiEvent } from '../state/ui';
 import { uiFx } from './FxLayer';
@@ -185,12 +189,11 @@ function measure(t: TourTarget, v: ReturnType<typeof useViewport>, ui: HTMLEleme
   return { x: pick.x / s, y: pick.y / s, w: pick.w / s, h: pick.h / s };
 }
 
-/** The spotlight: four shades around the target (they take every other click) and a ring with a tag. */
+/** The spotlight: four shades around the target (they take every other click) and a ring round it. */
 export function Spotlight({ ctx }: { ctx: TourCtx }) {
   const v = useViewport();
   const t = useStore(tour, (s) => s);
   const [rect, setRect] = useState<Rect | null>(null);
-  const [tag, setTag] = useState('');
   const host = useRef<HTMLDivElement>(null);
   const step = TOUR[t.step];
   const ctxRef = useRef(ctx);
@@ -202,11 +205,14 @@ export function Spotlight({ ctx }: { ctx: TourCtx }) {
       const target = step.target(ctxRef.current);
       const ui = host.current?.closest('.ui') as HTMLElement | null;
       let r = target ? measure(target, v, ui) : null;
-      if (target && 'world' in target && target.world === 'egg' && r && !(window as unknown as { __coysFarm?: { targets(): { kind: string }[] } }).__coysFarm?.targets().some((x) => x.kind === 'egg')) {
-        setTag('WAIT FOR A HEN TO LAY');
-      } else setTag(r?.next ? 'NEXT PAGE' : (target?.tag ?? ''));
       if (r) r = { x: Math.round(r.x) - 3, y: Math.round(r.y) - 3, w: Math.round(r.w) + 6, h: Math.round(r.h) + 6 };
       setRect((old) => (old && r && old.x === r.x && old.y === r.y && old.w === r.w && old.h === r.h ? old : r));
+      // the target (UI pixels) and what to do with it, for the step box beside it
+      const tagText = target && 'world' in target && target.world === 'egg' && r && !(window as unknown as { __coysFarm?: { targets(): { kind: string }[] } }).__coysFarm?.targets().some((x) => x.kind === 'egg') ? 'WAIT FOR A HEN TO LAY' : r?.next ? 'NEXT PAGE' : (target?.tag ?? '');
+      const was = tourTarget.get();
+      const next = r ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
+      const same = (was.rect === null && next === null) || (!!was.rect && !!next && was.rect.x === next.x && was.rect.y === next.y && was.rect.w === next.w && was.rect.h === next.h);
+      if (!same || was.tag !== tagText) tourTarget.set({ rect: next, tag: tagText });
       raf = requestAnimationFrame(loop);
     };
     loop();
@@ -217,6 +223,8 @@ export function Spotlight({ ctx }: { ctx: TourCtx }) {
   const H = v.uiH;
   return (
     <div ref={host} className="layer" style={{ zIndex: 40 }} data-ui="spotlight">
+      {/* no target on screen: the whole window dims, and still takes clicks through */}
+      {!rect && <div className="spot-shade" style={{ left: 0, top: 0, width: W, height: H, pointerEvents: 'none' }} />}
       {rect && (
         <>
           <div className="spot-shade" style={{ left: 0, top: 0, width: W, height: Math.max(0, rect.y) }} />
@@ -224,21 +232,27 @@ export function Spotlight({ ctx }: { ctx: TourCtx }) {
           <div className="spot-shade" style={{ left: 0, top: rect.y, width: Math.max(0, rect.x), height: rect.h }} />
           <div className="spot-shade" style={{ left: rect.x + rect.w, top: rect.y, width: Math.max(0, W - rect.x - rect.w), height: rect.h }} />
           <div className="spot-ring" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }} />
-          {tag && (
-            <div className="spot-tag" style={{ left: Math.max(2, Math.min(W - 120, rect.x)), top: rect.y > 30 ? rect.y - 16 : rect.y + rect.h + 6 }}>
-              {tag}
-            </div>
-          )}
+
         </>
       )}
     </div>
   );
 }
 
-/** The step box in the guide zone, and the logic that moves the tour on when the player acts. */
-export function TourBox({ ctx, rect, send }: { ctx: TourCtx; rect: Rect; send: (a: Action) => Promise<boolean> }) {
-  const { audio } = useServices();
+/** Where the spotlight is (UI pixels), for the step box to sit beside it. */
+export const tourTarget = createStore<{ rect: Rect | null; tag: string }>({ rect: null, tag: '' });
+
+/** The widths the step box tries, widest first (the narrow ones are for phones). */
+const BOX_WIDTHS = [264, 220, 180, 150];
+/** Seconds an action step waits before NEXT appears. */
+export const NEXT_AFTER_S = 5;
+
+/** The step box beside the spotlight, and the logic that moves the tour on when the player acts. */
+export function TourBox({ ctx, send }: { ctx: TourCtx; send: (a: Action) => Promise<boolean> }) {
   const v = useViewport();
+  const target = useStore(tourTarget, (s) => s.rect);
+  const action = useStore(tourTarget, (s) => s.tag);
+  const { audio } = useServices();
   const t = useStore(tour, (s) => s);
   const ctxRef = useRef(ctx);
   ctxRef.current = ctx;
@@ -286,57 +300,143 @@ export function TourBox({ ctx, rect, send }: { ctx: TourCtx; rect: Rect; send: (
     };
   }, [t.active, audio]);
 
+  // NEXT shows after a few seconds on a step (at once when the step cannot happen now)
+  const [waited, setWaited] = useState(-1);
+  useEffect(() => {
+    if (!t.active) return;
+    const id = setTimeout(() => setWaited(t.step), NEXT_AFTER_S * 1000);
+    return () => clearTimeout(id);
+  }, [t.active, t.step]);
+  const [ending, setEnding] = useState(false);
+  useEffect(() => setEnding(false), [t.step]);
+
+  // the box's height at each width it may take, measured in a hidden copy, then its place
+  const measureRef = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [heights, setHeights] = useState<number[]>([]);
+  useLayoutEffect(() => {
+    const m = measureRef.current;
+    if (!m) return;
+    const hs = [...m.children].map((c) => (c as HTMLElement).offsetHeight);
+    if (hs.join() !== heights.join()) setHeights(hs);
+  }, [heights, t.step, ending, waited, refusedAt, v.uiW, v.uiH]);
+  const z = v.zones;
+  const area = { x: z.world.x + 4, y: z.world.y + 4, w: z.world.w - 8, h: z.world.h - 8 };
+  const avoid = [z.tracker, z.toasts].map((r) => ({ x: r.x - 2, y: r.y - 2, w: r.w + 4, h: r.h + 4 }));
+  const sizes = BOX_WIDTHS.map((w, i) => ({ w: Math.min(w, area.w), h: heights[i] ?? 0 })).filter((s) => s.h > 0);
+  const place: Placement | null = sizes.length ? (placeTourBox(target, sizes, area, avoid) ?? placeTourBox(null, sizes, area, avoid)) : null;
+  // a new step drops in
+  useEffect(() => {
+    if (boxRef.current && t.active) motion.enter(boxRef.current);
+  }, [t.step, t.active]);
+
   if (!t.active || !step) return null;
   const blocked = (step.blocked?.(ctx) ?? false) || refusedAt === t.step;
-  return (
-    <div className="tour-box zone" data-ui="tour" role="status" aria-label="How to play" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, zIndex: 41 }}>
-      <div className="row" style={{ gap: 4 }}>
-        <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {t.step + 1}/{TOUR.length} {step.title}
+  const showNext = blocked || waited === t.step;
+  const go = (n: number) => {
+    uiSound(audio, n < t.step ? 'back' : 'click');
+    closeModal();
+    if (n >= TOUR.length) {
+      finishTour();
+      uiFx.emit({ kind: 'toast', text: 'TOUR OVER. REPLAY IT ANY TIME FROM SETTINGS.' });
+    } else tourStep(Math.max(0, n));
+  };
+  const text = typeof step.text === 'function' ? step.text(ctx) : step.text;
+  const content = (w: number, live: boolean) => (
+    <div className="tour-box" style={{ width: w }} data-ui={live ? 'tour' : undefined} role={live ? 'dialog' : undefined} aria-label={live ? 'How to play' : undefined}>
+      <div className="row spread" style={{ gap: 6 }}>
+        <span className="tour-step" data-ui={live ? 'tour-progress' : undefined}>
+          STEP {t.step + 1} OF {TOUR.length}
         </span>
         <span className="tour-dots" aria-hidden="true">
           {TOUR.map((_, i) => (
             <i key={i} className={i === t.step ? 'on' : i < t.step ? 'done' : ''} />
           ))}
         </span>
-        <button
-          className="btn"
-          disabled={t.step === 0}
-          onClick={() => {
-            uiSound(audio, 'back');
-            closeModal();
-            tourStep(Math.max(0, t.step - 1));
-          }}
-        >
-          BACK
-        </button>
-        {blocked && (
+      </div>
+      <span className="panel-title tour-title">{step.title}</span>
+      <span className="row" style={{ alignItems: 'flex-start', gap: 6 }}>
+        {step.hen && <SheetSprite id="x-hen-portrait" row="talk" play={live ? 'loop' : false} size={v.p} box={{ w: 32, h: 32 }} />}
+        <span className="tour-text">{text}</span>
+      </span>
+      {action && (
+        <span className="tour-action" data-ui={live ? 'tour-action' : undefined}>
+          {place?.side === 'right' ? '< ' : place?.side === 'left' ? '' : place?.side === 'below' ? '^ ' : place?.side === 'above' ? 'v ' : ''}
+          {action}
+          {place?.side === 'left' ? ' >' : ''}
+        </span>
+      )}
+      {ending ? (
+        <div className="col" style={{ gap: 4 }}>
+          <span className="tour-text">END THE TOUR? YOU CAN REPLAY IT FROM SETTINGS.</span>
+          <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
+            <button className="btn red" data-ui={live ? 'tour-end-yes' : undefined} onClick={() => go(TOUR.length)}>
+              END TOUR
+            </button>
+            <button
+              className="btn"
+              data-ui={live ? 'tour-end-no' : undefined}
+              onClick={() => {
+                uiSound(audio, 'click');
+                setEnding(false);
+              }}
+            >
+              KEEP GOING
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
+          <button className="btn" data-ui={live ? 'tour-back' : undefined} disabled={t.step === 0} onClick={() => go(t.step - 1)}>
+            BACK
+          </button>
+          {showNext && (
+            <button className="btn red" data-ui={live ? 'tour-next' : undefined} onClick={() => go(t.step + 1)}>
+              {t.step + 1 >= TOUR.length ? 'DONE' : 'NEXT'}
+            </button>
+          )}
+          <button className="btn" data-ui={live ? 'tour-skip-step' : undefined} data-tour={live ? 'tour-skip' : undefined} onClick={() => go(t.step + 1)}>
+            SKIP STEP
+          </button>
           <button
             className="btn"
+            data-ui={live ? 'tour-end' : undefined}
             onClick={() => {
               uiSound(audio, 'click');
-              tourStep(t.step + 1);
+              setEnding(true);
             }}
           >
-            LATER
+            END TOUR
           </button>
-        )}
-        <button
-          className="btn"
-          data-tour="tour-skip"
-          onClick={() => {
-            uiSound(audio, 'back');
-            finishTour();
-          }}
-        >
-          SKIP
-        </button>
-      </div>
-      <span className="row" style={{ flex: 1, minHeight: 0, overflow: 'hidden', alignItems: 'flex-start', gap: 6 }}>
-        {step.hen && <SheetSprite id="x-hen-portrait" row="talk" play="loop" size={v.p} box={{ w: 32, h: 32 }} />}
-        <span>{typeof step.text === 'function' ? step.text(ctx) : step.text}</span>
-      </span>
+        </div>
+      )}
     </div>
+  );
+  // the pointer: a notch on the box's edge facing the target
+  const pointer =
+    place && place.side !== 'center'
+      ? place.side === 'right'
+        ? { left: -6, top: place.pointer - 6, borderWidth: '6px 6px 6px 0', borderColor: 'transparent var(--ink) transparent transparent' }
+        : place.side === 'left'
+          ? { left: place.w, top: place.pointer - 6, borderWidth: '6px 0 6px 6px', borderColor: 'transparent transparent transparent var(--ink)' }
+          : place.side === 'below'
+            ? { left: place.pointer - 6, top: -6, borderWidth: '0 6px 6px 6px', borderColor: 'transparent transparent var(--ink) transparent' }
+            : { left: place.pointer - 6, top: place.h, borderWidth: '6px 6px 0 6px', borderColor: 'var(--ink) transparent transparent transparent' }
+      : null;
+  return (
+    <>
+      <div ref={measureRef} className="paged-measure" aria-hidden="true">
+        {BOX_WIDTHS.map((w) => (
+          <div key={w}>{content(Math.min(w, area.w), false)}</div>
+        ))}
+      </div>
+      {place && (
+        <div ref={boxRef} className="zone tour-place" data-ui="tour-place" data-side={place.side} style={{ left: place.x, top: place.y, width: place.w, zIndex: 41 }}>
+          {content(place.w, true)}
+          {pointer && <span className="tour-pointer" aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, borderStyle: 'solid', ...pointer }} />}
+        </div>
+      )}
+    </>
   );
 }
 
