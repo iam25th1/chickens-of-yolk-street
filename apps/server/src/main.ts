@@ -63,10 +63,10 @@ const priced = (m: string): string => `${m} ${priceOf(pricing, m).input}/${price
 if (inference.capFrom === 'NEARAI_DAILY_SPEND_CAP_USD') log('[agents] NEARAI_DAILY_SPEND_CAP_USD is the old name of LLM_DAILY_CAP_USD (the cap now covers every provider): rename it');
 log(
   providers.length
-    ? `[agents] agents run on their rule strategies; model decisions switch on once a provider answers. Chain: ${providers
+    ? `[agents] agent decisions run on a provider chain: ${providers
         .map((p) => `${p.label} (${p.cheapModel} for decisions${p.mainOnHardDays ? `, ${p.model} on hard days` : ''}, ${p.model} for weekly reflections)`)
-        .join(', then ')}, then the rules. ` +
-        `Awaiting a working provider: no model has answered yet. A model is asked only when it matters: an agent's first look, its weekly strategy, and at most once in ${inference.gapDays} in-game days a hard day or a price move of ${Math.round(inference.priceMove * 100)}%. ` +
+        .join(', then ')}, then the rule-based strategies as the last resort, all under a hard daily spend cap. ` +
+        `The live mode is whichever answers (healthz ai.mode, the AI tag's tooltip). A model is asked only when it matters: an agent's first look, its weekly strategy, and at most once in ${inference.gapDays} in-game days a hard day or a price move of ${Math.round(inference.priceMove * 100)}%. ` +
         `Capped at ${inference.capUsd} USD per UTC day for all providers, each agent at ${inference.agentCap.calls} calls and ${inference.agentCap.usd} USD, ${inference.closeBudgetMs / 1000} s of model time per day close; ` +
         `prices per million tokens: ${providers.flatMap((p) => [p.model, p.cheapModel].map(priced)).join(', ')}`
     : '[agents] NEARAI_API_KEY and SERV_API_KEY unset: agents run on their rule strategies (no model provider)',
@@ -98,6 +98,7 @@ const server = createGameServer({
   privy: config.privyAppId ? createPrivyVerifier(config.privyAppId, config.privyVerificationKey ?? undefined) : null,
   privyAppId: config.privyAppId,
   devLogin: config.devLogin,
+  demoSession: config.demoSession,
   clientDist: config.clientDist,
   settlementMode: chain.mode,
   dbKind: db.kind,
@@ -109,6 +110,7 @@ const tick = setInterval(() => {
   game.tick().catch((err: unknown) => log(`[day] tick failed: ${err instanceof Error ? err.stack : String(err)}`));
 }, 1000);
 
+if (config.demoSession) log('[demo] the demo session is ON (DEMO_MODE=1 on a local, non-production server): /?demo=new or /?demo=<farm name> signs straight in');
 const listening = (): void => log(`[http] listening on http://${config.host ?? 'localhost'}:${config.port} (day ${game.getClock().day})`);
 if (config.host) server.listen(config.port, config.host, listening);
 else server.listen(config.port, listening);

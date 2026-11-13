@@ -141,6 +141,19 @@ export function App() {
   const play = () => {
     unlockAudio();
     if (location.pathname === MINT_PATH) history.pushState(null, '', '/');
+    // a local recording server (DEMO_MODE) signs straight into a demo farm: no login screen is shown
+    const demo = new URLSearchParams(location.search).get('demo');
+    if (demo && config?.demoSession) {
+      void api
+        .loginDemo(demo)
+        .then((login) => {
+          sessionStore.set(login.session);
+          setSignedIn({ session: login.session, accountId: null });
+          setScreen('loadingFarm');
+        })
+        .catch((e: unknown) => setFatal(e instanceof Error ? e.message : String(e)));
+      return;
+    }
     const session = sessionStore.get();
     if (session) {
       setSignedIn({ session, accountId: null });
