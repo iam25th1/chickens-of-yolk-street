@@ -6,7 +6,7 @@
 // by its feet, machine name plates and particles. Machines stand on their own labelled pads.
 import { animate, createTimeline, steps } from 'animejs';
 import { ColorMatrixFilter, Container, Graphics, RenderTexture, Sprite, Text, type Renderer } from 'pixi.js';
-import { UNLOCK_IDS, type CoopKind, type FarmState, type HenView, type LaidEgg, type UnlockId } from '@coys/shared';
+import { type CoopKind, type FarmState, type HenView, type LaidEgg, type UnlockId } from '@coys/shared';
 import type { Viewport } from '../../app/viewport';
 import type { AssetStore } from '../../assets/store';
 import type { AudioEngine, LoopHandle } from '../../audio/audio';
@@ -17,7 +17,7 @@ import { Fx } from '../Fx';
 import type { Scene } from '../host';
 import { HenActor } from './HenActor';
 import { WorldLayers } from './layers';
-import { MIN_H, MIN_W, connectionGaps, farmLayout, specPoint, troughSpots, type FarmLayout, type MachineSpot, type Point } from './layout';
+import { MIN_H, MIN_W, connectionGaps, farmLayout, labelSpot, specPoint, troughSpots, type FarmLayout, type Point } from './layout';
 import { carry, freeSpot, movementAreas, nearestFree, route, type Areas } from './movement';
 
 const MAX_VISIBLE_HENS = 40;
@@ -62,6 +62,15 @@ const MACHINE_ROWS: Record<Exclude<UnlockId, 'conveyor'>, { id: string; idle: st
 
 export const MACHINE_NAME: Record<UnlockId, string> = { conveyor: 'CONVEYOR', grader: 'GRADER', cart: 'DELIVERY CART', hopper: 'FEED HOPPER', clerk: 'SALES CLERK' };
 
+/** The label a world thing shows on hover or tap (the layout object it names), if it has one. */
+function labelOf(t: WorldTarget): { name: string; text: string } | null {
+  if (t.kind === 'machine') return { name: t.unlock, text: MACHINE_NAME[t.unlock] };
+  if (t.kind === 'crate') return { name: 'crate', text: 'CRATE' };
+  if (t.kind === 'feed') return { name: 'trough', text: 'TROUGH AND FEED' };
+  if (t.kind === 'farmhouse') return { name: 'farmhouse', text: 'FARMHOUSE' };
+  return null;
+}
+
 /** A rival farm whose sign stands at the farm's edge. */
 export interface RivalSign {
   sign: string;
@@ -95,8 +104,9 @@ export class FarmScene implements Scene {
   private roostIndex = 0;
   private ground: Sprite | null = null;
   private readonly decor: FrameSprite[] = [];
-  private readonly plates = new Map<MachineSpot, Container>();
-  private labelKey = '';
+  /** The one name label on screen (hover, tap, or a machine's arrival), and when it goes. */
+  private label: Container | null = null;
+  private labelTimer: ReturnType<typeof setTimeout> | null = null;
   private plotsKey = '';
   private rivals: { s: FrameSprite; sign: string; bust: boolean }[] = [];
   private layout: FarmLayout = farmLayout(MIN_W, MIN_H, { w: 0, h: 0 });
@@ -153,12 +163,17 @@ export class FarmScene implements Scene {
     s.hitBox(1);
     s.on('pointerover', () => {
       s.filters = [HOVER];
+      const l = labelOf(target());
+      if (l) this.showLabel(l.name, l.text);
     });
     s.on('pointerout', () => {
       s.filters = [];
+      this.hideLabel();
     });
     s.on('pointertap', () => {
       this.audio.play('35-click', { volume: 0.6 });
+      const l = labelOf(target());
+      if (l) this.showLabel(l.name, l.text, 1500);
       this.hooks.open(target());
     });
     this.targetsList.set(s, target);
@@ -301,7 +316,6 @@ export class FarmScene implements Scene {
       const at = l.rivals[i];
       if (at) this.moveTo(r.s, at);
     });
-    this.labelPads();
     this.drawLayoutDebug();
   }
 
@@ -336,32 +350,33 @@ export class FarmScene implements Scene {
     }
   }
 
-  /** Machine name plates under each pad: bright when the machine is on the farm, faint until bought. */
-  private labelPads(): void {
-    const key = `${this.k}|${this.layout.w}x${this.layout.h}|${(this.farm?.unlocks ?? []).join()}`;
-    if (key === this.labelKey) return;
-    this.labelKey = key;
-    for (const p of this.plates.values()) p.destroy({ children: true });
-    this.plates.clear();
-    const owned = new Set(this.farm?.unlocks ?? []);
-    for (const u of UNLOCK_IDS) {
-      if (!owned.has(u)) continue;
-      const pad = this.layout.pads[u];
-      const plate = new Container();
-      const text = new Text({ text: MACHINE_NAME[u], style: { fontFamily: 'Silkscreen', fontSize: 8, fill: 0xf6e7c1 }, resolution: this.k });
-      text.roundPixels = true;
-      const w = Math.ceil(text.width) + 6;
-      const bg = new Graphics().rect(0, 0, w, 11).fill({ color: 0x2a160c, alpha: 0.85 });
-      text.position.set(3, 1);
-      plate.addChild(bg, text);
-      const x = Math.max(2, Math.min(this.layout.w - w - 2, u === 'conveyor' ? pad.left + 4 : Math.round((pad.left + pad.right) / 2 - w / 2)));
-      // the clerk stands behind the crate, so its plate goes over its head rather than on the crate
-      const clerkTop = this.layout.spec.objects.clerk?.box.top ?? pad.top;
-      plate.position.set(Math.round(x), Math.round(u === 'clerk' ? clerkTop - 12 : pad.bottom + 2));
-      plate.label = `plate:${u}`;
-      this.layers.by.labels.addChild(plate);
-      this.plates.set(u, plate);
-    }
+  /**
+   * A thing's name label: shown while the pointer is over it, for a moment after a tap, and once
+   * when a machine arrives; never more than one at a time, placed where it covers nothing else.
+   */
+  private showLabel(name: string, text: string, ms = 0): void {
+    this.hideLabel();
+    const plate = new Container();
+    const tx = new Text({ text, style: { fontFamily: 'Silkscreen', fontSize: 8, fill: 0xf6e7c1 }, resolution: this.k });
+    tx.roundPixels = true;
+    const w = Math.ceil(tx.width) + 6;
+    const spot = labelSpot(this.layout, name, w);
+    if (!spot) return;
+    const bg = new Graphics().rect(0, 0, w, 11).fill({ color: 0x2a160c, alpha: 0.85 });
+    tx.position.set(3, 1);
+    plate.addChild(bg, tx);
+    plate.position.set(spot.left, spot.top);
+    plate.label = `label:${name}`;
+    this.layers.by.labels.addChild(plate);
+    this.label = plate;
+    if (ms) this.labelTimer = setTimeout(() => this.hideLabel(), ms);
+  }
+
+  private hideLabel(): void {
+    if (this.labelTimer) clearTimeout(this.labelTimer);
+    this.labelTimer = null;
+    if (this.label && !this.label.destroyed) this.label.destroy({ children: true });
+    this.label = null;
   }
 
   /** Grass, straw yard, path, machine pads and the fence with its gate, drawn once per window size. */
@@ -476,7 +491,6 @@ export class FarmScene implements Scene {
 
     // machines bought with unlocks
     for (const u of farm.unlocks) this.ensureMachine(u, false);
-    this.labelPads();
     const plotsKey = farm.coops.map((c) => c.plot).join();
     if (plotsKey !== this.plotsKey) {
       this.plotsKey = plotsKey;
@@ -575,8 +589,9 @@ export class FarmScene implements Scene {
     this.arrival(u);
   }
 
-  /** The machine's pad flashes a few times so the player sees where it went. */
+  /** The machine's pad flashes a few times and its name shows, so the player sees where it went. */
   private arrival(u: UnlockId): void {
+    this.showLabel(u, MACHINE_NAME[u], 3000);
     const pad = this.layout.pads[u];
     const ring = new Graphics().rect(pad.left - 2, pad.top - 2, pad.right - pad.left + 4, pad.bottom - pad.top + 4).stroke({ color: 0xf2c94c, width: 2 });
     this.layers.by.labels.addChild(ring);
@@ -653,7 +668,6 @@ export class FarmScene implements Scene {
       }
       case 'unlockBought':
         this.ensureMachine(e.unlock, true);
-        this.labelPads();
         this.audio.play('24-machine');
         juice.shake(1, 160);
         break;

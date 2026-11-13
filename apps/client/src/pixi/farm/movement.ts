@@ -100,7 +100,8 @@ export function route(p: Point, q: Point, a: Areas, depth = 2): Point[] {
   for (let i = 1; i <= n; i++) {
     const t = i / n;
     const s = { x: Math.round(p.x + (q.x - p.x) * t), y: Math.round(p.y + (q.y - p.y) * t) };
-    if (!free(s, a)) break;
+    // the walk to it must be clear too (a rounded point can sit just past a box's corner)
+    if (!free(s, a) || !clear(p, s, a)) break;
     last = s;
   }
   return [last];
