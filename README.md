@@ -152,6 +152,87 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 [tall](docs/screenshots/live-resize-3-tall-560x1000.png), [wide again](docs/screenshots/live-resize-4-wide-1600x760.png))
 and the [belt](docs/screenshots/live-belt-clean.png), which carries only real eggs.
 
+## The Feather Mint: random numbers, instant mints and the press (13 November 2026)
+
+**Its own page.** The Feather Mint lives at [`/mint`](https://yolkstreet.25th.dev/mint) and opens without entering the
+farm; signing in is needed only to mint. It opens from the title (**MINT**), the top bar (**MINT**) and the market
+board. In order: the hero line ("Earn tickets on your farm. Mint a Feather. Each Feather is planned to hatch into one
+of 777 Founding Hens at mainnet launch."), your tickets and grade with **MINT A FEATHER**, the Feathers left of 777 and
+by grade, each grade's odds of a hen at the reveal (estimates that lock at the reveal), the recent mints with their
+farms and grades, all 777 in pages that fit the window (filters: grade, minted, not minted, mine), and the provenance
+hash and the contract at the foot. Like every screen, it fits the window at every size without a scrollbar.
+
+| 1920x1080 | 390x844 |
+|---|---|
+| ![The Feather Mint at 1920x1080, signed out: tickets, the 777, odds and recent mints beside the grid of 777](docs/screenshots/mint-live-1920x1080.png) | ![The Feather Mint on a phone](docs/screenshots/mint-live-390x844.png) |
+
+**Random numbers.** A Feather used to take the next number in mint order. Now the server draws a random free number from
+001 to 777 when the ticket is redeemed, from a seed anyone can check: the SHA-256 of the season, the ticket and the
+season's latest settlement transaction on NEAR (fixed before the redemption, and not the server's to choose):
+
+$$
+\text{seed} = \mathrm{SHA256}(\texttt{coys-mint|season|ticket|anchor}), \qquad n_i = 1 + \big(\mathrm{SHA256}(\text{seed}\,|\,i)_{0..3} \bmod 777\big)
+$$
+
+and the number is the first $n_i$ ($i = 0, 1, 2, \dots$) not taken yet. The seed, the anchor and the number are logged
+and kept with the ticket, so a draw can be replayed. Feather #001 (the Quill minted on day 577) keeps its number.
+
+**Instant mints.** Redeeming a ticket now mints its Feather at once, paid by the game, through the contract's new
+`mint_feather` (version 6, below): one mint at a time, every RPC call paced and retried with backoff (1.5, 3, 6 and 12
+seconds) when NEAR refuses it. A mint that cannot go out yet (no wallet linked, the game account under its margin)
+waits and goes again when the wallet is linked or at the next day close. A mint refused after its retries holds the
+ticket again and refunds its 25 coins; minting it again draws the same number. A number the contract already holds is
+replaced by the next one in the same stream. The daily settlement is unchanged; it no longer carries Feathers.
+
+```mermaid
+sequenceDiagram
+  participant P as Player
+  participant S as Game server
+  participant C as Contract (NEAR testnet)
+  P->>S: MINT (redeem a held ticket)
+  S->>S: fee, grade from the score, number drawn (seed logged)
+  S-->>P: ticketRedeemed, mintSent
+  S->>C: mint_feather (paced; backoff on 429)
+  alt confirmed
+    C-->>S: token id, transaction
+    S-->>P: featherMinted (CONFIRMED, receipt)
+  else refused after retries
+    S->>S: ticket held again, fee refunded
+    S-->>P: mintFailed (RETRY)
+  end
+```
+
+**The minting moment.** MINT plays the press: the ticket drops into the hopper, the press squashes down with a thump
+(a hitstop, a shake, the stamp and crate sounds) and stamps the card out face down; then **SENT TO NEAR** and
+**CONFIRMED** light with the receipt, the card flips to the Feather and a stamp lands (confetti, a sparkle and a harder
+shake for a Quill or a Golden Quill). If the mint fails, it says the ticket and the coins are back, with **RETRY**. The
+press is a new sheet made from the game's own art (the grader standing in the egg crate, the Fluff feather, the
+unminted card frame, the particle sheet), uploaded to `@25th/game-11` by the Spawn agent account `gama` (Spawn commit
+`1e5785c`) and backed up in coys-assets (PR #5, `x-mint-press`).
+
+| | 1920x1080 | 390x844 |
+|---|---|---|
+| Confirmed | ![The minting moment confirmed: the press, the Feather card stamped, all four stages lit, the receipt](docs/screenshots/mint-moment-confirmed-1920x1080.png) | ![The same on a phone](docs/screenshots/mint-moment-confirmed-390x844.png) |
+| Refused | ![A refused mint: the ticket and 25 coins are back, RETRY](docs/screenshots/mint-failed-1920x1080.png) | ![The same on a phone](docs/screenshots/mint-failed-390x844.png) |
+
+**Contract version 6.** `mint_feather` mints one Feather now, owner only, with the number the server drew. The live
+season's Feathers are the 777 (token ids `001` to `777`, the cap checked first); any other season's go into its own
+test collection (`test-<season>-NNN`) that never counts toward the 777, so a test season can mint for real without
+touching the real supply. Built in CI (run 43360778799, sha256 `d6c85dd9...`, 389,151 bytes, sandbox tests including the
+upgrade from version 5) and deployed and migrated on `play.coys-game.testnet` in one transaction
+([`8aADyAiD...`](https://testnet.nearblocks.io/txns/8aADyAiDPopPb67ZnY9WATvLM6jz7XjyWAgocF9o174r)): 1 of 777 minted,
+live season `s1`.
+
+**Checked live on testnet.** A test farm in the test season `verify-mint-1`, its wallet the game account:
+
+- a mint whose RPC calls were all refused (the writer pointed at an unresolvable testnet host): retried at 1.5, 3, 6 and
+  12 seconds, reported failed, the ticket held again with its 25 coins back and its seed kept;
+- the same ticket minted for real: the same number, `test-verify-mint-1-737`
+  ([`J8D9sqrt...`](https://testnet.nearblocks.io/txns/J8D9sqrtx6Pbin58k48hDJLtpEagJj5VSryPzZ6t7pMA)), and a second
+  ticket `test-verify-mint-1-091`
+  ([`85tSsXN1...`](https://testnet.nearblocks.io/txns/85tSsXN1rJKF735xc2827LNCJ3meCxzb9oK8RY8AWLBn)); afterwards the
+  contract still reads 1 of 777 minted.
+
 ## Farm zones and machine wear (13 November 2026)
 
 **Zones with real room.** The grader, the clerk's desk and the delivery cart used to stand crammed together at the
@@ -1118,6 +1199,14 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
 **Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
+
+### Brief 9, stage 3: the Feather Mint (13 November 2026)
+
+- **Numbers.** Random free numbers from a logged SHA-256 seed anchored on the season's last settlement transaction.
+- **Mints.** At once on redemption through contract version 6's `mint_feather`, paced, retried with backoff, refunded on
+  failure, caught up at day closes (migration 12). Test seasons mint into their own collection.
+- **Page and moment.** `/mint` with its seven parts in order; MINT in the title, top bar and board; the press sheet
+  (Spawn, coys-assets #5); SENT TO NEAR and CONFIRMED; RETRY. Checked live on testnet with a forced failure.
 
 ### Brief 9, stage 2: farm zones and machine wear (13 November 2026)
 

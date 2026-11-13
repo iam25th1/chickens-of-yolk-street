@@ -27,6 +27,9 @@ export interface TourCtx {
 }
 
 /** What the spotlight points at: a DOM element by its data-tour name, or a thing on the farm. */
+/** The egg the tour points at, kept while it lasts. */
+let stickyEgg: string | undefined;
+
 export type TourTarget = { dom: string; tag?: string } | { world: 'egg' | 'crate' | 'trough' | 'sign' | 'farmhouse' | 'yard'; tag?: string };
 
 type Signal = { from: 'server'; e: GameEvent } | { from: 'ui'; e: UiEvent };
@@ -179,7 +182,7 @@ function measure(t: TourTarget, v: ReturnType<typeof useViewport>, ui: HTMLEleme
     if (r.width === 0 && r.height === 0) return null;
     return { x: (r.left - u.left) / s, y: (r.top - u.top) / s, w: r.width / s, h: r.height / s, next: found.next };
   }
-  const farm = (window as unknown as { __coysFarm?: { targets(): { kind: string; x: number; y: number; w: number; h: number }[]; yard(): { x: number; y: number; w: number; h: number } } }).__coysFarm;
+  const farm = (window as unknown as { __coysFarm?: { targets(): { kind: string; id?: string; x: number; y: number; w: number; h: number }[]; yard(): { x: number; y: number; w: number; h: number } } }).__coysFarm;
   if (!farm) return null;
   if (t.world === 'yard') {
     const y = farm.yard();
@@ -187,7 +190,9 @@ function measure(t: TourTarget, v: ReturnType<typeof useViewport>, ui: HTMLEleme
   }
   const kind = t.world === 'trough' ? 'feed' : t.world;
   const list = farm.targets().filter((x) => x.kind === kind);
-  const pick = list[0];
+  // the same egg while it is there (eggs come and go, and the belt carries some): the box does not jump
+  const pick = (kind === 'egg' && list.find((x) => x.id !== undefined && x.id === stickyEgg)) || list[0];
+  if (kind === 'egg') stickyEgg = pick?.id;
   if (!pick) {
     if (t.world !== 'egg') return null;
     const y = farm.yard();

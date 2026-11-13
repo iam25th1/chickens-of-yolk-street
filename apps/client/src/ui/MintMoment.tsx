@@ -107,8 +107,11 @@ export function MintMoment({ ticketId, explorer, onRetry, onLedger, onClose }: M
     juice.shake(big ? 6 : 2, big ? 420 : 220);
     if (big) audio.play('45-deal-closed', { delayMs: 240 });
   }, [audio, big, face]);
+  // a failed mint stops the press: no card comes out
   useEffect(() => {
-    if (chain === 'failed') audio.play('20-fail', { volume: 0.6 });
+    if (chain !== 'failed') return;
+    audio.play('20-fail', { volume: 0.6 });
+    setPress('idle');
   }, [audio, chain]);
 
   const stage = (label: string, lit: boolean, ui: string) => (
@@ -129,7 +132,7 @@ export function MintMoment({ ticketId, explorer, onRetry, onLedger, onClose }: M
           data-ui="mint-press"
           onDone={() => setPress((p) => (p === 'ticket-in' ? 'press' : p === 'press' ? 'card-out' : 'idle'))}
         />
-        <div ref={card} style={{ position: 'relative', width: 48 * z, height: 68 * z, flex: 'none', visibility: out ? 'visible' : 'hidden' }}>
+        <div ref={card} style={{ position: 'relative', width: 48 * z, height: 68 * z, flex: 'none', visibility: out && chain !== 'failed' ? 'visible' : 'hidden' }}>
           <div className={`flip ${face === 'turning' ? 'turning' : ''}`} data-ui="mint-card">
             {face === 'down' || face === 'turning' || !grade || !number ? <UnmintedCard number={number ?? 0} z={z} /> : <FeatherCard grade={grade} number={number} z={z} row={face === 'up' ? 'shine' : 'float'} />}
           </div>
@@ -148,7 +151,7 @@ export function MintMoment({ ticketId, explorer, onRetry, onLedger, onClose }: M
         </div>
         <div className="col" style={{ gap: 4, flex: '1 1 150px', minWidth: 140 }}>
           {stage('TICKET IN', true, 'mint-stage-in')}
-          {stage('PRESSED', press === 'card-out' || out, 'mint-stage-pressed')}
+          {stage('PRESSED', chain !== 'failed' && (press === 'card-out' || out), 'mint-stage-pressed')}
           {/* the stages light in order: the chain may answer before the press is done */}
           {stage(`SENT TO NEAR${number ? `: FEATHER ${featherNo(number)}` : ''}`, out && (chain === 'sent' || chain === 'confirmed'), 'mint-stage-sent')}
           {stage('CONFIRMED', out && chain === 'confirmed', 'mint-stage-confirmed')}
