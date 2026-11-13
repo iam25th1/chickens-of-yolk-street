@@ -56,11 +56,28 @@ timestamp), which is sharper than Playwright's video recording, and the build tu
 The game's pixel cursor is mirrored into the page (a headless browser draws none), and it moves at
 about human speed.
 
+## Partial frames and the flash check
+
+Chrome's screencast hands over every frame it paints, including frames caught in the middle of a UI
+fade. In the naming scene the prompt's fade-in restarted on every keystroke (the modal's open animation
+runs again whenever the prompt re-renders), so the first build blinked between the prompt and the farm
+behind it about five times a second. The build now drops such partial frames before timing the footage
+and holds the frame before them: a short run of frames that leaves a steady frame and comes back to it,
+or a single frame darker or brighter than both its neighbours. Once a line's footage is sped up, any
+single in-between frame left by a fade is held over the same way. Nothing is blurred or faded over.
+
+After every export, `scripts/demo-video/flashcheck.py` checks the video against WCAG 2.x's general
+flash threshold: no more than 3 flashes in any 1 second, a flash being a pair of opposing changes of
+10 percent or more of the maximum relative luminance (the darker side under 0.80) over the whole frame,
+the footage or a quarter of the footage. It also flags any single frame whose mean luminance jumps more
+than 20 percent against both its neighbours. If it fails, the build keeps no output and lists the
+timestamps. Run it on its own with `~/.coys/demo/venv/bin/python scripts/demo-video/flashcheck.py <video>`.
+
 ## Edit
 
 1:40 to 2:10. Each section's footage is sped up at most 3x to fit its voice, and its last frame is held
 if it is short; it is never slowed down. The voice is kokoro-onnx, voice `af_heart` at speed 1.08, one
 file a line, saying "Serve" for SERV. The frame, the track chips, the captions (below the footage,
-never over it), the end card, the music ducked under the voice, the game's sounds at the logged
-actions and the sting on the end card are all in `build.py`, with the loudness at -15 LUFS and the
-true peak at -1.5 dB.
+never over it), the end card, the music ducked under the voice and the game's sounds at the logged
+actions are all in `build.py`, with the loudness at -15 LUFS and the true peak at -1.5 dB. The end card
+has no sting: only the music, fading out.

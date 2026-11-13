@@ -9,8 +9,14 @@ footage (scene clips, sped up at most 3x to fit the voice, the last frame held i
 The frame: a 1920x1080 dark brown canvas, the footage inset at 1568x882 (x 176, y 74) in a cream border
 inside a dark red one, the logo top left, YOLKSTREET.25TH.DEV in the top bar, a red track chip top
 right, captions below the footage (never over it). Audio: the farm-day loop under the voice, ducked by
-it, game sounds at the actions the capture logged, a sting on the end card, -15 LUFS. ffmpeg here has
-no drawtext or subtitles filter, so every piece of text is drawn with Pillow into overlays.
+it, game sounds at the actions the capture logged, -15 LUFS. ffmpeg here has no drawtext or subtitles
+filter, so every piece of text is drawn with Pillow into overlays.
+
+Partial frames are dropped and the frame before them held: a frame of a scene that is darker or brighter
+than both its neighbours (the naming prompt's fade restarting on each keystroke, a modal caught half
+faded in), and, once a line's footage is sped up, any single frame left between two others like that.
+After the export, flashcheck.py checks the video (WCAG's general flash threshold, and one-frame jumps);
+if it fails, the build keeps no output and lists the moments.
 """
 from __future__ import annotations
 
@@ -132,7 +138,6 @@ SFX = {
 }
 # a hatch: the egg cracks, pops, the hen clucks; three or more: the chorus
 HATCH = [(1.6, '09-crack/09-crack-a.mp3', 0.5), (2.4, '08-egg-pop/08-egg-pop-b.mp3', 0.5), (2.7, '01-cluck/01-cluck-a.mp3', 0.45)]
-STING = ('45-deal-closed/45-deal-closed-a.mp3', 0.7)
 MUSIC = '42-farm-day/42-farm-day-a-loop.ogg'
 
 
@@ -189,10 +194,59 @@ def clip_info(scene: str) -> dict:
     return json.loads((CAP / scene / 'clip.json').read_text())
 
 
-def segment_video(scene: str, start: float, end: float | None, crop: tuple | None, path: Path) -> float:
-    """One scene's stretch as a 30 fps video at the inset size; returns its length in seconds."""
+SPIKE = 0.12  # a frame this much darker or brighter than both its neighbours is a partial frame
+
+
+def frame_luma(scene: str) -> list[float]:
+    """Each captured frame's mean luma (0 to 255), measured once and kept beside the clip."""
+    cache = CAP / scene / 'luma.json'
     info = clip_info(scene)
-    frames = info['frames']
+    if cache.exists():
+        got = json.loads(cache.read_text())
+        if len(got) == len(info['frames']):
+            return got
+    out = [float(np.asarray(Image.open(CAP / scene / f['file']).convert('L').resize((160, 90)), np.float32).mean()) for f in info['frames']]
+    cache.write_text(json.dumps(out))
+    return out
+
+
+def settled(values: list[float], spike: float = SPIKE, back: float = 0.04, run_max: int = 8) -> list[int]:
+    """Indices of the frames to keep. A transient is dropped and the frame before it held: a run of up to
+    `run_max` frames that leaves a steady frame by more than `spike` (relative) and comes back to within
+    `back` of it (the naming prompt fading in again on each keystroke), or a single frame darker or
+    brighter than both its neighbours by more than `spike`. A change to somewhere new is kept."""
+    rel = lambda a, b: abs(a - b) / max(a, b, 1e-6)  # noqa: E731
+    keep: list[int] = []
+    i, n = 0, len(values)
+    while i < n:
+        keep.append(i)
+        a = values[i]
+        j = i + 1
+        if j < n and rel(values[j], a) > spike:
+            up = values[j] > a
+            m = j
+            while m < n and m - j < run_max and (values[m] > a) == up and rel(values[m], a) > back:
+                m += 1
+            if m < n and m - j < run_max and rel(values[m], a) <= back:
+                i = m
+                continue
+            # one frame off both its neighbours the same way
+            if j + 1 < n and rel(values[j + 1], values[j]) > spike and (values[j] > a) == (values[j] > values[j + 1]):
+                i = j + 1
+                continue
+        i += 1
+    return keep
+
+
+def segment_video(scene: str, start: float, end: float | None, crop: tuple | None, path: Path) -> float:
+    """One scene's stretch as a 30 fps video at the inset size; returns its length in seconds. Partial
+    frames are left out: the frame before them is held for their time."""
+    info = clip_info(scene)
+    all_frames = info['frames']
+    kept = settled(frame_luma(scene))
+    if len(kept) < len(all_frames):
+        print(f'    {scene}: {len(all_frames) - len(kept)} partial frames dropped')
+    frames = [all_frames[i] for i in kept]
     end = min(end if end is not None else info['duration'], info['duration'])
     lines = ['ffconcat version 1.0']
     for i, f in enumerate(frames):
@@ -231,9 +285,34 @@ def line_footage(key: str, label: str, clips: list, length: float) -> tuple[Path
     hold = max(0.0, length - total / speed)
     vf = f'setpts=PTS/{speed:.5f},fps={FPS},tpad=stop_mode=clone:stop_duration={hold + 0.1:.3f},trim=duration={length:.3f}'
     run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(joined), '-vf', vf, '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '12', '-pix_fmt', 'yuv420p', str(out)])
+    hold_over_partials(out)
     cut = max(0.0, total / speed - length)
     print(f'  {label}: footage {total:.1f} s at {speed:.2f}x into {length:.1f} s' + (f' (held {hold:.1f} s)' if hold > 0.05 else '') + (f' (CUT {cut:.1f} s)' if cut > 0.05 else ''))
     return out, [(t / speed, k, l) for t, k, l in actions if t / speed <= length]
+
+
+def video_luminance(path: Path) -> list[float]:
+    """Each frame's mean relative luminance (WCAG's, from linear RGB), as the flash check measures it."""
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', str(path), '-vf', 'scale=160:90:flags=area,format=rgb24', '-f', 'rawvideo', '-'], capture_output=True, check=True).stdout
+    rgb = np.frombuffer(raw, np.uint8).reshape(-1, 90, 160, 3).astype(np.float32) / 255.0
+    lin = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+    return [float(x) for x in (lin[..., 0] * 0.2126 + lin[..., 1] * 0.7152 + lin[..., 2] * 0.0722).mean(axis=(1, 2))]
+
+
+def hold_over_partials(path: Path) -> None:
+    """Sped up, a modal's fade can leave one in-between frame: such frames are dropped and the frame
+    before held (ffmpeg's fps filter repeats it into the gap)."""
+    for _ in range(3):
+        values = video_luminance(path)
+        keep = set(settled(values, 0.2, back=0.1, run_max=2))
+        drop = [i for i in range(len(values)) if i not in keep]
+        if not drop:
+            return
+        expr = '+'.join(f'eq(n,{i})' for i in drop)
+        tmp = path.with_name(path.stem + '-held.mp4')
+        run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(path), '-vf', f"select='not({expr})',fps={FPS}", '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '12', '-pix_fmt', 'yuv420p', str(tmp)])
+        tmp.replace(path)
+        print(f'    {path.stem}: {len(drop)} in-between frames held over')
 
 
 # ---- overlays ----------------------------------------------------------------------------------
@@ -390,7 +469,7 @@ def main() -> None:
     end_card(card)
     overlays.append((card, t, total + 1))
 
-    # audio: voice, game sounds, the sting; the music under it, ducked by the voice
+    # audio: voice and game sounds; the music under it, ducked by the voice
     n = int((total + 0.5) * SR)
     voice = np.zeros(n, np.float32)
     effects = np.zeros(n, np.float32)
@@ -406,7 +485,6 @@ def main() -> None:
         elif kind in SFX:
             rel, g = SFX[kind]
             place(effects, load_audio(rel), at, g)
-    place(effects, load_audio(STING[0]), t + 0.15, STING[1])
     loop = load_audio(MUSIC)
     music = np.tile(loop, int(np.ceil(n / len(loop))) + 1)[:n] * 0.32
     fade_in, fade_out = int(1.2 * SR), int(2.5 * SR)
@@ -463,6 +541,22 @@ def main() -> None:
     cols = 10
     rows = int(np.ceil(total / cols))
     run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(out), '-vf', f'fps=1,scale=384:-1,tile={cols}x{rows}', '-frames:v', '1', str(sheet)])
+
+    # the flash check: a video that fails it is not kept (no bytecode left beside the scripts)
+    import sys
+
+    sys.dont_write_bytecode = True
+    import flashcheck
+
+    found = flashcheck.check(str(out))
+    if found:
+        for f in (out, OUT / 'coys-demo-auto.srt', sheet):
+            f.unlink(missing_ok=True)
+        print(f'flash check FAILED: {len(found)} moments; no output kept')
+        for line in found:
+            print('  ' + line)
+        raise SystemExit(1)
+    print('flash check passed')
 
     log = {'length': total, 'sections': [{'chip': c, 'start': round(a, 2), 'end': round(b, 2)} for a, b, c in chips], 'captions': [{'start': round(a, 2), 'end': round(b, 2), 'text': c} for a, b, c, _ in captions]}
     (OUT / 'coys-demo-auto.json').write_text(json.dumps(log, indent=1))
