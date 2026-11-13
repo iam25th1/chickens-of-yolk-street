@@ -118,6 +118,8 @@ export const PAINTED: Record<string, PaintedSpec> = {
   '10-wholesaler': { group: 'cards', ratio: 4, use: 'ui' },
   // the farm's own hen, who walks the player through the tour
   'x-hen-portrait': { group: 'title', ratio: 8, use: 'ui' },
+  // the Feather Mint's press (the minting moment), made from the grader, the crate, a feather and the card frame
+  'x-mint-press': { group: 'cards', ratio: 3, use: 'ui' },
 };
 
 /** Sheets drawn on an exact grid (the packer measured it): shipped whole at their factor. */

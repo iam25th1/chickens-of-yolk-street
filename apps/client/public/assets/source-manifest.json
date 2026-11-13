@@ -9,7 +9,7 @@
   },
   "counts": {
     "easels": 65,
-    "artFolders": 82,
+    "artFolders": 83,
     "easelSheets": 65,
     "traitLayers": 10,
     "soundNumbers": 45,
@@ -17,7 +17,7 @@
     "audioTakes": 124,
     "unmappedEasels": 0,
     "unmappedUploads": 37,
-    "totalBytes": 102693126,
+    "totalBytes": 104196405,
     "loopOggs": 12
   },
   "known_issues": [
@@ -2476,6 +2476,34 @@
           "path": "art/22c-sales-clerk-wear/anim.json",
           "sha256": "aaddd118fbd529cb71d010344c357b96288b72fbfaf4dca73339c353e4f1ab5c",
           "bytes": 2247,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "x-mint-press",
+      "number": "x",
+      "doc_tracker": null,
+      "role": "extra",
+      "name": "mint-press",
+      "label": "mint press",
+      "sourceEasel": null,
+      "spawnAsset": "mint-press",
+      "folder": "art/x-mint-press",
+      "files": [
+        {
+          "path": "art/x-mint-press/x-mint-press.png",
+          "sha256": "12d2d907f6511f55f94d76b0ee57245376727e9e735fd64dc275b53033b1260a",
+          "bytes": 1499406,
+          "source": "/cdn/value.12d2d907f6511f55f94d76b0ee57245376727e9e735fd64dc275b53033b1260a.png",
+          "width": 1024,
+          "height": 1536,
+          "role": "sheet"
+        },
+        {
+          "path": "art/x-mint-press/anim.json",
+          "sha256": "68ac131fc2edf1d9d090f21231bd62cfcb2c4f32686f6f3a9baff01a234fdfa8",
+          "bytes": 3873,
           "role": "anim"
         }
       ]

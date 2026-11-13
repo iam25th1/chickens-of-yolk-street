@@ -90,6 +90,7 @@ Factor 1 means no downscale passes: the art keeps its original resolution, and t
 | x-founders-frame-rare | exact | 384x544 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 37.81% | 8 | 0.00% | 8 | 0.00% |
 | x-founders-frame-unminted | exact | 384x544 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 42.06% | 8 | 0.00% | 8 | 0.00% |
 | x-hen-portrait | painted | 1024x1536 | 2: 11.43% | 1 | 0.00% | 8 | 28.45% |
+| x-mint-press | painted | 1024x1536 | 2: 18.85% | 1 | 0.00% | 1 | 0.00% |
 
 ## Atlases
 
@@ -116,8 +117,8 @@ Painted pages are WebP (quality 90, alpha lossless); exact pages are lossless PN
 | farm.wide@6 | 3999x732 | 790.1 KB |
 | market | 899x362 | 10.9 KB |
 | cards | 901x3275 | 40.3 KB |
-| cards.wide@2 | 4096x485 | 911.9 KB |
-| cards.wide@3 | 4089x1072 | 1626.8 KB |
+| cards.wide@2 | 4076x716 | 1084.2 KB |
+| cards.wide@3 | 4096x1430 | 1945.6 KB |
 | cards.wide@4 | 4082x1896 | 2553.1 KB |
 | ui | 364x162 | 3.5 KB |
 | fx | 355x130 | 5.0 KB |
