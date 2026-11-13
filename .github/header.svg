@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="Chickens of Yolk Street: one live egg market where every rival is an AI agent" shape-rendering="crispEdges">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="Chickens of Yolk Street: one live egg market of players and AI farms" shape-rendering="crispEdges">
   <!-- sky, sun and drifting clouds -->
   <rect width="1200" height="300" fill="#5aa7d8"/>
   <g fill="#f2c94c">
@@ -21,7 +21,7 @@
   <g font-family="ui-monospace, Menlo, Consolas, monospace" font-weight="900">
     <text x="52" y="86" font-size="58" fill="#2a160c">CHICKENS OF YOLK STREET</text>
     <text x="48" y="82" font-size="58" fill="#b8321f">CHICKENS OF YOLK STREET</text>
-    <text x="50" y="122" font-size="22" fill="#2a160c">one live egg market | every rival, supplier and buyer is an AI agent | NEAR</text>
+    <text x="50" y="122" font-size="22" fill="#2a160c">one live egg market | farms run by players and AI | AI suppliers and buyers | NEAR</text>
   </g>
 
   <!-- market multiplier line: drawn by trades, never by script -->

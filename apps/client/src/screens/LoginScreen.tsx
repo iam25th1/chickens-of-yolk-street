@@ -48,7 +48,7 @@ export function LoginScreen({ privyAppId, devLogin, onSignedIn, onBack }: { priv
       <div ref={panel} className="panel" style={{ left: 184, top: 76, width: 272, height: 200 }}>
         <h2 className="panel-title">START YOUR FARM</h2>
         <div className="col" style={{ gap: 8 }}>
-          <span>ONE MARKET. EVERY RIVAL AND BUYER IS AN AI. YOUR EGGS SET THE PRICE.</span>
+          <span>ONE MARKET. FARMS ARE RUN BY PLAYERS AND BY AI; SUPPLIERS AND BUYERS ARE AI. YOUR EGGS SET THE PRICE.</span>
           {privyAppId && (
             <Suspense fallback={<span>OPENING SIGN-IN</span>}>
               <PrivyLogin

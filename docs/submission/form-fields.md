@@ -24,7 +24,7 @@ in by 25TH on the form itself; no personal data is written here.
 ## Idea
 
 ```text
-Chickens of Yolk Street is an egg farm in one shared live market where every rival, supplier and buyer is an AI agent with its own cash, memory and NEAR wallet. Prices, gluts and bankruptcies come only from what everyone trades: every egg sold by a player or an agent is supply in the same market, so flooding the street crashes the price for all.
+Chickens of Yolk Street is an egg farm in one shared live market with other players and AI: some farms are other players, some are AI farms (marked AI), and the feed suppliers and egg buyers are AI agents, each with its own cash, memory and NEAR wallet. Prices, gluts and bankruptcies come only from what everyone trades: every egg sold by a player or an agent is supply in the same market, so flooding the street crashes the price for all.
 
 Agents decide once a day on NEAR AI Cloud as validated structured JSON (with rule fallbacks and a hard spend cap), pay for their thinking, remember every farm and haggle in character through decision cards: the Squeezer prices your hunger into your feed, the Bakery holds you to standing contracts, the Wholesaler resells into gluts, and the Upstart borrows, overbuilds and goes bust, its hens sold at auction.
 

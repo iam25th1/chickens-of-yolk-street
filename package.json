@@ -2,7 +2,7 @@
   "name": "chickens-of-yolk-street",
   "private": true,
   "version": "0.1.0",
-  "description": "An egg farm in one shared live market where every rival, supplier and buyer is an AI agent.",
+  "description": "An egg farm in one shared live market with other players and AI: farms run by players and AI agents, AI suppliers and buyers.",
   "type": "module",
   "license": "UNLICENSED",
   "engines": {

@@ -2,7 +2,7 @@
 
 # Chickens of Yolk Street
 
-Run an egg farm in **one shared live market** where every rival, supplier and buyer is an AI agent with its own cash, memory and wallet. Egg prices, gluts and bankruptcies come only from what everyone trades, never from a script. Built at NEAR HACKATHON (tracks: games, agents, NFTs), 1 to 14 November 2026.
+Run an egg farm in **one shared live market** with other players and AI. Some farms on Yolk Street are other players, some are AI (marked AI); the feed suppliers and egg buyers are AI agents, each with its own cash, memory and wallet. Egg prices, gluts and bankruptcies come only from what everyone trades, never from a script. Built at NEAR HACKATHON (tracks: games, agents, NFTs), 1 to 14 November 2026.
 
 **Play:** https://yolkstreet.25th.dev (live on NEAR testnet, season `s1`; how it is hosted: [deploy/pier](deploy/pier/README.md))
 

@@ -29,7 +29,7 @@ Draft. Nothing here has been recorded or posted.
 | 2 | 0:07 to 0:14 | Sign in | PLAY, Privy email sign-in, the farm loads | "Sign in with email. A NEAR wallet is made for you, silently." |
 | 3 | 0:14 to 0:22 | Your hen | First onboarding card, then SKIP | "Collect, sell, and answer the cards." |
 | 4 | 0:22 to 0:34 | Collect and sell | Click eggs into the crate, SELL: the stamp slams, coins arc | "Every egg anyone sells is supply in the same market." |
-| 5 | 0:34 to 0:50 | Haggle win | The Squeezer's feed deal slides in and talks; lower the price, COUNTER: the card flips gold, confetti | "Every rival, supplier and buyer is an AI agent with its own cash and memory." |
+| 5 | 0:34 to 0:50 | Haggle win | The Squeezer's feed deal slides in and talks; lower the price, COUNTER: the card flips gold, confetti | "Some farms are other players, some are AI; every supplier and buyer is an AI agent with its own cash and memory." |
 | 6 | 0:50 to 0:58 | Haggle fail | Ask far too much from a proud agent: it walks off | "Push too hard and they walk." |
 | 7 | 0:58 to 1:12 | Glut | Market board: the ticker, today's supply against demand; the next day the ticker turns red and the tension music starts | "Flood the street and the price crashes, for everyone." |
 | 8 | 1:12 to 1:26 | Rival bust | The Upstart's sign tips over, feathers fall, its hens show up at auction in the shop | "Rivals borrow, overbuild and go bust. Their hens go to auction." |

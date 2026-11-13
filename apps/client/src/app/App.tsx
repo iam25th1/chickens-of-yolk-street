@@ -127,7 +127,7 @@ export function App() {
   };
   // the mint's own tab title
   useEffect(() => {
-    const base = 'Chickens of Yolk Street (Beta): an egg farm in a market of AI agents';
+    const base = 'Chickens of Yolk Street (Beta): an egg farm in a market of players and AI';
     document.title = screen === 'mint' ? 'Feather Mint: Chickens of Yolk Street (Beta)' : base;
   }, [screen]);
   // the browser's back and forward move between the title and the mint
