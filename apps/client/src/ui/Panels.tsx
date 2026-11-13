@@ -299,7 +299,7 @@ export function ShopPanel({
 }
 
 /** Settings: a volume and mute for every sound category, reduce motion, the guide and the tour. */
-export function SettingsBody({ onClose, onGuide }: { onClose: () => void; onGuide?: () => void }) {
+export function SettingsBody({ onClose, onGuide, farm, onRename }: { onClose: () => void; onGuide?: () => void; farm?: FarmState | null; onRename?: () => void }) {
   const { audio } = useServices();
   const s = useStore(settings, (v) => v);
   useEffect(() => audio.setLevels(s.sound), [audio, s.sound]);
@@ -308,6 +308,23 @@ export function SettingsBody({ onClose, onGuide }: { onClose: () => void; onGuid
   const SAMPLE: Partial<Record<SoundCategory, string>> = { hens: '01-cluck', eggs: '08-egg-pop', cards: '18-stamp', haggling: '19-haggle-win', machines: '24-machine', market: '23-sign-creak', voices: '40-loyalist', ui: '35-click', stings: '45-new-day' };
   return (
     <div className="col" style={{ gap: 8 }}>
+      {farm && onRename && (
+        <div className="row spread" style={{ gap: 6 }} data-ui="farm-name-setting">
+          <span style={{ minWidth: 0 }}>
+            FARM NAME: <b>{farm.name.toUpperCase()}</b>
+          </span>
+          <button
+            className="btn"
+            data-tour="rename-farm"
+            onClick={() => {
+              uiSound(audio, 'click');
+              onRename();
+            }}
+          >
+            {farm.renameFromDay !== null ? `RENAME FROM DAY ${farm.renameFromDay}` : 'RENAME'}
+          </button>
+        </div>
+      )}
       <Paged
         gap={3}
         ui="sound-settings"

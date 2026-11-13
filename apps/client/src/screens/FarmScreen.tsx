@@ -29,6 +29,7 @@ import { SettingsBody, ShopPanel } from '../ui/Panels';
 import { Spotlight, TOUR, TourBox } from '../ui/Tour';
 import { GRADE_LABEL, MintPage, RevealPanel, type RevealState } from '../ui/Feathers';
 import { HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
+import { NameFarm } from '../ui/NameFarm';
 
 /** What clicking each thing on the farm opens. */
 function modalFor(t: WorldTarget): ModalState {
@@ -104,11 +105,19 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
   // the server hears when it is finished or skipped
   const farmId = farm?.farmId ?? null;
   const tourDone = farm?.tourDone ?? false;
+  // a farm without a chosen name is named first (once a visit), then the tour starts
+  const needsName = farm?.needsName ?? false;
+  const askedName = useRef(false);
   useEffect(() => {
-    if (farmId) startTourFor(farmId, tourDone);
-    // only the first state of a farm decides
+    if (!farmId || !needsName || askedName.current) return;
+    askedName.current = true;
+    openModal({ kind: 'name', mode: 'first' });
+  }, [farmId, needsName]);
+  useEffect(() => {
+    if (farmId && !needsName) startTourFor(farmId, tourDone);
+    // the farm's first named state decides
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [farmId]);
+  }, [farmId, needsName]);
   const wasTouring = useRef(false);
   useEffect(() => {
     if (wasTouring.current && !touring && !tourDone) void send({ t: 'tourDone' });
@@ -222,7 +231,8 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
             uiFx.emit({ kind: 'stamp', row: 'sold', coins: e.totalMilli / 1000 });
             break;
           case 'refused':
-            if (e.code !== 'bad_message') uiFx.emit({ kind: 'toast', text: REFUSALS[e.code] ?? 'SOMETHING WENT WRONG', tone: 'bad' });
+            // a refused farm name is explained on the naming screen itself
+            if (e.code !== 'bad_message' && !e.code.startsWith('name_')) uiFx.emit({ kind: 'toast', text: REFUSALS[e.code] ?? 'SOMETHING WENT WRONG', tone: 'bad' });
             audio.play('35-back', { volume: 0.6 });
             break;
           case 'dayEnded': {
@@ -372,10 +382,11 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       )}
       {modal?.kind === 'settings' && (
         <Modal title="SETTINGS" onClose={closeModal} w={400} h={420}>
-          <SettingsBody onClose={closeModal} onGuide={() => openModal({ kind: 'guide' })} />
+          <SettingsBody onClose={closeModal} onGuide={() => openModal({ kind: 'guide' })} farm={farm} onRename={() => openModal({ kind: 'name', mode: 'rename' })} />
         </Modal>
       )}
       {modal?.kind === 'guide' && <HowToPlay onClose={closeModal} />}
+      {modal?.kind === 'name' && farm && <NameFarm farm={farm} mode={modal.mode} send={send} onClose={closeModal} />}
       {touring && <Spotlight ctx={ctx} />}
       <FxLayer />
     </div>

@@ -29,10 +29,19 @@ export const api = {
     if (!res.ok) throw new Error(`market: HTTP ${res.status}`);
     return (await res.json()) as { market: MarketState; clock: ClockState };
   },
-  loginDev: (name: string, deviceId: string) => post<LoginResult>('/api/login/dev', { name, deviceId }),
-  loginPrivy: (accessToken: string, name?: string) =>
-    post<LoginResult>('/api/login/privy', name ? { accessToken, name } : { accessToken }),
+  loginDev: (name: string, deviceId: string) => post<LoginResult>('/api/login/dev', name ? { name, deviceId } : { deviceId }),
+  /** Email sign-in: the access token, and only the hash of the email name (never the email). */
+  loginPrivy: (accessToken: string, nameGuard: { sha256: string; len: number } | null) =>
+    post<LoginResult>('/api/login/privy', nameGuard ? { accessToken, nameGuard } : { accessToken }),
 };
+
+/** The email-name guard: SHA-256 (hex) of the email name's letters and digits, lower case, and their count. */
+export async function nameGuardFor(emailName: string): Promise<{ sha256: string; len: number } | null> {
+  const letters = emailName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (letters.length < 3 || letters.length > 64 || !globalThis.crypto?.subtle) return null;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(letters));
+  return { sha256: [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join(''), len: letters.length };
+}
 
 const SESSION_KEY = 'coys.session';
 const DEVICE_KEY = 'coys.device';

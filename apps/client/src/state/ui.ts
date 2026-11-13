@@ -17,7 +17,8 @@ export type ModalState =
   | { kind: 'reveal'; ticketId: string; number: number; grade: FeatherGrade; milestone: MilestoneId; txHash: string; day: number }
   | { kind: 'feathers' }
   | { kind: 'settings' }
-  | { kind: 'guide' };
+  | { kind: 'guide' }
+  | { kind: 'name'; mode: 'first' | 'rename' };
 
 export const ui = createStore<{ modal: ModalState | null }>({ modal: null });
 

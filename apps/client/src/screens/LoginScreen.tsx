@@ -33,7 +33,8 @@ export function LoginScreen({ privyAppId, devLogin, onSignedIn, onBack }: { priv
     setBusy(true);
     setError(null);
     try {
-      const login = await api.loginDev(name.trim() || 'Farmer', sessionStore.deviceId());
+      // a typed name names the farm (if it passes the rules); blank: a generated one, chosen after
+      const login = await api.loginDev(name.trim(), sessionStore.deviceId());
       sessionStore.set(login.session);
       onSignedIn({ login, accountId: null });
     } catch (e) {
@@ -52,7 +53,6 @@ export function LoginScreen({ privyAppId, devLogin, onSignedIn, onBack }: { priv
             <Suspense fallback={<span>OPENING SIGN-IN</span>}>
               <PrivyLogin
                 appId={privyAppId}
-                name={name}
                 onSignedIn={(s) => {
                   sessionStore.set(s.login.session);
                   onSignedIn(s);
