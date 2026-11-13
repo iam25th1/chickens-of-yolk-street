@@ -54,6 +54,7 @@ import {
   type ProfileData,
   type PublicProfile,
   topBadges,
+  type Settlement,
 } from '@coys/shared';
 import { num, type Db, type Queryable } from '../db/db';
 import { migrate } from '../db/migrations';
@@ -142,6 +143,8 @@ export interface GameOptions {
   season?: string | null;
   /** SHA-256 of founders.json (the 777 Founding Hens the Feathers are planned to hatch into). */
   provenance?: string;
+  /** SETTLE_EVERY_DAYS: days settle on the chain in ranges of this many, one call each (default 1: every day, its own call). */
+  settleEvery?: number;
 }
 
 /** The newest public reason in an agent's stored reasons, or null. */
@@ -171,6 +174,7 @@ export class Game {
   private readonly rng: Rng;
   private readonly log: (line: string) => void;
   private readonly withCast: boolean;
+  private readonly settleEvery: number;
   private readonly withEntrants: boolean;
   private readonly provenance: string;
   private readonly wantSeason: string | null;
@@ -197,6 +201,7 @@ export class Game {
     this.log = opts.log ?? ((line) => console.log(line));
     this.brain = { ...opts.brain, log: this.log };
     this.withCast = opts.cast ?? true;
+    this.settleEvery = Math.max(1, Math.floor(opts.settleEvery ?? 1));
     this.withEntrants = this.withCast && (opts.entrants ?? true);
     this.provenance = opts.provenance ?? '';
     this.wantSeason = opts.season ?? null;
@@ -585,7 +590,7 @@ export class Game {
       else if (c.owner_kind === 'agent') farms.agents += num(c.n);
       else farms.players += num(c.n);
     }
-    const [settled] = await this.db.query('SELECT day, settlement_status, settlement_tx FROM market_days WHERE closed_at IS NOT NULL ORDER BY day DESC LIMIT 1');
+    const [settled] = await this.db.query('SELECT day, settlement_status, settlement_tx, settlement_first, settlement_last FROM market_days WHERE closed_at IS NOT NULL ORDER BY day DESC LIMIT 1');
     const agentRows = await this.db.query(
       `SELECT a.*, f.cash_milli AS farm_cash, (SELECT count(*) FROM hens h WHERE h.farm_id = a.farm_id AND h.status = 'alive') AS hens
        FROM agents a LEFT JOIN farms f ON f.id = a.farm_id
@@ -630,7 +635,13 @@ export class Game {
       chart,
       farms,
       settlement: settled
-        ? { day: num(settled.day), status: settled.settlement_status as 'pending' | 'sent' | 'noop' | 'failed', txHash: (settled.settlement_tx as string | null) ?? null }
+        ? {
+            day: num(settled.day),
+            status: settled.settlement_status as Settlement['status'],
+            txHash: (settled.settlement_tx as string | null) ?? null,
+            first: settled.settlement_first === null || settled.settlement_first === undefined ? null : num(settled.settlement_first),
+            last: settled.settlement_last === null || settled.settlement_last === undefined ? null : num(settled.settlement_last),
+          }
         : null,
       agents: agentRows.map((a) => ({
         id: String(a.id),
@@ -715,8 +726,14 @@ export class Game {
       `SELECT l.day, l.kind, SUM(l.amount_milli) AS amount FROM ledger l WHERE l.farm_id = $1 AND l.day >= $2 GROUP BY l.day, l.kind ORDER BY l.day DESC`,
       [farmId, this.clock.day - 30],
     );
-    const days = await this.db.query('SELECT day, settlement_status, settlement_tx FROM market_days WHERE day >= $1', [this.clock.day - 30]);
-    const settle = new Map(days.map((d) => [num(d.day), { day: num(d.day), status: d.settlement_status as 'pending', txHash: (d.settlement_tx as string | null) ?? null }]));
+    const days = await this.db.query('SELECT day, settlement_status, settlement_tx, settlement_first, settlement_last FROM market_days WHERE day >= $1', [this.clock.day - 30]);
+    const opt = (v: unknown): number | null => (v === null || v === undefined ? null : num(v));
+    const settle = new Map(
+      days.map((d) => [
+        num(d.day),
+        { day: num(d.day), status: d.settlement_status as Settlement['status'], txHash: (d.settlement_tx as string | null) ?? null, first: opt(d.settlement_first), last: opt(d.settlement_last) },
+      ]),
+    );
     const out = new Map<number, LedgerDay>();
     for (const r of rows) {
       const day = num(r.day);
@@ -1248,6 +1265,13 @@ export class Game {
       return outcome.day;
     });
 
+    if (this.settleEvery > 1 && this.chain.settleRange) {
+      await this.settleInRanges(closedDay, false);
+      this.emit(null, { t: 'market', market: await this.getMarketState() });
+      if (this.chain.collectionFor) this.collection = await this.chain.collectionFor(this.season).catch(() => this.collection);
+      this.kickMints();
+      return;
+    }
     const result = await this.chain.settleDay(this.db, this.season, closedDay);
     await this.db.query(
       'UPDATE market_days SET settlement_status = $3, settlement_tx = $4, settlement_error = $5, settlement_json = COALESCE($6, settlement_json), settlement_digest = COALESCE($7, settlement_digest) WHERE season = $1 AND day = $2',
@@ -1380,6 +1404,45 @@ export class Game {
     );
     this.log(`[mint] ticket ${ticketId} did not mint (${note}): held again, fee refunded`);
     if (playerId) this.emit(playerId, { t: 'event', event: { kind: 'mintFailed', ticketId, note, refundMilli: feeMilli } });
+  }
+
+  /**
+   * Settlement in ranges (SETTLE_EVERY_DAYS above 1): the closed day waits as 'batched'; once that many
+   * wait (or on a flush, at shutdown), one call settles them all, the range from the first waiting day
+   * to the last. A failed call leaves them waiting, and the next close tries the whole range again
+   * with the days since (catch-up by range, at most 100 days a call).
+   */
+  private async settleInRanges(closedDay: number | null, flush: boolean): Promise<void> {
+    const settleRange = this.chain.settleRange?.bind(this.chain);
+    if (!settleRange) return;
+    if (closedDay !== null) {
+      await this.db.query(`UPDATE market_days SET settlement_status = 'batched' WHERE season = $1 AND day = $2 AND settlement_status = 'pending'`, [this.season, closedDay]);
+    }
+    const waiting = (
+      await this.db.query<{ day: number }>(`SELECT day FROM market_days WHERE season = $1 AND closed_at IS NOT NULL AND settlement_status = 'batched' ORDER BY day LIMIT 100`, [this.season])
+    ).map((r) => num(r.day));
+    if (!waiting.length || (!flush && waiting.length < this.settleEvery)) return;
+    const first = waiting[0] ?? 0;
+    const last = waiting[waiting.length - 1] ?? first;
+    const r = await settleRange(this.db, this.season, first, last);
+    if (r.status === 'failed') {
+      await this.db.query('UPDATE market_days SET settlement_error = $3 WHERE season = $1 AND day = $2', [this.season, last, r.error ?? 'failed']);
+      return;
+    }
+    await this.db.tx(async (q) => {
+      await q.query(
+        `UPDATE market_days SET settlement_status = $4, settlement_tx = $5, settlement_error = $6, settlement_digest = $7, settlement_first = $2, settlement_last = $3
+         WHERE season = $1 AND day BETWEEN $2 AND $3 AND settlement_status = 'batched'`,
+        [this.season, first, last, r.status, r.txHash, r.error ?? null, r.digest ?? null],
+      );
+      if (r.settlement) await q.query('UPDATE market_days SET settlement_json = $3 WHERE season = $1 AND day = $2', [this.season, last, JSON.stringify(r.settlement)]);
+    });
+    if (r.status === 'sent') await this.catchUpLateDays(last + 1);
+  }
+
+  /** Settles the days still waiting for their range (at shutdown, or at a season's end). */
+  async flushSettlement(): Promise<void> {
+    if (this.settleEvery > 1) await this.serial(() => this.settleInRanges(null, true));
   }
 
   /**

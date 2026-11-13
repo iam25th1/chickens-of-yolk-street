@@ -1510,6 +1510,7 @@ All optional for local play. Copy `.env.example` to `.env` at the repo root. Pro
 | `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY` | server, client (via `/api/config`) | labelled local dev login |
 | `NEAR_TESTNET_ACCOUNT_ID`, `NEAR_TESTNET_PRIVATE_KEY` | server, deploy script | daily settlement is a recorded NO-OP |
 | `NEAR_TESTNET_RPC_URL`, `NEAR_GAME_CONTRACT_ID` | server | `https://test.rpc.fastnear.com`; the signing account |
+| `SETTLE_EVERY_DAYS` | server | 10: days settle in ranges of ten, one call each (1 settles every day on its own) |
 | `CHAIN_MINT_NEAR`, `CHAIN_MIN_BALANCE_NEAR`, `AGENT_ACCOUNT_FUNDING_NEAR` | server | 0.027 kept free per Feather mint (measured 0.0213, plus 25%); 0.1 margin (120 day closes of settlement gas, six real hours) under which mints and agent wallet links wait; 0.01 per new agent wallet |
 | `NEARAI_API_KEY`, `NEARAI_BASE_URL`, `NEARAI_MODEL`, `NEARAI_CHEAP_MODEL` | server | agents use their rule policies |
 | `NEARAI_DAILY_SPEND_CAP_USD` | server | 1.00 |

@@ -398,8 +398,12 @@ export interface MarketChartDay {
 
 export interface Settlement {
   day: number;
-  status: 'pending' | 'sent' | 'noop' | 'failed';
+  /** batched: waiting for its range of days to settle in one call. */
+  status: 'pending' | 'batched' | 'sent' | 'noop' | 'failed';
   txHash: string | null;
+  /** The range of days its call settled (the same day twice when it settled alone). */
+  first?: number | null;
+  last?: number | null;
 }
 
 export interface RivalRank {

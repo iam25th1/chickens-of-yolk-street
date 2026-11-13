@@ -1,8 +1,8 @@
 import { openDb, type Db } from '../src/db/db';
 import { InferenceBudget } from '../src/agents/brain';
 import { NEARAI_DEFAULT_CHEAP_MODEL, NEARAI_DEFAULT_MODEL, type NearAiClient } from '../src/ai/nearai';
-import { buildDayBatch, buildLateSettlement, commitBatch, digestOf, type DayBatch } from '../src/chain/batch';
-import { NoopChain, assignAgentWallets, type ChainWriter, type LateResult, type MintRequest, type MintResult, type SettleResult } from '../src/chain/chain';
+import { buildDayBatch, buildLateSettlement, buildRangeBatch, commitBalances, commitBatch, digestOf, type DayBatch, type RangeBatch } from '../src/chain/batch';
+import { NoopChain, assignAgentWallets, type ChainWriter, type LateResult, type MintRequest, type MintResult, type RangeResult, type SettleResult } from '../src/chain/chain';
 import { tokenFor, type Collection } from '../src/chain/mint';
 import { Game } from '../src/game/game';
 import { seededRng } from '../src/game/rng';
@@ -45,6 +45,9 @@ export class RecordingChain implements ChainWriter {
   readonly created: string[] = [];
   readonly walletLog: string[] = [];
   fundingNear = 0.05;
+  /** Ranges settled in one call (SETTLE_EVERY_DAYS above 1), in order, and what the next range calls do instead of landing. */
+  readonly ranges: { batch: RangeBatch; result: RangeResult }[] = [];
+  rangeScript: 'fail'[] = [];
   constructor(
     readonly gameAccount = 'game.testnet',
     /** Unused since Feathers mint at once; kept so older tests construct the same way. */
@@ -83,6 +86,16 @@ export class RecordingChain implements ChainWriter {
     return result;
   }
 
+  async settleRange(db: Db, season: string, first: number, last: number): Promise<RangeResult> {
+    if (this.rangeScript.shift() === 'fail') return { status: 'failed', txHash: null, first, last, error: 'NEAR testnet refused the call' };
+    await this.linkWallets(db);
+    const built = await buildRangeBatch(db, season, first, last);
+    await commitBalances(db, built.balances);
+    const result: RangeResult = { status: 'sent', txHash: `recorded-${season}-${first}-${last}`, first, last, settlement: built.settlement, digest: built.batch.digest };
+    this.ranges.push({ batch: built.batch, result });
+    return result;
+  }
+
   /** What the testnet writer does at each settlement: every open agent without a wallet gets one from the pool. */
   async linkWallets(db: Db): Promise<void> {
     await assignAgentWallets(
@@ -118,6 +131,8 @@ export async function makeGame(
     season?: string;
     db?: Db;
     chain?: ChainWriter;
+    /** SETTLE_EVERY_DAYS (default 1: every day its own call). */
+    settleEvery?: number;
     /** The real model names, priced as the server prices them (ASSUMED_PRICING), instead of the test pair. */
     realModels?: boolean;
   } = {},
@@ -134,6 +149,7 @@ export async function makeGame(
     log,
     cast: opts.cast ?? false,
     season: opts.season ?? null,
+    settleEvery: opts.settleEvery,
     brain: {
       client: opts.client ?? null,
       budget: new InferenceBudget(db, opts.capUsd ?? 1, () => clock.t),

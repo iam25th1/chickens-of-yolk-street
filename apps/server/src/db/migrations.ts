@@ -615,6 +615,21 @@ CREATE INDEX orders_farm ON orders (farm_id);
 -- standing on older days. Badges are then earned from what is known, quietly, as of the boot day.
 `,
   },
+  {
+    id: 17,
+    name: 'settlement ranges',
+    sql: `
+-- Days settle on the chain in ranges (SETTLE_EVERY_DAYS, default 10): a closed day waits as
+-- 'batched' until its range is sent, then every day of the range is 'sent' with the range's one
+-- transaction, its digest and its first and last day. The range's full record (each day's own
+-- record, as the database holds it, and the range's egg moves) is kept on its last day.
+ALTER TABLE market_days DROP CONSTRAINT IF EXISTS market_days_settlement_status_check;
+ALTER TABLE market_days ADD CONSTRAINT market_days_settlement_status_check
+  CHECK (settlement_status IN ('pending', 'batched', 'sent', 'noop', 'failed'));
+ALTER TABLE market_days ADD COLUMN settlement_first integer;
+ALTER TABLE market_days ADD COLUMN settlement_last integer;
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

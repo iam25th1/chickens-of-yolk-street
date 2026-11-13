@@ -65,6 +65,7 @@ const game = new Game({
   log,
   season: config.season,
   dayLengthMs: config.dayLengthMs,
+  settleEvery: config.settleEvery,
   provenance,
   brain: {
     client: nearAi,
@@ -103,11 +104,15 @@ const shutdown = (): void => {
   // open websockets would keep close() waiting for ever (the host then kills the process): drop
   // them first, then idle keep-alive connections; a half-finished day close rolls back on its own
   server.emit(DRAIN);
-  server.close(() => {
-    void db.close().then(() => process.exit(0));
-  });
   server.closeIdleConnections();
-  setTimeout(() => process.exit(0), 5000).unref();
+  setTimeout(() => process.exit(0), 6000).unref();
+  // the days still waiting for their range settle now (best effort: at most a few seconds), then close
+  const flushed = game.flushSettlement().catch((err: unknown) => log(`[chain] flush at shutdown failed: ${err instanceof Error ? err.message : String(err)}`));
+  void Promise.race([flushed, new Promise((r) => setTimeout(r, 4000))]).then(() => {
+    server.close(() => {
+      void db.close().then(() => process.exit(0));
+    });
+  });
 };
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

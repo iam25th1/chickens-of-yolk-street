@@ -21,6 +21,8 @@ export interface ServerConfig {
   dayLengthMs: number;
   /** DEMO_DAY_SECONDS was set but production ignores it (DEMO_MODE is not 1). */
   demoDayIgnored: boolean;
+  /** SETTLE_EVERY_DAYS: days settle on the chain in ranges of this many, one call each (default 10). */
+  settleEvery: number;
 }
 
 /** Season ids as the game contract accepts them. */
@@ -68,7 +70,16 @@ export function readConfig(env: NodeJS.ProcessEnv, repoRoot: string): ServerConf
     season,
     dayLengthMs: demoSeconds !== null && demoAllowed ? demoSeconds * 1000 : ECONOMY.day.lengthMs,
     demoDayIgnored: demoSeconds !== null && !demoAllowed,
+    settleEvery: settleEveryDays(env.SETTLE_EVERY_DAYS),
   };
+}
+
+/** SETTLE_EVERY_DAYS as a whole number of days from 1 (every day its own call) to 100; 10 when unset. */
+export function settleEveryDays(raw: string | undefined): number {
+  if (!raw) return 10;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 100) throw new Error('SETTLE_EVERY_DAYS must be a whole number from 1 to 100');
+  return n;
 }
 
 export interface InferenceConfig {
@@ -116,6 +127,7 @@ export const ENV_NAMES = [
   'ALLOW_PGLITE_IN_PRODUCTION',
   'GAME_SEASON',
   'DEMO_DAY_SECONDS',
+  'SETTLE_EVERY_DAYS',
   'DEMO_MODE',
   'SESSION_SECRET',
   'ALLOW_DEV_LOGIN',

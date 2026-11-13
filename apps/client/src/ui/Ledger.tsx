@@ -54,11 +54,14 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
         </span>
         <span style={{ width: 90, textAlign: 'right' }}>
           {d.settlement?.txHash && explorer ? (
-            <a href={`${explorer}${d.settlement.txHash}`} target="_blank" rel="noreferrer" style={{ color: '#2f6f9e' }}>
-              ON-CHAIN RECEIPT
+            // days settle together, ten to a call: the receipt names its range
+            <a href={`${explorer}${d.settlement.txHash}`} target="_blank" rel="noreferrer" style={{ color: '#2f6f9e' }} title="On-chain receipt">
+              {d.settlement.first && d.settlement.last && d.settlement.last > d.settlement.first ? `DAYS ${d.settlement.first}-${d.settlement.last}` : 'ON-CHAIN RECEIPT'}
             </a>
           ) : (
-            <span style={{ color: '#b8743a' }}>{d.settlement?.status === 'noop' ? 'LOCAL ONLY' : d.settlement?.status === 'failed' ? 'RETRYING' : 'PENDING'}</span>
+            <span style={{ color: '#b8743a' }}>
+              {d.settlement?.status === 'noop' ? 'LOCAL ONLY' : d.settlement?.status === 'failed' ? 'RETRYING' : d.settlement?.status === 'batched' ? 'IN A BATCH' : 'PENDING'}
+            </span>
           )}
         </span>
       </div>
