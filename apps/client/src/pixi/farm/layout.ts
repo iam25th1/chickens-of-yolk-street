@@ -16,6 +16,14 @@
 // by the gate, from where the cart drives out. The farm's own sign stands by the path under the
 // porch; the rivals' signs across the path. In landscape the goal tracker and toasts sit over the
 // bottom-left corner: only ground goes there.
+//
+// Land: the home plot is the w x h area at the origin. Each plot of land the farm owns attaches to a
+// side of it (the east field to the right, the west meadow to the left, the north pasture above, the
+// south orchard below), as deep as ECONOMY.land says, with its coop slots, a straw pasture the hens
+// walk, and its props. The fence follows the new outline: with the south orchard the bottom fence
+// steps down round it and the path runs on through it to the gate in its fence. With no land the
+// farm is exactly the home plot.
+import { ECONOMY, LAND_IDS, landCoopPlots, type LandId } from '@coys/shared';
 import derivedJson from '../../assets/derived.json';
 
 export interface Point {
@@ -59,9 +67,43 @@ export type Connection =
   | { kind: 'meet'; a: string; b: string; what: string }
   | { kind: 'over'; point: string; span: [string, string]; what: string };
 
+/** A plot of land beside the home plot, as laid out. */
+export interface LandPlot {
+  id: LandId;
+  /** Its ground, in world pixels (outside the home plot's 0, 0, w, h). */
+  box: Box;
+  /** The straw pasture hens walk on it. */
+  pasture: Box;
+  /** Its coop slots: the coop plot number (ECONOMY numbering) and the feet. */
+  coops: { plot: number; at: Point }[];
+  /** Tilled beds (ground only: the south orchard's rows). */
+  beds: Box[];
+  /** Its zones: the coop row and the room for its props. */
+  zones: { coops: Box; props: Box };
+}
+
+/** A row of fence (y, from left to right, on whole tiles) or a column of fence posts (x, top to bottom). */
+export interface FenceRail {
+  y: number;
+  left: number;
+  right: number;
+}
+export interface FencePosts {
+  x: number;
+  top: number;
+  bottom: number;
+}
+
 export interface FarmLayout {
+  /** The home plot's size: the farm area the window shows. */
   w: number;
   h: number;
+  /** The whole farm: the home plot and every plot of land, in world pixels. */
+  world: Box;
+  /** The plots of land the farm owns, in LAND_IDS order. */
+  land: LandPlot[];
+  /** The fence along the farm's outline: rails (a gate where the path crosses one) and posts. */
+  fences: { rails: FenceRail[]; posts: FencePosts[] };
   /** The bottom-left corner the guide covers (ground only). */
   guide: Box;
   yard: Box;
@@ -164,11 +206,12 @@ const artObject = (k: ArtKey, at: Point, points: Record<string, Point> = {}): Sp
  * covers none, as in portrait). Extra width widens the yard and spreads the coops; extra height
  * deepens the yard. Every anchor is a whole world pixel.
  */
-export function farmLayout(w: number, h: number, guide: { w: number; h: number }): FarmLayout {
+export function farmLayout(w: number, h: number, guide: { w: number; h: number }, land: readonly LandId[] = []): FarmLayout {
   w = Math.max(MIN_W, Math.floor(w));
   h = Math.max(MIN_H, Math.floor(h));
   const guideTop = h - guide.h;
   const objects: Record<string, SpecObject> = {};
+  const owned = LAND_IDS.filter((id) => land.includes(id));
 
   // the path: two tiles wide down the right side, from the porch steps to the gate in the fence
   // (as far right as leaves the farmhouse, which stands right of its steps, inside the farm)
@@ -321,24 +364,26 @@ export function farmLayout(w: number, h: number, guide: { w: number; h: number }
     clerk: padUnder(objects.clerk),
   };
 
-  const gateAt = { x: pathX, y: fenceY - 2 };
+  // the gate is in the outer fence: the home plot's, or the south orchard's when the farm owns it
+  const gateY = owned.includes('south') ? h + depthOf('south') - TILE : fenceY;
+  const gateAt = { x: pathX, y: gateY - 2 };
   objects.gate = {
     sprite: '23-farm-tileset',
     row: 'gate',
     at: gateAt,
-    box: { left: pathLeft, top: fenceY, right: pathRight, bottom: fenceY + TILE },
-    footprint: { left: pathLeft, top: fenceY + TILE - 3, right: pathRight, bottom: fenceY + TILE },
-    points: { centre: { x: pathX, y: fenceY } },
+    box: { left: pathLeft, top: gateY, right: pathRight, bottom: gateY + TILE },
+    footprint: { left: pathLeft, top: gateY + TILE - 3, right: pathRight, bottom: gateY + TILE },
+    points: { centre: { x: pathX, y: gateY } },
   };
   objects.path = {
     sprite: '23-farm-tileset',
     row: 'path',
     at: { x: pathX, y: houseGround },
-    box: { left: pathLeft, top: houseGround, right: pathRight, bottom: fenceY },
+    box: { left: pathLeft, top: houseGround, right: pathRight, bottom: gateY },
     footprint: { left: pathLeft, top: houseGround, right: pathRight, bottom: houseGround },
     points: {
       top: { x: pathX, y: houseGround },
-      bottom: { x: pathX, y: fenceY },
+      bottom: { x: pathX, y: gateY },
       // the cart bay's span across the path, on the cart's ground
       left: { x: pathLeft, y: objects.cart.points.wheel?.y ?? stallGround },
       right: { x: pathRight, y: objects.cart.points.wheel?.y ?? stallGround },
@@ -371,9 +416,21 @@ export function farmLayout(w: number, h: number, guide: { w: number; h: number }
     cartBay: around('cart'),
   };
 
+  const plotsOut = owned.map((id) => layLand(id, { w, h, half, fenceY, gateY, pathLeft, pathRight }, objects, around));
+  const world: Box = { left: 0, top: 0, right: w, bottom: h };
+  for (const p of plotsOut) {
+    world.left = Math.min(world.left, p.box.left);
+    world.top = Math.min(world.top, p.box.top);
+    world.right = Math.max(world.right, p.box.right);
+    world.bottom = Math.max(world.bottom, p.box.bottom);
+  }
+
   return {
     w,
     h,
+    world,
+    land: plotsOut,
+    fences: fencesFor(plotsOut, fenceY, gateY),
     zones,
     guide: { left: 0, top: guideTop, right: guide.w, bottom: h },
     yard,
@@ -387,12 +444,126 @@ export function farmLayout(w: number, h: number, guide: { w: number; h: number }
     pads,
     conveyor: { y: beltY, from: beltFrom, to: beltTo },
     path: { x: pathX, top: houseGround },
-    fence: { y: fenceY, gate: pathX },
+    fence: { y: gateY, gate: pathX },
     gate: gateAt,
     props,
     rivals,
     spec: { objects, connections },
   };
+}
+
+// ---- land -------------------------------------------------------------------------------------
+
+/** How far a plot of land reaches out from the home plot, in world pixels (whole tiles). */
+export const depthOf = (id: LandId): number => ECONOMY.land.plots[id].depth * TILE;
+
+type PropRow = 'hay-bale' | 'flowers' | 'puddle';
+type Home = { w: number; h: number; half: number; fenceY: number; gateY: number; pathLeft: number; pathRight: number };
+
+/**
+ * One plot of land laid out beside the home plot: its coop slots along its top (on the home plot's
+ * coop line for the east field and the west meadow), its straw pasture below them, and its props,
+ * each a spec object (coop<plot>, prop-<plot id>-<n>) so the room rules cover them too. The south
+ * orchard keeps the path's column clear (the path runs on to its gate) and has tilled beds beside
+ * its coops.
+ */
+function layLand(id: LandId, home: Home, objects: Record<string, SpecObject>, around: (...names: string[]) => Box): LandPlot {
+  const { w, h, half, fenceY } = home;
+  const d = depthOf(id);
+  const houseGround = 112;
+  const slots = landCoopPlots(id);
+  let box: Box;
+  let pasture: Box;
+  let xs: number[];
+  let feetY: number;
+  let props: { row: PropRow; x: number; y: number }[];
+  let beds: Box[] = [];
+  if (id === 'east' || id === 'west') {
+    box = id === 'east' ? { left: w, top: 0, right: w + d, bottom: h } : { left: -d, top: 0, right: 0, bottom: h };
+    feetY = houseGround;
+    xs = [box.left + 24 + half, box.right - 24 - half];
+    // (props stand outside the pasture, so a hen in it can always walk round them)
+    pasture = { left: box.left + 24, top: houseGround + 6, right: box.right - 24, bottom: fenceY - 46 };
+    const mid = Math.round((box.left + box.right) / 2);
+    // flowers between the coops; the hay bale and a puddle in the grass by the fence, far and near
+    const far = id === 'east' ? box.right - 44 : box.left + 44;
+    const near = id === 'east' ? box.left + 64 : box.right - 64;
+    props = [
+      { row: 'flowers', x: mid, y: houseGround },
+      { row: 'hay-bale', x: far, y: fenceY - 8 },
+      { row: 'puddle', x: near, y: fenceY - 8 },
+    ];
+  } else if (id === 'north') {
+    box = { left: 0, top: -d, right: w, bottom: 0 };
+    feetY = -d + 104;
+    xs = [Math.round(w * 0.3), Math.round(w * 0.62)];
+    pasture = { left: 24, top: feetY + 6, right: w - 24, bottom: -12 };
+    props = [
+      { row: 'flowers', x: Math.round(w * 0.1), y: feetY - 4 },
+      { row: 'hay-bale', x: w - 44, y: feetY - 4 },
+      { row: 'puddle', x: Math.round(w * 0.46), y: feetY - 30 },
+    ];
+  } else {
+    box = { left: 0, top: h, right: w, bottom: h + d };
+    feetY = h + 100;
+    xs = [24 + half, 24 + 3 * half + 40];
+    // the pasture and the beds stop short of the path, which runs on through the orchard to its gate
+    const clearOfPath = home.pathLeft - 24;
+    pasture = { left: 24, top: feetY + 6, right: clearOfPath, bottom: home.gateY - 46 };
+    const bedsLeft = Math.ceil(((xs[1] ?? 0) + half + 24) / TILE) * TILE;
+    const bedsRight = Math.floor(clearOfPath / TILE) * TILE;
+    if (bedsRight - bedsLeft >= 2 * TILE) beds = [{ left: bedsLeft, top: h + 2 * TILE, right: bedsRight, bottom: h + 6 * TILE }];
+    const bed = beds[0];
+    props = [
+      { row: 'flowers', x: bed ? bed.left + 24 : Math.round(w * 0.6), y: h + 4 * TILE },
+      { row: 'flowers', x: bed ? bed.right - 24 : Math.round(w * 0.7), y: h + 6 * TILE },
+      { row: 'hay-bale', x: clearOfPath - 20, y: home.gateY - 8 },
+      { row: 'puddle', x: 60, y: home.gateY - 8 },
+    ];
+  }
+  const coops = slots.map((plot, i) => ({ plot, at: { x: Math.round(xs[i] ?? xs[0] ?? 0), y: feetY } }));
+  for (const c of coops) objects[`coop${c.plot}`] = object('15-coop-deluxe', 'idle', c.at);
+  const names = props.slice(0, ECONOMY.land.plots[id].props).map((p, i) => {
+    const name = `prop-${id}-${i}`;
+    objects[name] = object('24-farm-props', p.row, { x: Math.round(p.x), y: Math.round(p.y) });
+    return name;
+  });
+  return { id, box, pasture, coops, beds, zones: { coops: around(...coops.map((c) => `coop${c.plot}`)), props: around(...names) } };
+}
+
+/**
+ * The fence along the outline, on whole tiles: the home plot's bottom rail runs across the whole
+ * view; with the south orchard it steps down round the orchard (posts down its sides, a rail along
+ * its foot with the gate). The east field and the west meadow get a column of posts on their far
+ * side, the north pasture a rail along its top.
+ */
+function fencesFor(plots: LandPlot[], fenceY: number, gateY: number): { rails: FenceRail[]; posts: FencePosts[] } {
+  const rails: FenceRail[] = [];
+  const posts: FencePosts[] = [];
+  const south = plots.find((p) => p.id === 'south');
+  if (south) {
+    const right = Math.ceil(south.box.right / TILE) * TILE;
+    rails.push({ y: fenceY, left: -Infinity, right: 0 }, { y: fenceY, left: right, right: Infinity }, { y: gateY, left: 0, right });
+    posts.push({ x: 0, top: fenceY, bottom: gateY }, { x: right - TILE, top: fenceY, bottom: gateY });
+  } else rails.push({ y: fenceY, left: -Infinity, right: Infinity });
+  for (const p of plots) {
+    if (p.id === 'east') posts.push({ x: Math.floor(p.box.right / TILE) * TILE - TILE, top: 0, bottom: fenceY });
+    if (p.id === 'west') posts.push({ x: p.box.left, top: 0, bottom: fenceY });
+    if (p.id === 'north') rails.push({ y: p.box.top, left: 0, right: Math.ceil(p.box.right / TILE) * TILE });
+  }
+  return { rails, posts };
+}
+
+/** Where a coop on this plot number stands (its feet): the home plot's four, or a slot on owned land. */
+export function coopAt(l: FarmLayout, plot: number): Point | undefined {
+  if (plot < l.plots.length) return l.plots[plot];
+  for (const p of l.land) for (const c of p.coops) if (c.plot === plot) return c.at;
+  return undefined;
+}
+
+/** Every coop slot of the farm (the home plot's and its land's), with its plot number. */
+export function coopSlots(l: FarmLayout): { plot: number; at: Point }[] {
+  return [...l.plots.map((at, plot) => ({ plot, at })), ...l.land.flatMap((p) => p.coops)];
 }
 
 /** A connection point by name ("crate.in"). */
@@ -496,7 +667,7 @@ export function labelSpot(l: FarmLayout, name: string, w: number, h = 11): Box |
   }
   for (const r of tries) {
     const b = { left: Math.round(r.left), top: Math.round(r.top), right: Math.round(r.right), bottom: Math.round(r.bottom) };
-    if (b.left < 0 || b.top < 0 || b.right > l.w || b.bottom > l.h) continue;
+    if (b.left < l.world.left || b.top < l.world.top || b.right > l.world.right || b.bottom > l.world.bottom) continue;
     if (!others.some((x) => hit(b, x))) return b;
   }
   return null;

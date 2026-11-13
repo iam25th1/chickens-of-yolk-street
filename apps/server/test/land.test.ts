@@ -131,6 +131,16 @@ describe('land badges', () => {
     expect(facts).toMatchObject({ landPlots: 4, landCoops: 1 });
     const farm = await p.tg.game.getFarmState(p.farmId);
     const paid = ECONOMY.land.prices.reduce((a, b) => a + b, 0);
-    expect(facts?.netWorth).toBe(Math.floor(worthOf(farm.cashMilli, farm.hens.length, farm.coops.map((c) => c.kind), [], toMilli(paid)).totalMilli / 1000));
+    expect(facts?.netWorth).toBe(
+      Math.floor(
+        worthOf(
+          farm.cashMilli,
+          farm.hens.length,
+          farm.coops.map((c) => c.kind),
+          [],
+          toMilli(paid),
+        ).totalMilli / 1000,
+      ),
+    );
   });
 });

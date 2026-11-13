@@ -98,8 +98,8 @@ export const ECONOMY = {
     plots: {
       east: { coopSlots: 2, props: 3, depth: 18 },
       west: { coopSlots: 2, props: 3, depth: 16 },
-      north: { coopSlots: 2, props: 3, depth: 11 },
-      south: { coopSlots: 2, props: 4, depth: 12 },
+      north: { coopSlots: 2, props: 3, depth: 13 },
+      south: { coopSlots: 2, props: 4, depth: 15 },
     } satisfies Record<LandId, { coopSlots: number; props: number; depth: number }>,
   },
   crowding: {
