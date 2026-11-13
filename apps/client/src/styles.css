@@ -799,6 +799,8 @@ input[type='range'].slider::-moz-range-thumb {
 /* The AI tag on AI farms and agents: a smaller stamp than BETA, inline, never wrapping or widening a row. */
 .ai-badge {
   display: inline-block;
+  /* aligned to the line's top, so it never makes a line taller than its text */
+  vertical-align: top;
   height: 8px;
   padding: 0 2px;
   margin-left: 3px;
