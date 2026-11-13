@@ -128,8 +128,10 @@ describe('no scrollbars and nothing cut off', () => {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: w < 600, hasTouch: w < 600 });
       const page = await ctx.newPage();
       const seen = new Set<string>();
+      const started = Date.now();
       const check = async (screen: string) => {
         await page.waitForTimeout(350);
+        if (process.env.E2E_PROGRESS) process.stdout.write(`${size} ${((Date.now() - started) / 1000).toFixed(0)}s ${screen}\n`);
         for (const p of await page.evaluate(overflowing)) problems.push(`${size} ${screen}: ${p}`);
         // one picture per screen, tab and tour step (not every further page), at CSS pixels
         const key = screen.replace(/ page \d+$/, '').replace(/[^a-z0-9]+/gi, '-').toLowerCase();

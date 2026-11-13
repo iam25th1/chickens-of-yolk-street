@@ -59,10 +59,15 @@ jobs:
           test "$(PGPASSWORD=ci-only psql -h localhost -U coys -d coys_restore -tAc 'SELECT season FROM game_clock')" = ci
 
   # No scrollbars and nothing cut off: the built game in a headless browser (the runner's own
-  # Chrome, a fresh profile per window size) at every checked size, every screen, tab, page and
+  # Chrome, a fresh profile) at every checked size, one job per size, every screen, tab, page and
   # tour step (e2e/no-scroll.test.ts). Nothing is downloaded for it.
   layout:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        size: [1280x720, 1440x900, 1920x1080, 2560x1440, 390x844, 360x640, 1024x640, 1180x820, 1680x1050, 768x1024, 412x915]
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-node@v7.1.0
@@ -71,9 +76,11 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Every screen fits at every window size
+      - name: Every screen fits at ${{ matrix.size }}
         env:
           CHROME_PATH: /usr/bin/google-chrome
+          E2E_SIZES: ${{ matrix.size }}
+          E2E_PROGRESS: '1'
         run: npm run test:e2e
 
   contracts:
