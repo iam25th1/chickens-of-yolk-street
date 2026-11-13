@@ -13,7 +13,7 @@ import { useViewport } from '../app/Stage';
 import { motion } from '../motion/ui';
 import type { Action } from '../net/socket';
 import { useStore } from '../state/store';
-import { uiEvents, type MarketTab } from '../state/ui';
+import { openModal, uiEvents, type MarketTab } from '../state/ui';
 import { AiBadge } from './AiBadge';
 import { BadgeRow } from './Badge';
 import { LOOK } from './cast';
@@ -686,18 +686,19 @@ function FarmsTab({ farm, market, wide, side }: TabProps) {
       <span style={{ lineHeight: '10px', color: '#8b5a2b' }}>A FARM THAT RUNS OUT OF COINS GOES BUST. ITS SIGN FALLS AND ITS HENS GO TO THE HEN AUCTION.</span>
     </button>
   );
-  // each farm opens its public profile; its best badges sit beside its name
+  // each farm opens its public profile (your own, your full profile); its best badges sit beside its name
   const rows = market.ranking.map((r, i) => (
     <button
       key={`${r.farmId}-${i}`}
       className="row spread"
       data-ui="ranking-row"
       data-farm={r.farmId}
-      title={`${r.name}: public profile`}
+      title={r.name === farm.name ? 'Your profile' : `${r.name}: public profile`}
       style={{ opacity: r.bust ? 0.6 : 1, width: '100%', gap: 6, alignItems: 'flex-start', border: 0, padding: 0, background: 'transparent', font: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer' }}
       onClick={() => {
         uiSound(audio, 'click');
-        openPublicProfile(r.farmId, 'market');
+        if (r.name === farm.name) openModal({ kind: 'profile', tab: 'overview' });
+        else openPublicProfile(r.farmId, 'market');
       }}
     >
       <span style={{ flex: 1, minWidth: 0, lineHeight: '9px', color: r.name === farm.name ? '#2f6f9e' : undefined }}>
