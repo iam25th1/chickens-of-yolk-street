@@ -1,8 +1,9 @@
 // The farm: the world on the canvas and the UI in fixed zones that never overlap (app/viewport.ts):
 // the top bar, the side panel (crate, waiting cards, desk), the goal tracker with the toast area
 // above it, and one modal at a time over a dimmed backdrop (shop, ledger, a card, a hen, a machine,
-// the crate, a hen's certificate, settings), or a page of its own (the Market, the Feather Mint). Server state flows in through the
-// socket; player choices go out as actions and come back as events with juice.
+// the crate, a hen's certificate, settings) or a page of its own (the Market, the Feather Mint).
+// Server state flows in through the socket; player choices go out as actions and come back as
+// events with juice.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ECONOMY, isCrash, type CardView } from '@coys/shared';
 import { useServices } from '../app/services';
