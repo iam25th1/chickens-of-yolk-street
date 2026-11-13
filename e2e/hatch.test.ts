@@ -79,9 +79,10 @@ async function buyAndHatch(page: Page, count: number, size: string): Promise<voi
   const landed = seen.filter((e) => e.y >= y.y && e.y <= y.y + y.h + 2);
   expect(landed.length, `${size}: landed eggs`).toBeGreaterThanOrEqual(count);
   for (const e of landed) expect(e.x >= y.x && e.x <= y.x + y.w, `${size}: egg at (${e.x}, ${e.y}) outside the yard`).toBe(true);
-  // every hen is in the yard (by her feet: the bottom of her box), new ones included
-  await page.waitForTimeout(1500);
-  for (const h of (await farm(page)).hens) {
+  // every new hen is in the yard (by her feet: the bottom of her box) as she comes out of her egg; the
+  // older hens may be anywhere they walk, a coop's door at night included
+  const old = new Set(before.hens.map((h) => h.id));
+  for (const h of after.hens.filter((x) => !old.has(x.id))) {
     const foot = { x: h.x + h.w / 2, y: h.y + h.h };
     expect(foot.x >= y.x - 4 && foot.x <= y.x + y.w + 4 && foot.y >= y.y - 4 && foot.y <= y.y + y.h + 4, `${size}: hen ${h.id} at (${foot.x}, ${foot.y}) outside the yard`).toBe(true);
   }
