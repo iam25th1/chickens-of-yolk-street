@@ -244,7 +244,7 @@ const SECTIONS: Section[] = [
     id: 'profile',
     title: 'YOUR PROFILE AND BADGES',
     short: 'PROFILE AND BADGES',
-    picture: () => <Badge id="first-egg" level="gold" zoom={2} />,
+    picture: () => <Badge id="crate-filler" level="gold" zoom={2} />,
     body: (
       <>
         <p>

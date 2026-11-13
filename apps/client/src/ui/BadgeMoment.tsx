@@ -1,7 +1,8 @@
 // The badge unlock moment: when the server says a badge (or a higher level of one) is earned, it pops
 // in at the top of the farm: the badge slams down (a stamp, a beat of hitstop and a small shake, which
 // reduce motion turns off), its frame glints once, and a win sting plays, with its name, level and
-// what earned it. Unlocks queue: one moment at a time, each for a few seconds (a tap moves on).
+// what earned it. Unlocks queue: one moment at a time, each for a few seconds (shorter while more
+// wait). It only shows: clicks pass through it, so it never stands in the way of what is under it.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BADGE_BY_ID, badgeText, type BadgeLevel } from '@coys/shared';
 import { useServices } from '../app/services';
@@ -17,8 +18,9 @@ interface Earned {
   level: BadgeLevel;
 }
 
-/** How long a moment stays (ms), and the pause before the next. */
+/** How long a moment stays (ms; shorter while others wait), and the pause before the next. */
 const SHOW_MS = 3000;
+const QUEUED_MS = 1600;
 const GAP_MS = 250;
 
 export function BadgeMoments() {
@@ -64,10 +66,13 @@ export function BadgeMoments() {
         setGlint(true);
         audio.play('19-haggle-win', { volume: 0.7 });
       }, 300),
-      setTimeout(() => {
-        if (panel.current) motion.leave(panel.current, () => setTimeout(next, GAP_MS));
-        else next();
-      }, SHOW_MS),
+      setTimeout(
+        () => {
+          if (panel.current) motion.leave(panel.current, () => setTimeout(next, GAP_MS));
+          else next();
+        },
+        queue.current.length ? QUEUED_MS : SHOW_MS,
+      ),
     ];
     return () => timers.forEach(clearTimeout);
   }, [now, audio, next]);
@@ -86,8 +91,7 @@ export function BadgeMoments() {
       data-ui="badge-moment"
       data-badge={now.badge}
       data-level={now.level}
-      style={{ left: Math.round(world.x + (world.w - width) / 2), top: world.y + 6, width, zIndex: 45, padding: 7, boxSizing: 'border-box', cursor: 'pointer' }}
-      onClick={() => next()}
+      style={{ left: Math.round(world.x + (world.w - width) / 2), top: world.y + 6, width, zIndex: 45, padding: 7, boxSizing: 'border-box', pointerEvents: 'none' }}
     >
       <div className="row" style={{ gap: 8, alignItems: 'center' }}>
         <span ref={stamp} style={{ display: 'inline-block', flex: 'none' }}>

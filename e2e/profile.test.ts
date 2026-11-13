@@ -50,17 +50,16 @@ async function enter(page: Page, name: string): Promise<void> {
   await page.locator('[data-ui="topbar"]').waitFor({ timeout: 60_000 });
 }
 
-/** Taps away every badge moment still queued (badges the day closes earned), until none is left. */
+/** Waits out every badge moment still queued (badges the day closes earned): they show one at a time, never more. */
 async function drainMoments(page: Page): Promise<void> {
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 240; i++) {
     await page.waitForTimeout(250);
-    const m = page.locator('[data-ui="badge-moment"]');
-    if (!(await m.count())) {
-      await page.waitForTimeout(400);
-      if (!(await m.count())) return;
-      continue;
+    const n = await page.locator('[data-ui="badge-moment"]').count();
+    expect(n).toBeLessThanOrEqual(1);
+    if (n === 0) {
+      await page.waitForTimeout(600);
+      if (!(await page.locator('[data-ui="badge-moment"]').count())) return;
     }
-    await m.first().click({ force: true });
   }
 }
 
