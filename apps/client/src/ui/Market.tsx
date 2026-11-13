@@ -327,7 +327,7 @@ function PricesTab({ market, wide, side }: TabProps) {
       <div className="row spread" style={{ gap: 6, alignItems: 'flex-start' }}>
         <span style={{ flex: 1, minWidth: 0, lineHeight: '9px' }}>
           {a.name.toUpperCase()}
-          <AiBadge />
+          <AiBadge brain={a.brain} />
         </span>
         <span style={{ flex: 'none' }}>{a.status === 'bust' ? 'BUST' : ROLE[a.role]}</span>
       </div>

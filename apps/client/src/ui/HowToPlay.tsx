@@ -5,6 +5,7 @@ import { Children, Fragment, isValidElement, useState, type ReactNode } from 're
 import { BADGES, ECONOMY, MARKET_CHART_DAYS, UNLOCK_IDS, type MilestoneId } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
+import { AiHowLine } from './AiBadge';
 import { Modal } from './Modal';
 import { Paged } from './Paged';
 import { Badge } from './Badge';
@@ -51,7 +52,9 @@ const SECTIONS: Section[] = [
     picture: () => <Hen />,
     body: (
       <>
-        <p>RUN THE BEST EGG FARM ON YOLK STREET. SOME FARMS ON YOLK STREET ARE OTHER PLAYERS, SOME ARE AI (MARKED AI). THE FEED SUPPLIERS AND THE EGG BUYERS ARE AI, EACH WITH ITS OWN COINS AND MEMORY.</p>
+        <p>
+          RUN THE BEST EGG FARM ON YOLK STREET. SOME FARMS ON YOLK STREET ARE OTHER PLAYERS, SOME ARE AI (MARKED AI). THE FEED SUPPLIERS AND THE EGG BUYERS ARE AI. <AiHowLine />
+        </p>
         <p>KEEP YOUR FARM OUT OF THE RED, GROW YOUR FLOCK, OUTLAST THE RIVALS, AND EARN FOUNDING HENS ALONG THE WAY.</p>
       </>
     ),
