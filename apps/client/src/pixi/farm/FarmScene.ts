@@ -6,7 +6,7 @@
 // by its feet, machine name plates and particles. Machines stand on their own labelled pads.
 import { animate, createTimeline, steps } from 'animejs';
 import { ColorMatrixFilter, Container, Graphics, RenderTexture, Sprite, Text, type Renderer } from 'pixi.js';
-import { type CoopKind, type FarmState, type HenView, type LaidEgg, type UnlockId } from '@coys/shared';
+import { coopCapacity, type CoopKind, type FarmState, type HenView, type LaidEgg, type UnlockId } from '@coys/shared';
 import type { Viewport } from '../../app/viewport';
 import type { AssetStore } from '../../assets/store';
 import type { AudioEngine, LoopHandle } from '../../audio/audio';
@@ -18,7 +18,7 @@ import type { Scene } from '../host';
 import { HenActor } from './HenActor';
 import { WorldLayers } from './layers';
 import { MIN_H, MIN_W, connectionGaps, farmLayout, labelSpot, specPoint, troughSpots, type FarmLayout, type Point } from './layout';
-import { carry, freeSpot, hatchSpots, movementAreas, nearestFree, route, type Areas } from './movement';
+import { carry, eggClear, freeSpot, hatchSpots, movementAreas, nearestFree, route, type Areas } from './movement';
 
 const MAX_VISIBLE_HENS = 40;
 /** Several new hens hatch this far apart. */
@@ -95,6 +95,11 @@ export class FarmScene implements Scene {
   private readonly hens = new Map<string, HenActor>();
   /** Eggs new hens are hatching from, until their shells fade. */
   private readonly hatchEggs = new Set<FrameSprite>();
+  /** Every hen id in the last farm state (shown or not), so a new one is told apart from one not shown. */
+  private lastHenIds: Set<string> | null = null;
+  /** New hens waiting to hatch: they hatch once nothing covers the farm (no page or modal open). */
+  private pendingHatch: HenActor[] = [];
+  private held = false;
   private readonly coops = new Map<string, { s: FrameSprite; kind: CoopKind; plot: number; swungAt: number; nextCreak: number }>();
   private readonly machines = new Map<UnlockId, FrameSprite>();
   private belt: FrameSprite[] = [];
@@ -471,11 +476,19 @@ export class FarmScene implements Scene {
     this.farm = farm;
     const l = this.layout;
 
-    // hens: show up to MAX_VISIBLE_HENS, keeping the ones already on screen (they persist by id);
-    // new ones (bought, from the auction or turned up) hatch from an egg in the yard
+    // hens: show up to MAX_VISIBLE_HENS, keeping the ones already on screen (they persist by id).
+    // A hen new to the farm (bought, from the auction, at random) always gets a place, the longest
+    // shown making room on a farm over the limit, and hatches from an egg at a coop's door.
     const present = new Set(farm.hens.map((h) => h.id));
-    const keep = [...this.hens.keys()].filter((id) => present.has(id)).slice(0, MAX_VISIBLE_HENS);
-    const shown = [...farm.hens.filter((h) => keep.includes(h.id)), ...farm.hens.filter((h) => !keep.includes(h.id))].slice(0, MAX_VISIBLE_HENS);
+    const before = this.lastHenIds;
+    this.lastHenIds = present;
+    const born = new Set(first || !before ? [] : farm.hens.filter((h) => !before.has(h.id)).map((h) => h.id));
+    const keep = [...this.hens.keys()].filter((id) => present.has(id) && !born.has(id));
+    const shown = [
+      ...farm.hens.filter((h) => born.has(h.id)),
+      ...farm.hens.filter((h) => keep.includes(h.id)),
+      ...farm.hens.filter((h) => !keep.includes(h.id) && !born.has(h.id)),
+    ].slice(0, MAX_VISIBLE_HENS);
     const ids = new Set(shown.map((h) => h.id));
     for (const [id, actor] of this.hens) {
       if (!ids.has(id)) {
@@ -488,14 +501,16 @@ export class FarmScene implements Scene {
       if (this.hens.has(h.id)) continue;
       const others = [...this.hens.values()].map((a) => a.position);
       const areas = this.areas;
-      const actor = new HenActor(this.assets, h, first ? freeSpot(areas, others) : areas.arrive);
+      const actor = new HenActor(this.assets, h, freeSpot(areas, others));
       this.clickable(actor.sprite, () => ({ kind: 'hen', hen: this.farm?.hens.find((x) => x.id === h.id) ?? h }));
       actor.sprite.label = `hen:${h.id}`;
       this.hens.set(h.id, actor);
       this.layers.add('depth', actor.sprite);
-      if (!first) fresh.push(actor);
+      if (born.has(h.id)) fresh.push(actor);
     }
-    if (fresh.length) this.hatch(fresh);
+    // they wait, unseen, until the farm is in view (a page or the shop may still be open)
+    for (const a of fresh) a.awaitHatch(this.areas.arrive);
+    this.pendingHatch.push(...fresh);
 
     // coops: at rest the door is shut and nothing moves
     for (const c of farm.coops) {
@@ -878,9 +893,56 @@ export class FarmScene implements Scene {
    * and the other hens), lands with a squash, wobbles, cracks and bursts, and the hen pops out,
    * shakes herself off and wanders. Several hatch a beat apart; three or more get the chorus.
    */
+  /** While a page or modal covers the farm, new hens wait in their eggs; they hatch when it is in view. */
+  setHeld(held: boolean): void {
+    this.held = held;
+  }
+
+  /**
+   * Where each new hen's egg lands: by the door of a coop with room (filling coops in plot order, the
+   * farm's hens before them first), a little apart when several share a door, on free yard ground;
+   * a spread-out yard spot when no door has free ground.
+   */
+  private hatchSpotsAtCoops(actors: HenActor[], others: Point[]): Point[] {
+    const farm = this.farm;
+    const coops = [...(farm?.coops ?? [])].sort((a, b) => a.plot - b.plot);
+    const doors = coops.map((c) => ({ at: this.layout.plots[c.plot], room: coopCapacity([c.kind]) })).filter((d): d is { at: Point; room: number } => Boolean(d.at));
+    const already = Math.max(0, (farm?.hens.length ?? 0) - actors.length);
+    const taken: Point[] = [...others];
+    const perDoor = new Map<number, number>();
+    const fallback = hatchSpots(this.areas, others, actors.length);
+    return actors.map((_, i) => {
+      // the coop this hen belongs to: the first with room for her, else the roomiest
+      let index = already + i;
+      let k = doors.findIndex((d) => {
+        if (index < d.room) return true;
+        index -= d.room;
+        return false;
+      });
+      if (k < 0) k = doors.reduce((best, d, j) => (d.room > (doors[best]?.room ?? 0) ? j : best), 0);
+      const door = doors[k]?.at;
+      const n = perDoor.get(k) ?? 0;
+      perDoor.set(k, n + 1);
+      if (door) {
+        // in front of the door, then a step down the yard at a time until the ground is free
+        const dx = [0, -22, 22, -11, 11][n % 5] ?? 0;
+        for (let dy = 14 + Math.floor(n / 5) * 14; dy < 80; dy += 4) {
+          const p = { x: Math.round(door.x + dx), y: Math.round(door.y + dy) };
+          if (eggClear(p, this.areas) && taken.every((o) => Math.hypot(o.x - p.x, (o.y - p.y) * 1.6) >= 20)) {
+            taken.push(p);
+            return p;
+          }
+        }
+      }
+      const p = fallback[i] ?? freeSpot(this.areas, taken);
+      taken.push(p);
+      return p;
+    });
+  }
+
   private hatch(actors: HenActor[]): void {
     const others = [...this.hens.values()].filter((a) => !actors.includes(a)).map((a) => a.position);
-    const spots = hatchSpots(this.areas, others, actors.length);
+    const spots = this.hatchSpotsAtCoops(actors, others);
     actors.forEach((actor, i) => {
       const at = spots[i] ?? freeSpot(this.areas, others);
       actor.awaitHatch(at);
@@ -943,7 +1005,8 @@ export class FarmScene implements Scene {
                   });
                   setTimeout(() => {
                     if (actor.sprite.destroyed) return;
-                    actor.popOut();
+                    // out of the shell, then off into the yard
+                    actor.popOut(() => actor.walkTo(route(at, freeSpot(this.areas, [...this.hens.values()].map((a) => a.position)), this.areas)));
                     this.fx.burst('feather-puff', ground.x, ground.y - 12, { count: 4, spread: 12, rise: 10 });
                     this.audio.play('01-cluck', { delayMs: 160, volume: 0.8 });
                   }, 130);
@@ -1082,6 +1145,12 @@ export class FarmScene implements Scene {
   }
 
   update(dtMs: number): void {
+    // new hens hatch once the farm is in view
+    if (!this.held && this.pendingHatch.length) {
+      const ready = this.pendingHatch.filter((a) => !a.sprite.destroyed && this.hens.get(a.hen.id) === a);
+      this.pendingHatch = [];
+      if (ready.length) this.hatch(ready);
+    }
     this.processLays();
     this.syncDayNight();
     const l = this.layout;

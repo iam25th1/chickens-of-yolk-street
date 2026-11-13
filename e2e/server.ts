@@ -43,6 +43,8 @@ export interface TestServer {
   wear(name: string, machines: Record<string, { condition: number; broken?: boolean }>): Promise<void>;
   /** Days close only when closeDays says (true), or on their own again when their time is up (false). */
   hold(on: boolean): void;
+  /** Gives the named farm n more hens (copies of one of its own), as a big flock has, and sends the farm its fresh state. */
+  flock(name: string, n: number): Promise<void>;
   /** Sets the named farm's coins (a rich farm's long numbers) and sends the farm its fresh state. */
   cash(name: string, coins: number): Promise<void>;
   /** Puts these eggs in the named farm's crate and sends the farm its fresh state. */
@@ -162,6 +164,18 @@ export async function startTestServer(): Promise<TestServer> {
     },
     hold(on) {
       held = on;
+    },
+    async flock(name, n) {
+      const farm = await farmNamed(name);
+      const [hen] = await db.query<{ id: string }>(`SELECT id FROM hens WHERE farm_id = $1 AND status = 'alive' ORDER BY id LIMIT 1`, [farm.id]);
+      if (!hen) throw new Error(`${name} has no hen to copy`);
+      await db.query(
+        `INSERT INTO hens (id, farm_id, status, body, eyes, comb, accessory, laying_trait, born_day, lay_progress)
+         SELECT id || '-copy-' || g, farm_id, 'alive', body, eyes, comb, accessory, laying_trait, born_day, 0 FROM hens, generate_series(1, $2::int) AS g WHERE id = $1`,
+        [hen.id, n],
+      );
+      const ok = await game.act(farm.player_id, { t: 'setClerkFloor', rid: 'browser-check', floor: Number(farm.clerk_floor) });
+      if (!ok.ok) throw new Error(`could not refresh ${name}: ${ok.message}`);
     },
     async cash(name, coins) {
       const farm = await farmNamed(name);

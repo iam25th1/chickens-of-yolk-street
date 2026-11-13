@@ -65,7 +65,7 @@ export class HenActor {
   }
 
   /** The egg burst: she pops out with a squash and a stretch, shakes herself off, then wanders. */
-  popOut(): void {
+  popOut(then?: () => void): void {
     this.sprite.visible = true;
     this.sprite.play('happy');
     const k = { s: 0.35 };
@@ -84,6 +84,7 @@ export class HenActor {
       this.state = 'idle';
       this.timer = 200 + Math.random() * 500;
       this.sprite.play('idle');
+      then?.();
     }, 1100);
   }
 
