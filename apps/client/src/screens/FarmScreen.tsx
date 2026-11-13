@@ -33,6 +33,9 @@ import { FeatherMint } from '../ui/FeatherMint';
 import { MintMoment } from '../ui/MintMoment';
 import { HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
 import { NameFarm } from '../ui/NameFarm';
+import { ProfilePage } from '../ui/Profile';
+import { PublicProfileModal } from '../ui/PublicProfile';
+import { BadgeMoments } from '../ui/BadgeMoment';
 import { MACHINE_NAME } from '../pixi/farm/FarmScene';
 
 /** What clicking each thing on the farm opens. */
@@ -77,6 +80,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
   const market = useStore(game, (s) => s.market);
   const status = useStore(game, (s) => s.status);
   const modal = useStore(ui, (s) => s.modal);
+  const profile = useStore(game, (s) => s.profile);
   const touring = useStore(tour, (s) => s.active);
   // the open card's live state: haggle mood and outcome arrive as events
   const [cardState, setCardState] = useState<{ card: CardView; result: OverlayResult | null; mood: 'warm' | 'firm' | 'cross' | null } | null>(null);
@@ -99,7 +103,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       s.close();
       socket.current = null;
       closeModal();
-      game.set({ status: 'idle', farm: null, ledger: null });
+      game.set({ status: 'idle', farm: null, ledger: null, profile: null });
     };
   }, [session]);
 
@@ -239,6 +243,16 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     const next = reveals.current.shift();
     if (next) openModal({ kind: 'reveal', ...next });
   }, [modal, farm]);
+
+  // the profile asks for its data when it opens, and again when a day closes or a badge comes while it is open
+  const profileOpen = modal?.kind === 'profile';
+  useEffect(() => {
+    if (!profileOpen) return;
+    void send({ t: 'getProfile' });
+    return events.on((e) => {
+      if (e.kind === 'dayEnded' || e.kind === 'badgeEarned') void send({ t: 'getProfile' });
+    });
+  }, [profileOpen, send]);
 
   /** Mints a held ticket: the minting moment opens at once and follows the mint's stages. */
   const startMint = useCallback(
@@ -385,6 +399,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         onLedger={() => openModal({ kind: 'ledger' })}
         onHelp={() => openModal({ kind: 'guide' })}
         onFeathers={() => openModal({ kind: 'feathers' })}
+        onProfile={() => openModal({ kind: 'profile', tab: 'overview' })}
       />
       {!(v.portrait && modal) && <SidePanel farm={farm} market={market} rect={z.side} send={send} onOpen={openCard} />}
       <ToastArea farm={farm} rect={z.toasts} offline={status === 'offline'} />
@@ -409,6 +424,21 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       )}
       {modal?.kind === 'feathers' && (
         <FeatherMint farm={farm} market={market} onMint={startMint} onSignIn={null} onClose={closeModal} closeLabel="BACK TO THE FARM" />
+      )}
+      {modal?.kind === 'profile' && (
+        <ProfilePage
+          farm={farm}
+          market={market}
+          profile={profile}
+          tab={modal.tab}
+          onTab={(tab) => ui.set({ modal: { kind: 'profile', tab } })}
+          onPublic={(farmId) => openModal({ kind: 'publicProfile', farmId, back: modal.tab })}
+          onMint={() => openModal({ kind: 'feathers' })}
+          onClose={closeModal}
+        />
+      )}
+      {modal?.kind === 'publicProfile' && (
+        <PublicProfileModal key={modal.farmId} farmId={modal.farmId} onClose={() => (modal.back ? openModal({ kind: 'profile', tab: modal.back }) : closeModal())} />
       )}
       {modal?.kind === 'minting' && (
         <MintMoment
@@ -435,12 +465,19 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       )}
       {modal?.kind === 'settings' && (
         <Modal title="SETTINGS" onClose={closeModal} w={400} h={420}>
-          <SettingsBody onClose={closeModal} onGuide={() => openModal({ kind: 'guide' })} farm={farm} onRename={() => openModal({ kind: 'name', mode: 'rename' })} />
+          <SettingsBody
+            onClose={closeModal}
+            onGuide={() => openModal({ kind: 'guide' })}
+            farm={farm}
+            onRename={() => openModal({ kind: 'name', mode: 'rename' })}
+            onProfile={() => openModal({ kind: 'profile', tab: 'overview' })}
+          />
         </Modal>
       )}
       {modal?.kind === 'guide' && <HowToPlay onClose={closeModal} />}
       {modal?.kind === 'name' && farm && <NameFarm farm={farm} mode={modal.mode} send={send} onClose={closeModal} />}
       {touring && <Spotlight ctx={ctx} />}
+      <BadgeMoments />
       <FxLayer />
     </div>
   );

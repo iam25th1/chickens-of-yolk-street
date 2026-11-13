@@ -165,6 +165,22 @@ describe('no scrollbars and nothing cut off', () => {
           await page.locator('[data-ui="mint-filters"] button', { hasText: label }).first().click();
           await check(`mint filter ${label.toLowerCase()}`);
         }
+        // the profile: every tab, and a few pages of each
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(200);
+        await page.locator('[data-tour="profile"]').first().click();
+        await page.locator('[data-ui="profile-page"]').waitFor();
+        await page.locator('[data-ui="profile-loading"]').waitFor({ state: 'detached', timeout: 15_000 });
+        for (const tab of ['overview', 'eggs', 'money', 'flock', 'machines', 'market', 'mint', 'badges']) {
+          await page.locator(`[data-tour="profile-${tab}"]`).click();
+          await check(`profile ${tab}`);
+          for (let i = 0; i < 3; i++) {
+            const next = page.locator('[data-ui="profile-page"] [data-ui="page-next"]:not([disabled]) >> visible=true').first();
+            if (!(await next.count())) break;
+            await next.click();
+            await check(`profile ${tab} page ${i + 2}`);
+          }
+        }
         // the cards the farm's things open, and a waiting offer
         await page.keyboard.press('Escape');
         const targets = await page.evaluate(() => (window as unknown as { __coysFarm?: { targets(): { kind: string; x: number; y: number; w: number; h: number }[] } }).__coysFarm?.targets() ?? []);

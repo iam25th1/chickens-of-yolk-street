@@ -5,6 +5,7 @@ import { sellToAgent } from './cards';
 import { ActionError, AGENT_COLUMNS, loadFarm, moveAgentCash, moveCash, remember, toAgent, type Ctx, type Farm } from './ctx';
 import { logMachine, wearMachine } from './machines';
 import { emit } from './market';
+import { statDelivered, statMissed } from './profile';
 
 interface ContractRow {
   id: string;
@@ -41,6 +42,7 @@ async function deliver(ctx: Ctx, farm: Farm, c: ContractRow, auto: boolean): Pro
   if (!a) return false;
   const total = await sellToAgent(ctx, farm, toAgent(a), c.grade, c.qtyPerDay, c.priceMilli, 'contract');
   await ctx.q.query('UPDATE contracts SET last_delivered_day = $2 WHERE id = $1', [c.id, ctx.day]);
+  await statDelivered(ctx.q, farm.id);
   emit(ctx, farm, { kind: 'contractDelivered', contractId: c.id, qty: c.qtyPerDay, totalMilli: total, auto });
   return true;
 }
@@ -88,6 +90,7 @@ export async function closeContracts(ctx: Ctx): Promise<Map<string, { delivered:
         const cancel = misses >= ECONOMY.buyers.bakery.cancelAfterMisses;
         await ctx.q.query(`UPDATE contracts SET misses = $2, status = CASE WHEN $3 THEN 'cancelled' ELSE status END WHERE id = $1`, [c.id, misses, cancel]);
         await ctx.q.query('UPDATE farms SET last_missed_day = $2 WHERE id = $1', [farm.id, ctx.day]);
+        await statMissed(ctx.q, farm.id);
         await remember(ctx, c.agentId, farm.id, { misses: 1 }, cancel ? ctx.day + ECONOMY.buyers.bakery.sulkDays : undefined);
         emit(ctx, farm, { kind: 'contractMissed', contractId: c.id, penaltyMilli: penalty });
       }

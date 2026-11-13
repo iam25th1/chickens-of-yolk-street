@@ -17,6 +17,7 @@ import {
 } from '@coys/shared';
 import { num, type Queryable } from '../db/db';
 import { ActionError, eggTotal, loadFarm, moveAgentCash, moveCash, newId, setAgentStock, toAgent, AGENT_COLUMNS, type AgentRow, type Ctx, type Farm } from './ctx';
+import { bumpStats } from './profile';
 
 const BIG_TRADE_MILLI = 25_000;
 
@@ -170,6 +171,7 @@ export async function executeFill(ctx: Ctx, order: OrderRow, qty: number, taker:
       await setAgentStock(ctx, maker.agent.id, stock);
     }
     await recordTrade(ctx, { seller: seller.name, sellerFarm: seller.id, buyer: maker.name, buyerAgent: maker.agent?.id ?? null, buyerFarm: maker.farm?.id ?? null, grade: order.grade, qty: n, priceMilli: price, via: 'order' });
+    await bumpStats(ctx.q, seller.id, { orders_filled: 1 });
     emit(ctx, seller, { kind: 'orderFilled', orderId: order.id, side: 'sell', qty: n, priceMilli: price, counterparty: maker.name });
   } else {
     // taker buys a farm's reserved eggs

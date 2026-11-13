@@ -213,6 +213,12 @@ export function createGameServer(opts: GameServerOptions): Server {
         if (req.method === 'GET' && url.pathname === '/api/market') {
           return json(res, 200, { market: await game.getMarketState(), clock: game.getClock() });
         }
+        // a farm's public profile: a whitelist of public fields (game/profile.ts), for anyone
+        if (req.method === 'GET' && url.pathname.startsWith('/api/profile/')) {
+          // farm ids are letters, digits and dashes: anything else is simply not found
+          const profile = await game.getPublicProfile(url.pathname.slice('/api/profile/'.length));
+          return profile ? json(res, 200, { profile }) : json(res, 404, { error: 'not_found' });
+        }
         if (req.method === 'POST' && url.pathname === '/api/login/dev') {
           if (!opts.devLogin) return json(res, 403, { error: 'dev login is off' });
           if (!loginLimiter.take(ip)) return json(res, 429, { error: 'rate_limited' });

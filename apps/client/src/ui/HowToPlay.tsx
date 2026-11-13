@@ -2,11 +2,12 @@
 // art. Opens from Settings and from the ? in the top bar. One section at a time, with previous and
 // next; a section longer than the window allows is split into pages (never a scrollbar).
 import { Children, Fragment, isValidElement, useState, type ReactNode } from 'react';
-import { ECONOMY, MARKET_CHART_DAYS, UNLOCK_IDS, type MilestoneId } from '@coys/shared';
+import { BADGES, ECONOMY, MARKET_CHART_DAYS, UNLOCK_IDS, type MilestoneId } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { Modal } from './Modal';
 import { Paged } from './Paged';
+import { Badge } from './Badge';
 import { MachineArt, UNLOCK_TEXT } from './Panels';
 import { SheetSprite } from './SheetSprite';
 
@@ -244,6 +245,25 @@ const SECTIONS: Section[] = [
     ),
   },
   {
+    id: 'profile',
+    title: 'YOUR PROFILE AND BADGES',
+    short: 'PROFILE AND BADGES',
+    picture: () => <Badge id="crate-filler" level="gold" zoom={2} />,
+    body: (
+      <>
+        <p>
+          PROFILE (IN THE TOP BAR, OR YOUR FARM&apos;S NAME IN SETTINGS) KEEPS YOUR FARM&apos;S RECORD IN TABS: YOUR RANK AND NET WORTH DAY BY DAY, EGGS BY GRADE, COINS IN AND OUT, YOUR FLOCK, YOUR
+          MACHINES, YOUR CONTRACTS AND HAGGLES, AND YOUR FEATHERS. ONLY YOU SEE IT.
+        </p>
+        <p>
+          BADGES ARE JUST FOR SHOW: THEY CHANGE NOTHING IN THE GAME. THERE ARE {BADGES.length}, MANY IN BRONZE, SILVER AND GOLD, AND A FEW SECRET ONES THAT SHOW THEMSELVES ONLY ONCE EARNED. THE
+          BADGES TAB SAYS WHAT EARNS EACH ONE AND HOW CLOSE YOU ARE.
+        </p>
+        <p>ANYONE CAN OPEN A FARM&apos;S PUBLIC PROFILE FROM THE FARMS RANKING: ITS NAME, SIGN, PLACE, BADGES AND A FEW NUMBERS. NEVER YOUR COINS, ORDERS, WALLET OR SIGN-IN.</p>
+      </>
+    ),
+  },
+  {
     id: 'glossary',
     title: 'GLOSSARY',
     short: 'GLOSSARY',
@@ -260,6 +280,8 @@ const SECTIONS: Section[] = [
         <li>FEATHER: A TESTNET NFT, A CLAIM TICKET FOR ONE OF THE 777 FOUNDING HENS (PLANNED).</li>
         <li>GRADE: FLUFF, PLUME, QUILL OR GOLDEN QUILL; IT SETS THE ODDS, NOT THE HEN.</li>
         <li>RECEIPT: THE DAY&apos;S RECORD ON NEAR, LINKED IN THE LEDGER.</li>
+        <li>NET WORTH: COINS, PLUS HENS AT THE HEN PRICE, COOPS AT THEIR PRICE AND MACHINES AT THEIR PRICE TIMES THEIR CONDITION.</li>
+        <li>BADGE: A MARK OF SOMETHING YOUR FARM DID. COSMETIC ONLY.</li>
         <li>TESTNET: NEAR&apos;S PRACTICE NETWORK, WHERE THIS BETA RECORDS EVERYTHING.</li>
       </ul>
     ),

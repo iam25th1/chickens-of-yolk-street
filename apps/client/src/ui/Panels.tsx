@@ -309,7 +309,20 @@ export function ShopPanel({
 }
 
 /** Settings: a volume and mute for every sound category, reduce motion, the guide and the tour. */
-export function SettingsBody({ onClose, onGuide, farm, onRename }: { onClose: () => void; onGuide?: () => void; farm?: FarmState | null; onRename?: () => void }) {
+export function SettingsBody({
+  onClose,
+  onGuide,
+  farm,
+  onRename,
+  onProfile,
+}: {
+  onClose: () => void;
+  onGuide?: () => void;
+  farm?: FarmState | null;
+  onRename?: () => void;
+  /** The farm's name opens its profile. */
+  onProfile?: () => void;
+}) {
   const { audio } = useServices();
   const s = useStore(settings, (v) => v);
   useEffect(() => audio.setLevels(s.sound), [audio, s.sound]);
@@ -321,7 +334,23 @@ export function SettingsBody({ onClose, onGuide, farm, onRename }: { onClose: ()
       {farm && onRename && (
         <div className="row spread" style={{ gap: 6 }} data-ui="farm-name-setting">
           <span style={{ minWidth: 0 }}>
-            FARM NAME: <b>{farm.name.toUpperCase()}</b>
+            FARM NAME:{' '}
+            {onProfile ? (
+              <button
+                className="link"
+                data-ui="farm-name-profile"
+                title="Your profile"
+                style={{ border: 0, padding: 0, background: 'transparent', font: 'inherit', fontWeight: 700, color: '#2f6f9e', cursor: 'pointer' }}
+                onClick={() => {
+                  uiSound(audio, 'click');
+                  onProfile();
+                }}
+              >
+                {farm.name.toUpperCase()}
+              </button>
+            ) : (
+              <b>{farm.name.toUpperCase()}</b>
+            )}
           </span>
           <button
             className="btn"

@@ -3,7 +3,8 @@
 // forward to close days. Never touches NEAR: its Feather mints are a stand-in that answers after a
 // short wait (the next ones can be made to fail, as NEAR refusing them would). A named farm can be
 // given every machine, a handful of Feather tickets and a wallet, so every screen has content to page;
-// and the Market can be given eggs to sell, a buyer's order, another player's offer and auction hens.
+// the Market can be given eggs to sell, a buyer's order, another player's offer and auction hens;
+// and a farm can be given a badge, so its player sees the unlock moment.
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import type { EggGrade } from '@coys/shared';
@@ -11,6 +12,7 @@ import { InferenceBudget } from '../apps/server/src/agents/brain';
 import { createSessionSigner } from '../apps/server/src/auth/session';
 import { NoopChain, type ChainWriter, type MintResult } from '../apps/server/src/chain/chain';
 import { openDb } from '../apps/server/src/db/db';
+import { grantBadge } from '../apps/server/src/game/badges';
 import { Game } from '../apps/server/src/game/game';
 import { createGameServer } from '../apps/server/src/net/server';
 
@@ -51,6 +53,8 @@ export interface TestServer {
   auction(n: number): Promise<void>;
   /** Another player's farm (made as the dev login makes one) offers its eggs at this share of today's price; every browser gets the market. Returns the farm's name and the order's id. */
   trader(name: string, grade: EggGrade, qty: number, share: number): Promise<{ name: string; orderId: string }>;
+  /** Gives the named farm a badge at a level now: its player hears it at once (the unlock moment). */
+  badge(name: string, badge: string, level: 'bronze' | 'silver' | 'gold' | 'plain'): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -191,6 +195,11 @@ export async function startTestServer(): Promise<TestServer> {
       const [order] = await db.query<{ id: string }>(`SELECT id FROM orders WHERE farm_id = $1 AND status = 'open' AND kind = 'limit' ORDER BY created_at DESC LIMIT 1`, [p.farmId]);
       if (!order) throw new Error('the trader has no open order');
       return { name: p.name, orderId: order.id };
+    },
+    async badge(name, badge, level) {
+      const [farm] = await db.query<{ id: string }>('SELECT id FROM farms WHERE name LIKE $1 LIMIT 1', [`${name}%`]);
+      if (!farm) throw new Error(`no farm named ${name}`);
+      await game.withCtx((ctx) => grantBadge(ctx, farm.id, badge, level));
     },
     async close() {
       clearInterval(timer);
