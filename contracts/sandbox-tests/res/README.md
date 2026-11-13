@@ -10,3 +10,10 @@ deployed on `play.coys-game.testnet` on 12 November 2026 (sha256
 `e57cda6610e00a63f0f8f56cb65b71f3e6bb6556280343755d233fc233b3ea41`, 353,408 bytes). The version 5
 test deploys it, mints three Feathers in a test season and skips two days, as happened on testnet,
 then upgrades with `migrate`, burns the test Feathers and catches the days up.
+
+`coys_game_v5.wasm` is version 5 (the live season, test Feathers burnt, late days), byte for byte
+the CI build (run 43321613192) kept as `contracts/coys-game/res/coys_game.wasm` and deployed on
+`play.coys-game.testnet` (sha256 `7fa2c0608b91f8f76df93789a072f086936248dec26ce7930353e7b72abbfa2d`,
+388,311 bytes). The version 6 test deploys it, sets the live season, mints two Feathers in a day
+close and skips two days, then upgrades with `migrate`, mints Feathers by drawn number (live and
+test) and catches the days up. Since version 6 no test deploys `coys_game_v4.wasm`.
