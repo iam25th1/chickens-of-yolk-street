@@ -150,6 +150,27 @@ describe('land', () => {
         expect(frame && map && frame.x > map.x && frame.y > map.y, `${size}: the map's frame moved off the home plot`).toBe(true);
         await check('dragged');
 
+        // with the camera moved, a click on a thing still hits it: the first farm object whose middle
+        // is on the canvas (not under the UI) opens its card
+        const thing = await page.evaluate(() => {
+          const all = (window as unknown as { __coysFarm: FarmHook }).__coysFarm.targets().filter((t) => ['farmhouse', 'crate', 'feed', 'coop'].includes(t.kind));
+          for (const t of all) {
+            const x = t.x + t.w / 2;
+            const y = t.y + t.h / 2;
+            if (x > 0 && y > 0 && x < innerWidth && y < innerHeight && document.elementFromPoint(x, y)?.tagName === 'CANVAS') return { kind: t.kind, x, y };
+          }
+          return null;
+        });
+        expect(thing, `${size}: something to click on screen`).not.toBeNull();
+        if (thing) {
+          await page.mouse.click(thing.x, thing.y);
+          await page.locator('[data-ui="modal"]').waitFor({ timeout: 5000 });
+          await check(`clicked the ${thing.kind} after the drag`);
+          await page.keyboard.press('Escape');
+          await page.waitForTimeout(300);
+          expect(await camera(page), `${size}: a click does not move the camera`).toEqual(cam);
+        }
+
         // the arrow keys move the camera back
         await page.keyboard.down('ArrowLeft');
         await page.keyboard.down('ArrowUp');
