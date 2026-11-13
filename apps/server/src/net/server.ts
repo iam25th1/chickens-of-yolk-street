@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 // HTTP API, WebSocket game protocol and (in production) the built client, on one port.
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
@@ -34,6 +35,8 @@ export interface GameServerOptions {
   privy: PrivyVerifier | null;
   privyAppId: string | null;
   devLogin: boolean;
+  /** POST /api/login/demo: only on a local, non-production server with DEMO_MODE=1 (env.ts demoSessionAllowed). */
+  demoSession?: boolean;
   clientDist: string | null;
   settlementMode: string;
   dbKind: string;
@@ -75,6 +78,8 @@ const displayName = z
   .max(40)
   .transform((s) => s.replace(/[^\p{L}\p{N} '-]/gu, '').trim().slice(0, 20) || 'Farmer');
 const devLoginBody = z.object({ name: displayName.optional(), deviceId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/) }).strict();
+/** The demo session: a new farm (which gets a generated name and asks for one), or an existing farm by its name. */
+const demoLoginBody = z.object({ farm: z.string().min(1).max(40) }).strict();
 // An email sign-in never names the farm: `name` is accepted from older clients and ignored. The
 // email-name guard is the SHA-256 of the email name's letters and digits, and their count.
 const privyLoginBody = z
@@ -208,7 +213,7 @@ export function createGameServer(opts: GameServerOptions): Server {
           return json(res, report.ok ? 200 : 503, report);
         }
         if (req.method === 'GET' && url.pathname === '/api/config') {
-          return json(res, 200, { protocol: PROTOCOL_VERSION, privyAppId: opts.privyAppId, devLogin: opts.devLogin });
+          return json(res, 200, { protocol: PROTOCOL_VERSION, privyAppId: opts.privyAppId, devLogin: opts.devLogin, demoSession: opts.demoSession === true });
         }
         if (req.method === 'GET' && url.pathname === '/api/feathers') {
           return json(res, 200, await game.getMintPage());
@@ -230,6 +235,22 @@ export function createGameServer(opts: GameServerOptions): Server {
           const who = await game.ensurePlayer('dev', body.data.deviceId, body.data.name ?? null);
           if (who.created) log(`[login] dev player ${who.playerId} joined`);
           return issue(res, who);
+        }
+        if (req.method === 'POST' && url.pathname === '/api/login/demo') {
+          // a local recording only: off unless the server allows it, and only from this machine
+          const local = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '');
+          if (opts.demoSession !== true || !local) return json(res, 403, { error: 'the demo session is off' });
+          const body = demoLoginBody.safeParse(await readBody(req));
+          if (!body.success) return json(res, 400, { error: 'bad_request' });
+          if (body.data.farm === 'new') {
+            const who = await game.ensurePlayer('dev', `demo-${randomUUID()}`, null);
+            log(`[login] demo session: a new farm`);
+            return issue(res, who);
+          }
+          const found = await game.playerOfFarm(body.data.farm);
+          if (!found) return json(res, 404, { error: 'no such farm' });
+          log(`[login] demo session: an existing farm`);
+          return issue(res, found);
         }
         if (req.method === 'POST' && url.pathname === '/api/login/privy') {
           if (!opts.privy) return json(res, 403, { error: 'Privy login is not configured' });

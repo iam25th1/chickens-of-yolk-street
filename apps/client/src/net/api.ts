@@ -4,6 +4,8 @@ export interface ServerConfigView {
   protocol: number;
   privyAppId: string | null;
   devLogin: boolean;
+  /** A local recording server (DEMO_MODE): /?demo=new or /?demo=<farm name> signs straight in. */
+  demoSession?: boolean;
 }
 
 export interface LoginResult {
@@ -29,6 +31,7 @@ export const api = {
     if (!res.ok) throw new Error(`market: HTTP ${res.status}`);
     return (await res.json()) as { market: MarketState; clock: ClockState };
   },
+  loginDemo: (farm: string) => post<LoginResult>('/api/login/demo', { farm }),
   loginDev: (name: string, deviceId: string) => post<LoginResult>('/api/login/dev', name ? { name, deviceId } : { deviceId }),
   /** Email sign-in: the access token, and only the hash of the email name (never the email). */
   loginPrivy: (accessToken: string, nameGuard: { sha256: string; len: number } | null) =>

@@ -17,6 +17,12 @@ export interface ServerConfig {
   privyAppId: string | null;
   privyVerificationKey: string | null;
   devLogin: boolean;
+  /**
+   * The demo session (POST /api/login/demo, for recording the demo video): signs straight into a new
+   * or named farm with no login screen. Only with DEMO_MODE=1 on a server that is not production and
+   * listens on loopback only; production never turns it on, whatever else is set.
+   */
+  demoSession: boolean;
   clientDist: string;
   /** GAME_SEASON, or null to keep the database's season (a fresh dev database makes its own). */
   season: string | null;
@@ -69,12 +75,19 @@ export function readConfig(env: NodeJS.ProcessEnv, repoRoot: string): ServerConf
     privyAppId,
     privyVerificationKey: env.PRIVY_VERIFICATION_KEY || null,
     devLogin: !privyAppId || env.ALLOW_DEV_LOGIN === '1',
+    demoSession: demoSessionAllowed(env),
     clientDist: resolve(repoRoot, 'apps/client/dist'),
     season,
     dayLengthMs: demoSeconds !== null && demoAllowed ? demoSeconds * 1000 : ECONOMY.day.lengthMs,
     demoDayIgnored: demoSeconds !== null && !demoAllowed,
     settleEvery: settleEveryDays(env.SETTLE_EVERY_DAYS),
   };
+}
+
+/** Whether the demo session may run: DEMO_MODE=1, not production, and HOST a loopback address (never all interfaces). */
+export function demoSessionAllowed(env: NodeJS.ProcessEnv): boolean {
+  if (env.NODE_ENV === 'production') return false;
+  return env.DEMO_MODE === '1' && ['127.0.0.1', 'localhost', '::1'].includes(env.HOST ?? '');
 }
 
 /** SETTLE_EVERY_DAYS as a whole number of days from 1 (every day its own call) to 100; 10 when unset. */

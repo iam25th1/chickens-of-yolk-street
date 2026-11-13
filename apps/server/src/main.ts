@@ -98,6 +98,7 @@ const server = createGameServer({
   privy: config.privyAppId ? createPrivyVerifier(config.privyAppId, config.privyVerificationKey ?? undefined) : null,
   privyAppId: config.privyAppId,
   devLogin: config.devLogin,
+  demoSession: config.demoSession,
   clientDist: config.clientDist,
   settlementMode: chain.mode,
   dbKind: db.kind,
@@ -109,6 +110,7 @@ const tick = setInterval(() => {
   game.tick().catch((err: unknown) => log(`[day] tick failed: ${err instanceof Error ? err.stack : String(err)}`));
 }, 1000);
 
+if (config.demoSession) log('[demo] the demo session is ON (DEMO_MODE=1 on a local, non-production server): /?demo=new or /?demo=<farm name> signs straight in');
 const listening = (): void => log(`[http] listening on http://${config.host ?? 'localhost'}:${config.port} (day ${game.getClock().day})`);
 if (config.host) server.listen(config.port, config.host, listening);
 else server.listen(config.port, listening);

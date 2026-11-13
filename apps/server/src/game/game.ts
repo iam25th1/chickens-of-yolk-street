@@ -746,6 +746,12 @@ export class Game {
     };
   }
 
+  /** A player farm's player, by the farm's exact name (the local demo session signs into it). */
+  async playerOfFarm(name: string): Promise<{ playerId: string; name: string } | null> {
+    const [r] = await this.db.query<{ player_id: string; name: string }>(`SELECT player_id, name FROM farms WHERE owner_kind = 'player' AND name = $1 AND player_id IS NOT NULL LIMIT 1`, [name]);
+    return r ? { playerId: String(r.player_id), name: String(r.name) } : null;
+  }
+
   /** The player's own profile (private: sent only to its player). */
   async getProfile(farmId: string): Promise<ProfileData> {
     const facts = (await loadFacts(this.db, [farmId], this.clock.day, ['daysNoBreakdown', 'bigTrades'])).get(farmId) ?? {};
