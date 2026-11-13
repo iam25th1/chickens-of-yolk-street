@@ -39,8 +39,10 @@ services:
         sync: false
       - key: NEARAI_API_KEY
         sync: false
-      - key: NEARAI_DAILY_SPEND_CAP_USD
-        value: '2'
+      - key: SERV_API_KEY
+        sync: false
+      - key: LLM_DAILY_CAP_USD
+        value: '1.5'
 
 databases:
   - name: yolk-street-db

@@ -31,8 +31,9 @@ the game clock, and a free database expires.
    | `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY` | from the Privy dashboard (the key is optional) |
    | `NEAR_TESTNET_ACCOUNT_ID`, `NEAR_TESTNET_PRIVATE_KEY` | `play.coys-game.testnet` and its testnet key |
    | `NEARAI_API_KEY` | from cloud.near.ai |
+   | `SERV_API_KEY` | from OpenServ (SERV Reasoning, the fallback provider) |
 
-   `NODE_ENV=production`, `DATABASE_URL` (from the database) and `NEARAI_DAILY_SPEND_CAP_USD=2` are
+   `NODE_ENV=production`, `DATABASE_URL` (from the database) and `LLM_DAILY_CAP_USD=1.5` are
    set by the Blueprint.
 3. Apply. The first deploy builds, runs the migrations and boots; check
    `https://<service>.onrender.com/healthz` shows `"ok": true`, `"db": { "kind": "postgres" }` and
