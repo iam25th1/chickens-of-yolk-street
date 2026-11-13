@@ -14,12 +14,13 @@ import { openDb } from './db/db';
 import { describeEnv, readConfig } from './env';
 import { Game } from './game/game';
 import { createGameServer, DRAIN } from './net/server';
+import { redactEmails } from './redact';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const envFile = join(repoRoot, '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
 
-const log = (line: string): void => console.log(`${new Date().toISOString()} ${line}`);
+const log = (line: string): void => console.log(`${new Date().toISOString()} ${redactEmails(line)}`);
 const config = readConfig(process.env, repoRoot);
 log(`[env] ${describeEnv(process.env)}`);
 log(`[build] ${BUILD.version}${BUILD.commit ? ` (${BUILD.commit})` : ''}${config.production ? ', production' : ''}`);

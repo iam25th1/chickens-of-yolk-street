@@ -1,6 +1,6 @@
 // The guide zone, bottom left: the goal tracker on one line (each goal pays coins when claimed) and,
-// stacked above it, the toast area: the one hint the farm needs most right now, then the news. While
-// the tour runs, its step box takes the whole zone instead.
+// stacked above it, the toast area: the one hint the farm needs most right now, then the news. The
+// tour's step box keeps clear of both.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { coopCapacity, feedGramsPerHenDay, type FarmState, type GoalId } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
@@ -8,7 +8,6 @@ import type { Rect } from '../app/viewport';
 import type { Action } from '../net/socket';
 import { dayElapsed, events } from '../state/game';
 import { useStore } from '../state/store';
-import { tour } from '../state/tour';
 import { toasts, uiFx } from './FxLayer';
 import { groundEggs } from './Hud';
 
@@ -78,7 +77,6 @@ export function Tracker({ farm, rect, send }: { farm: FarmState; rect: Rect; sen
   const { audio } = useServices();
   const box = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
-  const active = useStore(tour, (s) => s.active);
 
   useEffect(
     () =>
@@ -91,7 +89,6 @@ export function Tracker({ farm, rect, send }: { farm: FarmState; rect: Rect; sen
     [audio, rect.x, rect.y],
   );
 
-  if (active) return null;
   const goal = farm.goals.find((g) => g.state !== 'claimed');
   const index = goal ? farm.goals.indexOf(goal) : -1;
   return (

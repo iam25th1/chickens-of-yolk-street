@@ -145,6 +145,53 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 
 **Video:** _slot for a direct upload (drag the gameplay video into this section on GitHub)._
 
+**Live resize** (13 November 2026, the live farm in a fresh headless browser: wide 1600x760, narrow 900x760, tall
+560x1000, wide again; ten hens, all inside the yard at every size, the same size at the same zoom):
+[docs/screenshots/live-resize.mp4](docs/screenshots/live-resize.mp4), with the four stills
+([wide](docs/screenshots/live-resize-1-wide-1600x760.png), [narrow](docs/screenshots/live-resize-2-narrow-900x760.png),
+[tall](docs/screenshots/live-resize-3-tall-560x1000.png), [wide again](docs/screenshots/live-resize-4-wide-1600x760.png))
+and the [belt](docs/screenshots/live-belt-clean.png), which carries only real eggs.
+
+## Farm names, privacy and the new tour (13 November 2026)
+
+**Farm names.** A farm used to be named after its player at sign-in, and an email sign-in with no name typed sent the
+email's local part, so farms on the public board, in trades and on cards carried names made from email addresses. Now:
+
+- the game never receives an email: the client sends only the SHA-256 of the email name's letters and digits and their
+  count (the server keeps that hash to refuse farm names that contain it), and the server ignores any name an email
+  sign-in sends;
+- a new farm gets a goofy generated name ("Cluckingham Acres", "Yolkshire Roost") from farm word lists (no real people
+  or brands), and the first visit opens **NAME YOUR FARM**: the farm's sign shows the name as it is typed, **SHUFFLE**
+  draws another, **CONFIRM** keeps yours, closing keeps the generated one;
+- names are 3 to 24 characters of letters, numbers, spaces and simple punctuation, unique in the season (case aside),
+  pass a basic rude-word filter (with disguises undone, and farm words such as cockerel allowed), and never contain the
+  player's email name; **SETTINGS** renames the farm once an in-game week;
+- farms named before this (the three player farms of `s1`) get a generated name at boot, their old names leave the
+  player rows and recorded trades, and their owners are asked to choose a name on their next visit;
+- server logs replace anything shaped like an email address.
+
+A test signs in two email players the way the client does (an older client even sending the email name), lets them
+trade with each other and the street, closes a day, and checks every WebSocket message, the public market and mint page,
+and the player rows: no email and no four-letter piece of either email name anywhere. Three committed screenshots showed
+a player's email-derived farm name; they are replaced with the same screens from the test server
+([board](docs/screenshots/live-board.png), [tour over the board](docs/screenshots/live-tour-glut.png),
+[board at 2560x1440](docs/screenshots/founders-board-founding.png)). History is not rewritten: those files are still in
+commits `2b412e9` and `e725006`.
+
+**The tour.** Its box used to sit in the bottom-left corner with only BACK and SKIP (which ended it). Now the box sits
+beside what it highlights, with a pointer, never over it; inside the farm's area and clear of the top bar, the side
+panel, the goal tracker and the toasts; centred when a step has no target ([ui/tourPlace.ts](apps/client/src/ui/tourPlace.ts)
+tries each side and four widths, so it fits a phone's farm band too). It is larger, says **STEP 3 OF 11** with dots, says
+what to do on a highlighted line, and drops in with anime.js over a dimmed window with a spotlight. Every step has
+**BACK**, **SKIP STEP** and **END TOUR** (which asks once more; **REPLAY THE TOUR** in Settings brings it back), and
+**NEXT** appears after five seconds so nobody is stuck on a step that waits for an action. A new player sees it on first
+entry, after naming the farm, with no click. `e2e/tour.test.ts` checks at 1280x720, 1920x1080, 390x844 and 360x640 that
+on every step the box stays on screen, off its target and clear of the UI zones, and that every control works.
+
+**CI.** The browser checks (`e2e/`) run in their own workflow, `layout`, on pull requests only, and not for changes to
+docs alone.
+
+
 ## Scaling, no scrollbars, a clean conveyor and the 777 restored (12 November 2026)
 
 **One scale for every sprite.** Hens came out at different sizes after a resize, and walked out of their areas and over
@@ -952,7 +999,7 @@ All optional for local play. Copy `.env.example` to `.env` at the repo root. Pro
 | `npm ci --ignore-scripts` | install from the lockfile, no install scripts |
 | `npm run dev` | server (port 8787) and client (Vite, port 5173) |
 | `npm test` | Vitest: economy, agents, haggling, market, chain batch, simulation, WebSocket, packer, pixel passes, hen movement |
-| `npm run test:e2e` | after a build: every screen, tab, page and tour step in a headless browser at 11 window sizes; fails on anything that scrolls or is cut off (`SCREENSHOTS=1` saves them to `docs/screenshots`) |
+| `npm run test:e2e` | after a build: the naming screen and the tour at four sizes, and every screen, tab, page and tour step in a headless browser at 11 window sizes; fails on anything that scrolls or is cut off (`SCREENSHOTS=1` saves them to `docs/screenshots`) |
 | `npm run typecheck` / `npm run lint` | strict TypeScript; ESLint plus a check that no file holds an em dash |
 | `npm run build` / `npm start` | bundle the server and client; serve both on one port |
 | `npm run deploy-contract -- --wasm <file> --account <id.testnet> [--create] [--migrate]` | deploy a CI-built contract to a testnet account (sha256 checked, mainnet refused; see [deploy/testnet.md](deploy/testnet.md)) |
@@ -988,7 +1035,7 @@ docs/submission      drafts: demo shot list, post drafts, form fields
 
 ## Verification
 
-On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass. CI is green: the TypeScript job on every push and pull request (with PostgreSQL 16: the Postgres tests, the production build booting against Postgres with `/healthz` checked, and a backup restored into a second database), the browser check at all 11 window sizes in one job on pull requests (`layout`), and the contracts workflow whenever `contracts/` changes (unit tests, `cargo near build`, sandbox tests). The economy sheet tests hit their values exactly; the five-seed simulation meets the economy acceptance; a malformed model answer falls back to rules; a new season settles day 1 after an old season ended at day 3; non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
+On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass. CI is green: the TypeScript job on every push and pull request (with PostgreSQL 16: the Postgres tests, the production build booting against Postgres with `/healthz` checked, and a backup restored into a second database), the browser checks (`layout`: the naming screen, the tour at four sizes, and all 11 window sizes) on pull requests that change more than docs, and the contracts workflow whenever `contracts/` changes (unit tests, `cargo near build`, sandbox tests). The economy sheet tests hit their values exactly; the five-seed simulation meets the economy acceptance; a malformed model answer falls back to rules; a new season settles day 1 after an old season ended at day 3; non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
 
 The live Pier deploy and its tunnel were checked end to end on 11 November 2026 (receipts under [How NEAR fits in](#how-near-fits-in)).
 
@@ -1014,6 +1061,18 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
 **Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
+
+### Brief 9, stage 1: farm names, privacy, the new tour (13 November 2026)
+
+- **Recon.** The game never saw a full email, but an email sign-in with no name typed sent the email's local part as the
+  player's name; the farm was named after it and that name reached the public board, order book, trades, trade cards,
+  the public market and mint page, and the agents' prompts on NEAR AI. Three committed screenshots showed such a name.
+  Logs, on-chain data and every committed text file were clean.
+- **Fixed.** Generated farm names and NAME YOUR FARM, the email-name hash guard, renames in Settings, the boot-time rename
+  of the three `s1` player farms (old names gone from player rows and trades), log redaction, the three screenshots
+  replaced. Migration 10.
+- **Tour.** A larger box beside its target with a pointer, four controls on every step, NEXT after five seconds.
+- **CI.** The browser checks moved to a pull-request workflow that skips docs-only changes.
 
 ### Brief 8: scaling, no scrollbars, a clean conveyor and the 777 restored (12 November 2026)
 

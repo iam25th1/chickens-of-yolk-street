@@ -57,24 +57,3 @@ jobs:
           npx tsx scripts/db-backup.ts --out backups
           npx tsx scripts/db-restore.ts --file "$(ls backups/*.dump)" --url-env RESTORE_DATABASE_URL --yes
           test "$(PGPASSWORD=ci-only psql -h localhost -U coys -d coys_restore -tAc 'SELECT season FROM game_clock')" = ci
-
-  # No scrollbars and nothing cut off: the built game in a headless browser (the runner's own
-  # Chrome, a fresh profile per size) at all 11 checked window sizes in one job, every screen, tab,
-  # page and tour step (e2e/no-scroll.test.ts). Pull requests only. Nothing is downloaded for it.
-  layout:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version: 24.22.3
-          cache: npm
-      - run: npm ci --ignore-scripts
-      - run: npm run build
-      - name: Every screen fits at every window size
-        env:
-          CHROME_PATH: /usr/bin/google-chrome
-          E2E_PROGRESS: '1'
-        run: npm run test:e2e

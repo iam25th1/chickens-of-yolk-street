@@ -5,6 +5,9 @@ import { randomBytes } from 'node:crypto';
 import {
   BODY_COLOURS,
   ECONOMY,
+  FARM_NAME_PROBLEM_TEXT,
+  RENAME_EVERY_DAYS,
+  checkFarmName,
   EGG_GRADES,
   FEATHER_GRADES,
   FEED_TIERS,
@@ -82,6 +85,7 @@ import {
 import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
 import { featherCount, featherSlots, managementScore, milestoneViews, nextMilestone, rarityEstimates, redeemTicket, rollMilestones, standing, ticketViews } from './feathers';
 import { claimGoal, goalViews, markGoal, markToured, toured } from './goals';
+import { checkChosenName, nameTaken, renameLegacyFarms, setFarmName, uniqueFarmName } from './names';
 import { conveyorCarry, hopperRefill, logMachine, logSale, machineDay } from './machines';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
 
@@ -237,6 +241,12 @@ export class Game {
     this.clock = { day: num(clock?.day), dayStartedAt: num(clock?.day_started_at) };
     await this.serial(() =>
       this.inTx(async (ctx) => {
+        // farms named at sign-in before farm naming: a generated name now, the owner asked to choose
+        const renamed = await renameLegacyFarms(ctx.q, this.rng);
+        if (renamed) {
+          this.log(`[names] ${renamed} farm${renamed === 1 ? '' : 's'} named at sign-in got a generated name; their owners will be asked to choose one`);
+          ctx.marketChanged = true;
+        }
         if (this.withCast) await ensureCast(ctx, this.createFarmFn);
         const [listed] = await ctx.q.query(`SELECT count(*) AS n FROM hens WHERE status = 'forsale'`);
         if (num(listed?.n) === 0) await this.refreshShop(ctx);
@@ -271,40 +281,64 @@ export class Game {
 
   // ---- players --------------------------------------------------------------------------------
 
-  async ensurePlayer(provider: 'privy' | 'dev', subject: string, displayName: string): Promise<{ playerId: string; farmId: string; name: string; created: boolean }> {
+  /**
+   * Finds or makes a player and their farm. The farm's name never comes from sign-in: an email
+   * sign-in gets a generated name and the player is asked to choose one; the local dev login keeps
+   * the typed name when it passes the naming rules and is free. `guard` is the email-name guard
+   * (a hash and a length, see game/names.ts), kept to refuse farm names that contain it.
+   */
+  async ensurePlayer(
+    provider: 'privy' | 'dev',
+    subject: string,
+    typedName: string | null,
+    guard: { sha256: string; len: number } | null = null,
+  ): Promise<{ playerId: string; farmId: string; name: string; created: boolean }> {
     return this.serial(() =>
       this.inTx(async (ctx) => {
-        const [found] = await ctx.q.query<{ id: string; display_name: string; farm_id: string }>(
-          `SELECT p.id, p.display_name, f.id AS farm_id FROM players p JOIN farms f ON f.player_id = p.id
+        const [found] = await ctx.q.query<{ id: string; farm_id: string; farm_name: string; guard: string | null }>(
+          `SELECT p.id, f.id AS farm_id, f.name AS farm_name, p.name_guard_sha256 AS guard FROM players p JOIN farms f ON f.player_id = p.id
            WHERE p.auth_provider = $1 AND p.auth_subject = $2`,
           [provider, subject],
         );
-        if (found) return { playerId: found.id, farmId: found.farm_id, name: found.display_name, created: false };
+        if (found) {
+          if (guard && !found.guard) await ctx.q.query('UPDATE players SET name_guard_sha256 = $2, name_guard_len = $3 WHERE id = $1', [found.id, guard.sha256, guard.len]);
+          return { playerId: found.id, farmId: found.farm_id, name: String(found.farm_name), created: false };
+        }
+        const typed = provider === 'dev' && typedName ? checkFarmName(typedName) : null;
+        const keep = typed?.ok && !(await nameTaken(ctx.q, typed.name, null)) ? typed.name : null;
+        const name = keep ?? (await uniqueFarmName(ctx.q, this.rng));
         const playerId = newId();
-        await ctx.q.query('INSERT INTO players (id, auth_provider, auth_subject, display_name, created_at) VALUES ($1, $2, $3, $4, $5)', [
-          playerId,
-          provider,
-          subject,
-          displayName,
-          this.now(),
-        ]);
+        await ctx.q.query(
+          'INSERT INTO players (id, auth_provider, auth_subject, display_name, created_at, name_guard_sha256, name_guard_len) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [playerId, provider, subject, name, this.now(), guard?.sha256 ?? null, guard?.len ?? null],
+        );
         const s = ECONOMY.start;
-        const farmId = await this.createFarm(ctx, { ownerKind: 'player', playerId, agentKey: null, name: `${displayName}'s Farm`, cash: s.cash, hens: s.hens, coops: [s.coop], feed: s.feed });
+        const farmId = await this.createFarm(ctx, {
+          ownerKind: 'player',
+          playerId,
+          agentKey: null,
+          name,
+          nameSource: keep ? 'chosen' : 'generated',
+          needsName: !keep,
+          cash: s.cash,
+          hens: s.hens,
+          coops: [s.coop],
+          feed: s.feed,
+        });
         ctx.marketChanged = true;
-        return { playerId, farmId, name: displayName, created: true };
+        return { playerId, farmId, name, created: true };
       }),
     );
   }
 
   async playerInfo(playerId: string): Promise<{ name: string; farmId: string } | null> {
-    const [row] = await this.db.query<{ display_name: string; farm_id: string }>(
-      'SELECT p.display_name, f.id AS farm_id FROM players p JOIN farms f ON f.player_id = p.id WHERE p.id = $1',
-      [playerId],
-    );
-    return row ? { name: row.display_name, farmId: row.farm_id } : null;
+    const [row] = await this.db.query<{ name: string; farm_id: string }>('SELECT f.name, f.id AS farm_id FROM players p JOIN farms f ON f.player_id = p.id WHERE p.id = $1', [
+      playerId,
+    ]);
+    return row ? { name: String(row.name), farmId: row.farm_id } : null;
   }
 
-  private readonly createFarmFn: CreateFarm = (ctx, spec) => this.createFarm(ctx, { ...spec, playerId: null });
+  private readonly createFarmFn: CreateFarm = (ctx, spec) => this.createFarm(ctx, { ...spec, playerId: null, nameSource: 'agent', needsName: false });
 
   private async createFarm(
     ctx: Ctx,
@@ -313,6 +347,8 @@ export class Game {
       playerId: string | null;
       agentKey: string | null;
       name: string;
+      nameSource: 'generated' | 'chosen' | 'agent';
+      needsName: boolean;
       cash: number;
       hens: number;
       coops: readonly CoopKind[];
@@ -321,9 +357,9 @@ export class Game {
   ): Promise<string> {
     const farmId = newId();
     await ctx.q.query(
-      `INSERT INTO farms (id, owner_kind, player_id, agent_key, name, cash_milli, feed_tier, feed_${spec.feed.tier}_g, created_day)
-       VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8)`,
-      [farmId, spec.ownerKind, spec.playerId, spec.agentKey, spec.name, spec.feed.tier, spec.feed.kg * 1000, ctx.day],
+      `INSERT INTO farms (id, owner_kind, player_id, agent_key, name, cash_milli, feed_tier, feed_${spec.feed.tier}_g, created_day, name_source, needs_name)
+       VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, $10)`,
+      [farmId, spec.ownerKind, spec.playerId, spec.agentKey, spec.name, spec.feed.tier, spec.feed.kg * 1000, ctx.day, spec.nameSource, spec.needsName],
     );
     await moveCash(ctx, farmId, 'start', toMilli(spec.cash), 'opening balance');
     for (const [plot, kind] of spec.coops.entries()) {
@@ -428,6 +464,12 @@ export class Game {
       orders,
       goals: await goalViews(q, farmId),
       tourDone: await toured(q, farmId),
+      ...(await (async () => {
+        const [n] = await q.query('SELECT needs_name, renamed_day FROM farms WHERE id = $1', [farmId]);
+        const renamed = n?.renamed_day === null || n?.renamed_day === undefined ? null : num(n.renamed_day);
+        const from = renamed === null ? null : renamed + RENAME_EVERY_DAYS;
+        return { needsName: Boolean(n?.needs_name), renameFromDay: from !== null && from > day ? from : null };
+      })()),
       milestones: await milestoneViews(q, farmId),
       standing: await standing(q, farmId, Math.max(1, day - 1)),
       tickets: await ticketViews(q, farmId),
@@ -670,6 +712,20 @@ export class Game {
         return practiceCard(ctx, farm);
       case 'tourDone':
         return markToured(ctx.q, farm.id);
+      case 'setFarmName': {
+        const [st] = await ctx.q.query('SELECT needs_name, renamed_day FROM farms WHERE id = $1', [farm.id]);
+        const needsName = Boolean(st?.needs_name);
+        const renamedDay = st?.renamed_day === null || st?.renamed_day === undefined ? null : num(st.renamed_day);
+        const r = await checkChosenName(ctx.q, { id: farm.id, playerId: farm.playerId, needsName, renamedDay }, action.name, ctx.day);
+        if (!r.ok) throw new ActionError(`name_${r.problem}`, FARM_NAME_PROBLEM_TEXT[r.problem]);
+        // the first choice is free; a later rename in Settings starts the weekly wait
+        await setFarmName(ctx.q, farm.id, r.name, { source: 'chosen', needsName: false, renamedDay: needsName ? null : ctx.day });
+        ctx.marketChanged = true;
+        return;
+      }
+      case 'keepFarmName':
+        await ctx.q.query('UPDATE farms SET needs_name = false WHERE id = $1', [farm.id]);
+        return;
       case 'redeemTicket': {
         const r = await redeemTicket(ctx, farm.id, action.ticketId);
         emit(ctx, farm, { kind: 'ticketRedeemed', ticketId: action.ticketId, grade: r.grade, score: r.score, feeMilli: r.feeMilli });

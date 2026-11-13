@@ -699,18 +699,37 @@ input[type='range'].slider::-moz-range-thumb {
 }
 
 /* The tour: a step box in the guide zone, and a spotlight on the thing to do. */
+/* The tour's step box: placed beside its target (ui/tourPlace.ts), a pointer at it. */
+.tour-place {
+  pointer-events: auto;
+}
+
 .tour-box {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 4px 6px;
+  gap: 5px;
+  padding: 7px 8px 8px;
   background: var(--cream);
   box-shadow:
     0 0 0 1px var(--ink),
-    inset 0 0 0 1px var(--straw-deep);
+    inset 0 0 0 2px var(--wood-light),
+    inset 0 0 0 3px var(--wood),
+    2px 2px 0 1px var(--ink);
   color: var(--ink);
-  line-height: 9px;
-  overflow: hidden;
+  line-height: 10px;
+}
+
+.tour-step {
+  color: var(--wood);
+  letter-spacing: 1px;
+}
+
+.tour-title {
+  margin: 0;
+}
+
+.tour-text {
+  line-height: 10px;
 }
 
 .tour-dots {
@@ -745,16 +764,6 @@ input[type='range'].slider::-moz-range-thumb {
     0 0 0 1px var(--ink),
     0 0 0 3px var(--straw),
     0 0 0 4px var(--ink);
-  pointer-events: none;
-}
-
-.spot-tag {
-  position: absolute;
-  padding: 2px 4px;
-  background: var(--straw);
-  color: var(--ink);
-  box-shadow: 0 0 0 1px var(--ink);
-  white-space: nowrap;
   pointer-events: none;
 }
 
@@ -868,4 +877,13 @@ input[type='range'].slider::-moz-range-thumb {
   overflow: hidden;
   visibility: hidden;
   pointer-events: none;
+}
+
+/* What to do in this step, in the tour's box, beside its pointer. */
+.tour-action {
+  align-self: flex-start;
+  padding: 2px 4px;
+  background: var(--straw);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink);
 }

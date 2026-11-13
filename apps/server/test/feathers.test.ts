@@ -280,8 +280,8 @@ describe('minting at the day close', () => {
     expect(sent.filter((e) => e.kind === 'featherMinted').map((e) => (e.kind === 'featherMinted' ? e.number : 0))).toEqual([41, 42]);
     const page = await t.game.getMintPage();
     expect(page.slots.map((s) => [s.number, s.farm])).toEqual([
-      [41, "Ada's Farm"],
-      [42, "Ada's Farm"],
+      [41, 'Ada'],
+      [42, 'Ada'],
     ]);
     await t.db.close();
   });
@@ -380,7 +380,7 @@ describe('the mint page', () => {
     expect(page.slots.map((s) => [s.number, s.farm])).toEqual([
       [1, 'TEST SEASON VERIFY-FEATHERS-1'],
       [2, 'TEST SEASON VERIFY-FEATHERS-1'],
-      [3, "Ada's Farm"],
+      [3, 'Ada'],
     ]);
     expect(page.minted).toBe(3);
     expect(page.left).toBe(774);

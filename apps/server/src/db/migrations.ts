@@ -431,6 +431,23 @@ CREATE TABLE chain_archive (
 );
 `,
   },
+  {
+    id: 10,
+    name: 'farm names',
+    sql: `
+-- Farm names are chosen by players (or generated), never taken from sign-in. name_source: legacy
+-- (named before this, renamed at boot), generated, chosen, or agent. needs_name: ask the owner to
+-- pick one on their next visit. renamed_day: the last rename in Settings (once an in-game week).
+ALTER TABLE farms ADD COLUMN name_source text NOT NULL DEFAULT 'legacy' CHECK (name_source IN ('legacy', 'generated', 'chosen', 'agent'));
+ALTER TABLE farms ADD COLUMN needs_name boolean NOT NULL DEFAULT false;
+ALTER TABLE farms ADD COLUMN renamed_day integer;
+UPDATE farms SET name_source = 'agent' WHERE owner_kind = 'agent';
+-- the player's email name, kept only as its SHA-256 (letters and digits, lower case) and length, so
+-- a farm name that contains it can be refused without the server ever holding it
+ALTER TABLE players ADD COLUMN name_guard_sha256 text;
+ALTER TABLE players ADD COLUMN name_guard_len integer;
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

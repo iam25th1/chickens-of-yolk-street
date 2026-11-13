@@ -81,6 +81,10 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
     .strict(),
   z.object({ t: z.literal('setSupplier'), rid, supplier: z.enum(['squeezer', 'loyalist']) }).strict(),
   z.object({ t: z.literal('getLedger'), rid }).strict(),
+  /** Name the farm (the first choice, or a rename in Settings once an in-game week). The server checks the rules. */
+  z.object({ t: z.literal('setFarmName'), rid, name: z.string().min(1).max(64) }).strict(),
+  /** Keep the generated farm name (the naming screen skipped or closed). */
+  z.object({ t: z.literal('keepFarmName'), rid }).strict(),
 ]);
 
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
@@ -319,6 +323,10 @@ export interface FarmState {
   hopperCapMilli: number;
   /** The player has done the how-to-play tour (it shows once per player). */
   tourDone: boolean;
+  /** Ask the player to name their farm (a new farm, or one named before farm naming). */
+  needsName: boolean;
+  /** The first in-game day a rename in Settings is allowed again (null: now). */
+  renameFromDay: number | null;
   /** Milestones, in order: each rolls once for a Feather Ticket. */
   milestones: MilestoneView[];
   /** Feather Tickets: held, queued for the next day close, or minted. */
@@ -464,6 +472,13 @@ export type ServerMessage =
   | { t: 'pong'; n: number; serverNow: number };
 
 export type ErrorCode =
+  | 'name_length'
+  | 'name_characters'
+  | 'name_letters'
+  | 'name_rude'
+  | 'name_email'
+  | 'name_taken'
+  | 'name_wait'
   | 'bad_message'
   | 'unauthenticated'
   | 'rate_limited'
