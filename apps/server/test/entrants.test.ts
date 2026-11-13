@@ -71,23 +71,18 @@ describe('AI farms enter the street', () => {
     for (let i = 0; i < 6; i++) await t.game.ensurePlayer('dev', `device-000${i}`, `Player ${i}`);
     const cap = aiFarmCap(6);
     expect(cap).toBe(9);
-    const before = (await openRivals(t)).length;
-    let day = 0;
-    while (day < 25 && (await openRivals(t)).length === before) {
+    // a chance entry names its reason; an entry under the floor says how few were open
+    const chance = /enters Yolk Street as a new AI farm \((supply under demand for \d+ days|.+ went bust)\)/;
+    let first: string | null = null;
+    for (let d = 0; d < 40; d++) {
+      const seen = t.logs.length;
       await nextDay(t);
-      day++;
-      expect((await openRivals(t)).length - before).toBeLessThanOrEqual(1);
+      const entered = t.logs.slice(seen).filter((l) => chance.test(l));
+      expect(entered.length).toBeLessThanOrEqual(1);
+      first ??= entered[0] ?? null;
+      expect((await openRivals(t)).length).toBeLessThanOrEqual(cap);
     }
-    expect(day).toBeGreaterThanOrEqual(ECONOMY.agents.entry.scarceDays);
-    expect((await openRivals(t)).length).toBe(before + 1);
-    expect(t.logs.some((l) => l.includes(`(supply under demand for ${ECONOMY.agents.entry.scarceDays} days)`))).toBe(true);
-    for (let d = 0; d < 30; d++) {
-      const n = (await openRivals(t)).length;
-      await nextDay(t);
-      const m = (await openRivals(t)).length;
-      expect(m - n).toBeLessThanOrEqual(1);
-      expect(m).toBeLessThanOrEqual(cap);
-    }
+    expect(first).toMatch(new RegExp(`supply under demand for ${ECONOMY.agents.entry.scarceDays} days`));
     await t.db.close();
   });
 

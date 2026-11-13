@@ -16,8 +16,8 @@ export interface DecisionResult {
   brain: 'rules' | 'nearai' | 'skipped';
   model: string | null;
   fallback: boolean;
-  /** Tokens the model call used, when one was made. */
-  tokens?: { prompt: number; completion: number };
+  /** The model call made and the tokens it used, when one was made (also when its reply was unusable). */
+  tokens?: Tokens;
 }
 
 export interface ReflectionResult {
@@ -25,7 +25,13 @@ export interface ReflectionResult {
   brain: 'rules' | 'nearai';
   model: string | null;
   fallback: boolean;
-  tokens?: { prompt: number; completion: number };
+  tokens?: Tokens;
+}
+
+export interface Tokens {
+  model: string;
+  prompt: number;
+  completion: number;
 }
 
 export interface Pricing {
@@ -169,7 +175,7 @@ async function callModel(
   messages: { role: 'system' | 'user'; content: string }[],
   maxTokens: number,
   responseFormat?: Record<string, unknown>,
-): Promise<{ content: string; tokens: { prompt: number; completion: number } } | null> {
+): Promise<{ content: string; tokens: Tokens } | null> {
   if (!opts.client) return null;
   const price = priceOf(opts.pricing, model);
   const prompt = estimateTokens(messages.map((m) => m.content).join('\n'));
@@ -180,7 +186,7 @@ async function callModel(
   }
   try {
     const { content, usage } = await opts.client.chat(messages, { model, maxTokens, timeoutMs: 20_000, ...(responseFormat ? { responseFormat } : {}) });
-    const tokens = { prompt: usage?.prompt_tokens ?? prompt, completion: usage?.completion_tokens ?? Math.ceil(content.length / 3) };
+    const tokens = { model, prompt: usage?.prompt_tokens ?? prompt, completion: usage?.completion_tokens ?? Math.ceil(content.length / 3) };
     await opts.budget.record('calls', chargeFor(price, tokens.prompt, tokens.completion), c.agent.id);
     return { content, tokens };
   } catch (err) {

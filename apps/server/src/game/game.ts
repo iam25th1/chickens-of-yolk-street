@@ -52,7 +52,7 @@ import {
 } from '@coys/shared';
 import { num, type Db, type Queryable } from '../db/db';
 import { migrate } from '../db/migrations';
-import { decide, reflect, type BrainOptions, type DecisionResult } from '../agents/brain';
+import { decide, reflect, type BrainOptions, type DecisionResult, type Tokens } from '../agents/brain';
 import type { FarmAction } from '../agents/decision';
 import type { MintedFeather } from '../chain/batch';
 import { missedDays, storeLateDays, type ChainWriter, type MintResult } from '../chain/chain';
@@ -144,7 +144,7 @@ function lastReason(raw: unknown): string | null {
 interface Gathered {
   agentId: string;
   result: DecisionResult;
-  reflection: { text: string; brain: string; now: WeekStart; tokens: { prompt: number; completion: number } | null } | null;
+  reflection: { text: string; brain: string; now: WeekStart; tokens: Tokens | null } | null;
   firstWeek: WeekStart | null;
 }
 
@@ -996,10 +996,10 @@ export class Game {
     return { feedGramsUsed, fedMultiplier };
   }
 
-  /** Tallies a model call's tier and tokens (a call that failed to parse still used them). */
-  private count(model: string | null, tokens: { prompt: number; completion: number } | null): void {
-    if (!tokens || !model || model === 'rules') return;
-    if (model === this.brain.model) this.stats.mainCalls++;
+  /** Tallies a model call's tier and tokens (a call whose reply was unusable still used them). */
+  private count(tokens: Tokens | null): void {
+    if (!tokens) return;
+    if (tokens.model === this.brain.model) this.stats.mainCalls++;
     else this.stats.cheapCalls++;
     this.stats.promptTokens += tokens.prompt;
     this.stats.completionTokens += tokens.completion;
@@ -1082,7 +1082,7 @@ export class Game {
             await storeReflection(ctx, agent, reflection.text, reflection.now, reflection.brain);
             this.stats.reflections++;
             if (reflection.brain !== 'rules') this.stats.reflectionCalls++;
-            this.count(reflection.brain, reflection.tokens);
+            this.count(reflection.tokens);
           } else if (firstWeek) await startWeek(ctx, agent, firstWeek);
           await turnOverStock(ctx, agent);
           if (result.brain !== 'skipped') {
@@ -1095,7 +1095,7 @@ export class Game {
           if (result.brain === 'nearai') this.stats.modelCalls++;
           if (result.fallback) this.stats.fallbacks++;
           if (result.brain === 'skipped') this.stats.skipped++;
-          this.count(result.model, result.tokens ?? null);
+          this.count(result.tokens ?? null);
           await recordReason(ctx, agent, result.decision.reason);
           await q.query('UPDATE agents SET last_decided_day = $2, last_brain = $3 WHERE id = $1', [agent.id, day, result.brain]);
           await bustIfBroke(ctx, agent);
