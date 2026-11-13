@@ -84,7 +84,8 @@ describe('AI farms enter the street', () => {
     }
     expect(first).toMatch(new RegExp(`supply under demand for ${ECONOMY.agents.entry.scarceDays} days`));
     await t.db.close();
-  });
+    // forty day closes with the full cast, each also recording profiles and checking badges
+  }, 120_000);
 
   it("the Market page shows each agent's latest reason, and which trades an AI made", async () => {
     const t = await makeGame({ cast: true, seed: 2 });
