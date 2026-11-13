@@ -292,7 +292,8 @@ export function Ticker({ extra = [] }: { extra?: string[] }) {
     </div>
   );
   return (
-    <div ref={strip} className={`ticker ${crash ? 'crash' : ''}`} aria-live="polite">
+    // a marquee: the prices run past and repeat, so every one is seen (the layout check knows it by data-marquee)
+    <div ref={strip} className={`ticker ${crash ? 'crash' : ''}`} aria-live="polite" data-marquee="">
       <div ref={track} className="ticker-track" style={{ gap: 16 }}>
         {row('a')}
         {row('b')}

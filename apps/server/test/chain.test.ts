@@ -1,8 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ECONOMY } from '@coys/shared';
-import { buildDayBatch, commitBatch, digestOf } from '../src/chain/batch';
-import { NoopChain, agentAccountName, agentPublicKey, assertTestnetConfig, mintsAffordable } from '../src/chain/chain';
+import { buildDayBatch, buildLateSettlement, commitBatch, digestOf } from '../src/chain/batch';
+import { NoopChain, agentAccountName, agentPublicKey, assertTestnetConfig, lateDaysToSend, mintsAffordable, seasonMayMint, settledCountsAgree } from '../src/chain/chain';
 import { FeatherRenderer } from '../src/chain/feather-image';
 import { decodePng } from '../src/chain/png';
 import { openDb } from '../src/db/db';
@@ -151,6 +151,103 @@ describe('the daily batch', () => {
     expect(r).toMatchObject({ status: 'noop', txHash: null });
     expect(r.digest).toBe(digestOf(r.settlement));
     expect(lines.join('\n')).toMatch(new RegExp(`NO-OP for season ${t.game.season} day 1`));
+    await t.db.close();
+  });
+});
+
+describe('test seasons and the real 777', () => {
+  it('only the contract\'s live season mints Feathers: a test season sends none, and a ticket mints only in its own season', async () => {
+    expect(seasonMayMint(undefined, 's1')).toBe(true); // version 4: no live season
+    expect(seasonMayMint('s1', 's1')).toBe(true);
+    expect(seasonMayMint('s1', 'verify-feathers-2')).toBe(false);
+    expect(seasonMayMint(null, 's1')).toBe(false); // version 5 before a live season is set
+    const t = await makeGame({ cast: false });
+    const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
+    await t.game.act(playerId, { t: 'linkWallet', rid: 'w1', accountId: 'ada.testnet' });
+    t.clock.t += ECONOMY.day.lengthMs;
+    await t.game.endDay();
+    const day = (await t.game.getMarketState()).day - 1;
+    for (const [id, season] of [
+      ['mine', t.game.season],
+      ['other', 'another-season'],
+    ] as const) {
+      await t.db.query(`INSERT INTO feather_tickets (id, farm_id, milestone, season, day, status, grade, redeemed_seq, created_at) VALUES ($1, $2, 'full-coop', $3, 1, 'queued', 'fluff', 1, 0)`, [id, farmId, season]);
+    }
+    const renderer = new FeatherRenderer(assets);
+    const built = await buildDayBatch(t.db, t.game.season, day, { feathers: { cap: 5, base: 0 }, renderer });
+    expect(built.minted.map((m) => m.ticketId)).toEqual(['mine']);
+    expect(built.batch.feather_mints?.every((f) => f.season === t.game.season)).toBe(true);
+    await t.db.close();
+
+    // a day close on a season that is not the contract's live one mints nothing, with tickets queued
+    const chain = new RecordingChain('game.testnet', 5);
+    chain.liveSeason = 'the-live-season';
+    const u = await makeGame({ cast: false, chain });
+    const ada = await u.game.ensurePlayer('dev', 'device-0001', 'Ada');
+    await u.game.act(ada.playerId, { t: 'linkWallet', rid: 'w1', accountId: 'ada.testnet' });
+    await u.db.query(`INSERT INTO feather_tickets (id, farm_id, milestone, season, day, status, grade, redeemed_seq, created_at) VALUES ('q', $1, 'full-coop', $2, 1, 'queued', 'fluff', 1, 0)`, [ada.farmId, u.game.season]);
+    u.clock.t += ECONOMY.day.lengthMs;
+    await u.game.endDay();
+    expect(chain.batches.at(-1)?.feather_mints).toEqual([]);
+    chain.liveSeason = u.game.season;
+    u.clock.t += ECONOMY.day.lengthMs;
+    await u.game.endDay();
+    expect(chain.batches.at(-1)?.feather_mints?.length).toBe(1);
+    await u.db.close();
+  });
+});
+
+describe('missed days', () => {
+  const head = { last_day: 538, days_settled: 46, v2_through: 489 };
+  const sent = Array.from({ length: 48 }, (_, i) => 490 + i).filter((d) => d !== 509 && d !== 510);
+
+  it('are recorded late only once the season moved past them, after its version 2 days, and only once', () => {
+    expect(lateDaysToSend([480, 509, 510, 538, 540], head, [])).toEqual([509, 510]);
+    expect(lateDaysToSend([509, 510], head, [509])).toEqual([510]);
+    expect(lateDaysToSend([509, 510], head, [509, 510])).toEqual([]);
+  });
+
+  it('are not sent when the contract counts a different number of settled days (a failed day may have landed)', () => {
+    expect(settledCountsAgree(head, sent, [])).toBe(true);
+    expect(settledCountsAgree({ ...head, days_settled: 47 }, sent, [])).toBe(false);
+    // once recorded late and marked sent, they are not counted as days the head settled
+    expect(settledCountsAgree(head, [...sent, 509, 510], [509, 510])).toBe(true);
+  });
+
+  it('are caught up at the next day close from the database records, by their digests, and marked settled', async () => {
+    const chain = new RecordingChain('game.testnet');
+    const t = await makeGame({ cast: true, chain });
+    const { playerId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
+    await t.game.act(playerId, { t: 'linkWallet', rid: 'w1', accountId: 'ada.testnet' });
+    for (let i = 0; i < 3; i++) {
+      t.clock.t += ECONOMY.day.lengthMs;
+      await t.game.endDay();
+    }
+    const days = await t.db.query(`SELECT day FROM market_days WHERE season = $1 AND closed_at IS NOT NULL ORDER BY day`, [t.game.season]);
+    const [a, b] = days.map((d) => Number(d.day));
+    await t.db.query(`UPDATE market_days SET settlement_status = 'failed', settlement_tx = NULL, settlement_json = NULL, settlement_digest = NULL WHERE season = $1 AND day IN ($2, $3)`, [t.game.season, a, b]);
+    const expected = await buildLateSettlement(t.db, t.game.season, a as number);
+    const nets = await t.db.query(`SELECT farm_id, SUM(amount_milli) AS net FROM ledger WHERE season = $1 AND day = $2 GROUP BY farm_id`, [t.game.season, a]);
+    for (const n of nets) expect(expected.farms.find((f) => f.farm === String(n.farm_id))?.net_milli).toBe(String(Number(n.net)));
+    expect(expected.eggs).toEqual([]);
+    expect(expected.feathers).toEqual([]);
+
+    t.clock.t += ECONOMY.day.lengthMs;
+    await t.game.endDay();
+    expect(chain.late.map((l) => l.days.map((d) => d.day))).toEqual([[a, b]]);
+    const rows = await t.db.query(`SELECT day, settlement_status, settlement_tx, settlement_json, settlement_digest FROM market_days WHERE season = $1 AND day IN ($2, $3) ORDER BY day`, [t.game.season, a, b]);
+    for (const r of rows) {
+      expect(r.settlement_status).toBe('sent');
+      expect(r.settlement_tx).toBe(`late-${t.game.season}-${a}-${b}`);
+      expect(digestOf(JSON.parse(String(r.settlement_json)))).toBe(r.settlement_digest);
+    }
+    expect(JSON.parse(String(rows[0]?.settlement_json))).toEqual(expected);
+    // nothing left: the next close records nothing late
+    t.clock.t += ECONOMY.day.lengthMs;
+    await t.game.endDay();
+    expect(chain.late.length).toBe(1);
+    const open = await t.db.query(`SELECT count(*) AS n FROM market_days WHERE season = $1 AND closed_at IS NOT NULL AND settlement_status <> 'sent'`, [t.game.season]);
+    expect(Number(open[0]?.n)).toBe(0);
     await t.db.close();
   });
 });

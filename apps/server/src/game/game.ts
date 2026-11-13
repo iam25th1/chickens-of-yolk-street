@@ -51,7 +51,7 @@ import { migrate } from '../db/migrations';
 import { decide, type BrainOptions, type DecisionResult } from '../agents/brain';
 import type { FarmAction } from '../agents/decision';
 import type { MintedFeather } from '../chain/batch';
-import type { ChainWriter } from '../chain/chain';
+import { missedDays, storeLateDays, type ChainWriter } from '../chain/chain';
 import { arriveCards, buyBagsFrom, createCards, expireCards, farmCards, practiceCard, respondCard, type Candidate } from './cards';
 import {
   applyDecision,
@@ -1039,8 +1039,23 @@ export class Game {
       [this.season, closedDay, result.status, result.txHash, result.error ?? null, result.settlement ? JSON.stringify(result.settlement) : null, result.digest ?? null],
     );
     if (result.status === 'sent' && result.txHash && result.minted?.length) await this.announceMints(result.minted, result.txHash, closedDay);
+    if (result.status === 'sent') await this.catchUpLateDays(closedDay);
     this.emit(null, { t: 'market', market: await this.getMarketState() });
   }
+
+  /**
+   * At each day close that settled, any earlier closed day of this season whose settlement failed (or
+   * never ran) is recorded late on the chain: one paced call for up to ten days, by their digests.
+   */
+  private async catchUpLateDays(closedDay: number): Promise<void> {
+    if (!this.chain.settleLateDays) return;
+    const missed = await missedDays(this.db, this.season, closedDay);
+    if (!missed.length) return;
+    const late = await this.chain.settleLateDays(this.db, this.season, missed);
+    if (late.status !== 'sent') this.log(`[chain] ${missed.length} missed days of ${this.season} wait to be recorded late: ${late.error ?? late.status}`);
+    await storeLateDays(this.db, this.season, late);
+  }
+
 
   /** Each minted Feather's owner hears about it (the reveal moment) and gets their farm's new tickets. */
   private async announceMints(minted: MintedFeather[], txHash: string, day: number): Promise<void> {

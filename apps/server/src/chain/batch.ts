@@ -104,8 +104,8 @@ export const featherToken = (n: number): string => String(n).padStart(3, '0');
 /** SHA-256 (hex) of a value's JSON. */
 export const digestOf = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
-export async function buildDayBatch(db: Db, season: string, day: number, opts: { feathers: FeatherOpts | null; renderer: FeatherRenderer | null }): Promise<BuiltBatch> {
-  // who holds what, off chain
+/** Each farm's NEAR testnet account (its player's, or its agent's), where it has one. */
+async function farmAccountMap(db: Db): Promise<Map<string, string>> {
   const farmAccounts = new Map<string, string>();
   for (const r of await db.query(
     `SELECT f.id, COALESCE(p.near_account_id, a.near_account_id) AS account FROM farms f
@@ -113,6 +113,42 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
   )) {
     if (r.account) farmAccounts.set(String(r.id), String(r.account));
   }
+  return farmAccounts;
+}
+
+/** Every farm's net result for a day, from the ledger, with its account. */
+async function dayNets(db: Db, season: string, day: number, farmAccounts: Map<string, string>): Promise<FarmNet[]> {
+  const nets = await db.query(
+    `SELECT f.id, COALESCE(SUM(l.amount_milli), 0) AS net FROM farms f LEFT JOIN ledger l ON l.farm_id = f.id AND l.season = $1 AND l.day = $2
+     GROUP BY f.id ORDER BY f.id`,
+    [season, day],
+  );
+  return nets.map((n) => ({ farm: String(n.id), account: farmAccounts.get(String(n.id)) ?? null, net_milli: String(num(n.net)) }));
+}
+
+/**
+ * The full settlement of a day whose close failed to settle, recorded late: its supply and multiplier
+ * and every farm's net, as the database holds them. No egg moves and no Feathers: the next day that
+ * settled already brought every egg balance up to what its holder really has, and a Feather mints
+ * only with a live day. Its SHA-256 is the digest the contract records for the day.
+ */
+export async function buildLateSettlement(db: Db, season: string, day: number): Promise<FullSettlement> {
+  const [md] = await db.query('SELECT supply, multiplier, closed_at FROM market_days WHERE season = $1 AND day = $2', [season, day]);
+  if (!md || md.closed_at === null || md.closed_at === undefined) throw new Error(`season ${season} day ${day} has not closed`);
+  return {
+    season,
+    day,
+    supply: num(md.supply),
+    multiplier_milli: Math.round(num(md.multiplier) * 1000),
+    farms: await dayNets(db, season, day, await farmAccountMap(db)),
+    eggs: [],
+    feathers: [],
+  };
+}
+
+export async function buildDayBatch(db: Db, season: string, day: number, opts: { feathers: FeatherOpts | null; renderer: FeatherRenderer | null }): Promise<BuiltBatch> {
+  // who holds what, off chain
+  const farmAccounts = await farmAccountMap(db);
   const agentAccounts = new Map<string, string>();
   for (const r of await db.query('SELECT id, near_account_id FROM agents WHERE near_account_id IS NOT NULL')) agentAccounts.set(String(r.id), String(r.near_account_id));
 
@@ -174,15 +210,16 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
     }
   }
 
-  // Feathers: redeemed tickets, oldest redemption first, to the player's wallet
+  // Feathers: redeemed tickets of this season, oldest redemption first, to the player's wallet (the
+  // contract mints a Feather only in the season that won it, and only in its live season)
   const minted: MintedFeather[] = [];
   const feather_mints: FeatherMint[] = [];
   if (opts.feathers && opts.renderer && opts.feathers.cap > 0) {
     const queued = await db.query(
       `SELECT t.id, t.grade, t.milestone, t.season, t.day, p.near_account_id AS account FROM feather_tickets t
        JOIN farms f ON f.id = t.farm_id LEFT JOIN players p ON p.id = f.player_id
-       WHERE t.status = 'queued' AND p.near_account_id IS NOT NULL ORDER BY t.redeemed_seq, t.id LIMIT $1`,
-      [opts.feathers.cap],
+       WHERE t.status = 'queued' AND t.season = $2 AND p.near_account_id IS NOT NULL ORDER BY t.redeemed_seq, t.id LIMIT $1`,
+      [opts.feathers.cap, season],
     );
     for (const t of queued) {
       const number = opts.feathers.base + feather_mints.length + 1;
@@ -202,12 +239,7 @@ export async function buildDayBatch(db: Db, season: string, day: number, opts: {
   }
 
   const [md] = await db.query('SELECT supply, multiplier FROM market_days WHERE season = $1 AND day = $2', [season, day]);
-  const nets = await db.query(
-    `SELECT f.id, COALESCE(SUM(l.amount_milli), 0) AS net FROM farms f LEFT JOIN ledger l ON l.farm_id = f.id AND l.season = $1 AND l.day = $2
-     GROUP BY f.id ORDER BY f.id`,
-    [season, day],
-  );
-  const all: FarmNet[] = nets.map((n) => ({ farm: String(n.id), account: farmAccounts.get(String(n.id)) ?? null, net_milli: String(num(n.net)) }));
+  const all = await dayNets(db, season, day, farmAccounts);
   const moving = new Set(moves.flatMap((m) => [m.from, m.to]).filter((a): a is string => a !== null));
   const settlement: FullSettlement = {
     season,

@@ -121,11 +121,39 @@ archive `cfe525e7...`, equal to the fold over `chain_archive`. To check it later
 `chain_archive` for the season in day order, $a_d = \mathrm{SHA256}(a_{d-1} \,|\, d \,|\, \text{record}_d)$ from 64
 zeros, and compare with `season_head({ "season": "s1" }).archive`.
 
+### Version 5: test Feathers burnt, a live season, missed days recorded late
+
+Version 5 (`contracts/coys-game`, CI build `7fa2c060...abbfa2d`) adds, all owner only:
+
+- `set_live_season(season)`: from then on only that season's day closes mint Feathers, and a Feather belongs to the
+  season that mints it, so a test season can never mint against the real 777 (the server also sends no mints for a
+  season that is not the live one);
+- `burn_test_feathers(token_ids)`: burns Feathers of any season but the live one and returns their numbers to the
+  supply (reused smallest first; `feather_supply().minted` counts only Feathers that exist);
+- `settle_late_days(season, days)`: records closed days whose day close failed, once the season has moved past them,
+  by each day's settlement digest, folded into `late_days(season).hash`
+  ($h_i = \mathrm{SHA256}(h_{i-1} \,|\, \text{season} \,|\, \text{day}_i \,|\, \text{digest}_i)$ from 64 zeros).
+
+Its `migrate` reads version 4 (kept byte for byte in `contracts/sandbox-tests/res/coys_game_v4.wasm` and upgraded in the
+sandbox tests); `migrate_v2` reads version 2. Done on `play.coys-game.testnet` on 12 November 2026, each right after a
+day close so the server's own call never met these:
+
+| Step | Transaction |
+|---|---|
+| `npm run deploy-contract -- --wasm contracts/coys-game/res/coys_game.wasm --account play.coys-game.testnet --migrate` | [4h7ZEQkP...](https://testnet.nearblocks.io/txns/4h7ZEQkPG66zVmNrNvLr8W3b9dyBYmQoFibEBFCWuN92) |
+| `set_live_season({"season": "s1"})` | [6WTTxYay...](https://testnet.nearblocks.io/txns/6WTTxYaySdGt8DggxzAgGCzYJb5AUg1VxUV1QS3SVGxF) |
+| `burn_test_feathers({"token_ids": ["001", "002", "003"]})` (the test season `verify-feathers-1`): 0 minted, 777 remaining | [2uVuUnQ5...](https://testnet.nearblocks.io/txns/2uVuUnQ52oEQGrgfozpL83PhKw3duat69eB1HZzkdzVo) |
+| `npm run settle-late-days -- --season s1`: days 509 and 510, late hash `5f5dbd6d...` | [ANKGbgth...](https://testnet.nearblocks.io/txns/ANKGbgthoMpqTw6M6CmZQRz87NKWYqBhyjebMdYjaM8g) |
+
+The upgrade took about 34,900 bytes more (the larger code; about 0.35 NEAR held for storage); the burn gave back the
+three Feathers' storage. `settle-late-days` needs `DATABASE_URL` as well as the signing key, and `--dry-run` lists the
+missed days and their digests without signing. The server does the same at each day close that settles (one paced call),
+unless the contract's count of settled days disagrees with the database.
+
 ## Upgrading a version 1 contract (done, 11 November 2026)
 
 Version 1 settled days without seasons. The version 2 wasm was deployed over it with `migrate` in the
-same transaction (version 4's `migrate` reads version 2, so a version 1 contract now goes through
-version 2 first):
+same transaction (a version 1 contract now goes through version 2 first; version 5's `migrate_v2` reads version 2):
 
 ```powershell
 npm run deploy-contract -- --wasm contracts/coys-game/res/coys_game.wasm --account coys-game.testnet --migrate

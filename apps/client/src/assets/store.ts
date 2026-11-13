@@ -142,7 +142,12 @@ export class AssetStore {
   async loadGroups(groups: Group[], d: number, opts: { quick?: boolean; onEach?: () => void } = {}): Promise<void> {
     await Promise.all(
       groups.map(async (g) => {
-        this.density.set(g, d);
+        if (this.density.get(g) !== d) {
+          this.density.set(g, d);
+          // the level drawn may change at once (an atlas for the new density may already be here):
+          // every sprite picks up its frames and its scale together
+          this.version++;
+        }
         const exact = derived.atlases[g] ? [this.loadAtlas(g)] : [];
         const full = this.paintedKeys(g, d);
         const quick = opts.quick ? this.paintedKeys(g, d, true) : null;
@@ -244,9 +249,13 @@ export class AssetStore {
     return k ? (this.pages.get(k)?.[page]?.bitmap ?? null) : null;
   }
 
-  /** Frames of a row, with per-frame pivot and duration, at the level drawn now. */
+  /**
+   * Frames of a row, with per-frame pivot and duration, at the level drawn now. Cached by the
+   * atlas page they come from (which names the level), never by a counter: frames and texelScale
+   * always describe the same level, so a sprite is the same size at every density.
+   */
   frames(id: string, row: string): Frame[] {
-    const key = `${id}/${row}/${this.version}`;
+    const key = `${id}/${row}/${this.key(id) ?? '-'}`;
     const hit = this.frameCache.get(key);
     if (hit) return hit;
     const k = this.key(id);

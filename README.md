@@ -26,7 +26,7 @@ NEAR tools used: **Privy social login** (email, with a silent NEAR wallet), **NE
 
 | NEAR piece | What it does here | Status in this build |
 |---|---|---|
-| **Game contract on testnet** (`near-sdk` 5.30.1) | One contract on the game account: the Feathers (NEP-171, `near-contract-standards` 5.30.1, 777 ever, capped on chain), egg tokens (NEP-245, `near-sdk-contract-tools` 4.0.0 from the near org), and `settle_day`, owner only, once per in-game day of a season, storing only a fixed-size head per season. | **Live**, version 4, on `play.coys-game.testnet` (upgraded in place on 12 November 2026, tx [`9jsFd4EA...`](https://testnet.nearblocks.io/txns/9jsFd4EAZc3nkE4v11x4poVTMhLyYzPpuZKrsCud9J4s), wasm built in CI with `cargo near`, sha256 `e57cda66...`), with the founders provenance committed ([`JBoKNVa6...`](https://testnet.nearblocks.io/txns/JBoKNVa6Pi5jAb2BA4chAh8K43GGpWgw8AtHJy26b5AB)). The demo account `coys-game.testnet` stays on version 2 ([deploy/testnet.md](deploy/testnet.md)). |
+| **Game contract on testnet** (`near-sdk` 5.30.1) | One contract on the game account: the Feathers (NEP-171, `near-contract-standards` 5.30.1, 777 ever, capped on chain), egg tokens (NEP-245, `near-sdk-contract-tools` 4.0.0 from the near org), and `settle_day`, owner only, once per in-game day of a season, storing only a fixed-size head per season. | **Live**, version 5, on `play.coys-game.testnet` (upgraded in place on 12 November 2026 to version 4, tx [`9jsFd4EA...`](https://testnet.nearblocks.io/txns/9jsFd4EAZc3nkE4v11x4poVTMhLyYzPpuZKrsCud9J4s), and to version 5, tx [`4h7ZEQkP...`](https://testnet.nearblocks.io/txns/4h7ZEQkPG66zVmNrNvLr8W3b9dyBYmQoFibEBFCWuN92); wasm built in CI with `cargo near`, sha256 `7fa2c060...`), live season `s1`, with the founders provenance committed ([`JBoKNVa6...`](https://testnet.nearblocks.io/txns/JBoKNVa6Pi5jAb2BA4chAh8K43GGpWgw8AtHJy26b5AB)). The demo account `coys-game.testnet` stays on version 2 ([deploy/testnet.md](deploy/testnet.md)). |
 | **Agent wallets** (near-api-js 7.5.3) | Each agent gets a testnet sub-account of the game account (`bakery1.coys-game.testnet` and so on), funded from it; its eggs settle to it. A contract delivery moves egg tokens from the player's wallet to the Bakery's. | **Live**: seven wallets, and a delivery proven on chain (below). |
 | **Privy social login** (docs.near.org social login) | Email sign-in; a NEAR testnet wallet is created silently with Privy's extended-chains API; the server verifies the ES256 access token with `jose`. That wallet holds the player's Feathers and eggs. | Wired. Needs `PRIVY_APP_ID` and the live domain in Privy's allowed domains. |
 | **NEAR AI Cloud** (OpenAI-compatible) | Every agent's daily decision, as structured JSON output (`json_schema`, strict) checked against a zod schema; anything unusable falls back to rules and is logged. Hard daily spend cap. | Wired. Needs `NEARAI_API_KEY` and account credits; default model `Qwen/Qwen3.6-35B-A3B-FP8`, cheaper `z-ai/glm-5.3-flash` for struggling agents. |
@@ -79,7 +79,7 @@ day records can be released back to the account ([The Feathers beta](#the-feathe
 Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what to do and what you should see. Commands are the same in PowerShell and a POSIX shell unless shown otherwise.
 
 1. **Install.** Run `npm ci --ignore-scripts`. You see the lockfile install with no package install scripts (`.npmrc` also sets `ignore-scripts=true`).
-2. **Test.** Run `npm test`. You see **322 tests pass and 2 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it); on a fresh clone without a coys-assets checkout beside the repo, the asset re-pack check skips too (321 and 3). Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
+2. **Test.** Run `npm test`. You see **334 tests pass and 2 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it); on a fresh clone without a coys-assets checkout beside the repo, the asset re-pack check skips too (333 and 3). After `npm run build`, `npm run test:e2e` opens every screen in a headless browser at 11 window sizes and checks that nothing scrolls or is cut off (it needs a Chromium: `CHROME_PATH` points at one). Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
 3. **Play.** Run `npm run dev` and open http://localhost:5173. You see an egg fill up over the loading plate, then the title: the logo stamps in and the price ticker scrolls.
 4. **Sign in.** Press **PLAY**. With `PRIVY_APP_ID` set you sign in with email; without it a red **LOCAL DEV LOGIN** label asks for a name. You see your farm: 10 hens, a starter coop, **50.00** coins, **DAY001**.
 5. **Take the tour.** The first time you enter your farm the tour starts on its own: your hen walks you through the loop by doing it (collect an egg, sell, the market, feed, an offer, a hen, machines, rivals, the ledger). Each step ends when you do the thing; **SKIP** ends it, and it never comes back unless you press **REPLAY THE TOUR** in **SETTINGS**. After it, the goal in the corner shows what to aim for next, with a **CLAIM** button and coins when you reach it. The **?** in the top bar opens **HOW TO PLAY**, the guide to everything.
@@ -90,9 +90,9 @@ Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what 
 10. **Sell into a glut.** Speed days up: `DEMO_DAY_SECONDS=30` before `npm run dev` (PowerShell: `$env:DEMO_DAY_SECONDS = "30"; npm run dev`). Open the **market board**: you see **SOLD n OF d**, today's sales against demand. When a day's supply runs well past demand (Old Money releasing its hoard, the Wholesaler reselling), you see the next multiplier fall, the ticker turn red at 0.80 or lower, the **GLUT WARNING** card in the tray, and the tension music take over.
 11. **Watch a rival bust.** The Upstart borrows feed from the Loyalist to grow on good weeks. When a glut meets its debt, it goes below zero: you see its sign tip over, a price wave cross the ticker, feathers fall, and its hens appear in the shop as **AUCTION** hens at half price; a new rival opens three days later. At 30-second days this usually happens 8 to 14 minutes into a season.
 12. **Deliver a contract.** Accept the Bakery's contract, then press **DELIVER** on the desk each day (or buy the delivery cart: it delivers at dusk). You see coins arrive; with testnet credentials the day's batch moves those egg tokens to the Bakery's wallet. Miss one and you pay a penalty and the Bakery remembers.
-13. **Read the ledger.** Open the **ledger** (top bar): you see the season, day-by-day income, costs and net, contracts and debts, and an **ON-CHAIN RECEIPT** link per settled day that opens the testnet explorer.
+13. **Read the ledger.** Open the **ledger** (top bar): you see the season and tabs: **DAYS** (income, costs and net a day, with an **ON-CHAIN RECEIPT** link per settled day that opens the testnet explorer, in pages that fit the window), **CONTRACTS**, **FEATHERS** and **MILESTONES**. Nothing in the game scrolls: longer lists have **PREV** and **NEXT**.
 14. **Comfort.** **SETTINGS**: a volume and a mute for each of twelve sound groups (master, music, ambience, hens, eggs and money, cards and stamps, haggling, machines, market and rivals, agent voices, buttons, new day and stings), a reset button, and **REDUCE MOTION**, kept per browser. Each change applies at once and plays a sample. With reduce motion, stamps still slam and chime, but nothing shakes or freezes.
-15. **Win a Feather.** Reach a milestone in good standing (fill your coops, sell 500 eggs, win 10 haggles...). At the day close you get one roll at 30%: a win is a **Feather Ticket**, a miss says so kindly and names the next milestone. Press **FEATHERS** in the top bar: the mint page shows all 777 numbers, your tickets and the grade a redemption would get now. Press **REDEEM FOR 25 COINS**; at the next day close the reveal flips your card to a Feather (Fluff, Plume, Quill or Golden Quill) with its number of 777 and the receipt. Add `?debug=layout` to the address to see the farm's layout spec drawn over it.
+15. **Win a Feather.** Reach a milestone in good standing (fill your coops, sell 500 eggs, win 10 haggles...). At the day close you get one roll at 30%: a win is a **Feather Ticket**, a miss says so kindly and names the next milestone. Press **FEATHERS** in the top bar: the mint page's tabs show your tickets and the grade a redemption would get now, all 777 numbers (in pages that fit the window), each grade's odds, and the provenance and contract. Press **REDEEM FOR 25 COINS**; at the next day close the reveal flips your card to a Feather (Fluff, Plume, Quill or Golden Quill) with its number of 777 and the receipt. Add `?debug=layout` to the address to see the farm's layout spec drawn over it.
 16. **Production build.** `npm run build`, then start it as production would (PowerShell):
     `$env:NODE_ENV = "production"; $env:GAME_SEASON = "local"; $env:SESSION_SECRET = "a-long-random-string"; $env:DATABASE_URL = "postgres://..."; node apps/server/dist/main.js`.
     Open http://localhost:8787/healthz: you see `{"ok":true,"version":"0.1.0","commit":"...","season":"local",...,"db":{"kind":"postgres","ok":true,...}}`. Without a Postgres at hand, `ALLOW_PGLITE_IN_PRODUCTION=1` with `DATABASE_URL=memory://` checks the build on PGlite (never for players).
@@ -144,6 +144,142 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 </details>
 
 **Video:** _slot for a direct upload (drag the gameplay video into this section on GitHub)._
+
+## Scaling, no scrollbars, a clean conveyor and the 777 restored (12 November 2026)
+
+**One scale for every sprite.** Hens came out at different sizes after a resize, and walked out of their areas and over
+standing objects. The size bug had one cause: the sprite store cached each animation's frames under a key that changed
+only when an atlas page finished downloading, while each sprite's on-screen size was computed from the density in use
+now. After a window change that moved the world to another painted density (say 3 to 4 texels per world pixel), a hen
+built from the cached frames of the old density came out at 4/3 of her size, or 3/4. The cache key now carries the
+density each sprite group is drawn at, so a frame and its scale always agree; a test resizes through the densities
+2, 3, 4, 6 and 8 and back and checks that a hen keeps her size (26.1 world pixels tall, the size table's value).
+
+$$
+\text{on-screen size} = \frac{\text{frame texels}}{\text{texels per world pixel}} \times k \quad\text{with both read at the same density}
+$$
+
+**Hens keep to their areas.** Where hens may walk now comes from the layout spec
+([`pixi/farm/movement.ts`](apps/client/src/pixi/farm/movement.ts)): the straw yard, and the path from the porch that new
+hens arrive by, turning into the yard in the gap below the farm sign (they used to cross the belt row). Every standing
+object (trough, sacks, hopper, props, signs, machines, coops) is a keep-out box from its lower art down to its footprint,
+a hen's half width wider; a hen's feet never stand in one, and every walk goes round them by a box corner. Unbuilt coops
+and machines not bought leave their ground free. On a resize every hen (and every egg on the ground) is carried to the
+same place relative to the yard in the new layout, then to the nearest free spot, instead of keeping a stale world
+position. Positions are world units throughout. Tests sweep 41 window sizes and ratios (3440x1000 to 600x1900), with and
+without machines: arrival, entry, trough places, 40 random spots and 40 routed walks a layout, every one walkable and off
+every footprint, and a resize sequence (wide, narrow, phone, tall, wide) that carries 31 hens and checks each.
+
+**No scrollbars anywhere.** Nothing scrolls: content that cannot fit becomes pages or tabs, measured as drawn
+([`ui/Paged.tsx`](apps/client/src/ui/Paged.tsx)). Each panel says how tall it may grow; each list is packed into pages
+that fit what is left, with PREV and NEXT and the page number, and splits differently at every window size. Scrollbars
+are hidden only as the last safeguard, after the content fits.
+
+| Screen | Before | Now |
+|---|---|---|
+| How to play | 13 sections in a list; the glossary and milestones scrolled | one section at a time with PREV and NEXT (a long one in pages); the list of sections stays beside it when the window is wide |
+| Ledger | days in a 120-pixel scroll box, then contracts, Feathers and milestones below | tabs DAYS, CONTRACTS, FEATHERS, MILESTONES; days paged |
+| Market board | prices and the farm ranking side by side (names cut off on phones) | tabs BOARD, FARMS, ORDERS, TRADES; ranking, order book and trades paged; names wrap |
+| Shop | the hen tiles scrolled | hen tiles in a grid paged to fit; coops and machines paged |
+| Mint page | one long page (up to 821 pixels past the window) | tabs YOUR TICKETS, ALL 777, ODDS, ABOUT; the 777 slots in a grid paged to fit |
+| Settings | 8 to 10 pixels too wide on every window; a scroll box on the title | sliders take the width left; sound rows paged |
+| Side panel | 2 pixels too narrow for the sell card; the desk scrolled | the card fits exactly; the desk is paged |
+| Toasts | long messages cut with an ellipsis | messages wrap; only the newest that fit are shown |
+
+`e2e/no-scroll.test.ts` opens the built game in a fresh headless browser at 11 window sizes (1280x720, 1440x900, 1920x1080, 2560x1440, 390x844 and 360x640, and in between 1024x640, 1180x820 on a 2x screen, 1680x1050, 768x1024 and 412x915) and, at each, checks the title and
+its settings, all 11 tour steps, the farm, every modal, tab and page (shop, market, ledger, settings, guide, mint page),
+every card the farm's things open and an offer: no element scrolls or clips its content, and the page never scrolls. It
+runs in CI (job `layout`, on the runner's own Chrome). Screenshots of every screen: [docs/screenshots/](docs/screenshots).
+
+<details>
+<summary><b>Every screen, tab and tour step</b> at 1280x720 and on a phone (390x844), from the browser check</summary>
+
+<br>
+
+| | |
+|---|---|
+| ![The mint page at 1280x720: tabs YOUR TICKETS, ALL 777, ODDS, ABOUT, the filters, one row of nine numbers and PAGE 1 OF 87 with PREV and NEXT; the belt below carries no painted eggs](docs/screenshots/mint-page-all-777-1280x720.png) | ![How to play on a phone: the goal section with the hen, SECTION 1 OF 13 between PREV and NEXT, under the farm](docs/screenshots/guide-390x844.png) |
+
+| Screen | 1280x720 | 390x844 (phone) |
+|---|---|---|
+| Title | [title-1280x720.png](docs/screenshots/title-1280x720.png) | [title-390x844.png](docs/screenshots/title-390x844.png) |
+| Title settings | [title-settings-1280x720.png](docs/screenshots/title-settings-1280x720.png) | [title-settings-390x844.png](docs/screenshots/title-settings-390x844.png) |
+| Farm | [farm-1280x720.png](docs/screenshots/farm-1280x720.png) | [farm-390x844.png](docs/screenshots/farm-390x844.png) |
+| Tour step 1 | [tour-step-1-1280x720.png](docs/screenshots/tour-step-1-1280x720.png) | [tour-step-1-390x844.png](docs/screenshots/tour-step-1-390x844.png) |
+| Tour step 10 (Feathers) | [tour-step-10-1280x720.png](docs/screenshots/tour-step-10-1280x720.png) | [tour-step-10-390x844.png](docs/screenshots/tour-step-10-390x844.png) |
+| Shop: hens | [shop-shop-hens-1280x720.png](docs/screenshots/shop-shop-hens-1280x720.png) | [shop-shop-hens-390x844.png](docs/screenshots/shop-shop-hens-390x844.png) |
+| Shop: feed | [shop-shop-feed-1280x720.png](docs/screenshots/shop-shop-feed-1280x720.png) | [shop-shop-feed-390x844.png](docs/screenshots/shop-shop-feed-390x844.png) |
+| Shop: coops | [shop-shop-coops-1280x720.png](docs/screenshots/shop-shop-coops-1280x720.png) | [shop-shop-coops-390x844.png](docs/screenshots/shop-shop-coops-390x844.png) |
+| Shop: machines | [shop-shop-machines-1280x720.png](docs/screenshots/shop-shop-machines-1280x720.png) | [shop-shop-machines-390x844.png](docs/screenshots/shop-shop-machines-390x844.png) |
+| Board | [market-market-board-1280x720.png](docs/screenshots/market-market-board-1280x720.png) | [market-market-board-390x844.png](docs/screenshots/market-market-board-390x844.png) |
+| Board: farms | [market-market-farms-1280x720.png](docs/screenshots/market-market-farms-1280x720.png) | [market-market-farms-390x844.png](docs/screenshots/market-market-farms-390x844.png) |
+| Board: orders | [market-market-orders-1280x720.png](docs/screenshots/market-market-orders-1280x720.png) | [market-market-orders-390x844.png](docs/screenshots/market-market-orders-390x844.png) |
+| Board: trades | [market-market-trades-1280x720.png](docs/screenshots/market-market-trades-1280x720.png) | [market-market-trades-390x844.png](docs/screenshots/market-market-trades-390x844.png) |
+| Ledger: days | [ledger-ledger-days-1280x720.png](docs/screenshots/ledger-ledger-days-1280x720.png) | [ledger-ledger-days-390x844.png](docs/screenshots/ledger-ledger-days-390x844.png) |
+| Ledger: contracts | [ledger-ledger-contracts-1280x720.png](docs/screenshots/ledger-ledger-contracts-1280x720.png) | [ledger-ledger-contracts-390x844.png](docs/screenshots/ledger-ledger-contracts-390x844.png) |
+| Ledger: Feathers | [ledger-ledger-feathers-1280x720.png](docs/screenshots/ledger-ledger-feathers-1280x720.png) | [ledger-ledger-feathers-390x844.png](docs/screenshots/ledger-ledger-feathers-390x844.png) |
+| Ledger: milestones | [ledger-ledger-milestones-1280x720.png](docs/screenshots/ledger-ledger-milestones-1280x720.png) | [ledger-ledger-milestones-390x844.png](docs/screenshots/ledger-ledger-milestones-390x844.png) |
+| Settings | [settings-1280x720.png](docs/screenshots/settings-1280x720.png) | [settings-390x844.png](docs/screenshots/settings-390x844.png) |
+| How to play | [guide-1280x720.png](docs/screenshots/guide-1280x720.png) | [guide-390x844.png](docs/screenshots/guide-390x844.png) |
+| Mint page: tickets | [mint-page-your-tickets-1280x720.png](docs/screenshots/mint-page-your-tickets-1280x720.png) | [mint-page-your-tickets-390x844.png](docs/screenshots/mint-page-your-tickets-390x844.png) |
+| Mint page: all 777 | [mint-page-all-777-1280x720.png](docs/screenshots/mint-page-all-777-1280x720.png) | [mint-page-all-777-390x844.png](docs/screenshots/mint-page-all-777-390x844.png) |
+| Mint page: odds | [mint-page-odds-1280x720.png](docs/screenshots/mint-page-odds-1280x720.png) | [mint-page-odds-390x844.png](docs/screenshots/mint-page-odds-390x844.png) |
+| Mint page: about | [mint-page-about-1280x720.png](docs/screenshots/mint-page-about-1280x720.png) | [mint-page-about-390x844.png](docs/screenshots/mint-page-about-390x844.png) |
+| A hen | [card-hen-1280x720.png](docs/screenshots/card-hen-1280x720.png) | [card-hen-390x844.png](docs/screenshots/card-hen-390x844.png) |
+| A machine | [card-machine-1280x720.png](docs/screenshots/card-machine-1280x720.png) | [card-machine-390x844.png](docs/screenshots/card-machine-390x844.png) |
+| The crate | [card-crate-1280x720.png](docs/screenshots/card-crate-1280x720.png) | [card-crate-390x844.png](docs/screenshots/card-crate-390x844.png) |
+| Feed | [card-feed-1280x720.png](docs/screenshots/card-feed-1280x720.png) | [card-feed-390x844.png](docs/screenshots/card-feed-390x844.png) |
+| A coop | [card-coop-1280x720.png](docs/screenshots/card-coop-1280x720.png) | [card-coop-390x844.png](docs/screenshots/card-coop-390x844.png) |
+| The farmhouse | [card-farmhouse-1280x720.png](docs/screenshots/card-farmhouse-1280x720.png) | [card-farmhouse-390x844.png](docs/screenshots/card-farmhouse-390x844.png) |
+| An offer | [offer-card-1280x720.png](docs/screenshots/offer-card-1280x720.png) | [offer-card-390x844.png](docs/screenshots/offer-card-390x844.png) |
+
+Tour steps 2 to 9 and 11 are beside them (`tour-step-N-1280x720.png`, `tour-step-N-390x844.png`).
+
+</details>
+
+**A clean conveyor.** The belt's art had eggs painted on it, so eggs that were not there rode the belt. A new sheet,
+`conveyor-clean`, was created in 25TH's Spawn world `@25th/game-11` (Spawn commit `9ee1f6c`, a new upload and its
+record; the old belt and every other asset untouched): the same 512x640 sheet, 16x16 frames at 8x, five rows of four
+frames at 100 ms, the same outline and palette, with each egg pixel given the belt surface of its own frame (432 of 5120
+art pixels). It was pulled back byte for byte (`6180dedd...dcde6`), backed up in coys-assets as `18b-conveyor-clean`
+(PR #3, hashes verified) and replaces the old belt on the farm and in the shop. A test checks every frame of the
+belt at every level, and the packed sheet, for the two egg colours: none.
+
+**The 777 restored.** The three test Feathers (#001 to #003, minted on 12 November in the test season
+`verify-feathers-1`) counted against the cap, so the board read 774 of 777. Contract version 5 burns Feathers of a
+season that is not the live one and returns their numbers to the supply (the next mints reuse them, smallest first);
+it was sandbox-tested against the exact version 4 code, then deployed in place. From now on only the contract's live
+season mints Feathers, and a Feather belongs to the season that mints it: a test season cannot mint against the real
+777, enforced by the contract (version 5) and by the server (it sends no mints for a season that is not the live one),
+with tests for both.
+
+| Step | Transaction |
+|---|---|
+| Upgrade to version 5 with `migrate` (wasm `7fa2c060...abbfa2d`, CI build) | [4h7ZEQkP...](https://testnet.nearblocks.io/txns/4h7ZEQkPG66zVmNrNvLr8W3b9dyBYmQoFibEBFCWuN92) |
+| `set_live_season("s1")` | [6WTTxYay...](https://testnet.nearblocks.io/txns/6WTTxYaySdGt8DggxzAgGCzYJb5AUg1VxUV1QS3SVGxF) |
+| `burn_test_feathers(["001", "002", "003"])`: 0 minted, 777 remaining | [2uVuUnQ5...](https://testnet.nearblocks.io/txns/2uVuUnQ52oEQGrgfozpL83PhKw3duat69eB1HZzkdzVo) |
+
+**Days 509 and 510 settled.** Their day closes failed on 12 November when the public RPC refused a burst of reads (429);
+day 511 had already caught every egg balance up. Version 5 records a missed day late, by the SHA-256 of its full
+settlement, once the season has moved past it: each day's settlement was rebuilt from the database (supply,
+multiplier, every farm's net from the ledger; no egg moves) and both went in one call. The contract folds them into a
+late record per season:
+
+$$
+h_0 = 0^{64},\qquad h_i = \mathrm{SHA256}\big(h_{i-1}\,|\,\text{season}\,|\,\text{day}_i\,|\,\text{digest}_i\big)
+$$
+
+| Day | Supply | Multiplier | Farms with a net | Digest |
+|---|---|---|---|---|
+| 509 | 55 | 1.594 | 1 | `d2eebe0e48f264177a9d04976ab8e21acbfd60401cd18332992034dd628286b7` |
+| 510 | 101 | 1.867 | 2 | `ccbf1bb8c1e8873c40cbbb59874d35e4735b5ee639d694988988c22c0dd8e821` |
+
+Transaction [ANKGbgth...](https://testnet.nearblocks.io/txns/ANKGbgthoMpqTw6M6CmZQRz87NKWYqBhyjebMdYjaM8g); the
+contract's `late_days("s1")` reads days `[509, 510]` with hash `5f5dbd6d...4f96c`, which anyone can recompute from the two
+digests above. No closed day of `s1` is unsettled. From now on, each day close that settles also records any earlier
+missed day of the season the same way (one paced call, up to ten days), unless the contract's count of settled days
+disagrees with the database, when a day marked failed may have landed after all and a person should look.
+`npm run settle-late-days -- --season s1 --dry-run` lists missed days and their digests.
 
 ## The Feathers beta, compact settlement and the layout spec (12 November 2026)
 
@@ -815,10 +951,12 @@ All optional for local play. Copy `.env.example` to `.env` at the repo root. Pro
 |---|---|
 | `npm ci --ignore-scripts` | install from the lockfile, no install scripts |
 | `npm run dev` | server (port 8787) and client (Vite, port 5173) |
-| `npm test` | Vitest: economy, agents, haggling, market, chain batch, simulation, WebSocket, packer, pixel passes |
+| `npm test` | Vitest: economy, agents, haggling, market, chain batch, simulation, WebSocket, packer, pixel passes, hen movement |
+| `npm run test:e2e` | after a build: every screen, tab, page and tour step in a headless browser at 11 window sizes; fails on anything that scrolls or is cut off (`SCREENSHOTS=1` saves them to `docs/screenshots`) |
 | `npm run typecheck` / `npm run lint` | strict TypeScript; ESLint plus a check that no file holds an em dash |
 | `npm run build` / `npm start` | bundle the server and client; serve both on one port |
 | `npm run deploy-contract -- --wasm <file> --account <id.testnet> [--create] [--migrate]` | deploy a CI-built contract to a testnet account (sha256 checked, mainnet refused; see [deploy/testnet.md](deploy/testnet.md)) |
+| `npm run settle-late-days -- --season <id> [--dry-run]` | record closed days whose settlement failed, late, by their digests (the server also does it at each day close) |
 | `npx tsx scripts/db-backup.ts` / `scripts/db-restore.ts` | back up the Postgres database to `backups/`, or restore a dump into another (see [deploy/pier](deploy/pier/README.md)) |
 | `npx tsx scripts/make-share-images.ts` | cut the favicon and the share image from the sprites |
 | `cd contracts/coys-game && cargo test` | contract unit tests (CI also runs `cargo near build` and the sandbox tests) |
@@ -831,7 +969,8 @@ apps/server          game server: HTTP, WebSocket, game, agents, cards, market, 
 packages/shared      economy config and formulas, agent pricing, protocol, pixel passes
 contracts/coys-game  the game contract (Rust); res/ holds the CI-built wasm and its sha256
 contracts/sandbox-tests  near-workspaces sandbox tests for the contract (res/ holds the version 1 wasm)
-scripts              asset packer, dev runner, text check, testnet deploy, backups, share images
+scripts              asset packer, dev runner, text check, testnet deploy, backups, share images, late days
+e2e                  the browser check: no scrollbars, nothing cut off, at every window size
 deploy               Pier and Render settings, testnet contract accounts and seasons
 render.yaml          Render Blueprint (fallback host)
 docs/screenshots     headless captures of this build
@@ -849,9 +988,16 @@ docs/submission      drafts: demo shot list, post drafts, form fields
 
 ## Verification
 
-On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass. CI is green: the TypeScript job (with PostgreSQL 16: the Postgres tests, the production build booting against Postgres with `/healthz` checked, and a backup restored into a second database) and the contracts job (unit tests, `cargo near build`, sandbox tests). The economy sheet tests hit their values exactly; the five-seed simulation meets the economy acceptance; a malformed model answer falls back to rules; a new season settles day 1 after an old season ended at day 3; non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
+On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass. CI is green: the TypeScript job on every push and pull request (with PostgreSQL 16: the Postgres tests, the production build booting against Postgres with `/healthz` checked, and a backup restored into a second database), the browser check at all 11 window sizes in one job on pull requests (`layout`), and the contracts workflow whenever `contracts/` changes (unit tests, `cargo near build`, sandbox tests). The economy sheet tests hit their values exactly; the five-seed simulation meets the economy acceptance; a malformed model answer falls back to rules; a new season settles day 1 after an old season ended at day 3; non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
 
 The live Pier deploy and its tunnel were checked end to end on 11 November 2026 (receipts under [How NEAR fits in](#how-near-fits-in)).
+
+Brief 8 was checked on 12 November 2026: the hen size and movement tests (41 window sizes and a resize sequence), the
+belt test (no egg colour on any frame), the browser check at 11 window sizes with every screen, tab, page and tour step
+open (nothing scrolls, nothing is cut off), the contract's unit and sandbox tests (version 4 upgraded to 5 with the test
+Feathers burnt and two missed days recorded), and on `play.coys-game.testnet` the upgrade, the burn (0 minted, 777
+remaining) and days 509 and 510 recorded late, with no unsettled closed day left in `s1` (under
+[Scaling, no scrollbars, a clean conveyor and the 777 restored](#scaling-no-scrollbars-a-clean-conveyor-and-the-777-restored-12-november-2026)).
 
 Brief 7 was checked live on 12 November 2026 on `4471029`: the version 4 upgrade and the release of version 2's records on
 `play.coys-game.testnet`, three Feathers minted in a test season, the mint page and the board, and the farm and its layout
@@ -868,6 +1014,29 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
 **Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
+
+### Brief 8: scaling, no scrollbars, a clean conveyor and the 777 restored (12 November 2026)
+
+- **Recon first.** No PR was open. Four causes found: a frame cache keyed by atlas downloads, not by the density each
+  sprite is drawn at (hens changed size after a resize); straight random walks in a yard box that holds the trough,
+  props and machines, with arrivals crossing the belt row and resizes leaving stale targets; eggs painted on all 20
+  frames of the belt; scroll boxes in the modal body, the side desk, the ledger and settings (the mint page ran up to
+  821 pixels past the window). On chain, the three test Feathers (#001 to #003, held by the game account) counted
+  against 777, and `s1` days 509 and 510 had failed with 429s and never settled.
+- **Scaling and movement.** The cache key carries the density; movement areas and keep-outs come from the layout spec,
+  walks are routed round standing objects, and every hen and egg is carried relative to the yard on a resize. Tests for
+  both.
+- **Clean conveyor.** Created as a new asset in Spawn `@25th/game-11` with the Spawn agent account (the in-world builder
+  is not open to agent accounts, so the sheet was made from the existing belt, pixel for pixel, and uploaded through the
+  world's asset door; easel 28 and every other asset are untouched), pulled byte for byte, backed up in coys-assets
+  (PR #3), drawn on the farm and in the shop, with a test.
+- **No scrollbars.** A pager that measures what it draws and fits each panel; tabs for the ledger, the board (a new FARMS
+  tab) and the mint page; the guide one section at a time; the top bar on two rows under 640 UI pixels; toasts that wrap.
+  The browser check runs in CI.
+- **Contract version 5** (sandbox-tested against the exact version 4 code, then upgraded in place): `burn_test_feathers`,
+  `set_live_season`, mints only for the live season and only of its own season, and `settle_late_days`. The burn and
+  the late days are recorded above; the server now records missed days at each day close and never sends mints for a
+  season that is not the live one.
 
 ### Brief 7: the Feathers beta, compact settlement and the layout spec (12 November 2026)
 

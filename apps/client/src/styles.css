@@ -165,8 +165,8 @@ body {
 .modal-body {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  /* content is split into pages that fit (ui/Paged.tsx); hidden only as the last safeguard */
+  overflow: hidden;
 }
 
 .tabs {
@@ -532,7 +532,8 @@ input[type='range'].slider::-moz-range-thumb {
   box-shadow:
     inset 2px 0 0 var(--ink),
     inset 3px 0 0 var(--terracotta);
-  padding: 4px 4px 4px 6px;
+  /* 4 + the 128-pixel sell card + 4 = the panel's 136 */
+  padding: 4px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -563,12 +564,6 @@ input[type='range'].slider::-moz-range-thumb {
   color: var(--straw);
   display: flex;
   justify-content: space-between;
-}
-
-.desk {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
 }
 
 .card {
@@ -631,9 +626,6 @@ input[type='range'].slider::-moz-range-thumb {
   background: var(--ink);
   color: var(--cream);
   box-shadow: 0 0 0 1px var(--straw);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   line-height: 8px;
   flex: none;
 }
@@ -682,9 +674,6 @@ input[type='range'].slider::-moz-range-thumb {
   color: var(--cream);
   line-height: 8px;
   box-shadow: 0 0 0 1px var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   flex: none;
 }
 
@@ -800,7 +789,7 @@ input[type='range'].slider::-moz-range-thumb {
 
 /* The How to play guide. */
 .guide-text p {
-  margin: 0 0 6px;
+  margin: 0;
   line-height: 10px;
 }
 
@@ -811,7 +800,7 @@ input[type='range'].slider::-moz-range-thumb {
 }
 
 .guide-text li {
-  margin-bottom: 3px;
+  margin: 0;
 }
 
 /* The Feathers (beta): cards built from the Spawn frames, the reveal flip and the mint page grid. */
@@ -867,4 +856,16 @@ input[type='range'].slider::-moz-range-thumb {
 .mint-table th:first-child,
 .mint-table td:first-child {
   text-align: left;
+}
+
+/* Paged: the hidden copy each item is measured in (no height of its own, never seen or clicked). */
+.paged-measure {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
 }

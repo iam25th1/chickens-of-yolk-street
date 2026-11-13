@@ -100,12 +100,16 @@ pays testnet gas and storage, so players never need testnet NEAR. A ticket whose
 
 On testnet, the verification minted three Feathers in the test season `verify-feathers-1` to a test farm's wallet:
 #001 Fluff, #002 Quill and #003 Golden Quill, redeemed at management scores 0.169, 0.683 and 0.875
-([BFBD96ii...](https://testnet.nearblocks.io/txns/BFBD96iiCiatw79xgcpzysjf3rb6osjM2Z1Qk1QLJQ7g)). They count toward the 777
-like any other; the mint page names their season.
+([BFBD96ii...](https://testnet.nearblocks.io/txns/BFBD96iiCiatw79xgcpzysjf3rb6osjM2Z1Qk1QLJQ7g)). They counted toward the
+777 (the board read 774 of 777) until contract version 5 burnt them and returned their numbers to the supply
+([2uVuUnQ5...](https://testnet.nearblocks.io/txns/2uVuUnQ52oEQGrgfozpL83PhKw3duat69eB1HZzkdzVo), the same day): the
+next Feathers minted take #001, #002 and #003 again. Since version 5 only the live season (`s1`) mints, and a Feather
+belongs to the season that mints it, so a test season can no longer mint against the 777; the server sends no mints
+for a season that is not the live one either ([deploy/testnet.md](../deploy/testnet.md)).
 
-Tests: 18 contract unit tests and 8 sandbox tests on the CI-built wasm, among them **mint 777 in 39 batches of 20 then
-refuse the 778th** (126 Tgas at most per batch, 3,169 bytes a Feather), and the upgrade of the exact version 2 code
-deployed on testnet.
+Tests: 24 contract unit tests and 10 sandbox tests on the CI-built wasm, among them **mint 777 in 39 batches of 20 then
+refuse the 778th** (126 Tgas at most per batch, 3,169 bytes a Feather), the upgrade of the exact version 2 code, and the
+upgrade of the exact version 4 code with the three test Feathers burnt and their numbers reused.
 
 ## The 777 Founding Hens
 

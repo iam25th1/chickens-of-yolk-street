@@ -2,8 +2,8 @@
   "version": 1,
   "source": {
     "repo": "iam25th1/coys-assets",
-    "commit": "2de9231d3d731dd942cd11c51103e0cecb9f1d33",
-    "manifestSha256": "16ef3ba6cfe35cf4fdba1bd084504d1f5e78fc6ee53d60b96e37cfaae12333b4"
+    "commit": "5aa7a9a6c6708aa49813c4acfc28683bb1c908d2",
+    "manifestSha256": "b4031c4b0ecd710dab4421f86f169a10ca5795495df05d7debd1529d7592441d"
   },
   "sprites": {
     "01-hen-base": {
@@ -1070,6 +1070,52 @@
       "role": "canonical",
       "docTracker": "18",
       "label": "egg conveyor",
+      "width": 512,
+      "height": 640,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "horizontal": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "vertical": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "corner": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "start": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "end": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        }
+      }
+    },
+    "18b-conveyor-clean": {
+      "json": "sprites/18b-conveyor-clean.json",
+      "png": "sprites/18b-conveyor-clean.png",
+      "sha256": "6180dedd009dc7f5538c8b7ee5194b19bf20eb03b5eae49f463e2bb54f8dcde6",
+      "source": "art/18b-conveyor-clean/18b-conveyor-clean.png",
+      "role": "alternate",
+      "docTracker": "18",
+      "label": "egg conveyor, no painted eggs",
       "width": 512,
       "height": 640,
       "grid": 8,

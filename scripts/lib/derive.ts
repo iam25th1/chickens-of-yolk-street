@@ -128,7 +128,8 @@ export const EXACT_GROUP: Record<string, Group> = {
   '34-cursor': 'boot',
   '35-particles': 'fx',
   '30-stamps': 'fx',
-  '18-conveyor': 'farm',
+  // the belt without the eggs painted on it (Spawn upload conveyor-clean), so only real eggs ride it
+  '18b-conveyor-clean': 'farm',
   '23-farm-tileset': 'farm',
   '24-farm-props': 'farm',
   '27-town-square-plate': 'market',
@@ -155,7 +156,7 @@ export const EXACT_GROUP: Record<string, Group> = {
 };
 
 /** In the packed set but not drawn by the game (measured for the report only). */
-export const UNUSED = ['01-hen-base', '01-hen-anims', '03-chick', '19b-egg-sorter'];
+export const UNUSED = ['01-hen-base', '01-hen-anims', '03-chick', '19b-egg-sorter', '18-conveyor'];
 
 /** The grid the previous pass downscaled each painted sheet to (for the report's "detail lost" column). */
 export const PREVIOUS_GRID: Record<string, number> = {

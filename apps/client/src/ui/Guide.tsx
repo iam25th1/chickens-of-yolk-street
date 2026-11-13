@@ -1,7 +1,7 @@
 // The guide zone, bottom left: the goal tracker on one line (each goal pays coins when claimed) and,
 // stacked above it, the toast area: the one hint the farm needs most right now, then the news. While
 // the tour runs, its step box takes the whole zone instead.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { coopCapacity, feedGramsPerHenDay, type FarmState, type GoalId } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import type { Rect } from '../app/viewport';
@@ -35,10 +35,11 @@ export function hint(farm: FarmState): string | null {
   return null;
 }
 
-/** Hints and news, newest nearest the tracker. */
+/** Hints and news, newest nearest the tracker: whole messages (wrapped, never cut), as many as fit. */
 export function ToastArea({ farm, rect, offline = false }: { farm: FarmState; rect: Rect; offline?: boolean }) {
   const list = useStore(toasts, (s) => s.list);
   const [, tick] = useState(0);
+  const box = useRef<HTMLDivElement>(null);
   // hints change with the clock, not only with server updates
   useEffect(() => {
     const id = setInterval(() => tick((n) => n + 1), 1000);
@@ -46,9 +47,19 @@ export function ToastArea({ farm, rect, offline = false }: { farm: FarmState; re
   }, []);
   const h = offline ? 'RECONNECTING TO THE MARKET' : hint(farm);
   const lines = Math.max(1, Math.floor((rect.h + 2) / 16));
-  const shown = list.slice(-Math.max(0, lines - (h ? 1 : 0)));
+  const [fit, setFit] = useState(lines);
+  const room = Math.max(0, Math.min(fit, lines) - (h ? 1 : 0));
+  const shown = room ? list.slice(-room) : [];
+  // a long message wraps and takes more room: keep only the newest that fit the zone (and try them
+  // all again when a message comes or the zone changes)
+  const newest = list[list.length - 1]?.id;
+  useLayoutEffect(() => setFit(lines), [newest, lines, rect.w, h]);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (el && el.scrollHeight > el.clientHeight + 1 && fit > 1) setFit(fit - 1);
+  }, [fit, newest, lines, rect.w, h]);
   return (
-    <div className="toasts zone" data-ui="toasts" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
+    <div ref={box} className="toasts zone" data-ui="toasts" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
       {[...shown].reverse().map((t) => (
         <div key={t.id} className={`toast ${t.tone === 'bad' ? 'bad' : ''}`} role="status" data-ui="toast" title={t.text}>
           {t.text}

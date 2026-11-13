@@ -1,5 +1,6 @@
 // The one modal: a panel inside the modal zone (app/viewport.ts) over a backdrop that dims the whole
-// window. Escape, the close button or a click on the backdrop dismiss it.
+// window. Escape, the close button or a click on the backdrop dismiss it. It never scrolls: its body
+// says how tall it may grow (data-room), and long content splits into pages that fit (ui/Paged.tsx).
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
@@ -40,6 +41,15 @@ export function Modal({
   const maxH = Math.min(h, Math.floor(z.h));
   // the panel is as tall as its content; it is centred on whole UI pixels once measured
   const [height, setHeight] = useState(maxH);
+  // the panel's own padding and title row: what is left of the zone is the body's room
+  const [chrome, setChrome] = useState(36);
+  useLayoutEffect(() => {
+    const panel = el.current;
+    const body = panel?.querySelector<HTMLElement>('.modal-body');
+    if (!panel || !body) return;
+    const c = panel.offsetHeight - body.offsetHeight;
+    if (c > 0 && c !== chrome) setChrome(c);
+  }, [chrome, maxH, children]);
   useLayoutEffect(() => {
     const panel = el.current;
     if (!panel) return;
@@ -73,7 +83,9 @@ export function Modal({
             X
           </button>
         </div>
-        <div className="modal-body">{children}</div>
+        <div className="modal-body" data-room={Math.max(0, maxH - chrome)}>
+          {children}
+        </div>
       </div>
     </>
   );

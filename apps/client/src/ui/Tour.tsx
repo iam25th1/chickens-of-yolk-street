@@ -103,12 +103,12 @@ export const TOUR: TourStep[] = [
     blocked: (c) => !c.modal && waitingCards(c.farm).length === 0,
   },
   {
-    title: 'EVERY HEN IS ONE OF A KIND',
+    title: 'ONE OF A KIND',
     hen: true,
     text: (c) =>
       c.market.minting === 'off'
         ? 'BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND: HER LOOKS AND HER LAYING ARE HERS ALONE.'
-        : `BUY A HEN IN THE SHOP. SHE IS ONE OF A KIND: HER LOOKS AND HER LAYING ARE HERS ALONE. HENS STAY ON YOUR FARM; ONLY FEATHERS ARE MINTED.`,
+        : 'BUY A HEN IN THE SHOP. HER LOOKS AND HER LAYING ARE HERS ALONE. HENS STAY ON YOUR FARM; ONLY FEATHERS ARE MINTED.',
     target: (c) => {
       if (c.modal?.kind === 'shop') return c.modal.tab === 'hens' ? { dom: 'buy-hen', tag: 'BUY HER' } : { dom: 'shop-hens' };
       return c.modal ? close : { dom: 'shop', tag: 'THE SHOP' };
@@ -116,7 +116,7 @@ export const TOUR: TourStep[] = [
     done: (s) => server(s, 'hensBought'),
   },
   {
-    title: 'MACHINES DO CHORES',
+    title: 'MACHINES WORK',
     text: 'MACHINES WORK FOR YOU. IN THE SHOP, SEE WHAT THE CONVEYOR SAVES.',
     target: (c) => {
       if (c.modal?.kind === 'shop') return c.modal.tab === 'machines' ? { dom: 'machine-conveyor', tag: 'WHAT IT DOES' } : { dom: 'shop-machines' };
@@ -126,16 +126,16 @@ export const TOUR: TourStep[] = [
   },
   {
     title: 'RIVALS GO BUST',
-    text: 'RIVAL FARMS CAN RUN OUT OF COINS AND GO BUST. THEIR HENS GO TO AUCTION. OPEN THE BOARD AND TAP THE FARMS.',
+    text: 'RIVAL FARMS CAN RUN OUT OF COINS AND GO BUST. THEIR HENS GO TO AUCTION. OPEN THE BOARD, THEN ITS FARMS, AND TAP THEM.',
     target: (c) =>
-      c.modal?.kind === 'market' ? (c.modal.tab === 'board' ? { dom: 'farms', tag: 'THE FARMS' } : { dom: 'market-board' }) : c.modal ? close : { dom: 'market', tag: 'THE BOARD' },
+      c.modal?.kind === 'market' ? (c.modal.tab === 'farms' ? { dom: 'farms', tag: 'THE FARMS' } : { dom: 'market-farms' }) : c.modal ? close : { dom: 'market', tag: 'THE BOARD' },
     done: (s) => tapped(s, 'farms'),
   },
   {
     title: 'FEATHERS (BETA)',
     hen: true,
     text: (c) =>
-      `MILESTONES WIN FEATHER TICKETS. REDEEM ONE ON THE MINT PAGE: ITS FEATHER IS A CLAIM TICKET FOR ONE OF ${c.market.feathers.max} FOUNDING HENS, PLANNED TO HATCH AT MAINNET LAUNCH. A BETTER-RUN FARM REDEEMS A BETTER GRADE. OPEN THE MINT PAGE.`,
+      `MILESTONES WIN FEATHER TICKETS. REDEEM ONE FOR A FEATHER, A CLAIM ON ONE OF ${c.market.feathers.max} FOUNDING HENS (PLANNED). OPEN THE MINT PAGE.`,
     target: (c) => (c.modal?.kind === 'feathers' ? { dom: 'mint-tickets', tag: 'YOUR TICKETS' } : c.modal ? close : { dom: 'feathers', tag: 'THE MINT PAGE' }),
     done: (s) => opened(s, 'feathers'),
   },
@@ -147,16 +147,26 @@ export const TOUR: TourStep[] = [
   },
 ];
 
-/** A spotlight target's box in UI pixels, read from the page or the farm. */
-function measure(t: TourTarget, v: ReturnType<typeof useViewport>, ui: HTMLElement | null): Rect | null {
+/** The element the tour points at: never a pager's hidden measuring copy; on a later page, the pager's NEXT. */
+function domTarget(id: string): { el: Element; next: boolean } | null {
+  const el = [...document.querySelectorAll(`[data-tour="${id}"]`)].find((e) => !e.closest('.paged-measure'));
+  if (el) return { el, next: false };
+  const hidden = document.querySelector(`.paged-measure [data-tour="${id}"]`);
+  const next = hidden?.closest('.paged')?.querySelector('[data-ui="page-next"]:not([disabled])');
+  return next ? { el: next, next: true } : null;
+}
+
+/** A spotlight target's box in UI pixels, read from the page or the farm (next: it is the pager's NEXT). */
+function measure(t: TourTarget, v: ReturnType<typeof useViewport>, ui: HTMLElement | null): (Rect & { next?: boolean }) | null {
   const s = v.p / v.dpr;
   if ('dom' in t) {
-    const el = document.querySelector(`[data-tour="${t.dom}"]`);
-    if (!el || !ui) return null;
+    const found = domTarget(t.dom);
+    if (!found || !ui) return null;
+    const el = found.el;
     const r = el.getBoundingClientRect();
     const u = ui.getBoundingClientRect();
     if (r.width === 0 && r.height === 0) return null;
-    return { x: (r.left - u.left) / s, y: (r.top - u.top) / s, w: r.width / s, h: r.height / s };
+    return { x: (r.left - u.left) / s, y: (r.top - u.top) / s, w: r.width / s, h: r.height / s, next: found.next };
   }
   const farm = (window as unknown as { __coysFarm?: { targets(): { kind: string; x: number; y: number; w: number; h: number }[]; yard(): { x: number; y: number; w: number; h: number } } }).__coysFarm;
   if (!farm) return null;
@@ -194,7 +204,7 @@ export function Spotlight({ ctx }: { ctx: TourCtx }) {
       let r = target ? measure(target, v, ui) : null;
       if (target && 'world' in target && target.world === 'egg' && r && !(window as unknown as { __coysFarm?: { targets(): { kind: string }[] } }).__coysFarm?.targets().some((x) => x.kind === 'egg')) {
         setTag('WAIT FOR A HEN TO LAY');
-      } else setTag(target?.tag ?? '');
+      } else setTag(r?.next ? 'NEXT PAGE' : (target?.tag ?? ''));
       if (r) r = { x: Math.round(r.x) - 3, y: Math.round(r.y) - 3, w: Math.round(r.w) + 6, h: Math.round(r.h) + 6 };
       setRect((old) => (old && r && old.x === r.x && old.y === r.y && old.w === r.w && old.h === r.h ? old : r));
       raf = requestAnimationFrame(loop);

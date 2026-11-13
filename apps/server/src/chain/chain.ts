@@ -12,13 +12,20 @@
 // in reserve on top of a CHAIN_MIN_BALANCE_NEAR margin (default 0.5 NEAR: a few real days of
 // settlement gas), so nothing optional (mints, linking or creating agent wallets) ever eats into
 // the days' own settlements. A redeemed ticket that cannot be minted yet waits for a later day.
+// From version 5 the contract names its live season and mints Feathers for that season only, so a
+// test season can never mint against the real 777: this writer sends no mints unless the server's
+// season is the contract's live season (and the contract refuses them anyway).
+//
+// A day whose close failed to settle (a refused RPC call, say) is caught up later: the next day's
+// moves already bring every egg balance up to date, so the missed day is recorded by its digest
+// alone with settle_late_days (version 5), paced, once the season has moved past it.
 import { createHmac } from 'node:crypto';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { Account, JsonRpcProvider, KeyPairSigner, baseEncode, nearToYocto, teraToGas } from 'near-api-js';
 import type { KeyPairString } from 'near-api-js';
 import { num, type Db } from '../db/db';
 import { ECONOMY, type FeatherGrade, type MilestoneId } from '@coys/shared';
-import { buildDayBatch, commitBatch, type FullSettlement, type MintedFeather } from './batch';
+import { buildDayBatch, buildLateSettlement, commitBatch, digestOf, type FullSettlement, type MintedFeather } from './batch';
 import type { FeatherRenderer } from './feather-image';
 
 export interface SettleResult {
@@ -48,6 +55,43 @@ export interface ChainWriter {
   settleDay(db: Db, season: string, day: number): Promise<SettleResult>;
   /** Every Feather on the contract (any season), as last read; absent without a chain. */
   featherTokens?(): Promise<ChainFeather[]>;
+  /** Records closed days of a season that failed to settle, once the season has moved past them; absent without a chain. */
+  settleLateDays?(db: Db, season: string, days: number[]): Promise<LateResult>;
+}
+
+/** The outcome of recording missed days late. */
+export interface LateResult {
+  status: 'sent' | 'skipped' | 'failed';
+  txHash: string | null;
+  error?: string;
+  /** The days recorded, each with its full settlement and digest. */
+  days: { day: number; settlement: FullSettlement; digest: string }[];
+}
+
+/** The contract's compact head for a season (version 4 on). */
+interface SeasonHead {
+  last_day: number;
+  days_settled: number;
+  v2_through: number;
+}
+
+/** Which missed days can be recorded late: past the season's head, after its version 2 days, not recorded yet. */
+export function lateDaysToSend(days: number[], head: SeasonHead, recorded: number[]): number[] {
+  return days.filter((d) => d < head.last_day && d > head.v2_through && !recorded.includes(d));
+}
+
+/**
+ * Whether the database and the contract agree on which days settled: the contract's count of settled
+ * days since its version 2 days equals the database's sent days in that range, less the days recorded
+ * late. If they differ, a day marked failed may have landed after all, and nothing is sent late.
+ */
+export function settledCountsAgree(head: SeasonHead, sentDays: number[], recorded: number[]): boolean {
+  return sentDays.filter((d) => d > head.v2_through && d <= head.last_day && !recorded.includes(d)).length === head.days_settled;
+}
+
+/** Whether day closes may send Feather mints to this contract for this season: version 4 has no live season (always), version 5 only its live one. */
+export function seasonMayMint(liveSeason: string | null | undefined, season: string): boolean {
+  return liveSeason === undefined || liveSeason === season;
 }
 
 /** A Feather as the contract holds it: its number, grade, milestone, season, day and owner. */
@@ -140,8 +184,8 @@ export class TestnetChain implements ChainWriter {
   private checked = false;
   /** Last known: could the game account not afford a mint? Null until first read. */
   private low: boolean | null = null;
-  /** The contract's Feather count and provenance; null until read, or when the contract has no Feathers (before version 4). */
-  private feathers: { minted: number; provenance: string | null } | null = null;
+  /** The contract's Feather count, provenance and live season (undefined on version 4); null until read, or when the contract has no Feathers (before version 4). */
+  private feathers: { minted: number; provenance: string | null; liveSeason?: string | null } | null = null;
 
   constructor(
     private readonly cfg: TestnetConfig,
@@ -208,15 +252,17 @@ export class TestnetChain implements ChainWriter {
     return this.cfg.contractId;
   }
 
-  /** The contract's Feather count and provenance, or null when it has none (before version 4: no feather_supply). */
-  private async readFeathers(): Promise<{ minted: number; provenance: string | null } | null> {
+  /** The contract's Feather count, provenance and live season, or null when it has none (before version 4: no feather_supply). */
+  private async readFeathers(): Promise<{ minted: number; provenance: string | null; liveSeason?: string | null } | null> {
     try {
-      const r = await this.provider.callFunction<{ minted: number; max: number; remaining: number; provenance: string | null }>({
+      const r = await this.provider.callFunction<{ minted: number; max: number; remaining: number; provenance: string | null; live_season?: string | null }>({
         contractId: this.cfg.contractId,
         method: 'feather_supply',
         args: {},
       });
-      return typeof r?.minted === 'number' ? { minted: r.minted, provenance: r.provenance ?? null } : null;
+      if (typeof r?.minted !== 'number') return null;
+      // version 5 always answers live_season (null until set); version 4 has no such field
+      return { minted: r.minted, provenance: r.provenance ?? null, ...('live_season' in r ? { liveSeason: r.live_season ?? null } : {}) };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (/MethodNotFound|method.*not found|CodeDoesNotExist/i.test(msg)) return null;
@@ -297,15 +343,18 @@ export class TestnetChain implements ChainWriter {
       this.feathers = await this.readFeathers();
       const affordable = mintsAffordable(await this.balanceNear(), this.cfg, ECONOMY.feathers.mintsPerBatch);
       this.low = affordable === 0;
-      const feathers = this.feathers === null ? null : { cap: affordable, base: this.feathers.minted };
+      const mayMint = this.feathers !== null && seasonMayMint(this.feathers.liveSeason, season);
+      const feathers = this.feathers === null ? null : { cap: mayMint ? affordable : 0, base: this.feathers.minted };
       const built = await buildDayBatch(db, season, day, { feathers, renderer: this.renderer });
-      const waiting = await db.query(`SELECT count(*) AS n FROM feather_tickets WHERE status = 'queued'`);
+      const waiting = await db.query(`SELECT count(*) AS n FROM feather_tickets WHERE status = 'queued' AND season = $1`, [season]);
       const left = num(waiting[0]?.n) - built.minted.length;
       if (left > 0) {
         this.log(
           this.feathers === null
             ? `[chain] ${left} redeemed Feathers wait: the contract has no Feathers yet (upgrade to version 4)`
-            : `[chain] ${left} redeemed Feathers wait: the game account can store ${affordable} mints now (each keeps ${this.cfg.mintNear} NEAR), or their player has no wallet linked`,
+            : !mayMint
+              ? `[chain] ${left} redeemed Feathers wait: season ${season} is not the contract's live season (${this.feathers.liveSeason ?? 'none set'}), so it mints none`
+              : `[chain] ${left} redeemed Feathers wait: the game account can store ${affordable} mints now (each keeps ${this.cfg.mintNear} NEAR), or their player has no wallet linked`,
         );
       }
       const outcome = await this.account.callFunctionRaw({
@@ -329,7 +378,90 @@ export class TestnetChain implements ChainWriter {
       return { status: 'failed', txHash: null, error: error.slice(0, 500) };
     }
   }
+
+  /** A view call, retried with backoff when the RPC refuses a burst (429). */
+  private async view<T>(method: string, args: Record<string, unknown>): Promise<T> {
+    for (let i = 0; ; i++) {
+      try {
+        return (await this.provider.callFunction({ contractId: this.cfg.contractId, method, args })) as T;
+      } catch (err) {
+        if (i >= 4 || !/429|rate limit/i.test(err instanceof Error ? err.message : String(err))) throw err;
+        await pause(1500 * 2 ** i);
+      }
+    }
+  }
+
+  async settleLateDays(db: Db, season: string, days: number[]): Promise<LateResult> {
+    try {
+      await pause(PACE_MS);
+      const blocked = await this.preflight();
+      if (blocked) return { status: 'skipped', txHash: null, error: blocked, days: [] };
+      const head = await this.view<SeasonHead | null>('season_head', { season });
+      if (!head) return { status: 'skipped', txHash: null, error: `the contract has no season ${season}`, days: [] };
+      await pause(PACE_MS);
+      const late = await this.view<{ days: number[]; hash: string } | null>('late_days', { season }).catch((err: unknown) => {
+        if (/MethodNotFound|method.*not found/i.test(err instanceof Error ? err.message : String(err))) return null;
+        throw err;
+      });
+      if (!late) return { status: 'skipped', txHash: null, error: 'the contract cannot record days late (upgrade to version 5)', days: [] };
+      const sent = await db.query<{ day: number }>(`SELECT day FROM market_days WHERE season = $1 AND settlement_status = 'sent'`, [season]);
+      if (!settledCountsAgree(head, sent.map((r) => num(r.day)), late.days)) {
+        return {
+          status: 'skipped',
+          txHash: null,
+          error: `the contract counts ${head.days_settled} days settled in ${season}, the database a different number: a day marked failed may have landed, so nothing is recorded late (a person should look)`,
+          days: [],
+        };
+      }
+      const todo = lateDaysToSend(days, head, late.days);
+      if (!todo.length) return { status: 'skipped', txHash: null, error: 'no missed day the contract can record yet', days: [] };
+      const out: LateResult['days'] = [];
+      for (const day of todo) {
+        const settlement = await buildLateSettlement(db, season, day);
+        out.push({ day, settlement, digest: digestOf(settlement) });
+      }
+      await pause(PACE_MS);
+      const outcome = await this.account.callFunctionRaw({
+        contractId: this.cfg.contractId,
+        methodName: 'settle_late_days',
+        args: { season, days: out.map((d) => ({ day: d.day, digest: d.digest })) },
+        gas: teraToGas('100'),
+        deposit: 0n,
+      });
+      const txHash = outcome.transaction_outcome.id;
+      this.log(`[chain] season ${season} days ${todo.join(', ')} recorded late on NEAR testnet: ${txHash} (digests ${out.map((d) => d.digest.slice(0, 12)).join(', ')})`);
+      return { status: 'sent', txHash, days: out };
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      this.log(`[chain] season ${season} late days ${days.join(', ')} FAILED on NEAR testnet: ${error.slice(0, 300)}`);
+      return { status: 'failed', txHash: null, error: error.slice(0, 500), days: [] };
+    }
+  }
 }
+
+/** Marks the days a late call recorded as settled, with that call's tx and each day's full settlement and digest. */
+export async function storeLateDays(db: Db, season: string, late: LateResult): Promise<void> {
+  if (late.status !== 'sent') return;
+  for (const d of late.days) {
+    await db.query(
+      `UPDATE market_days SET settlement_status = 'sent', settlement_tx = $3, settlement_error = NULL, settlement_json = $4, settlement_digest = $5 WHERE season = $1 AND day = $2`,
+      [season, d.day, late.txHash, JSON.stringify(d.settlement), d.digest],
+    );
+  }
+}
+
+/** Closed days of a season whose settlement failed or never ran, before a given day (oldest first, at most ten). */
+export async function missedDays(db: Db, season: string, before: number): Promise<number[]> {
+  const rows = await db.query<{ day: number }>(
+    `SELECT day FROM market_days WHERE season = $1 AND day < $2 AND closed_at IS NOT NULL AND settlement_status IN ('failed', 'pending') ORDER BY day LIMIT 10`,
+    [season, before],
+  );
+  return rows.map((r) => num(r.day));
+}
+
+/** The gap between this writer's calls to the public RPC, which refuses bursts. */
+const PACE_MS = 1500;
+const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export function createChainWriter(env: NodeJS.ProcessEnv, renderer: FeatherRenderer, log: (line: string) => void): ChainWriter {
   const accountId = env.NEAR_TESTNET_ACCOUNT_ID;

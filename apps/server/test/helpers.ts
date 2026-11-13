@@ -1,8 +1,8 @@
 import { openDb, type Db } from '../src/db/db';
 import { InferenceBudget } from '../src/agents/brain';
 import type { NearAiClient } from '../src/ai/nearai';
-import { buildDayBatch, commitBatch, type DayBatch } from '../src/chain/batch';
-import { NoopChain, agentAccountName, type ChainWriter, type SettleResult } from '../src/chain/chain';
+import { buildDayBatch, buildLateSettlement, commitBatch, digestOf, type DayBatch } from '../src/chain/batch';
+import { NoopChain, agentAccountName, seasonMayMint, type ChainWriter, type LateResult, type SettleResult } from '../src/chain/chain';
 import { Game } from '../src/game/game';
 import { seededRng } from '../src/game/rng';
 
@@ -28,6 +28,10 @@ export class RecordingChain implements ChainWriter {
   readonly settlements: SettleResult[] = [];
   /** The contract's Feather count (a version 4 contract starts at 0; null: an older contract without Feathers). */
   featherMinted: number | null = 0;
+  /** The contract's live season (version 5); undefined: a version 4 contract, which has none. */
+  liveSeason: string | null | undefined = undefined;
+  /** Days recorded late, in call order. */
+  readonly late: LateResult[] = [];
   constructor(
     readonly gameAccount = 'game.testnet',
     /** Feathers minted per day (0: none). Minting uses a stand-in card image, not the packed art. */
@@ -41,7 +45,7 @@ export class RecordingChain implements ChainWriter {
     const renderer = this.mintCap
       ? { render: (grade: string, n: number) => ({ dataUri: `data:image/png;base64,${grade}${n}`, sha256Base64: 'stand-in', sha256Hex: `stand-in-${grade}-${n}` }) }
       : null;
-    const feathers = this.featherMinted === null ? null : { cap: this.mintCap, base: this.featherMinted };
+    const feathers = this.featherMinted === null ? null : { cap: seasonMayMint(this.liveSeason, season) ? this.mintCap : 0, base: this.featherMinted };
     const built = await buildDayBatch(db, season, day, { feathers, renderer: renderer as never });
     this.batches.push(built.batch);
     const txHash = `recorded-${season}-${day}`;
@@ -49,6 +53,17 @@ export class RecordingChain implements ChainWriter {
     if (this.featherMinted !== null) this.featherMinted += built.minted.length;
     const result: SettleResult = { status: 'sent', txHash, minted: built.minted, settlement: built.settlement, digest: built.batch.digest };
     this.settlements.push(result);
+    return result;
+  }
+
+  async settleLateDays(db: Db, season: string, days: number[]): Promise<LateResult> {
+    const out: LateResult['days'] = [];
+    for (const day of days) {
+      const settlement = await buildLateSettlement(db, season, day);
+      out.push({ day, settlement, digest: digestOf(settlement) });
+    }
+    const result: LateResult = { status: 'sent', txHash: `late-${season}-${days.join('-')}`, days: out };
+    this.late.push(result);
     return result;
   }
 }

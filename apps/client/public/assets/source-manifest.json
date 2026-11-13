@@ -9,7 +9,7 @@
   },
   "counts": {
     "easels": 65,
-    "artFolders": 76,
+    "artFolders": 77,
     "easelSheets": 65,
     "traitLayers": 10,
     "soundNumbers": 45,
@@ -17,7 +17,7 @@
     "audioTakes": 124,
     "unmappedEasels": 0,
     "unmappedUploads": 37,
-    "totalBytes": 99697277,
+    "totalBytes": 99709936,
     "loopOggs": 12
   },
   "known_issues": [
@@ -931,6 +931,34 @@
           "path": "art/18-conveyor/anim.json",
           "sha256": "574ead24b04b236e037163c19e7598a1a6625d4709e7f6af88abd07756487d5f",
           "bytes": 4679,
+          "role": "anim"
+        }
+      ]
+    },
+    {
+      "tracker": "18b-conveyor-clean",
+      "number": "18b",
+      "doc_tracker": "18",
+      "role": "alternate",
+      "name": "conveyor-clean",
+      "label": "egg conveyor, no painted eggs",
+      "sourceEasel": null,
+      "spawnAsset": "conveyor-clean",
+      "folder": "art/18b-conveyor-clean",
+      "files": [
+        {
+          "path": "art/18b-conveyor-clean/18b-conveyor-clean.png",
+          "sha256": "6180dedd009dc7f5538c8b7ee5194b19bf20eb03b5eae49f463e2bb54f8dcde6",
+          "bytes": 7908,
+          "source": "/cdn/value.6180dedd009dc7f5538c8b7ee5194b19bf20eb03b5eae49f463e2bb54f8dcde6.png",
+          "width": 512,
+          "height": 640,
+          "role": "sheet"
+        },
+        {
+          "path": "art/18b-conveyor-clean/anim.json",
+          "sha256": "d060ea7ab20e27d29a1306dd786518940798c9bcb34a884542bd15efda65e10d",
+          "bytes": 4751,
           "role": "anim"
         }
       ]

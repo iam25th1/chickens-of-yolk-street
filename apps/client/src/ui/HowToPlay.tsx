@@ -1,10 +1,12 @@
 // The How to play guide: short sections in plain words, each with a picture from the game's own
-// art. Opens from Settings and from the ? in the top bar.
-import { useState, type ReactNode } from 'react';
+// art. Opens from Settings and from the ? in the top bar. One section at a time, with previous and
+// next; a section longer than the window allows is split into pages (never a scrollbar).
+import { Children, Fragment, isValidElement, useState, type ReactNode } from 'react';
 import { ECONOMY, UNLOCK_IDS, type MilestoneId } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { Modal } from './Modal';
+import { Paged } from './Paged';
 import { MachineArt, UNLOCK_TEXT } from './Panels';
 import { SheetSprite } from './SheetSprite';
 
@@ -110,7 +112,7 @@ const SECTIONS: Section[] = [
     id: 'offers',
     title: 'OFFERS, HAGGLING AND CONTRACTS',
     short: 'OFFERS AND HAGGLES',
-    picture: () => <SheetSprite id="29-card-bulk-order" row="flutter" zoom={1} style={{ height: 72, overflow: 'hidden' }} />,
+    picture: () => <SheetSprite id="32-icons" row="cash" zoom={4} />,
     body: (
       <>
         <p>BUYERS AND SUPPLIERS SEND CARDS. ACCEPT, DECLINE, OR COUNTER WITH YOUR OWN PRICE: UP TO {ECONOMY.haggle.maxRounds} ROUNDS AGAINST THEIR HIDDEN WALK-AWAY PRICE.</p>
@@ -241,39 +243,71 @@ const SECTIONS: Section[] = [
   },
 ];
 
+/** A section's body as blocks to page: each paragraph, and each list item as a list of one. */
+function blocksOf(body: ReactNode): ReactNode[] {
+  const out: ReactNode[] = [];
+  const walk = (n: ReactNode) => {
+    for (const c of Children.toArray(n)) {
+      const kids = isValidElement(c) ? (c.props as { children?: ReactNode }).children : null;
+      if (isValidElement(c) && c.type === Fragment) walk(kids);
+      else if (isValidElement(c) && c.type === 'ul') for (const li of Children.toArray(kids)) out.push(<ul key={`li-${out.length}`}>{li}</ul>);
+      else out.push(c);
+    }
+  };
+  walk(body);
+  return out;
+}
+
 export function HowToPlay({ onClose }: { onClose: () => void }) {
   const { audio } = useServices();
+  const v = useViewport();
   const [at, setAt] = useState(0);
   const s = SECTIONS[at] ?? SECTIONS[0];
   if (!s) return null;
+  // the list of sections beside the text when the window is wide enough; else previous and next only
+  const wide = Math.min(520, Math.floor(v.zones.modal.w)) >= 440;
+  const go = (i: number) => {
+    uiSound(audio, 'click');
+    setAt(i);
+  };
   return (
     <Modal title="HOW TO PLAY" onClose={onClose} w={520} h={320} className="guide-page">
       <div className="row" style={{ alignItems: 'flex-start', gap: 8 }} data-ui="guide">
-        <nav className="col" style={{ width: 150, flex: 'none', gap: 2 }} aria-label="Sections">
-          {SECTIONS.map((x, i) => (
-            <button
-              key={x.id}
-              className={`btn ${i === at ? 'red' : ''}`}
-              style={{ justifyContent: 'flex-start', width: '100%', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'clip' }}
-              title={x.title}
-              data-tour={`guide-${x.id}`}
-              onClick={() => {
-                uiSound(audio, 'click');
-                setAt(i);
-              }}
-            >
-              {x.short}
-            </button>
-          ))}
-        </nav>
-        <article className="col" style={{ flex: 1, minWidth: 0, gap: 6 }}>
+        {wide && (
+          <nav className="col" style={{ width: 150, flex: 'none', gap: 2 }} aria-label="Sections">
+            {SECTIONS.map((x, i) => (
+              <button
+                key={x.id}
+                className={`btn ${i === at ? 'red' : ''}`}
+                style={{ justifyContent: 'flex-start', width: '100%', whiteSpace: 'nowrap' }}
+                title={x.title}
+                data-tour={`guide-${x.id}`}
+                onClick={() => go(i)}
+              >
+                {x.short}
+              </button>
+            ))}
+          </nav>
+        )}
+        <article className="col" style={{ flex: 1, minWidth: 0, gap: 6 }} data-ui="guide-section" data-section={s.id}>
           <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
-            <div style={{ width: 72, height: 72, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e3cc96', overflow: 'hidden' }}>{s.picture()}</div>
+            <div style={{ width: 72, height: 72, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#e3cc96' }}>{s.picture()}</div>
             <h3 className="panel-title" style={{ margin: 0 }}>
               {s.title}
             </h3>
           </div>
-          <div className="guide-text">{s.body}</div>
+          <div className="guide-text">
+            <Paged
+              key={s.id}
+              items={blocksOf(s.body)}
+              gap={4}
+              resetKey={s.id}
+              label={`SECTION ${at + 1} OF ${SECTIONS.length}`}
+              onPrevEdge={at > 0 ? () => go(at - 1) : undefined}
+              onNextEdge={at < SECTIONS.length - 1 ? () => go(at + 1) : undefined}
+              ui="guide-pages"
+            />
+          </div>
         </article>
       </div>
     </Modal>

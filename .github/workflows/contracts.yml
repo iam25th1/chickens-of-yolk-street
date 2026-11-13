@@ -1,0 +1,63 @@
+name: contracts
+
+# The contracts build and test only when something under contracts/ changes.
+on:
+  push:
+    branches: [main, 'build/**']
+    paths: ['contracts/**', '.github/workflows/contracts.yml']
+  pull_request:
+    paths: ['contracts/**', '.github/workflows/contracts.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/cache@v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/coys-game/target
+            contracts/sandbox-tests/target
+            contracts/founding-hens/target
+          key: cargo-${{ hashFiles('contracts/*/Cargo.lock', 'contracts/*/rust-toolchain.toml') }}
+      - name: Install cargo-near 0.23.0 (checksum verified)
+        run: |
+          base=https://github.com/near/cargo-near/releases/download/cargo-near-v0.23.0
+          f=cargo-near-x86_64-unknown-linux-gnu.tar.gz
+          curl -sSfL -o "$f" "$base/$f"
+          curl -sSfL -o "$f.sha256" "$base/$f.sha256"
+          echo "$(cut -d' ' -f1 "$f.sha256")  $f" | sha256sum -c
+          mkdir -p cn && tar -xzf "$f" -C cn
+          find cn -name cargo-near -type f -exec install -m 755 {} "$HOME/.cargo/bin/" \;
+          cargo near --version
+      - name: Contract unit tests
+        working-directory: contracts/coys-game
+        run: cargo test --locked
+      - name: Build the contract (cargo near)
+        working-directory: contracts/coys-game
+        run: cargo near build non-reproducible-wasm --locked
+      - name: Founding Hens prototype unit tests (the reveal draw)
+        working-directory: contracts/founding-hens
+        run: cargo test --locked
+      - name: Build the Founding Hens prototype (sandbox only, never deployed)
+        working-directory: contracts/founding-hens
+        run: cargo near build non-reproducible-wasm --locked
+      - name: Sandbox tests (Feathers and the 777 cap, compact settlement, the version 2 upgrade and release, provenance, access control, the reveal)
+        working-directory: contracts/sandbox-tests
+        env:
+          COYS_WASM: ${{ github.workspace }}/contracts/coys-game/target/near/coys_game.wasm
+          FOUNDING_WASM: ${{ github.workspace }}/contracts/founding-hens/target/near/founding_hens.wasm
+        run: cargo test --locked -- --test-threads=1 --nocapture
+      - name: Contract size
+        run: wc -c contracts/coys-game/target/near/coys_game.wasm contracts/founding-hens/target/near/founding_hens.wasm
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: coys-game-wasm
+          path: contracts/coys-game/target/near/coys_game.wasm
+          if-no-files-found: error

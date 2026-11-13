@@ -18,6 +18,11 @@ fn wasm_v2() -> anyhow::Result<Vec<u8>> {
     Ok(std::fs::read("res/coys_game_v2.wasm")?)
 }
 
+/// Version 4 (Feathers, compact settlement), exactly as deployed on play.coys-game.testnet on 12 November 2026.
+fn wasm_v4() -> anyhow::Result<Vec<u8>> {
+    Ok(std::fs::read("res/coys_game_v4.wasm")?)
+}
+
 /// Feather mints in one day's settlement: the server never sends more than this in one batch.
 const MINTS_PER_BATCH: u32 = 20;
 
@@ -58,6 +63,7 @@ async fn setup() -> anyhow::Result<(Contract, Account, Account, Account)> {
     let worker = near_workspaces::sandbox().await?;
     let contract = worker.dev_deploy(&wasm()?).await?;
     contract.call("new").args_json(json!({ "owner_id": contract.id() })).max_gas().transact().await?.into_result()?;
+    contract.call("set_live_season").args_json(json!({ "season": "s1" })).max_gas().transact().await?.into_result()?;
     let (player, agent, mallory) = accounts(&worker).await?;
     Ok((contract, player, agent, mallory))
 }
@@ -114,7 +120,7 @@ async fn the_game_settles_a_day_and_balances_follow() -> anyhow::Result<()> {
     assert_eq!(done["eggs_burned"], "2");
     assert_eq!(done["feathers"], json!(["001"]));
     let supply: Value = contract.view("feather_supply").await?.json()?;
-    assert_eq!(supply, json!({ "minted": 1, "max": 777, "remaining": 776, "provenance": null }));
+    assert_eq!(supply, json!({ "minted": 1, "max": 777, "remaining": 776, "provenance": null, "live_season": "s1" }));
 
     let bal = |who: &Account| json!({ "account_id": who.id(), "token_id": "egg-brown" });
     let p: String = contract.view("mt_balance_of").args_json(bal(&player)).await?.json()?;
@@ -200,9 +206,9 @@ async fn version_2_upgrades_in_place_and_releases_its_day_records() -> anyhow::R
     }
 
     let v4 = v2.as_account().deploy(&wasm()?).await?.into_result()?;
-    let by_mallory = mallory.call(v4.id(), "migrate").max_gas().transact().await?;
+    let by_mallory = mallory.call(v4.id(), "migrate_v2").max_gas().transact().await?;
     assert!(by_mallory.is_failure(), "a stranger ran migrate");
-    let migrated = v4.call("migrate").max_gas().transact().await?.into_result()?;
+    let migrated = v4.call("migrate_v2").max_gas().transact().await?.into_result()?;
     let after = v4.view_account().await?;
     println!(
         "upgrade: storage {} -> {} bytes ({:+}), migrate gas {} Tgas",
@@ -221,7 +227,7 @@ async fn version_2_upgrades_in_place_and_releases_its_day_records() -> anyhow::R
     let meta: Value = v4.view("nft_metadata").await?.json()?;
     assert_eq!(meta["name"], "Yolk Street Feathers (beta)");
     let supply: Value = v4.view("feather_supply").await?.json()?;
-    assert_eq!(supply, json!({ "minted": 0, "max": 777, "remaining": 777, "provenance": null }));
+    assert_eq!(supply, json!({ "minted": 0, "max": 777, "remaining": 777, "provenance": null, "live_season": null }));
 
     // the live server's version 2 batch still settles, compact; an ordinary hen is refused
     settle(&v4, batch_v2(41, &player, &agent)).await?;
@@ -277,6 +283,7 @@ async fn exactly_777_feathers_then_the_778th_is_refused() -> anyhow::Result<()> 
     let game = root.create_subaccount("game").initial_balance(NearToken::from_near(60)).transact().await?.into_result()?;
     let contract = game.deploy(&wasm()?).await?.into_result()?;
     contract.call("new").args_json(json!({ "owner_id": contract.id() })).max_gas().transact().await?.into_result()?;
+    contract.call("set_live_season").args_json(json!({ "season": "s1" })).max_gas().transact().await?.into_result()?;
     let (player, agent, mallory) = accounts(&worker).await?;
     let start = contract.view_account().await?;
 
@@ -316,7 +323,7 @@ async fn exactly_777_feathers_then_the_778th_is_refused() -> anyhow::Result<()> 
         (end.storage_usage - start.storage_usage) / 777
     );
     let supply: Value = contract.view("feather_supply").await?.json()?;
-    assert_eq!(supply, json!({ "minted": 777, "max": 777, "remaining": 0, "provenance": null }));
+    assert_eq!(supply, json!({ "minted": 777, "max": 777, "remaining": 0, "provenance": null, "live_season": "s1" }));
     let total: String = contract.view("nft_total_supply").await?.json()?;
     assert_eq!(total, "777");
     let last: Value = contract.view("nft_token").args_json(json!({ "token_id": "777" })).await?.json()?;
@@ -402,5 +409,66 @@ async fn only_the_game_account_can_settle_or_mint() -> anyhow::Result<()> {
     settle(&contract, batch_in("s1", 1, &player, &agent)).await?;
     let again = contract.call("settle_day").args_json(json!({ "batch": batch_in("s1", 1, &player, &agent) })).max_gas().transact().await?;
     assert!(again.is_failure(), "a day settled twice");
+    Ok(())
+}
+
+#[tokio::test]
+async fn version_4_upgrades_burns_the_test_feathers_and_catches_up_missed_days() -> anyhow::Result<()> {
+    let worker = near_workspaces::sandbox().await?;
+    let root = worker.root_account()?;
+    let game = root.create_subaccount("play").initial_balance(NearToken::from_near(20)).transact().await?.into_result()?;
+    let v4 = game.deploy(&wasm_v4()?).await?.into_result()?;
+    v4.call("new").args_json(json!({ "owner_id": v4.id() })).max_gas().transact().await?.into_result()?;
+    let (player, agent, mallory) = accounts(&worker).await?;
+    // as on testnet: s1 settles days 1 to 3, a test season mints Feathers 001 to 003, s1 skips days 4 and 5
+    for day in 1..=3 {
+        settle(&v4, batch_in("s1", day, &player, &agent)).await?;
+    }
+    let mut test = batch_in("verify-feathers-1", 1, &player, &agent);
+    test["feather_mints"] = json!(["fluff", "quill", "golden-quill"].iter().map(|g| feather(v4.as_account(), g, "verify-feathers-1", 1)).collect::<Vec<_>>());
+    settle(&v4, test).await?;
+    settle(&v4, batch_in("s1", 6, &player, &agent)).await?;
+    let before = v4.view_account().await?;
+
+    let v5 = v4.as_account().deploy(&wasm()?).await?.into_result()?;
+    let by_mallory = mallory.call(v5.id(), "migrate").max_gas().transact().await?;
+    assert!(by_mallory.is_failure(), "a stranger ran migrate");
+    v5.call("migrate").max_gas().transact().await?.into_result()?;
+    let after = v5.view_account().await?;
+    println!("upgrade v4 to v5: storage {} -> {} bytes ({:+})", before.storage_usage, after.storage_usage, after.storage_usage as i64 - before.storage_usage as i64);
+    assert_eq!(last_day(&v5, "s1").await?, 6);
+    let supply: Value = v5.view("feather_supply").await?.json()?;
+    assert_eq!(supply, json!({ "minted": 3, "max": 777, "remaining": 774, "provenance": null, "live_season": null }));
+
+    // a test season can no longer mint against the 777, nor can anything before the live season is set
+    let mut more = batch_in("verify-feathers-2", 1, &player, &agent);
+    more["feather_mints"] = json!([feather(&player, "fluff", "verify-feathers-2", 1)]);
+    assert!(v5.call("settle_day").args_json(json!({ "batch": more })).max_gas().transact().await?.is_failure());
+    v5.call("set_live_season").args_json(json!({ "season": "s1" })).max_gas().transact().await?.into_result()?;
+
+    // burn the three test Feathers: their numbers return to the supply
+    let stranger = mallory.call(v5.id(), "burn_test_feathers").args_json(json!({ "token_ids": ["001"] })).max_gas().transact().await?;
+    assert!(stranger.is_failure(), "a stranger burnt a Feather");
+    let burnt: Value = v5.call("burn_test_feathers").args_json(json!({ "token_ids": ["001", "002", "003"] })).max_gas().transact().await?.into_result()?.json()?;
+    assert_eq!(burnt, json!({ "minted": 0, "max": 777, "remaining": 777, "provenance": null, "live_season": "s1" }));
+    let total: String = v5.view("nft_total_supply").await?.json()?;
+    assert_eq!(total, "0");
+    let released = v5.view_account().await?;
+    println!("burn of 3 Feathers released {} bytes", after.storage_usage as i64 - released.storage_usage as i64);
+
+    // the live season mints and takes number 001 again
+    let mut s1 = batch_in("s1", 7, &player, &agent);
+    s1["feather_mints"] = json!([feather(&player, "plume", "s1", 7)]);
+    let done = settle(&v5, s1).await?;
+    assert_eq!(done["feathers"], json!(["001"]));
+
+    // days 4 and 5 caught up late, once, by their digests; the head is untouched
+    let late = json!([{ "day": 4, "digest": digest(4) }, { "day": 5, "digest": digest(5) }]);
+    let rec: Value = v5.call("settle_late_days").args_json(json!({ "season": "s1", "days": late })).max_gas().transact().await?.into_result()?.json()?;
+    let h = sha256_hex(&format!("{}|s1|5|{}", sha256_hex(&format!("{ZERO}|s1|4|{}", digest(4))), digest(5)));
+    assert_eq!(rec, json!({ "days": [4, 5], "hash": h }));
+    let twice = v5.call("settle_late_days").args_json(json!({ "season": "s1", "days": [{ "day": 4, "digest": digest(4) }] })).max_gas().transact().await?;
+    assert!(twice.is_failure(), "a day settled late twice");
+    assert_eq!(last_day(&v5, "s1").await?, 7);
     Ok(())
 }

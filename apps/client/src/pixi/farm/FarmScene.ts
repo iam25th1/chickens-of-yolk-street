@@ -17,7 +17,8 @@ import { Fx } from '../Fx';
 import type { Scene } from '../host';
 import { HenActor } from './HenActor';
 import { WorldLayers } from './layers';
-import { MIN_H, MIN_W, connectionGaps, farmLayout, randomIn, specPoint, spreadSpot, troughSpots, type FarmLayout, type MachineSpot, type Point } from './layout';
+import { MIN_H, MIN_W, connectionGaps, farmLayout, specPoint, troughSpots, type FarmLayout, type MachineSpot, type Point } from './layout';
+import { carry, freeSpot, movementAreas, nearestFree, route, type Areas } from './movement';
 
 const MAX_VISIBLE_HENS = 40;
 const TILE = 16;
@@ -99,6 +100,7 @@ export class FarmScene implements Scene {
   private plotsKey = '';
   private rivals: { s: FrameSprite; sign: string; bust: boolean }[] = [];
   private layout: FarmLayout = farmLayout(MIN_W, MIN_H, { w: 0, h: 0 });
+  private areasCache: { key: string; areas: Areas } | null = null;
   private view = { x: 0, y: 0, w: 640, h: 360 };
   /** What the baked ground shows (coops and machines change its pads and plots). */
   private groundKey = '';
@@ -209,6 +211,15 @@ export class FarmScene implements Scene {
 
   // ---- layout ---------------------------------------------------------------------------------
 
+  /** Where hens may walk now (movement.ts): the layout's yard and path, round what stands there. */
+  private get areas(): Areas {
+    const built = (this.farm?.coops ?? []).map((c) => c.plot);
+    const unlocks = this.farm?.unlocks ?? [];
+    const key = `${this.layout.w}x${this.layout.h}|${built.join()}|${unlocks.join()}`;
+    if (this.areasCache?.key !== key) this.areasCache = { key, areas: movementAreas(this.layout, { builtPlots: built, unlocks }) };
+    return this.areasCache.areas;
+  }
+
   /**
    * The window shows this part of the world. The farm fills the free area (v.farm.w x v.farm.h);
    * grass runs on under the HUD to the window's edges, so there is no border.
@@ -216,7 +227,18 @@ export class FarmScene implements Scene {
   resize(view: { x: number; y: number; w: number; h: number }, v: Viewport): void {
     this.view = view;
     this.k = v.farm.k;
+    // hens and eggs on the ground keep their place in the composition, in world units, as it re-flows
+    const before = this.areas;
     this.layout = farmLayout(v.farm.w, v.farm.h, v.farm.guide);
+    const after = this.areas;
+    if (before !== after) {
+      for (const a of this.hens.values()) a.carry((p) => carry(p, before, after));
+      for (const g of this.eggs.values()) {
+        if (g.pending || g.s.destroyed) continue;
+        const to = carry({ x: g.s.x, y: g.s.y }, before, after);
+        g.s.position.set(to.x, to.y);
+      }
+    }
     this.night.clear().rect(view.x, view.y, view.w, view.h).fill({ color: 0x3b4f7a, alpha: 0.24 });
     this.groundKey = '';
     this.rebake();
@@ -281,14 +303,6 @@ export class FarmScene implements Scene {
     });
     this.labelPads();
     this.drawLayoutDebug();
-    // a smaller window: hens outside the new yard step back into it
-    for (const a of this.hens.values()) {
-      const p = a.position;
-      if (p.x < l.yard.left || p.x > l.yard.right || p.y < l.yard.top || p.y > l.yard.bottom) {
-        const to = spreadSpot(l.yard, []);
-        a.sprite.position.set(to.x, to.y);
-      }
-    }
   }
 
   /**
@@ -434,12 +448,14 @@ export class FarmScene implements Scene {
     for (const h of shown) {
       if (this.hens.has(h.id)) continue;
       const others = [...this.hens.values()].map((a) => a.position);
-      const actor = new HenActor(this.assets, h, first ? spreadSpot(l.yard, others) : l.gate);
+      const areas = this.areas;
+      const actor = new HenActor(this.assets, h, first ? freeSpot(areas, others) : areas.arrive);
       this.clickable(actor.sprite, () => ({ kind: 'hen', hen: this.farm?.hens.find((x) => x.id === h.id) ?? h }));
       actor.sprite.label = `hen:${h.id}`;
       this.hens.set(h.id, actor);
       this.layers.add('depth', actor.sprite);
-      if (!first) actor.walkTo(spreadSpot(l.yard, others));
+      // a new hen comes down the path and turns into the yard below the farm sign
+      if (!first) actor.walkTo([areas.enter, ...route(areas.enter, freeSpot(areas, others), areas)]);
     }
 
     // coops: at rest the door is shut and nothing moves
@@ -520,7 +536,7 @@ export class FarmScene implements Scene {
     const c = this.layout.conveyor;
     for (let x = c.from; x < c.to; x += TILE) {
       const row = x === c.from ? 'start' : x + TILE >= c.to ? 'end' : 'horizontal';
-      const s = new FrameSprite(this.assets, ['18-conveyor'], row);
+      const s = new FrameSprite(this.assets, ['18b-conveyor-clean'], row);
       s.position.set(x + TILE / 2, c.y);
       s.label = 'conveyor';
       this.clickable(s, () => ({ kind: 'machine', unlock: 'conveyor' }));
@@ -873,7 +889,7 @@ export class FarmScene implements Scene {
       if (fresh && actor && !actor.busy && !isNight()) {
         actor.lay((at) => this.spawnEgg(egg, at, true));
       } else {
-        const at = actor ? actor.position : randomIn(this.layout.yard);
+        const at = actor ? actor.position : freeSpot(this.areas, []);
         this.spawnEgg(egg, { x: at.x + (Math.random() * 12 - 6), y: at.y + (Math.random() * 6 - 3) }, false);
       }
     }
@@ -921,17 +937,18 @@ export class FarmScene implements Scene {
     const l = this.layout;
     const fed = (this.farm?.fedToday ?? 0) > 0;
     const coopSpots = [...this.coops.values()].map((c) => l.plots[c.plot]).filter((p): p is Point => Boolean(p));
-    const spots = troughSpots(l);
+    const areas = this.areas;
+    const spots = troughSpots(l).map((p) => nearestFree(p, areas));
     const positions = () => [...this.hens.values()].map((a) => a.position);
     const world = {
       night: this.nightOn,
       fed,
-      troughSpot: () => spots[Math.floor(Math.random() * spots.length)] ?? l.trough,
-      roost: () => {
+      troughSpot: (from: Point) => route(from, spots[Math.floor(Math.random() * spots.length)] ?? nearestFree(l.trough, areas), areas),
+      roost: (from: Point) => {
         const c = coopSpots[this.roostIndex++ % Math.max(1, coopSpots.length)] ?? { x: 100, y: 160 };
-        return { x: c.x + (Math.random() * 44 - 22), y: c.y + 12 + Math.random() * 14 };
+        return route(from, nearestFree({ x: Math.round(c.x + (Math.random() * 44 - 22)), y: Math.round(c.y + 12 + Math.random() * 14) }, areas), areas);
       },
-      spot: () => spreadSpot(l.yard, positions()),
+      spot: (from: Point) => route(from, freeSpot(areas, positions()), areas),
       door: (at: Point) => this.door(at),
     };
     for (const a of this.hens.values()) {

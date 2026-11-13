@@ -128,6 +128,44 @@ describe('derived sprites', () => {
     }
   });
 
+  it('the conveyor carries no painted eggs: no egg colour on any frame of the sheet the farm draws', () => {
+    // the old belt (18-conveyor) had eggs painted on it; the clean one is the same sheet without them
+    const EGG = ['248,230,200', '222,184,140'];
+    const isEgg = (img: Rgba, x: number, y: number): boolean => {
+      const i = (y * img.width + x) * 4;
+      return (img.data[i + 3] ?? 0) > 0 && EGG.includes(`${img.data[i]},${img.data[i + 1]},${img.data[i + 2]}`);
+    };
+    const s = manifest.sprites['18b-conveyor-clean'];
+    expect(s).toBeDefined();
+    expect(ids).not.toContain('18-conveyor');
+    let checked = 0;
+    for (const [level, rows] of Object.entries(s?.frames ?? {})) {
+      for (const [row, frames] of Object.entries(rows)) {
+        expect(frames.length, `${row} at ${level}`).toBe(4);
+        for (const [x, y, w, h, , , n] of frames) {
+          const img = page(s?.group ?? '', n ?? 0);
+          for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) expect(isEgg(img, x + i, y + j), `${row} at ${level}: egg pixel at (${x + i}, ${y + j})`).toBe(false);
+          checked++;
+        }
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(20);
+    // the packed source sheet too, and it keeps the old belt's size, rows and timing
+    const src = decodePng(readFileSync(join(assets, index.sprites['18b-conveyor-clean']?.png ?? '')));
+    const old = decodePng(readFileSync(join(assets, index.sprites['18-conveyor']?.png ?? '')));
+    expect([src.width, src.height]).toEqual([old.width, old.height]);
+    let eggs = 0;
+    let oldEggs = 0;
+    for (let y = 0; y < src.height; y++) for (let x = 0; x < src.width; x++) {
+      if (isEgg(src, x, y)) eggs++;
+      if (isEgg(old, x, y)) oldEggs++;
+    }
+    expect(eggs).toBe(0);
+    expect(oldEggs).toBeGreaterThan(0);
+    const shape = (j: SheetJson) => ({ grid: j.meta.grid, size: j.meta.size, rows: Object.values(j.animations).map((a) => a.length), frames: Object.values(j.frames) });
+    expect(shape(sourceJson('18b-conveyor-clean'))).toEqual(shape(sourceJson('18-conveyor')));
+  });
+
   it('draws the world at the design sizes: a hen 32 world pixels, a coop and the farmhouse 96', () => {
     const tallest = (id: string, row: string) => Math.max(...(manifest.sprites[id]?.frames['4']?.[row] ?? []).map((f) => f[3])) / 4;
     expect(tallest('02-body', 'idle')).toBeGreaterThan(20);
