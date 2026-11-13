@@ -152,6 +152,76 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 [tall](docs/screenshots/live-resize-3-tall-560x1000.png), [wide again](docs/screenshots/live-resize-4-wide-1600x760.png))
 and the [belt](docs/screenshots/live-belt-clean.png), which carries only real eggs.
 
+## Agents that reflect, and AI farms that enter (13 November 2026)
+
+**The agent loop.** Each agent decides once per in-game day from a compact observation (its cash and stock, the last
+three days' supply against demand, the multiplier's slope, recent busts, how many AI and player farms are open, its own
+farm, its memory of every farm, its last reflection and reasons). A persona prompt and one strict action schema go to
+NEAR AI: the cheap model on routine days, the main model on hard days (a crash or glut, or cash under the struggle line)
+and for the weekly reflection. Every answer, model or rules, passes `validateDecision` on the server; anything unusable,
+or anything past the global or per-agent caps, falls back to the upgraded rules. Each decision carries a public reason
+under 80 characters, shown on the market board; every seven days each agent writes a reflection under 400 characters
+that it reads back next time.
+
+```mermaid
+flowchart LR
+  obs["Observation<br/>cash, stock, 3-day trend, busts,<br/>open farms, memory, last reflection"]
+  tier{"Hard day or<br/>weekly reflection?"}
+  caps{"Within the global and<br/>per-agent caps?"}
+  cheap["NEAR AI, cheap model"]
+  main["NEAR AI, main model"]
+  rules["Rules (trend-aware)"]
+  val["validateDecision<br/>one zod schema, own role only,<br/>known farms and orders"]
+  apply["Apply: farm actions, orders,<br/>offers (cards), restock"]
+  pub["Public reason (under 80)<br/>on the market board"]
+  refl["Weekly reflection (under 400)<br/>stored, read back"]
+  obs --> caps
+  caps -- no --> rules
+  caps -- yes --> tier
+  tier -- no --> cheap
+  tier -- yes --> main
+  cheap --> val
+  main --> val
+  rules --> val
+  val -- unusable --> rules
+  val --> apply --> pub
+  main -. every 7 days .-> refl --> obs
+  apply --> obs
+```
+
+**AI farms that enter.** Beyond the two base rivals, new AI farms (Early Bird Eggs, the Cluck Collective, Gilded Roost
+Estates, Pennywise Poultry: a registry in [`agents/entrants.ts`](apps/server/src/agents/entrants.ts), with their own
+personas, the Upstart's or Old Money's looks, smaller starts) enter on their own. At each day close, after three days
+of supply under demand or a rival's bust in the last five days, one enters with chance 25%; with fewer than two AI farms
+open, one enters at once; never more than
+
+$$
+\text{cap} = \max\left(4,\ \lfloor 1.5 \times \text{active player farms} \rfloor\right).
+$$
+
+Every AI farm and agent wears an **AI** tag on the market board and the ticker. Agent wallets are now a reusable pool:
+a wallet whose agents are all bust (any kind) goes to the next new agent, and no wallet is funded while one is free;
+each wallet created and its funding is recorded, and the server logs the pool's size and the NEAR spent.
+
+**Thirty days, five seeds, with entrants** (`apps/server/test/sim.test.ts`): the median day stays in 0.8 to 1.3x, every
+seed has gluts, rivals go bust on their own, and the AI farm count stays between 2 and its cap every day.
+
+| Seed | Median | Lowest | Glut days | Rival busts | Entrants |
+|---|---|---|---|---|---|
+| 1 | 1.16x | 0.48x | 8 | 1 | 2 |
+| 2 | 1.11x | 0.46x | 8 | 2 | 2 |
+| 3 | 1.16x | 0.49x | 10 | 1 | 1 |
+| 4 | 1.10x | 0.46x | 7 | 1 | 2 |
+| 5 | 0.97x | 0.40x | 7 | 1 | 2 |
+
+**Model against rules.** NEAR AI still answers 402 (no credits), so the comparison runs a recorded stand-in model
+(replies authored in character and replayed by situation, with some unusable ones) against the rules, 30 days over the
+same five seeds: the stand-in gives fewer and milder gluts (18 to 37 glut days against 40 to 48) but more rival busts
+(11 to 20 against 5 to 6). It is a stand-in, not a measurement of a real model. Measured prompts (about 1,600 tokens in,
+160 out per decision) at the live pace (480 in-game days a real day) need about **1.07 USD a real day without caps, 0.08
+at the default caps** at the assumed prices (main 0.20/0.80, cheap 0.10/0.40 USD per million tokens, both overridable).
+The full write-up, the per-day entrant counts and the credits table: [docs/agents.md](docs/agents.md).
+
 ## The Feather Mint: random numbers, instant mints and the press (13 November 2026)
 
 **Its own page.** The Feather Mint lives at [`/mint`](https://yolkstreet.25th.dev/mint) and opens without entering the
@@ -1204,6 +1274,13 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
 **Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
+
+### Brief 9, stage 4: agents that reflect, AI farms that enter (13 November 2026)
+
+- **Agents.** Richer observations, personas, one validated schema with a public reason, weekly reflections, model tiers,
+  per-agent caps, trend-aware rules (migration 13). A 30-day comparison on a recorded stand-in model (NEAR AI: 402) and
+  the credits needed.
+- **AI farms.** A registry of entrants, the entry rule and its bounds, the AI tag, a reusable wallet pool.
 
 ### Brief 9, stage 3: the Feather Mint (13 November 2026)
 
