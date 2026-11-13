@@ -43,6 +43,14 @@ export const SIZE_TABLE = {
   hopper: { rel: 2.0, brief: 2.0, by: 'height', sprites: ['21-feed-hopper'], row: 'idle' },
   clerk: { rel: 1.4, brief: 1.4, by: 'height', sprites: ['22-sales-clerk'], row: 'idle' },
   sign: { rel: 1.4, brief: 1.4, by: 'height', sprites: ['17-sign-farm', '17-sign-upstart', '17-sign-old-money'], row: 'sway' },
+  'hatch-egg': {
+    rel: 24 / HEN_PX,
+    brief: 24 / HEN_PX,
+    by: 'height',
+    sprites: ['x-hatch-egg'],
+    row: 'wobble',
+    note: 'exact pixel art (24 px tall and 20 wide at rest, on its own 32 px grid): just room for a crouched hen, big and goofy next to a laid egg',
+  },
   'hay-bale': {
     rel: 26 / HEN_PX,
     brief: 0.8,
