@@ -78,6 +78,7 @@ const KIND_LABEL: Record<string, string> = {
   hens: 'HENS',
   coop: 'COOPS',
   unlock: 'MACHINES',
+  land: 'LAND',
   repair: 'REPAIRS',
   'feather-fee': 'MINT FEES',
   penalty: 'PENALTIES',
@@ -261,6 +262,7 @@ function overview(p: ProfileData, farm: FarmState, market: MarketState, onPublic
       <Stat label="NET WORTH" value={coins(p.netWorthMilli)} ui="profile-net-worth" />
       <span style={{ lineHeight: '9px', color: PALETTE.wood }}>
         COINS {whole(p.netWorth.cashMilli)}, HENS {whole(p.netWorth.hensMilli)}, COOPS {whole(p.netWorth.coopsMilli)}, MACHINES {whole(p.netWorth.machinesMilli)}
+        {p.netWorth.landMilli > 0 ? `, LAND ${whole(p.netWorth.landMilli)}` : ''}
       </span>
       <Stat label="RANK ON THE STREET" value={p.rank ? `${p.rank} OF ${p.farms}` : 'BUST'} ui="profile-rank" />
       <Stat label="DAYS IN GOOD STANDING" value={p.goodDays} />

@@ -24,7 +24,7 @@ import { daysNoBreakdown, rivalsOutlasted, traitsOf, worthOf } from './profile';
 
 export type Facts = Partial<Record<BadgeMetric, number>>;
 
-type Family = 'stats' | 'farm' | 'days' | 'climb' | 'profit' | 'machineDays' | 'trades' | 'sales' | 'memory' | 'contracts' | 'flock' | 'machines' | 'rivals' | 'feathers' | 'worth';
+type Family = 'stats' | 'farm' | 'days' | 'climb' | 'profit' | 'machineDays' | 'trades' | 'sales' | 'memory' | 'contracts' | 'flock' | 'machines' | 'rivals' | 'feathers' | 'worth' | 'land';
 
 /** Which query family reads each number. */
 const FAMILY: Record<BadgeMetric, Family> = {
@@ -95,6 +95,8 @@ const FAMILY: Record<BadgeMetric, Family> = {
   mintedGrades: 'feathers',
   milestonesReached: 'feathers',
   netWorth: 'worth',
+  landPlots: 'land',
+  landCoops: 'land',
 };
 
 const OWNS: Record<UnlockId, BadgeMetric> = { conveyor: 'ownsConveyor', grader: 'ownsGrader', cart: 'ownsCart', hopper: 'ownsHopper', clerk: 'ownsClerk' };
@@ -267,10 +269,16 @@ export async function loadFacts(q: Queryable, farmIds: string[], day: number, me
     }
   }
   if (families.has('worth')) {
+    const land = new Map((await q.query('SELECT farm_id, SUM(price_milli) AS paid FROM farm_land WHERE farm_id = ANY($1::text[]) GROUP BY farm_id', ids)).map((r) => [String(r.farm_id), num(r.paid)]));
     for (const r of await q.query('SELECT id, cash_milli FROM farms WHERE id = ANY($1::text[])', ids)) {
       const f = out.get(String(r.id)) as Facts & { coopKinds?: CoopKind[]; machines?: { unlock: UnlockId; condition: number }[] };
-      set(r.id, 'netWorth', worthOf(num(r.cash_milli), f.hens ?? 0, f.coopKinds ?? [], f.machines ?? []).totalMilli / 1000);
+      set(r.id, 'netWorth', worthOf(num(r.cash_milli), f.hens ?? 0, f.coopKinds ?? [], f.machines ?? [], land.get(String(r.id)) ?? 0).totalMilli / 1000);
     }
+  }
+  if (families.has('land')) {
+    // plots of land owned, and coops standing on them (coop plots past the home plot's)
+    for (const r of await q.query('SELECT farm_id, count(*) AS n FROM farm_land WHERE farm_id = ANY($1::text[]) GROUP BY farm_id', ids)) set(r.farm_id, 'landPlots', r.n);
+    for (const r of await q.query('SELECT farm_id, count(*) AS n FROM coops WHERE farm_id = ANY($1::text[]) AND plot >= $2 GROUP BY farm_id', [farmIds, ECONOMY.coops.plots])) set(r.farm_id, 'landCoops', r.n);
   }
   if (families.has('rivals')) {
     const n = await rivalsOutlasted(q, farmIds);
@@ -307,7 +315,8 @@ export const ACTION_BADGES: Partial<Record<string, BadgeMetric[]>> = {
   deliverContract: [...SALE, 'deliveries', 'bestDeliveryStreak', 'contractsTaken'],
   buyHen: [...FLOCK, 'auctionHens'],
   buyHens: [...FLOCK, 'auctionHens'],
-  buildCoop: ['coops', 'deluxeCoops', 'fullCoops'],
+  buildCoop: ['coops', 'deluxeCoops', 'fullCoops', 'landCoops'],
+  buyLand: ['landPlots', 'netWorth'],
   upgradeCoop: ['coops', 'deluxeCoops', 'fullCoops'],
   buyUnlock: ['ownsConveyor', 'ownsGrader', 'ownsCart', 'ownsHopper', 'ownsClerk', 'machinesOwned'],
   repairMachine: ['repairs', 'bestRepairStreak'],

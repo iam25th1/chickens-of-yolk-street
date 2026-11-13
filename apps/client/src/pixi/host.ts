@@ -16,6 +16,8 @@ export interface Scene {
   update(dtMs: number): void;
   /** The visible world, in world pixels (it may start left of or above the origin). */
   resize?(view: { x: number; y: number; w: number; h: number }, v: Viewport): void;
+  /** Where the scene's camera looks: the world point (whole world pixels) drawn at the view's origin. None: the origin. */
+  camera?(): { x: number; y: number };
   destroy(): void;
 }
 
@@ -57,12 +59,13 @@ export class PixiHost {
     return this.scene?.fit === 'farm' ? v.farm : v.plate;
   }
 
-  /** The world's offset, plus any screen shake, on whole device pixels. */
+  /** The world's offset, less the scene's camera, plus any screen shake, on whole device pixels. */
   private place(): void {
     const v = viewport.get();
     const view = this.view(v);
     const o = juice.offset();
-    this.world.position.set((view.offX + Math.round(o.x * view.k)) / v.dpr, (view.offY + Math.round(o.y * view.k)) / v.dpr);
+    const cam = this.scene?.camera?.() ?? { x: 0, y: 0 };
+    this.world.position.set((view.offX + Math.round((o.x - cam.x) * view.k)) / v.dpr, (view.offY + Math.round((o.y - cam.y) * view.k)) / v.dpr);
   }
 
   private layout(v: Viewport): void {

@@ -13,6 +13,11 @@ export type CoopKind = (typeof COOP_KINDS)[number];
 export const UNLOCK_IDS = ['conveyor', 'grader', 'cart', 'hopper', 'clerk'] as const;
 export type UnlockId = (typeof UNLOCK_IDS)[number];
 
+/** The neighbouring plots a farm can buy around its home plot, in the order the shop lists them. */
+export const LAND_IDS = ['east', 'west', 'north', 'south'] as const;
+export type LandId = (typeof LAND_IDS)[number];
+export const LAND_NAME: Record<LandId, string> = { east: 'EAST FIELD', west: 'WEST MEADOW', north: 'NORTH PASTURE', south: 'SOUTH ORCHARD' };
+
 /** The goal chain that teaches the game, in order, with its coin rewards. */
 export const GOAL_IDS = ['collect', 'sell', 'coop', 'haggle', 'machine', 'rival'] as const;
 
@@ -76,8 +81,28 @@ export const ECONOMY = {
       red: { capacity: 30, price: 150 },
       deluxe: { capacity: 60, price: 450 },
     } satisfies Record<CoopKind, { capacity: number; price: number }>,
-    /** Coop plots on one farm. */
+    /** Coop plots on the home plot (bought land adds its own: ECONOMY.land). */
     plots: 4,
+  },
+  /**
+   * Land: a farm starts on its home plot and may buy the four plots around it, in any order. The
+   * first plot bought costs prices[0], the second prices[1], and so on, whichever plot it is. Each
+   * plot adds coopSlots coop plots (numbered after the home plot's four, in LAND_IDS order, so a
+   * coop keeps its number whatever was bought first), a pasture the hens walk, and room for props
+   * (props spots). depth is how far the plot reaches out from the home plot, in 16-pixel tiles.
+   * Prices tuned with the 30-day simulation (apps/server/test/sim.test.ts, its SIM LAND line): the
+   * street's most successful farm can pay for its first plot by day 3 to 6, two by day 10, three by
+   * day 16 to 21 and all four only by day 28 to 30, or not within the 30 days; the simulation's
+   * greedy players, who never build a second coop, never hold enough.
+   */
+  land: {
+    prices: [600, 900, 1200, 1500],
+    plots: {
+      east: { coopSlots: 2, props: 3, depth: 18 },
+      west: { coopSlots: 2, props: 3, depth: 16 },
+      north: { coopSlots: 2, props: 3, depth: 13 },
+      south: { coopSlots: 2, props: 4, depth: 15 },
+    } satisfies Record<LandId, { coopSlots: number; props: number; depth: number }>,
   },
   crowding: {
     /** Laying lost for every 10% of hens over capacity. */
@@ -347,6 +372,33 @@ export const ageFactor = (ageDays: number): number =>
 
 export function coopCapacity(kinds: readonly CoopKind[]): number {
   return kinds.reduce((sum, k) => sum + ECONOMY.coops.kinds[k].capacity, 0);
+}
+
+/** Coins for the next plot of land for a farm that owns `owned` plots (null when it owns them all). */
+export function landPrice(owned: number): number | null {
+  return ECONOMY.land.prices[owned] ?? null;
+}
+
+/** The coop plot numbers a plot of land adds (after the home plot's, in LAND_IDS order). */
+export function landCoopPlots(id: LandId): number[] {
+  let next: number = ECONOMY.coops.plots;
+  for (const l of LAND_IDS) {
+    const n = ECONOMY.land.plots[l].coopSlots;
+    if (l === id) return Array.from({ length: n }, (_, i) => next + i);
+    next += n;
+  }
+  return [];
+}
+
+/** Every coop plot a farm with this land may build on: the home plot's, then each owned plot's, in LAND_IDS order. */
+export function coopPlots(land: readonly LandId[]): number[] {
+  const home = Array.from({ length: ECONOMY.coops.plots }, (_, i) => i);
+  return [...home, ...LAND_IDS.filter((l) => land.includes(l)).flatMap(landCoopPlots)];
+}
+
+/** The plot of land a coop plot number lies on, or null for the home plot. */
+export function landOfCoopPlot(plot: number): LandId | null {
+  return LAND_IDS.find((l) => landCoopPlots(l).includes(plot)) ?? null;
 }
 
 export function nextCoopKind(kind: CoopKind): CoopKind | null {

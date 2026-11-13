@@ -3,22 +3,26 @@
 //
 // The farm fills the free part of the window (layout.ts) and draws in a fixed layer order
 // (layers.ts): ground, ground animation, the conveyor's floor, then every object, hen and egg sorted
-// by its feet, machine name plates and particles. Machines stand on their own labelled pads.
+// by its feet, machine name plates and particles. Machines stand on their own labelled pads. With
+// land beside the home plot the farm is bigger than the window, and its camera (camera.ts) looks
+// round it; with the home plot alone the camera never moves.
 import { animate, createTimeline, steps } from 'animejs';
 import { ColorMatrixFilter, Container, Graphics, RenderTexture, Sprite, Text, type Renderer } from 'pixi.js';
-import { coopCapacity, type CoopKind, type FarmState, type HenView, type LaidEgg, type UnlockId } from '@coys/shared';
+import { coopCapacity, type CoopKind, type FarmState, type HenView, type LaidEgg, type LandId, type UnlockId } from '@coys/shared';
 import type { Viewport } from '../../app/viewport';
 import type { AssetStore } from '../../assets/store';
 import type { AudioEngine, LoopHandle } from '../../audio/audio';
 import { juice } from '../../motion/juice';
+import { settings } from '../../state/settings';
 import { dayElapsed, isNight, sameDay, type ClientEvent } from '../../state/game';
 import { FrameSprite } from '../FrameSprite';
 import { Fx } from '../Fx';
 import type { Scene } from '../host';
 import { HenActor } from './HenActor';
 import { WorldLayers } from './layers';
-import { MIN_H, MIN_W, connectionGaps, farmLayout, labelSpot, specPoint, troughSpots, type FarmLayout, type Point } from './layout';
-import { carry, eggClear, freeSpot, hatchSpots, movementAreas, nearestFree, route, type Areas } from './movement';
+import { canLook, cameraOn, clampCamera, farmCamera, inView, type Lookable } from './camera';
+import { MIN_H, MIN_W, connectionGaps, coopAt, coopSlots, farmLayout, labelSpot, specPoint, troughSpots, type Box, type FarmLayout, type Point } from './layout';
+import { carry, eggClear, freeSpot, hatchSpots, movementAreas, nearestFree, pickRegion, travel, type Areas } from './movement';
 
 const MAX_VISIBLE_HENS = 40;
 /** Several new hens hatch this far apart. */
@@ -26,6 +30,14 @@ const HATCH_STAGGER_MS = 420;
 const TILE = 16;
 /** How long an egg takes from the ground to the crate on the conveyor (the server collects it at 5 s). */
 const RIDE_MS = 4200;
+/** How fast the arrow keys and WASD move the camera, in world pixels a millisecond. */
+const KEY_PAN = 0.3;
+/** The fence tiles in the farm tileset (row 6): the rail, a post, the gate. */
+const RAIL_TILE: [number, number] = [0, 6];
+const POST_TILE: [number, number] = [1, 6];
+const GATE_TILE: [number, number] = [3, 6];
+/** The tilled furrows (row 2), the south orchard's beds. */
+const BED_TILE: [number, number] = [2, 2];
 
 /** Something on the farm the player clicked. */
 export type WorldTarget =
@@ -85,7 +97,7 @@ export interface RivalSign {
   bust: boolean;
 }
 
-export class FarmScene implements Scene {
+export class FarmScene implements Scene, Lookable {
   readonly root = new Container();
   readonly fit = 'farm' as const;
   private readonly layers = new WorldLayers();
@@ -132,6 +144,18 @@ export class FarmScene implements Scene {
   private layout: FarmLayout = farmLayout(MIN_W, MIN_H, { w: 0, h: 0 });
   private areasCache: { key: string; areas: Areas } | null = null;
   private view = { x: 0, y: 0, w: 640, h: 360 };
+  /** The farm area the viewport gives (the home plot's size) and the plots of land the farm owns. */
+  private area = { w: MIN_W, h: MIN_H, guide: { w: 0, h: 0 } };
+  private landIds: LandId[] = [];
+  /** The camera's corner (world pixels; whole pixels on screen), the keys held, and whether the farm is being dragged. */
+  private cam = { x: 0, y: 0 };
+  private camTween: ReturnType<typeof animate> | null = null;
+  private steer = { x: 0, y: 0 };
+  private dragged = false;
+  /** Fence tiles a new plot's moment is still putting up (left out of the baked ground until they pop up). */
+  private rising = new Set<string>();
+  /** Plots bought while a page or modal covered the farm: their moment plays once it is in view. */
+  private pendingLand: LandId[] = [];
   /** What the baked ground shows (coops and machines change its pads and plots). */
   private groundKey = '';
   private k = 2;
@@ -191,6 +215,8 @@ export class FarmScene implements Scene {
       this.hideLabel();
     });
     s.on('pointertap', () => {
+      // letting go after dragging the farm round is not a click
+      if (this.dragged) return;
       this.audio.play('35-click', { volume: 0.6 });
       const l = labelOf(target());
       if (l) this.showLabel(l.name, l.text, 1500);
@@ -228,6 +254,11 @@ export class FarmScene implements Scene {
     });
   }
 
+  /** New land's moment, for checks: fence posts up on screen now, and fence tiles still to go up. */
+  landMomentState(): { posts: number; waiting: number } {
+    return { posts: this.layers.by.floor.children.filter((c) => c.label === 'land-post' && !c.destroyed).length, waiting: this.rising.size + this.pendingLand.length };
+  }
+
   /** The draw order, for checks: layer, kind and foot position of everything in the world. */
   drawOrder(): { layer: string; label: string; y: number }[] {
     return this.layers.drawOrder().map((e) => ({ layer: e.layer, label: e.obj.label ?? '', y: Math.round(e.obj.y) }));
@@ -247,9 +278,91 @@ export class FarmScene implements Scene {
     s.destroy();
   }
 
-  /** A farm point in world coordinates (the farm is drawn at the world origin). */
+  /** A farm point where it is in the farm area now (world pixels from the area's corner, the camera taken off). */
   toStage(p: Point): Point {
-    return { x: p.x, y: p.y };
+    const c = this.camera();
+    return { x: p.x - c.x, y: p.y - c.y };
+  }
+
+  // ---- camera ---------------------------------------------------------------------------------
+
+  /** The camera's corner on whole world pixels (the host draws the world from it). */
+  camera(): Point {
+    return { x: Math.round(this.cam.x), y: Math.round(this.cam.y) };
+  }
+
+  /** Whether the farm is on screen and bigger than the farm area. */
+  lookable(): boolean {
+    return !!this.root.parent && canLook(this.layout);
+  }
+
+  pan(dx: number, dy: number): void {
+    this.camTween?.pause();
+    this.camTween = null;
+    this.setCam({ x: this.cam.x + dx, y: this.cam.y + dy });
+  }
+
+  hold(dir: { x: number; y: number }): void {
+    this.steer = dir;
+    if (dir.x || dir.y) {
+      this.camTween?.pause();
+      this.camTween = null;
+    }
+  }
+
+  setDragging(on: boolean): void {
+    this.dragged = on;
+    if (on) this.hideLabel();
+  }
+
+  /** Back to the home plot (HOME). */
+  goHome(): void {
+    this.glide({ x: 0, y: 0 });
+  }
+
+  /** Centres the camera on a farm point (the small map). */
+  lookAt(p: Point): void {
+    this.glide(clampCamera({ x: Math.round(p.x - this.layout.w / 2), y: Math.round(p.y - this.layout.h / 2) }, this.layout));
+  }
+
+  /** Brings a box into view if the camera does not show it (a coop built, land bought). */
+  private reveal(box: Box): void {
+    const c = this.camera();
+    const mid = { x: (box.left + box.right) / 2, y: (box.top + box.bottom) / 2 };
+    if (!inView(mid, c, this.layout)) this.glide(cameraOn(box, this.layout));
+  }
+
+  /** Moves the camera there: a short glide, or at once with reduce motion on. */
+  private glide(to: Point): void {
+    this.camTween?.pause();
+    this.camTween = null;
+    const end = clampCamera(to, this.layout);
+    if (settings.get().reduceMotion) return this.setCam(end);
+    const k = { x: this.cam.x, y: this.cam.y };
+    this.camTween = animate(k, { x: end.x, y: end.y, duration: 520, ease: 'inOutQuad', onUpdate: () => this.setCam(k), onComplete: () => (this.camTween = null) });
+  }
+
+  private setCam(p: Point): void {
+    const c = clampCamera(p, this.layout);
+    const before = this.camera();
+    this.cam = c;
+    const after = this.camera();
+    if (before.x !== after.x || before.y !== after.y) this.publishCamera();
+  }
+
+  /** Tells the small map where the camera is and what the farm is. */
+  private publishCamera(): void {
+    const l = this.layout;
+    const c = this.camera();
+    farmCamera.set({
+      on: canLook(l),
+      x: c.x,
+      y: c.y,
+      w: l.w,
+      h: l.h,
+      world: l.world,
+      plots: [{ id: 'home', box: { left: 0, top: 0, right: l.w, bottom: l.h } }, ...l.land.map((p) => ({ id: p.id, box: p.box }))],
+    });
   }
 
   // ---- layout ---------------------------------------------------------------------------------
@@ -258,7 +371,7 @@ export class FarmScene implements Scene {
   private get areas(): Areas {
     const built = (this.farm?.coops ?? []).map((c) => c.plot);
     const unlocks = this.farm?.unlocks ?? [];
-    const key = `${this.layout.w}x${this.layout.h}|${built.join()}|${unlocks.join()}`;
+    const key = `${this.layout.w}x${this.layout.h}|${this.landIds.join()}|${built.join()}|${unlocks.join()}`;
     if (this.areasCache?.key !== key) this.areasCache = { key, areas: movementAreas(this.layout, { builtPlots: built, unlocks }) };
     return this.areasCache.areas;
   }
@@ -270,9 +383,17 @@ export class FarmScene implements Scene {
   resize(view: { x: number; y: number; w: number; h: number }, v: Viewport): void {
     this.view = view;
     this.k = v.farm.k;
-    // hens and eggs on the ground keep their place in the composition, in world units, as it re-flows
+    this.area = { w: v.farm.w, h: v.farm.h, guide: v.farm.guide };
+    this.relayout();
+  }
+
+  /**
+   * Lays the farm out again for the farm area and the land it owns. Hens and eggs on the ground keep
+   * their place in the composition, in world units, as it re-flows; the camera stays on the farm.
+   */
+  private relayout(): void {
     const before = this.areas;
-    this.layout = farmLayout(v.farm.w, v.farm.h, v.farm.guide);
+    this.layout = farmLayout(this.area.w, this.area.h, this.area.guide, this.landIds);
     const after = this.areas;
     if (before !== after) {
       for (const a of this.hens.values()) a.carry((p) => carry(p, before, after));
@@ -282,23 +403,33 @@ export class FarmScene implements Scene {
         g.s.position.set(to.x, to.y);
       }
     }
-    this.night.clear().rect(view.x, view.y, view.w, view.h).fill({ color: 0x3b4f7a, alpha: 0.24 });
+    this.cam = clampCamera(this.cam, this.layout);
     this.groundKey = '';
     this.rebake();
     this.arrange();
+    this.publishCamera();
   }
 
-  /** Bakes the ground again when the window, the coops or the machines changed. */
+  /**
+   * The part of the world the ground covers: whatever the window can show from anywhere the camera
+   * can go (with the home plot alone, just the window).
+   */
+  private bakeBox(): Box {
+    const v = this.view;
+    const l = this.layout;
+    return { left: Math.floor(l.world.left + v.x), top: Math.floor(l.world.top + v.y), right: Math.ceil(l.world.right - l.w + v.x + v.w), bottom: Math.ceil(l.world.bottom - l.h + v.y + v.h) };
+  }
+
+  /** Bakes the ground again when the window, the land, the coops or the machines changed. */
   private rebake(): void {
-    const key = `${this.view.x},${this.view.y},${this.view.w},${this.view.h}|${(this.farm?.unlocks ?? []).join()}|${(this.farm?.coops ?? []).map((c) => c.plot).join()}`;
+    const b = this.bakeBox();
+    const key = `${b.left},${b.top},${b.right},${b.bottom}|${this.landIds.join()}|${[...this.rising].join()}|${(this.farm?.unlocks ?? []).join()}|${(this.farm?.coops ?? []).map((c) => c.plot).join()}`;
     if (key === this.groundKey) return;
     this.groundKey = key;
-    const v = this.view;
-    const gx = Math.floor(v.x);
-    const gy = Math.floor(v.y);
     this.ground?.destroy(true);
-    this.ground = this.bakeGround(gx, gy, Math.ceil(v.x + v.w) - gx, Math.ceil(v.y + v.h) - gy);
+    this.ground = this.bakeGround(b.left, b.top, b.right - b.left, b.bottom - b.top);
     this.layers.by.ground.addChild(this.ground);
+    this.night.clear().rect(b.left, b.top, b.right - b.left, b.bottom - b.top).fill({ color: 0x3b4f7a, alpha: 0.24 });
   }
 
   /** Puts every fixed thing on its spot for the current layout. */
@@ -310,7 +441,7 @@ export class FarmScene implements Scene {
     this.moveTo(this.sack, l.sack);
     this.moveTo(this.crate, l.crate);
     for (const c of this.coops.values()) {
-      const plot = l.plots[c.plot];
+      const plot = coopAt(l, c.plot);
       if (plot) this.moveTo(c.s, plot);
     }
     for (const [u, s] of this.machines) if (u !== 'conveyor') this.moveTo(s, l.machines[u]);
@@ -336,10 +467,25 @@ export class FarmScene implements Scene {
       this.decor.push(s);
     }
     for (const p of l.props) this.decor.push(this.place(new FrameSprite(this.assets, ['24-farm-props'], p.row).desync(), p));
+    // the land's props, and grass and straw that move on it
+    for (const [name, o] of Object.entries(l.spec.objects)) if (name.startsWith('prop-')) this.decor.push(this.place(new FrameSprite(this.assets, ['24-farm-props'], o.row).desync(), o.at));
+    for (const p of l.land) {
+      for (const [row, x, y] of [
+        ['grass-sway', p.box.left + 40, p.box.top + 24],
+        ['straw-flutter', p.pasture.left + 30, p.pasture.top + 20],
+        ['straw-flutter', p.pasture.right - 40, p.pasture.bottom - 16],
+      ] as const) {
+        const s = new FrameSprite(this.assets, ['23-farm-tileset'], row).desync();
+        s.position.set(Math.round(x / TILE) * TILE + TILE / 2, Math.round(y / TILE) * TILE + TILE / 2);
+        this.layers.add('groundAnim', s);
+        this.animated.push(s);
+        this.decor.push(s);
+      }
+    }
     const built = new Set((this.farm?.coops ?? []).map((c) => c.plot));
-    l.plots.forEach((p, i) => {
-      if (!built.has(i)) this.decor.push(this.place(new FrameSprite(this.assets, ['24-farm-props'], 'signpost').desync(), { x: p.x - 20, y: p.y - 6 }));
-    });
+    for (const { plot, at } of coopSlots(l)) {
+      if (!built.has(plot)) this.decor.push(this.place(new FrameSprite(this.assets, ['24-farm-props'], 'signpost').desync(), { x: at.x - 20, y: at.y - 6 }));
+    }
     this.rivals.forEach((r, i) => {
       const at = l.rivals[i];
       if (at) this.moveTo(r.s, at);
@@ -423,6 +569,13 @@ export class FarmScene implements Scene {
     const yl = Math.floor((l.yard.left - 8) / TILE) * TILE;
     const yt = Math.floor((l.yard.top - 8) / TILE) * TILE;
     for (let y = yt; y < l.yard.bottom + 12; y += TILE) for (let x = yl; x < l.yard.right + 12; x += TILE) tile(Math.abs((x * 3 + y * 5) / TILE) % 2, 3, x, y);
+    // the land's straw pastures and the orchard's tilled beds
+    for (const p of l.land) {
+      const pl = Math.floor((p.pasture.left - 8) / TILE) * TILE;
+      const pt = Math.floor((p.pasture.top - 8) / TILE) * TILE;
+      for (let y = pt; y < p.pasture.bottom + 12; y += TILE) for (let x = pl; x < p.pasture.right + 12; x += TILE) tile(Math.abs((x * 3 + y * 5) / TILE) % 2, 3, x, y);
+      for (const b of p.beds) for (let y = b.top; y < b.bottom; y += TILE) for (let x = b.left; x < b.right; x += TILE) tile(BED_TILE[0], BED_TILE[1], x, y);
+    }
     // pads of packed dirt under the machines on the farm (the belt is its own station)
     for (const u of this.farm?.unlocks ?? []) {
       if (u === 'conveyor') continue;
@@ -432,19 +585,17 @@ export class FarmScene implements Scene {
     }
     // empty coop plots: a square of dirt waiting for a coop
     const built = new Set((this.farm?.coops ?? []).map((c) => c.plot));
-    l.plots.forEach((p, i) => {
-      if (built.has(i)) return;
+    for (const { plot, at: p } of coopSlots(l)) {
+      if (built.has(plot)) continue;
       const y0 = Math.round((p.y - 32) / TILE) * TILE;
       const x0 = Math.round((p.x - 32) / TILE) * TILE;
       for (const y of [y0, y0 + TILE]) for (let x = x0; x < x0 + 4 * TILE; x += TILE) tile(1, 2, x, y);
-    });
+    }
     // the path from the farmhouse door down through the gate
     for (let y = Math.floor(l.path.top / TILE) * TILE; y < y0 + h; y += TILE) for (const x of [l.path.x - TILE, l.path.x]) tile(0, 2, x, y);
-    // the fence across the whole width, a gate where the path crosses it
-    for (let x = left; x < x0 + w; x += TILE) {
-      const onPath = x === l.path.x - TILE || x === l.path.x;
-      tile(onPath ? 3 : 0, 6, x, l.fence.y);
-    }
+    // the fence along the outline, a gate where the path crosses it (tiles a new plot is still
+    // putting up are left out: they pop up in its moment)
+    for (const t of fenceTiles(l, left, x0 + w, top, y0 + h)) if (!this.rising.has(`${t.x},${t.y}`)) tile(t.tile[0], t.tile[1], t.x, t.y);
     const rt = RenderTexture.create({ width: Math.ceil(w), height: Math.ceil(h), scaleMode: 'nearest' });
     this.renderer.render({ container: g, target: rt });
     g.destroy({ children: true });
@@ -474,6 +625,21 @@ export class FarmScene implements Scene {
   sync(farm: FarmState): void {
     const first = this.farm === null;
     this.farm = farm;
+    // land bought: the farm grows (its moment plays once the farm is in view)
+    const land = farm.land ?? [];
+    if (land.join() !== this.landIds.join()) {
+      const before = this.layout;
+      const fresh = land.filter((id) => !this.landIds.includes(id));
+      this.landIds = [...land];
+      if (!first) {
+        // the new fence waits to go up in the moment
+        const had = new Set(fenceTiles(before, -4096, 4096, -4096, 4096).map((t) => `${t.x},${t.y}`));
+        const next = farmLayout(this.area.w, this.area.h, this.area.guide, this.landIds);
+        for (const t of fenceTiles(next, -4096, 4096, -4096, 4096)) if (!had.has(`${t.x},${t.y}`)) this.rising.add(`${t.x},${t.y}`);
+        this.pendingLand.push(...fresh);
+      }
+      this.relayout();
+    }
     const l = this.layout;
 
     // hens: show up to MAX_VISIBLE_HENS, keeping the ones already on screen (they persist by id).
@@ -515,7 +681,7 @@ export class FarmScene implements Scene {
     // coops: at rest the door is shut and nothing moves
     for (const c of farm.coops) {
       const have = this.coops.get(c.id);
-      const plot = l.plots[c.plot] ?? l.plots[0];
+      const plot = coopAt(l, c.plot) ?? l.plots[0];
       if (!plot) continue;
       if (!have) {
         const s = this.clickable(this.place(new FrameSprite(this.assets, [`15-coop-${c.kind}`], 'idle').still('idle', 0), plot), () => ({ kind: 'coop', coopId: c.id }));
@@ -668,9 +834,11 @@ export class FarmScene implements Scene {
         break;
       }
       case 'coopBuilt': {
-        const plot = l.plots[e.plot];
+        const plot = coopAt(l, e.plot);
         const coop = this.coops.get(e.coopId);
         if (!plot || !coop) break;
+        // a coop built on land out of view: the camera goes to look
+        this.reveal({ left: plot.x - 40, top: plot.y - 90, right: plot.x + 40, bottom: plot.y + 20 });
         coop.s.play('build', { loop: false, restart: true, onDone: () => coop.s.still('idle', 0) });
         const k = { y: 0.1 };
         createTimeline()
@@ -690,15 +858,18 @@ export class FarmScene implements Scene {
         let n = 0;
         for (const actor of this.hens.values()) {
           if (n++ > 6) break;
-          actor.walkTo({ x: plot.x + (Math.random() * 40 - 20), y: plot.y + 14 + Math.random() * 10 });
+          actor.walkTo(travel(actor.position, nearestFree({ x: Math.round(plot.x + (Math.random() * 40 - 20)), y: Math.round(plot.y + 14 + Math.random() * 10) }, this.areas), this.areas));
         }
         break;
       }
+      case 'landBought':
+        // the moment plays in update() once nothing covers the farm (sync queued it)
+        break;
       case 'coopUpgraded': {
         const coop = this.coops.get(e.coopId);
         if (!coop) break;
         coop.s.play('upgrade', { loop: false, restart: true, onDone: () => coop.s.still('idle', 0) });
-        const plot = l.plots[coop.plot];
+        const plot = coopAt(l, coop.plot);
         if (plot) this.fx.burst('dust-puff', plot.x, plot.y, { count: 4, spread: 18 });
         juice.shake(2, 200);
         this.audio.play('21-build');
@@ -906,7 +1077,7 @@ export class FarmScene implements Scene {
   private hatchSpotsAtCoops(actors: HenActor[], others: Point[]): Point[] {
     const farm = this.farm;
     const coops = [...(farm?.coops ?? [])].sort((a, b) => a.plot - b.plot);
-    const doors = coops.map((c) => ({ at: this.layout.plots[c.plot], room: coopCapacity([c.kind]) })).filter((d): d is { at: Point; room: number } => Boolean(d.at));
+    const doors = coops.map((c) => ({ at: coopAt(this.layout, c.plot), room: coopCapacity([c.kind]) })).filter((d): d is { at: Point; room: number } => Boolean(d.at));
     const already = Math.max(0, (farm?.hens.length ?? 0) - actors.length);
     const taken: Point[] = [...others];
     const perDoor = new Map<number, number>();
@@ -1006,7 +1177,7 @@ export class FarmScene implements Scene {
                   setTimeout(() => {
                     if (actor.sprite.destroyed) return;
                     // out of the shell, then off into the yard
-                    actor.popOut(() => actor.walkTo(route(at, freeSpot(this.areas, [...this.hens.values()].map((a) => a.position)), this.areas)));
+                    actor.popOut(() => actor.walkTo(travel(at, freeSpot(this.areas, [...this.hens.values()].map((a) => a.position), Math.random, 8, pickRegion(this.areas, at)), this.areas)));
                     this.fx.burst('feather-puff', ground.x, ground.y - 12, { count: 4, spread: 12, rise: 10 });
                     this.audio.play('01-cluck', { delayMs: 160, volume: 0.8 });
                   }, 130);
@@ -1046,7 +1217,7 @@ export class FarmScene implements Scene {
       s.filters = [];
     });
     s.on('pointertap', () => {
-      if (g.pending) return;
+      if (g.pending || this.dragged) return;
       g.pending = true;
       void this.hooks.collect(egg.id).then((ok) => {
         if (ok) return;
@@ -1145,29 +1316,32 @@ export class FarmScene implements Scene {
   }
 
   update(dtMs: number): void {
-    // new hens hatch once the farm is in view
+    // new land's moment, and new hens hatching, once the farm is in view
+    if (!this.held && this.pendingLand.length) this.landMoment(this.pendingLand.splice(0));
     if (!this.held && this.pendingHatch.length) {
       const ready = this.pendingHatch.filter((a) => !a.sprite.destroyed && this.hens.get(a.hen.id) === a);
       this.pendingHatch = [];
       if (ready.length) this.hatch(ready);
     }
+    // the arrow keys and WASD look round the farm
+    if ((this.steer.x || this.steer.y) && dtMs > 0) this.setCam({ x: this.cam.x + this.steer.x * KEY_PAN * dtMs, y: this.cam.y + this.steer.y * KEY_PAN * dtMs });
     this.processLays();
     this.syncDayNight();
     const l = this.layout;
     const fed = (this.farm?.fedToday ?? 0) > 0;
-    const coopSpots = [...this.coops.values()].map((c) => l.plots[c.plot]).filter((p): p is Point => Boolean(p));
+    const coopSpots = [...this.coops.values()].map((c) => coopAt(l, c.plot)).filter((p): p is Point => Boolean(p));
     const areas = this.areas;
     const spots = troughSpots(l).map((p) => nearestFree(p, areas));
     const positions = () => [...this.hens.values()].map((a) => a.position);
     const world = {
       night: this.nightOn,
       fed,
-      troughSpot: (from: Point) => route(from, spots[Math.floor(Math.random() * spots.length)] ?? nearestFree(l.trough, areas), areas),
+      troughSpot: (from: Point) => travel(from, spots[Math.floor(Math.random() * spots.length)] ?? nearestFree(l.trough, areas), areas),
       roost: (from: Point) => {
         const c = coopSpots[this.roostIndex++ % Math.max(1, coopSpots.length)] ?? { x: 100, y: 160 };
-        return route(from, nearestFree({ x: Math.round(c.x + (Math.random() * 44 - 22)), y: Math.round(c.y + 12 + Math.random() * 14) }, areas), areas);
+        return travel(from, nearestFree({ x: Math.round(c.x + (Math.random() * 44 - 22)), y: Math.round(c.y + 12 + Math.random() * 14) }, areas), areas);
       },
-      spot: (from: Point) => route(from, freeSpot(areas, positions()), areas),
+      spot: (from: Point) => travel(from, freeSpot(areas, positions(), Math.random, 8, pickRegion(areas, from)), areas),
       door: (at: Point) => this.door(at),
     };
     for (const a of this.hens.values()) {
@@ -1185,6 +1359,58 @@ export class FarmScene implements Scene {
     for (const s of this.belt) s.update(dtMs);
     for (const s of this.loose) if (!s.destroyed) s.update(dtMs);
     this.fx.update(dtMs);
+  }
+
+  /**
+   * New land's moment: the camera goes to the new plot, its fence posts pop up one after another
+   * round it with a hammer tap each (the build sound, pitched up) and a puff of dust now and then,
+   * and the pasture sparkles. Reduce motion keeps the glide short and drops the shake.
+   */
+  private landMoment(ids: LandId[]): void {
+    const l = this.layout;
+    const plots = l.land.filter((p) => ids.includes(p.id));
+    const first = plots[0];
+    if (!first) {
+      this.rising.clear();
+      this.rebake();
+      return;
+    }
+    this.reveal(first.box);
+    // the fence tiles still to go up, in order round the plot (by angle from its middle)
+    const mid = { x: (first.box.left + first.box.right) / 2, y: (first.box.top + first.box.bottom) / 2 };
+    const tiles = fenceTiles(l, -4096, 4096, -4096, 4096)
+      .filter((t) => this.rising.has(`${t.x},${t.y}`))
+      .sort((a, b) => Math.atan2(a.y - mid.y, a.x - mid.x) - Math.atan2(b.y - mid.y, b.x - mid.x));
+    const gap = Math.max(18, Math.min(60, Math.round(1600 / Math.max(1, tiles.length))));
+    const start = 380;
+    const posts: Sprite[] = [];
+    tiles.forEach((t, i) => {
+      setTimeout(() => {
+        if (this.root.destroyed) return;
+        const s = new Sprite(this.assets.region('23-farm-tileset', t.tile[0] * 128, t.tile[1] * 128, 128, 128));
+        s.anchor.set(0.5, 1);
+        s.position.set(t.x + TILE / 2, t.y + TILE);
+        s.label = 'land-post';
+        this.layers.by.floor.addChild(s);
+        posts.push(s);
+        const k = { y: 0 };
+        animate(k, { y: [0, 1.3, 1], duration: 260, ease: 'outBack(2)', onUpdate: () => !s.destroyed && s.scale.set(1, k.y) });
+        if (i % 3 === 0) this.audio.play('21-build', { volume: 0.35, pitch: 1.35 + (i % 2) * 0.15, minGapMs: 70 });
+        if (i % 4 === 0) this.fx.burst('dust-puff', t.x + TILE / 2, t.y + TILE, { count: 2, spread: 6 });
+      }, start + i * gap);
+    });
+    const done = start + tiles.length * gap + 320;
+    setTimeout(() => {
+      if (this.root.destroyed) return;
+      // the posts stand in the baked ground now
+      this.rising.clear();
+      this.rebake();
+      for (const s of posts) if (!s.destroyed) s.destroy();
+      for (const p of plots) this.fx.burst('sparkle', (p.pasture.left + p.pasture.right) / 2, (p.pasture.top + p.pasture.bottom) / 2, { count: 6, spread: 30, rise: 0.02 });
+      juice.shake(2, 220);
+      this.audio.play('07-chorus', { volume: 0.7 });
+    }, done);
+    this.audio.play('21-build', { delayMs: start, volume: 0.6 });
   }
 
   /** Where a machine stands (its feet), for its smoke and sparkles. */
@@ -1257,6 +1483,8 @@ export class FarmScene implements Scene {
   }
 
   destroy(): void {
+    this.camTween?.pause();
+    farmCamera.set({ on: false, x: 0, y: 0 });
     for (const id of this.smoke.values()) clearInterval(id);
     for (const w of this.wobble.values()) w.pause();
     this.ambience.day?.stop(600);
@@ -1265,4 +1493,26 @@ export class FarmScene implements Scene {
     for (const l of this.machineLoops.values()) l?.stop(600);
     this.root.destroy({ children: true });
   }
+}
+
+/**
+ * The fence's tiles inside a box of the world: each rail's row (the gate where the path crosses
+ * it) and each column of posts, on whole tiles.
+ */
+export function fenceTiles(l: FarmLayout, x0: number, x1: number, y0: number, y1: number): { x: number; y: number; tile: [number, number] }[] {
+  const out: { x: number; y: number; tile: [number, number] }[] = [];
+  const seen = new Set<string>();
+  const put = (x: number, y: number, tile: [number, number]) => {
+    const key = `${x},${y}`;
+    if (seen.has(key) || x + TILE <= x0 || x >= x1 || y + TILE <= y0 || y >= y1) return;
+    seen.add(key);
+    out.push({ x, y, tile });
+  };
+  for (const r of l.fences.rails) {
+    const from = Math.max(Math.floor(x0 / TILE) * TILE, Number.isFinite(r.left) ? r.left : -Infinity);
+    const to = Math.min(x1, r.right);
+    for (let x = Math.ceil(from / TILE) * TILE; x < to; x += TILE) put(x, r.y, r.y === l.fence.y && (x === l.path.x - TILE || x === l.path.x) ? GATE_TILE : RAIL_TILE);
+  }
+  for (const p of l.fences.posts) for (let y = p.top; y < p.bottom; y += TILE) put(p.x, y, POST_TILE);
+  return out;
 }
