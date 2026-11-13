@@ -125,7 +125,7 @@ describe('no scrollbars and nothing cut off', () => {
             await walk(`${modal} ${id}`, max);
           }
         };
-        await tabs('shop', ['shop-hens', 'shop-feed', 'shop-coops', 'shop-machines']);
+        await tabs('shop', ['shop-hens', 'shop-feed', 'shop-coops', 'shop-machines', 'shop-land']);
         // the Market (a page of its own): every tab, and every page of every list on it
         await open('market');
         await page.locator('[data-ui="market-page"]').waitFor();

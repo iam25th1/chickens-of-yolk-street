@@ -3,7 +3,7 @@
 import type { FeatherGrade, MilestoneId, UnlockId } from '@coys/shared';
 import { Emitter, createStore } from './store';
 
-export type ShopTab = 'hens' | 'feed' | 'coops' | 'machines';
+export type ShopTab = 'hens' | 'feed' | 'coops' | 'machines' | 'land';
 /** The Market page's tabs: prices, sell, buy orders, your orders, trade, hen auction, farms. */
 export type MarketTab = 'prices' | 'sell' | 'buyers' | 'mine' | 'trade' | 'auction' | 'farms';
 export const PROFILE_TABS = ['overview', 'eggs', 'money', 'flock', 'machines', 'market', 'mint', 'badges'] as const;

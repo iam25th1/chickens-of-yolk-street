@@ -32,6 +32,24 @@ interface SeedReport {
   /** Open AI farms after each day close, and the days it was outside [floor, cap]. */
   aiFarmsPerDay: number[];
   aiOutOfBounds: string[];
+  /**
+   * Land: for each player, and for the street's most successful farm (the AI farm richest on the
+   * last day), the first day (after its close) the farm's coins reached the price of the first plot,
+   * of the first two, and so on (each plot bought as soon as the coins allow), or null within the 30
+   * days; and the coins each held on the last day.
+   */
+  land: Record<string, (number | null)[]>;
+  lastCash: Record<string, number>;
+}
+
+/** The first day (1-based) the coins reached the price of the first k plots together, for k = 1 to 4 (null: not within the run). */
+function landDays(coins: number[]): (number | null)[] {
+  let need = 0;
+  return ECONOMY.land.prices.map((p) => {
+    need += p;
+    const d = coins.findIndex((c) => c >= need);
+    return d < 0 ? null : d + 1;
+  });
 }
 
 async function runSeed(seed: number): Promise<{ report: SeedReport; t: TestGame; players: { playerId: string; farmId: string }[] }> {
@@ -54,6 +72,8 @@ async function runSeed(seed: number): Promise<{ report: SeedReport; t: TestGame;
   const players = [await t.game.ensurePlayer('dev', 'sim-player-01', 'Ada'), await t.game.ensurePlayer('dev', 'sim-player-02', 'Bo')];
   for (const [i, p] of players.entries()) await t.game.act(p.playerId, { t: 'linkWallet', rid: `w${i}`, accountId: ['ada.testnet', 'bo.testnet'][i] ?? 'x.testnet' });
   const cash: Record<string, string[]> = {};
+  const coins: number[][] = players.map(() => []);
+  const rivalCoins: Record<string, number[]> = {};
   const aiFarmsPerDay: number[] = [];
   const aiOutOfBounds: string[] = [];
   for (let day = 1; day <= 30; day++) {
@@ -61,9 +81,17 @@ async function runSeed(seed: number): Promise<{ report: SeedReport; t: TestGame;
     const open = await aiFarmsOpen(t);
     aiFarmsPerDay.push(open.ai);
     if (open.ai < ECONOMY.agents.entry.minAiFarms || open.ai > aiFarmCap(open.players)) aiOutOfBounds.push(`day ${day}: ${open.ai} AI farms, ${open.players} players`);
-    const rows = await t.db.query(`SELECT a.kind, a.generation, a.entrant_key, a.status, COALESCE(f.cash_milli, a.cash_milli) AS cash FROM agents a LEFT JOIN farms f ON f.id = a.farm_id`);
-    for (const r of rows) (cash[`${String(r.entrant_key ?? r.kind)}${Number(r.generation) > 1 ? r.generation : ''}`] ??= Array<string>(day - 1).fill('.')).push(r.status === 'bust' ? 'bust' : String(Math.round(Number(r.cash) / 1000)));
-    for (const [i, p] of players.entries()) (cash[`player${i + 1}`] ??= []).push(String(Math.round((await t.game.getFarmState(p.farmId)).cashMilli / 1000)));
+    const rows = await t.db.query(`SELECT a.kind, a.generation, a.entrant_key, a.status, a.role, COALESCE(f.cash_milli, a.cash_milli) AS cash FROM agents a LEFT JOIN farms f ON f.id = a.farm_id`);
+    for (const r of rows) {
+      const key = `${String(r.entrant_key ?? r.kind)}${Number(r.generation) > 1 ? r.generation : ''}`;
+      (cash[key] ??= Array<string>(day - 1).fill('.')).push(r.status === 'bust' ? 'bust' : String(Math.round(Number(r.cash) / 1000)));
+      if (r.role === 'rival') (rivalCoins[key] ??= Array<number>(day - 1).fill(0)).push(r.status === 'bust' ? 0 : Number(r.cash) / 1000);
+    }
+    for (const [i, p] of players.entries()) {
+      const c = (await t.game.getFarmState(p.farmId)).cashMilli / 1000;
+      (cash[`player${i + 1}`] ??= []).push(String(Math.round(c)));
+      coins[i]?.push(c);
+    }
   }
   const history = (await t.db.query('SELECT day, supply, multiplier, reference FROM market_days WHERE closed_at IS NOT NULL ORDER BY day')).map((r) => ({
     day: Number(r.day),
@@ -104,6 +132,11 @@ async function runSeed(seed: number): Promise<{ report: SeedReport; t: TestGame;
     entrants: (await t.db.query(`SELECT name, opened_day FROM agents WHERE entrant_key IS NOT NULL ORDER BY opened_day, name`)).map((r) => `${String(r.name)} (day ${String(r.opened_day)})`),
     aiFarmsPerDay,
     aiOutOfBounds,
+    ...(() => {
+      const best = Object.entries(rivalCoins).sort((a, b) => (b[1].at(-1) ?? 0) - (a[1].at(-1) ?? 0))[0] ?? ['none', []];
+      const series: [string, number[]][] = [...coins.map((c, i) => [`player${i + 1}`, c] as [string, number[]]), [`best farm (${best[0]})`, best[1]]];
+      return { land: Object.fromEntries(series.map(([k, c]) => [k, landDays(c)])), lastCash: Object.fromEntries(series.map(([k, c]) => [k, Math.round(c.at(-1) ?? 0)])) };
+    })(),
   };
   return { report, t, players };
 }
@@ -139,6 +172,11 @@ describe('30-day market simulation', () => {
     }
     console.log(
       `SIM ACCEPTANCE ${reports.map((r) => `seed ${r.seed}: median x${r.medianMultiplier.toFixed(2)}, min x${r.minMultiplier.toFixed(2)}, ${r.glutDays} glut days, rival busts: ${r.rivalBusts.join(', ') || 'none'}, ${r.onChainDeliveries.eggs} contract eggs to the Bakery wallet on chain`).join(' | ')}`,
+    );
+    console.log(
+      `SIM LAND prices ${ECONOMY.land.prices.join(' ')}: ${reports
+        .map((r) => `seed ${r.seed}: ${Object.entries(r.land).map(([p, d]) => `${p} plots by day ${d.map((x) => x ?? '-').join('/')} (day 30 coins ${r.lastCash[p]})`).join(', ')}`)
+        .join(' | ')}`,
     );
     console.log(
       `SIM ENTRANTS ${reports.map((r) => `seed ${r.seed}: entrants ${r.entrants.join(', ') || 'none'}; rival busts ${r.rivalBusts.join(', ') || 'none'}; AI farms per day ${r.aiFarmsPerDay.join(' ')}`).join(' | ')}`,

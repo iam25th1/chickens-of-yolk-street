@@ -16,6 +16,10 @@ import {
   RARITIES,
   breakageRate,
   coopCapacity,
+  coopPlots,
+  LAND_IDS,
+  LAND_NAME,
+  landPrice,
   coopUpgradeCost,
   crowdingFactor,
   eggPrice,
@@ -42,6 +46,7 @@ import {
   type FeedTier,
   type GameEvent,
   type HenView,
+  type LandId,
   type LedgerDay,
   type MarketChartDay,
   type MarketDay,
@@ -117,7 +122,7 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 export type PlayerAction = DistributiveOmit<Exclude<ActionMessage, { t: 'linkWallet' | 'getLedger' | 'getProfile' }>, 'rid'>;
 
 /** Actions that are business on the farm (the night owl and the rooster crow count them); settings and the tour are not. */
-const BUSINESS = new Set<string>(['buyHens', 'buyHen', 'buyFeed', 'buyFeedOnCredit', 'buildCoop', 'upgradeCoop', 'buyUnlock', 'repairMachine', 'sell', 'collect', 'claimGoal', 'redeemTicket', 'respondCard', 'deliverContract', 'placeOrder', 'cancelOrder', 'fillOrder']);
+const BUSINESS = new Set<string>(['buyHens', 'buyHen', 'buyFeed', 'buyFeedOnCredit', 'buildCoop', 'upgradeCoop', 'buyUnlock', 'buyLand', 'repairMachine', 'sell', 'collect', 'claimGoal', 'redeemTicket', 'respondCard', 'deliverContract', 'placeOrder', 'cancelOrder', 'fillOrder']);
 
 export type ActionResult = { ok: true; events: GameEvent[] } | { ok: false; code: ErrorCode; message: string };
 
@@ -205,6 +210,8 @@ export class Game {
   private mintAgain = false;
   private clock = { day: 1, dayStartedAt: 0 };
   private ticking = false;
+  /** The agents' decisions for the coming close, gathered ahead of midnight so model calls never hold the close up. */
+  private gathering: { day: number; promise: Promise<Gathered[] | null> } | null = null;
   /** Decisions, reflections and model calls (by tier, with their tokens), for reports and tests. */
   readonly stats = { decisions: 0, modelCalls: 0, fallbacks: 0, skipped: 0, reflections: 0, reflectionCalls: 0, mainCalls: 0, cheapCalls: 0, promptTokens: 0, completionTokens: 0 };
 
@@ -329,6 +336,12 @@ export class Game {
     if (this.now() >= this.clock.dayStartedAt + this.dayMs) {
       await this.tickIfDue();
       return;
+    }
+    // a model call takes seconds: the agents decide in the day's last stretch (the close's model time
+    // and a little more), in the background, so the close itself never waits on a model
+    const lead = (this.brain.chain?.closeBudgetMs ?? 0) + 10_000;
+    if (this.withCast && lead > 10_000 && !this.gathering && this.now() >= this.clock.dayStartedAt + this.dayMs - lead) {
+      this.gathering = { day: this.clock.day, promise: this.gatherDecisions().catch(() => null) };
     }
     await this.serial(() =>
       this.inTx(async (ctx) => {
@@ -504,6 +517,7 @@ export class Game {
       [farmId, 'alive'],
     );
     const coops = await q.query('SELECT id, kind, plot FROM coops WHERE farm_id = $1 ORDER BY plot', [farmId]);
+    const land = await ownedLand(q, farmId);
     const unlocks = await this.loadUnlocks(q, farmId);
     const eggs = await q.query('SELECT id, hen_id, at_ms, grade, broken, collected FROM lay_events WHERE farm_id = $1 AND day = $2 ORDER BY at_ms', [farmId, day]);
     const shopRows = await q.query(`SELECT id, body, eyes, comb, accessory, laying_trait, born_day, status FROM hens WHERE status IN ('forsale', 'auction') ORDER BY status, laying_trait DESC LIMIT 12`);
@@ -518,6 +532,7 @@ export class Game {
       fedToday: farm.fedMultiplier,
       hens: hens.map(henView),
       coops: coops.map((c) => ({ id: String(c.id), kind: c.kind as CoopKind, plot: num(c.plot) })),
+      land,
       crate: farm.crate,
       unlocks: unlocks.owned,
       machineState: machineViews(unlocks),
@@ -870,6 +885,18 @@ export class Game {
       case 'keepFarmName':
         await ctx.q.query('UPDATE farms SET needs_name = false WHERE id = $1', [farm.id]);
         return;
+      case 'buyLand': {
+        // the next price in the list, whichever plot it is; a plot is bought once
+        const owned = await ownedLand(ctx.q, farm.id);
+        if (owned.includes(action.plot)) throw new ActionError('invalid_action', `${action.plot} is already yours`);
+        const price = landPrice(owned.length);
+        if (price === null) throw new ActionError('invalid_action', 'every plot is bought');
+        const cost = toMilli(price);
+        await spend(ctx, farm, 'land', cost, LAND_NAME[action.plot].toLowerCase());
+        await ctx.q.query('INSERT INTO farm_land (farm_id, plot, bought_day, price_milli) VALUES ($1, $2, $3, $4)', [farm.id, action.plot, ctx.day, cost]);
+        emit(ctx, farm, { kind: 'landBought', plot: action.plot, costMilli: cost });
+        return;
+      }
       case 'redeemTicket': {
         const r = await redeemTicket(ctx, farm.id, action.ticketId, this.collection ?? 'live');
         emit(ctx, farm, { kind: 'ticketRedeemed', ticketId: action.ticketId, grade: r.grade, score: r.score, feeMilli: r.feeMilli, number: r.number });
@@ -927,13 +954,9 @@ export class Game {
         await ctx.q.query('UPDATE farms SET hopper_cap_milli = $2 WHERE id = $1', [farm.id, toMilli(action.cap)]);
         return;
       case 'buildCoop': {
+        // the first free coop plot: the home plot's, then each plot of land the farm owns
         const used = new Set((await ctx.q.query<{ plot: number }>('SELECT plot FROM coops WHERE farm_id = $1', [farm.id])).map((r) => num(r.plot)));
-        let plot = -1;
-        for (let p = 0; p < ECONOMY.coops.plots; p++)
-          if (!used.has(p)) {
-            plot = p;
-            break;
-          }
+        const plot = coopPlots(await ownedLand(ctx.q, farm.id)).find((p) => !used.has(p)) ?? -1;
         if (plot < 0) throw new ActionError('invalid_action', 'no free coop plot');
         const cost = toMilli(ECONOMY.coops.kinds[action.kind].price);
         await spend(ctx, farm, 'coop', cost, `build ${action.kind}`);
@@ -1183,7 +1206,10 @@ export class Game {
    * total supply, then open the next day with fresh cards and a fresh shop.
    */
   async endDay(): Promise<void> {
-    const decisions = await this.gatherDecisions();
+    // the decisions gathered ahead of midnight for this day, or gathered now
+    const early = this.gathering?.day === this.clock.day ? await this.gathering.promise : null;
+    this.gathering = null;
+    const decisions = early ?? (await this.gatherDecisions());
     const closedDay = await this.serial(async () => {
       let ctxOut: Ctx | null = null;
       const outcome = await this.db.tx(async (q) => {
@@ -1561,3 +1587,9 @@ export class Game {
   }
 }
 
+/** The plots of land a farm owns beside its home plot, in LAND_IDS order. */
+export async function ownedLand(q: Queryable, farmId: string): Promise<LandId[]> {
+  const rows = await q.query<{ plot: string }>('SELECT plot FROM farm_land WHERE farm_id = $1', [farmId]);
+  const have = new Set(rows.map((r) => String(r.plot)));
+  return LAND_IDS.filter((l) => have.has(l));
+}

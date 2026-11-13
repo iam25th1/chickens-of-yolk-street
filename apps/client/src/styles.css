@@ -928,3 +928,72 @@ input[type='range'].slider::-moz-range-thumb {
 .topbar.compact .stat-label {
   display: none;
 }
+
+/* ---- land ------------------------------------------------------------------------------------- */
+
+/* The shop's LAND tab: the home plot in the middle of a 3 x 3 map, the four plots around it. */
+.land-map {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 34px);
+  gap: 3px;
+}
+
+.land-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+  background: var(--cream-deep);
+  box-shadow: 0 0 0 1px var(--wood);
+  text-align: center;
+}
+
+.land-cell.home {
+  background: var(--straw);
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+.land-cell.owned {
+  background: var(--grass);
+  color: var(--cream);
+  box-shadow: 0 0 0 1px var(--grass-deep);
+}
+
+.land-cell.owned .chip {
+  color: var(--ink);
+}
+
+/* The look-round controls over the farm's top-left corner: the small map and HOME. */
+.look {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.land-mini {
+  position: relative;
+  background: var(--grass-deep);
+  box-shadow:
+    0 0 0 1px var(--ink),
+    0 2px 0 1px var(--ink);
+  cursor: pointer;
+}
+
+.land-mini-plot {
+  position: absolute;
+  background: var(--grass);
+}
+
+.land-mini-plot.home {
+  background: var(--straw);
+}
+
+.land-mini-view {
+  position: absolute;
+  box-shadow: inset 0 0 0 1px var(--cream);
+  pointer-events: none;
+}
