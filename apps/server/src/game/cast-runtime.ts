@@ -119,11 +119,22 @@ export async function aiFarmCounts(q: Queryable): Promise<{ open: number; pendin
 /**
  * The entry rule, at each day close (ctx.day is the new day): while the AI farms (open, plus base
  * rivals about to reopen) are under the cap, a new one enters with ECONOMY.agents.entry.chance when
- * supply stayed under demand on each of the last closed days or a rival went bust lately; under the
- * floor of open AI farms one enters whatever the chance. At most one a day. The game's seeded rng
- * decides, so a seed replays the same street.
+ * supply stayed under demand on each of the last closed days or a rival went bust lately (at most one
+ * a day); under the floor of open AI farms they enter whatever the chance, until the floor is met.
+ * The game's seeded rng decides, so a seed replays the same street.
  */
-export async function enterAiFarm(ctx: Ctx, createFarm: CreateFarm): Promise<AgentRow | null> {
+export async function enterAiFarms(ctx: Ctx, createFarm: CreateFarm): Promise<AgentRow[]> {
+  const entered: AgentRow[] = [];
+  for (let i = 0; i < ECONOMY.agents.entry.minAiFarms + 1; i++) {
+    const one = await enterAiFarm(ctx, createFarm);
+    if (!one) break;
+    entered.push(one);
+    if ((await aiFarmCounts(ctx.q)).open >= ECONOMY.agents.entry.minAiFarms) break;
+  }
+  return entered;
+}
+
+async function enterAiFarm(ctx: Ctx, createFarm: CreateFarm): Promise<AgentRow | null> {
   const e = ECONOMY.agents.entry;
   const counts = await aiFarmCounts(ctx.q);
   const forced = counts.open < e.minAiFarms;

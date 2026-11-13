@@ -64,7 +64,7 @@ import {
   buildContext,
   chargeForThinking,
   ensureCast,
-  enterAiFarm,
+  enterAiFarms,
   loyalistCreditQuote,
   openAgents,
   recordReason,
@@ -1139,7 +1139,7 @@ export class Game {
         await this.refreshShop(ctx);
         if (this.withCast) await ensureCast(ctx, this.createFarmFn);
         // a new AI farm may enter: when eggs ran short for days, a rival went bust, or too few are open
-        if (this.withEntrants) await enterAiFarm(ctx, this.createFarmFn);
+        if (this.withEntrants) await enterAiFarms(ctx, this.createFarmFn);
         // orders, fills and offers price against the new day's market
         const candidates: Candidate[] = [];
         for (const { agentId, result } of acted) {

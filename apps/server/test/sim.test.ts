@@ -1,59 +1,18 @@
-// 30 in-game days of the whole market, over five fixed seeds: the seven agents plus two headless
-// players who play greedily (feed first, accept good cards, haggle sometimes, expand while it pays,
-// sell everything). The model brain is a stub that answers each agent's own in-character decision
-// as JSON on most calls and garbage on every fourth, under a small spend cap, so fallbacks and the
-// cap are exercised too. Each seed prints a report; the economy acceptance is checked across seeds.
+// 30 in-game days of the whole market, over five fixed seeds: the seven agents, the AI farms that
+// enter by the entry rule, and two headless players who play greedily (sim-players.ts). The model
+// brain is a stub that answers each agent's own rule decision as JSON on most calls and garbage on
+// every fourth, under a small spend cap, so fallbacks and the cap are exercised too. Each seed prints
+// a report (with its entrants, busts and open AI farms per day); the economy acceptance is checked
+// per seed and across seeds, and the AI farm count stays within its bounds after every day close.
 import { describe, expect, it } from 'vitest';
-import { ECONOMY, emptyEggStock, type FarmState } from '@coys/shared';
+import { ECONOMY, aiFarmCap, emptyEggStock } from '@coys/shared';
 import { NearAiClient } from '../src/ai/nearai';
 import type { AgentContext } from '../src/agents/decision';
 import { ruleDecision } from '../src/agents/rules';
 import { RecordingChain, makeGame, type TestGame } from './helpers';
+import { aiFarmsOpen, playDay } from './sim-players';
 
-const eggs = (f: FarmState) => f.crate.white + f.crate.cream + f.crate.brown + f.crate.golden;
 const SEEDS = [1, 2, 3, 4, 5];
-
-async function playDay(t: TestGame, players: { playerId: string; farmId: string }[], day: number): Promise<void> {
-  // cards arrive through the day; walk the clock across the day in steps
-  for (const frac of [0.15, 0.35, 0.55, 0.75, 0.95]) {
-    const start = t.game.getClock().dayStartedAt;
-    t.clock.t = start + Math.floor(ECONOMY.day.lengthMs * frac);
-    await t.game.tick();
-    for (const p of players) {
-      const farm = await t.game.getFarmState(p.farmId);
-      for (const card of farm.cards.filter((c) => c.status === 'open')) {
-        const haggle = card.choices.includes('counter') && (day + card.id.charCodeAt(0)) % 3 === 0;
-        const choice = haggle ? 'counter' : card.choices.includes('accept') ? 'accept' : (card.choices[0] ?? 'decline');
-        const ask = haggle ? (card.offerMilli / 1000) * (card.kind === 'feed-deal' || card.kind === 'credit-terms' ? 0.85 : 1.2) : undefined;
-        await t.game.act(p.playerId, { t: 'respondCard', rid: `${card.id}-${frac}`, cardId: card.id, choice, ...(ask ? { ask } : {}) });
-      }
-      for (const c of farm.contracts.filter((c) => !c.deliveredToday)) {
-        await t.game.act(p.playerId, { t: 'deliverContract', rid: `d-${c.id}-${day}-${frac}`, contractId: c.id });
-      }
-    }
-  }
-  for (const p of players) {
-    let farm = await t.game.getFarmState(p.farmId);
-    if (eggs(farm) > 0) await t.game.act(p.playerId, { t: 'sell', rid: `s-${p.farmId}-${day}`, items: farm.crate });
-    farm = await t.game.getFarmState(p.farmId);
-    // feed first: keep four days in the trough, standard feed when it can, cheap when short
-    for (let i = 0; i < 4; i++) {
-      const feed = farm.feedGrams.cheap + farm.feedGrams.standard + farm.feedGrams.premium;
-      if (feed >= farm.hens.length * 120 * 4) break;
-      const tier = farm.cashMilli >= 110_000 ? 'standard' : 'cheap';
-      if (farm.cashMilli < ECONOMY.feed.tiers[tier].bagPrice * 1150) break;
-      if (!(await t.game.act(p.playerId, { t: 'buyFeed', rid: `f-${p.farmId}-${day}-${i}`, tier, bags: 1 })).ok) break;
-      farm = await t.game.getFarmState(p.farmId);
-    }
-    const room = farm.coops.reduce((s, c) => s + ECONOMY.coops.kinds[c.kind].capacity, 0) - farm.hens.length;
-    // expand with what is left after a bag of feed for the bigger flock
-    const afford = Math.floor((farm.cashMilli / 1000 - 25 - ECONOMY.feed.tiers.standard.bagPrice) / ECONOMY.hen.price);
-    if (room > 0 && afford > 0) await t.game.act(p.playerId, { t: 'buyHens', rid: `h-${p.farmId}-${day}`, count: Math.min(room, afford, 20) });
-    if (farm.cashMilli > 200_000 && farm.coops.length < ECONOMY.coops.plots) await t.game.act(p.playerId, { t: 'buildCoop', rid: `c-${p.farmId}-${day}`, kind: 'red' });
-  }
-  t.clock.t = t.game.getClock().dayStartedAt + ECONOMY.day.lengthMs;
-  await t.game.endDay();
-}
 
 interface SeedReport {
   seed: number;
@@ -68,6 +27,11 @@ interface SeedReport {
   /** Contract eggs that moved as tokens from a player wallet to the Bakery wallet, and the first receipt. */
   onChainDeliveries: { transfers: number; eggs: number; firstReceipt: string | null };
   cash: Record<string, string>;
+  /** AI farms that entered by the entry rule, with the day each opened. */
+  entrants: string[];
+  /** Open AI farms after each day close, and the days it was outside [floor, cap]. */
+  aiFarmsPerDay: number[];
+  aiOutOfBounds: string[];
 }
 
 async function runSeed(seed: number): Promise<{ report: SeedReport; t: TestGame; players: { playerId: string; farmId: string }[] }> {
@@ -90,10 +54,15 @@ async function runSeed(seed: number): Promise<{ report: SeedReport; t: TestGame;
   const players = [await t.game.ensurePlayer('dev', 'sim-player-01', 'Ada'), await t.game.ensurePlayer('dev', 'sim-player-02', 'Bo')];
   for (const [i, p] of players.entries()) await t.game.act(p.playerId, { t: 'linkWallet', rid: `w${i}`, accountId: ['ada.testnet', 'bo.testnet'][i] ?? 'x.testnet' });
   const cash: Record<string, string[]> = {};
+  const aiFarmsPerDay: number[] = [];
+  const aiOutOfBounds: string[] = [];
   for (let day = 1; day <= 30; day++) {
     await playDay(t, players, day);
-    const rows = await t.db.query(`SELECT a.kind, a.generation, a.status, COALESCE(f.cash_milli, a.cash_milli) AS cash FROM agents a LEFT JOIN farms f ON f.id = a.farm_id`);
-    for (const r of rows) (cash[`${String(r.kind)}${Number(r.generation) > 1 ? r.generation : ''}`] ??= Array<string>(day - 1).fill('.')).push(r.status === 'bust' ? 'bust' : String(Math.round(Number(r.cash) / 1000)));
+    const open = await aiFarmsOpen(t);
+    aiFarmsPerDay.push(open.ai);
+    if (open.ai < ECONOMY.agents.entry.minAiFarms || open.ai > aiFarmCap(open.players)) aiOutOfBounds.push(`day ${day}: ${open.ai} AI farms, ${open.players} players`);
+    const rows = await t.db.query(`SELECT a.kind, a.generation, a.entrant_key, a.status, COALESCE(f.cash_milli, a.cash_milli) AS cash FROM agents a LEFT JOIN farms f ON f.id = a.farm_id`);
+    for (const r of rows) (cash[`${String(r.entrant_key ?? r.kind)}${Number(r.generation) > 1 ? r.generation : ''}`] ??= Array<string>(day - 1).fill('.')).push(r.status === 'bust' ? 'bust' : String(Math.round(Number(r.cash) / 1000)));
     for (const [i, p] of players.entries()) (cash[`player${i + 1}`] ??= []).push(String(Math.round((await t.game.getFarmState(p.farmId)).cashMilli / 1000)));
   }
   const history = (await t.db.query('SELECT day, supply, multiplier, reference FROM market_days WHERE closed_at IS NOT NULL ORDER BY day')).map((r) => ({
@@ -132,12 +101,15 @@ async function runSeed(seed: number): Promise<{ report: SeedReport; t: TestGame;
     })(),
     wholesalerResold: Number((await t.db.query(`SELECT COALESCE(SUM(qty), 0) AS n FROM trades WHERE via = 'resale'`))[0]?.n),
     cash: Object.fromEntries(Object.entries(cash).map(([k, v]) => [k, v.join(' ')])),
+    entrants: (await t.db.query(`SELECT name, opened_day FROM agents WHERE entrant_key IS NOT NULL ORDER BY opened_day, name`)).map((r) => `${String(r.name)} (day ${String(r.opened_day)})`),
+    aiFarmsPerDay,
+    aiOutOfBounds,
   };
   return { report, t, players };
 }
 
 describe('30-day market simulation', () => {
-  it('five seeds: a typical day near 1.00x, a glut in every seed, rivals going bust, the cap holding', async () => {
+  it('five seeds: a typical day near 1.00x, a glut in every seed, rivals going bust, AI farms entering within bounds, the cap holding', async () => {
     const reports: SeedReport[] = [];
     for (const seed of SEEDS) {
       const { report, t, players } = await runSeed(seed);
@@ -158,6 +130,8 @@ describe('30-day market simulation', () => {
       expect(report.inference.spendUsd).toBeLessThanOrEqual(report.inference.capUsd);
       expect(report.inference.fallbacks).toBeGreaterThan(0);
       expect(report.contracts.delivered + report.contracts.missed).toBeGreaterThan(0);
+      // the AI farm count never leaves its bounds: at least the floor, at most the cap
+      expect(report.aiOutOfBounds).toEqual([]);
       // Bakery contract eggs reach the Bakery's wallet as tokens in the day's settlement batch
       expect(report.onChainDeliveries.transfers).toBeGreaterThan(0);
       for (const p of players) expect(await t.game.ledgerTotal(p.farmId)).toBe((await t.game.getFarmState(p.farmId)).cashMilli);
@@ -166,12 +140,22 @@ describe('30-day market simulation', () => {
     console.log(
       `SIM ACCEPTANCE ${reports.map((r) => `seed ${r.seed}: median x${r.medianMultiplier.toFixed(2)}, min x${r.minMultiplier.toFixed(2)}, ${r.glutDays} glut days, rival busts: ${r.rivalBusts.join(', ') || 'none'}, ${r.onChainDeliveries.eggs} contract eggs to the Bakery wallet on chain`).join(' | ')}`,
     );
+    console.log(
+      `SIM ENTRANTS ${reports.map((r) => `seed ${r.seed}: entrants ${r.entrants.join(', ') || 'none'}; rival busts ${r.rivalBusts.join(', ') || 'none'}; AI farms per day ${r.aiFarmsPerDay.join(' ')}`).join(' | ')}`,
+    );
     for (const r of reports) {
       expect(r.medianMultiplier).toBeGreaterThanOrEqual(0.8);
       expect(r.medianMultiplier).toBeLessThanOrEqual(1.3);
       expect(r.glutDays).toBeGreaterThanOrEqual(1);
     }
     expect(reports.filter((r) => r.rivalBusts.length > 0).length).toBeGreaterThanOrEqual(3);
+    // with entrants: the median over seeds of each seed's median, gluts and busts across the seeds
+    const medians = reports.map((r) => r.medianMultiplier).sort((a, b) => a - b);
+    expect(medians[2]).toBeGreaterThanOrEqual(0.8);
+    expect(medians[2]).toBeLessThanOrEqual(1.3);
+    expect(reports.reduce((n, r) => n + r.glutDays, 0)).toBeGreaterThanOrEqual(1);
+    expect(reports.reduce((n, r) => n + r.rivalBusts.length, 0)).toBeGreaterThanOrEqual(1);
+    expect(reports.some((r) => r.entrants.length > 0)).toBe(true);
   }, 600_000);
 
   it('a rival can go bust in a glut; its hens go to auction and a new rival opens', async () => {
