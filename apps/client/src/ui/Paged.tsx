@@ -219,8 +219,9 @@ export function Paged({
       {!cell && (
         <div ref={measure} className="paged-measure" aria-hidden="true">
           {items.map((it, i) => (
-            // flow-root keeps an item's own margins inside its measured height
-            <div key={i} style={{ display: 'flow-root' }}>
+            // laid out as the shown list lays it out (a flex column item: an inline item becomes a
+            // block, so its padding counts), with its own margins inside the measured height
+            <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
               {it}
             </div>
           ))}
