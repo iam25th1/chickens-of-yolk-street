@@ -701,7 +701,7 @@ export class Game {
         bust: r.bust_day !== null,
         badges: topBadges(marks.get(String(r.id)) ?? [], 3),
       })),
-      explorer: this.chain.explorer,
+      explorer: await this.explorer(),
       minting: this.chain.minting,
       feathers: await (async () => {
         const c = await featherCount(this.db, this.chain.featherMinted);
@@ -734,7 +734,7 @@ export class Game {
       provenance: this.provenance,
       contract: this.chain.contractId,
       contractUrl: this.chain.contractId ? `https://testnet.nearblocks.io/address/${this.chain.contractId}` : null,
-      explorer: this.chain.explorer,
+      explorer: await this.explorer(),
       minting: this.chain.minting,
       redeemFeeMilli: toMilli(F.redeemFee),
       estimates: rarityEstimates(byGrade),
@@ -744,6 +744,21 @@ export class Game {
       recent: [...(await featherSlots(this.db, 'recent')), ...slots.filter((x) => !local.some((l) => l.number === x.number)).reverse()].slice(0, 8),
       slots,
     };
+  }
+
+  /**
+   * The explorer base for settlement receipts: the chain writer's, or, on a server that does not
+   * settle (a local copy of a live database), the testnet explorer while the database holds days a
+   * testnet call settled, so their real receipts stay linked.
+   */
+  private explorerKnown: string | null | undefined = undefined;
+  private async explorer(): Promise<string | null> {
+    if (this.chain.explorer) return this.chain.explorer;
+    if (this.explorerKnown === undefined) {
+      const [r] = await this.db.query(`SELECT 1 AS x FROM market_days WHERE settlement_tx IS NOT NULL AND settlement_status = 'sent' LIMIT 1`);
+      this.explorerKnown = r ? 'https://testnet.nearblocks.io/txns/' : null;
+    }
+    return this.explorerKnown;
   }
 
   /** A player farm's player, by the farm's exact name (the local demo session signs into it). */
