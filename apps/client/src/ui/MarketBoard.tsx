@@ -2,7 +2,8 @@
 // how much the whole street has sold against what it needs (a glut sinks tomorrow's price, scarcity
 // lifts it) and the Feathers left. FARMS: the farms ranked, bust ones with their hens at auction.
 // ORDERS: sell into a buyer's order, buy a neighbour's eggs, or post your own price. TRADES: recent
-// big trades and the cast. Every list is paged to fit (never a scrollbar).
+// big trades and the cast, each agent with its latest public reason. Every AI farm and agent wears
+// the AI tag. Every list is paged to fit (never a scrollbar).
 import { useEffect, useState } from 'react';
 import { EGG_GRADES, type EggGrade, type FarmState, type MarketState } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
@@ -10,6 +11,7 @@ import type { Action } from '../net/socket';
 import { uiEvents, type MarketTab } from '../state/ui';
 import { useViewport } from '../app/Stage';
 import { LOOK } from './cast';
+import { AiBadge } from './AiBadge';
 import { SplitFlap } from './Hud';
 import { SheetSprite } from './SheetSprite';
 import { Modal } from './Modal';
@@ -171,6 +173,7 @@ export function MarketBoard({
               <span key={`${r.name}-${i}`} className="row spread" style={{ opacity: r.bust ? 0.6 : 1, width: '100%', gap: 6, alignItems: 'flex-start' }}>
                 <span style={{ flex: 1, minWidth: 0, lineHeight: '9px' }}>
                   {i + 1}. {r.name.toUpperCase()}
+                  {r.kind !== 'player' && <AiBadge />}
                 </span>
                 <span style={{ flex: 'none' }}>{r.bust ? 'BUST' : `${r.hens} HENS`}</span>
               </span>
@@ -190,7 +193,8 @@ export function MarketBoard({
                 ...buys.slice(0, 6).map((o) => (
                   <div key={o.id} className="row spread">
                     <span>
-                      {o.owner.split(' ').slice(-1)[0]?.toUpperCase()} BUYS {o.qty} {o.grade.toUpperCase()} AT {coins(o.priceMilli)}
+                      {o.owner.split(' ').slice(-1)[0]?.toUpperCase()}
+                      {o.ownerKind === 'agent' && <AiBadge />} BUYS {o.qty} {o.grade.toUpperCase()} AT {coins(o.priceMilli)}
                     </span>
                     <button className="btn" disabled={farm.crate[o.grade] <= 0} onClick={click(() => void send({ t: 'fillOrder', orderId: o.id, qty: Math.min(o.qty, farm.crate[o.grade]) }))}>
                       SELL
@@ -200,7 +204,8 @@ export function MarketBoard({
                 ...sells.slice(0, 4).map((o) => (
                   <div key={o.id} className="row spread">
                     <span>
-                      {o.owner.split(' ')[0]?.toUpperCase()} SELLS {o.qty} {o.grade.toUpperCase()} AT {coins(o.priceMilli)}
+                      {o.owner.split(' ')[0]?.toUpperCase()}
+                      {o.ownerKind === 'agent' && <AiBadge />} SELLS {o.qty} {o.grade.toUpperCase()} AT {coins(o.priceMilli)}
                     </span>
                     <button className="btn sky" disabled={farm.cashMilli < o.priceMilli} onClick={click(() => void send({ t: 'fillOrder', orderId: o.id, qty: Math.min(o.qty, Math.floor(farm.cashMilli / o.priceMilli)) }))}>
                       BUY
@@ -262,16 +267,29 @@ export function MarketBoard({
             ...(market.trades.length === 0 ? [<span key="quiet">QUIET SO FAR</span>] : []),
             ...market.trades.slice(0, 12).map((t, i) => (
               <span key={`t${i}`}>
-                {t.seller.split(' ')[0]?.toUpperCase()} {t.qty} {t.grade.toUpperCase()} TO {t.buyer.split(' ').slice(-1)[0]?.toUpperCase()} {coins(t.totalMilli)}
+                {t.seller.split(' ')[0]?.toUpperCase()}
+                {t.sellerAi && <AiBadge />} {t.qty} {t.grade.toUpperCase()} TO {t.buyer.split(' ').slice(-1)[0]?.toUpperCase()}
+                {t.buyerAi && <AiBadge />} {coins(t.totalMilli)}
               </span>
             )),
             <span key="cast" className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0, paddingTop: 4 }}>
               THE CAST
             </span>,
             ...market.agents.map((a) => (
-              <div key={a.id} className="row spread" style={{ opacity: a.status === 'bust' ? 0.5 : 1, gap: 6 }}>
-                <span>{a.name.toUpperCase()}</span>
-                <span>{a.status === 'bust' ? 'BUST' : coins(a.cashMilli)}</span>
+              <div key={a.id} className="col" style={{ opacity: a.status === 'bust' ? 0.5 : 1, gap: 1 }} data-ui="cast-agent">
+                <div className="row spread" style={{ gap: 6 }}>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    {a.name.toUpperCase()}
+                    <AiBadge />
+                  </span>
+                  <span style={{ flex: 'none' }}>{a.status === 'bust' ? 'BUST' : coins(a.cashMilli)}</span>
+                </div>
+                {/* its latest public reason: under 80 characters, wrapping inside the row */}
+                {a.reason && (
+                  <span style={{ lineHeight: '9px', color: '#8b5a2b', overflowWrap: 'anywhere' }} data-ui="cast-reason">
+                    {a.reason.toUpperCase()}
+                  </span>
+                )}
               </div>
             )),
           ]}

@@ -796,6 +796,24 @@ input[type='range'].slider::-moz-range-thumb {
   font-size: 8px;
 }
 
+/* The AI tag on AI farms and agents: a smaller stamp than BETA, inline, never wrapping or widening a row. */
+.ai-badge {
+  display: inline-block;
+  height: 8px;
+  padding: 0 2px;
+  margin-left: 3px;
+  background: var(--sky-deep);
+  color: var(--cream);
+  box-shadow: 0 0 0 1px var(--ink);
+  font-family: var(--font-body);
+  font-size: 8px;
+  font-weight: 400;
+  line-height: 8px;
+  letter-spacing: 0;
+  vertical-align: 0;
+  white-space: nowrap;
+}
+
 /* The How to play guide. */
 .guide-text p {
   margin: 0;

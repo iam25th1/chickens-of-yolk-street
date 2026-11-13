@@ -6,6 +6,7 @@ import { motion } from '../motion/ui';
 import { dayElapsed, events, game, gameTime, sameDay } from '../state/game';
 import { useStore } from '../state/store';
 import type { Rect } from '../app/viewport';
+import { AiBadge } from './AiBadge';
 import { SheetSprite, flapRect } from './SheetSprite';
 
 /** A number that counts to its new value and pops when it goes up. */
@@ -256,7 +257,9 @@ export function Ticker({ extra = [] }: { extra?: string[] }) {
         ...extra,
       ]
     : ['OPENING THE MARKET'];
-  const text = items.join('|');
+  // the farms item names how many of them are AI farms, with the AI tag
+  const aiFarms = market ? market.farms.agents : 0;
+  const text = `${items.join('|')}|${aiFarms}`;
 
   useEffect(() => {
     if (!track.current) return;
@@ -287,6 +290,11 @@ export function Ticker({ extra = [] }: { extra?: string[] }) {
         <span key={i} className="ticker-item">
           <span className={i === 4 ? (up ? 'up' : 'down') : ''}>{t}</span>
           {i === 4 && <span className={up ? 'up' : 'down'}>{up ? '+' : '-'}</span>}
+          {i === 6 && market && aiFarms > 0 && (
+            <span data-ui="ticker-ai">
+              <AiBadge /> {aiFarms}
+            </span>
+          )}
         </span>
       ))}
     </div>
