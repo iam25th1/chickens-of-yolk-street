@@ -458,6 +458,24 @@ ALTER TABLE unlocks ADD COLUMN condition double precision NOT NULL DEFAULT 1 CHE
 ALTER TABLE unlocks ADD COLUMN broken boolean NOT NULL DEFAULT false;
 `,
   },
+  {
+    id: 12,
+    name: 'instant mints',
+    sql: `
+-- Instant mints: redeeming a ticket draws its Feather's number at once (a random free number, from a
+-- seed anyone can check, kept here with the transaction it came from) and sends its mint at once,
+-- game-paid. A test season's Feathers have their own collection (token ids "test-..."), so a number
+-- is unique within its collection: the token id is the unique key now.
+ALTER TABLE feather_tickets DROP CONSTRAINT IF EXISTS feather_tickets_number_key;
+CREATE UNIQUE INDEX feather_tickets_token ON feather_tickets (token_id);
+ALTER TABLE feather_tickets ADD COLUMN number_seed text;
+ALTER TABLE feather_tickets ADD COLUMN number_anchor text;
+-- where a queued ticket's mint stands: waiting (for a wallet, the chain or a day close), sending
+ALTER TABLE feather_tickets ADD COLUMN mint_state text CHECK (mint_state IN ('waiting', 'sending'));
+ALTER TABLE feather_tickets ADD COLUMN mint_note text;
+ALTER TABLE feather_tickets ADD COLUMN mint_tries integer NOT NULL DEFAULT 0;
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

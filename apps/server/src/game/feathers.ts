@@ -7,8 +7,10 @@
 // SHA-256 of the season, the closed day, the farm, the milestone and the previous day's settlement
 // transaction, and the roll is the seed's first 52 bits as a fraction of 2^52. A win is a Feather
 // Ticket. The player redeems a ticket on the mint page for a coin fee; its grade comes from the
-// farm's management score then, and the next day close mints the Feather (#001 to #777, in mint
-// order) on NEAR testnet, game-paid. Rolls stop once the tickets out and Feathers minted reach 777.
+// farm's management score then, its number is drawn at random from the free ones (chain/mint.ts),
+// and its Feather is minted on NEAR testnet at once, game-paid (a mint that cannot go out yet waits
+// for the next chance, at the latest a day close). Rolls stop once the tickets out and Feathers
+// minted reach 777.
 import { createHash } from 'node:crypto';
 import {
   coopCapacity,
@@ -27,6 +29,7 @@ import {
   type Rarity,
 } from '@coys/shared';
 import { num, type Queryable } from '../db/db';
+import { drawForTicket, type Collection } from '../chain/mint';
 import { ActionError, loadFarm, newId, spend, type Ctx } from './ctx';
 
 const F = ECONOMY.feathers;
@@ -114,7 +117,7 @@ export interface FeatherCount {
 
 export async function featherCount(q: Queryable, chainMinted: number | null): Promise<FeatherCount> {
   const [r] = await q.query(
-    `SELECT count(*) FILTER (WHERE status IN ('held', 'queued')) AS out, count(*) FILTER (WHERE status = 'minted') AS minted FROM feather_tickets`,
+    `SELECT count(*) FILTER (WHERE status IN ('held', 'queued')) AS out, count(*) FILTER (WHERE status = 'minted' AND left(COALESCE(token_id, ''), 5) <> 'test-') AS minted FROM feather_tickets`,
   );
   const minted = Math.max(chainMinted ?? 0, num(r?.minted));
   const tickets = num(r?.out);
@@ -211,8 +214,16 @@ export async function managementScore(q: Queryable, farmId: string): Promise<Man
   return { score, grade: gradeFor(score), parts };
 }
 
-/** Redeems a held ticket: the coin fee is paid, the grade set from the score now, and it mints at the next day close. */
-export async function redeemTicket(ctx: Ctx, farmId: string, ticketId: string): Promise<{ grade: FeatherGrade; score: number; feeMilli: number }> {
+/**
+ * Redeems a held ticket: the coin fee is paid, the grade set from the score now, and its Feather's
+ * number drawn (a random free one, from a seed kept with the ticket). The game sends its mint at once.
+ */
+export async function redeemTicket(
+  ctx: Ctx,
+  farmId: string,
+  ticketId: string,
+  collection: Collection = 'live',
+): Promise<{ grade: FeatherGrade; score: number; feeMilli: number; number: number }> {
   const [t] = await ctx.q.query('SELECT farm_id, status FROM feather_tickets WHERE id = $1', [ticketId]);
   if (!t || t.farm_id !== farmId) throw new ActionError('not_found', 'no such ticket on this farm');
   if (t.status !== 'held') throw new ActionError('invalid_action', 'this ticket is already redeemed');
@@ -226,7 +237,8 @@ export async function redeemTicket(ctx: Ctx, farmId: string, ticketId: string): 
     [ticketId, grade, score, feeMilli, ctx.day],
   );
   ctx.log(`[feathers] farm ${farmId} redeemed ticket ${ticketId}: score ${score.toFixed(3)} grade ${grade}`);
-  return { grade, score, feeMilli };
+  const { number } = await drawForTicket(ctx.q, ticketId, ctx.season, collection, ctx.log);
+  return { grade, score, feeMilli, number };
 }
 
 export async function ticketViews(q: Queryable, farmId: string): Promise<FeatherTicketView[]> {
@@ -239,6 +251,7 @@ export async function ticketViews(q: Queryable, farmId: string): Promise<Feather
     grade: (r.grade as FeatherGrade | null) ?? null,
     score: r.score === null || r.score === undefined ? null : num(r.score),
     number: r.number === null || r.number === undefined ? null : num(r.number),
+    mint: r.status === 'queued' && r.mint_state ? { state: r.mint_state as 'waiting' | 'sending', note: (r.mint_note as string | null) ?? null } : null,
     owner: (r.owner_account as string | null) ?? null,
     mintTx: (r.mint_tx as string | null) ?? null,
     mintDay: r.mint_day === null || r.mint_day === undefined ? null : num(r.mint_day),
@@ -279,11 +292,12 @@ export function rarityEstimates(byGrade: Record<FeatherGrade, number>): Record<F
   return Object.fromEntries(FEATHER_GRADES.map((g) => [g, Object.fromEntries(RARITIES.map((r, i) => [r, p(g)[i] ?? 0]))])) as Record<FeatherGrade, Record<Rarity, number>>;
 }
 
-/** Every minted Feather, in number order, for the mint page. */
-export async function featherSlots(q: Queryable): Promise<FeatherSlot[]> {
+/** Every minted Feather of the 777 (test collections aside), in number order, or the most recently minted first. */
+export async function featherSlots(q: Queryable, order: 'number' | 'recent' = 'number'): Promise<FeatherSlot[]> {
   const rows = await q.query(
     `SELECT t.number, t.grade, t.milestone, t.day, t.owner_account, t.mint_tx, f.name FROM feather_tickets t JOIN farms f ON f.id = t.farm_id
-     WHERE t.status = 'minted' AND t.number IS NOT NULL ORDER BY t.number`,
+     WHERE t.status = 'minted' AND t.number IS NOT NULL AND left(COALESCE(t.token_id, ''), 5) <> 'test-'
+     ORDER BY ${order === 'number' ? 't.number' : 't.mint_day DESC NULLS LAST, t.redeemed_seq DESC NULLS LAST, t.number DESC'}`,
   );
   return rows.map((r) => ({
     number: num(r.number),

@@ -54,7 +54,7 @@ describe('feed on credit', () => {
 });
 
 describe('the Feather reveal moment', () => {
-  it('a day close mints a redeemed ticket as a Feather and tells its owner its number, grade and receipt; no hen is minted', async () => {
+  it('redeeming mints the Feather at once and tells its owner each stage: sent, then confirmed with its number, grade and receipt; no hen is minted', async () => {
     const chain = new RecordingChain('game.testnet', 3);
     const t = await makeGame({ chain, season: 'mint', seed: 9 });
     const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-mint', 'Mina');
@@ -72,15 +72,16 @@ describe('the Feather reveal moment', () => {
     const grade = (await t.game.getFarmState(farmId)).tickets[0]?.grade;
     expect(grade).toBe('fluff');
 
-    t.clock.t = t.game.getClock().dayStartedAt + ECONOMY.day.lengthMs;
-    await t.game.endDay();
-
-    expect(events.filter((e) => e.kind === 'featherMinted')).toEqual([
-      { kind: 'featherMinted', ticketId: 'tk', number: 1, grade: 'fluff', milestone: 'full-coop', token: '001', owner: 'mina.testnet', txHash: 'recorded-mint-1', day: 1 },
+    await t.game.mintsIdle();
+    const n = chain.mints[0]?.number ?? 0;
+    const token = String(n).padStart(3, '0');
+    expect(events.filter((e) => e.kind === 'mintSent' || e.kind === 'featherMinted')).toEqual([
+      { kind: 'mintSent', ticketId: 'tk', number: n, grade: 'fluff' },
+      { kind: 'featherMinted', ticketId: 'tk', number: n, grade: 'fluff', milestone: 'full-coop', token, owner: 'mina.testnet', txHash: `minted-${token}`, day: 1 },
     ]);
     const farm = await t.game.getFarmState(farmId);
     expect(farm.tickets).toEqual([
-      expect.objectContaining({ id: 'tk', status: 'minted', grade: 'fluff', number: 1, owner: 'mina.testnet', mintTx: 'recorded-mint-1', mintDay: 1 }),
+      expect.objectContaining({ id: 'tk', status: 'minted', grade: 'fluff', number: n, owner: 'mina.testnet', mintTx: `minted-${token}`, mintDay: 1 }),
     ]);
     expect(chain.batches.flatMap((b) => b.hen_mints)).toEqual([]);
     const market = await t.game.getMarketState();

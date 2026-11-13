@@ -131,8 +131,10 @@ export interface FeatherTicketView {
   /** Set at redemption from the management score. */
   grade: FeatherGrade | null;
   score: number | null;
-  /** The Feather's number, 1 to 777, once minted. */
+  /** The Feather's number, 1 to 777: drawn at redemption, shown once minted. */
   number: number | null;
+  /** A queued ticket's mint: waiting (with why), or being sent. */
+  mint: { state: 'waiting' | 'sending'; note: string | null } | null;
   /** The account it was minted to, and the settlement transaction. */
   owner: string | null;
   mintTx: string | null;
@@ -448,10 +450,16 @@ export type CardOutcome = 'accepted' | 'declined' | 'won' | 'failed' | 'expired'
 
 export type GameEvent =
   | { kind: 'hensBought'; count: number; fromAuction: number; costMilli: number; henIds?: string[] }
-  /** A day close minted one of the player's Feathers on NEAR testnet (the reveal moment). */
-  | { kind: 'featherMinted'; ticketId: string; number: number; grade: FeatherGrade; milestone: MilestoneId; token: string; owner: string; txHash: string; day: number }
-  /** The player redeemed a ticket: it mints at the next day close. */
-  | { kind: 'ticketRedeemed'; ticketId: string; grade: FeatherGrade; score: number; feeMilli: number }
+  /** One of the player's Feathers is minted on NEAR testnet and confirmed (the minting moment's last stage). txHash is null when an earlier send landed unseen. */
+  | { kind: 'featherMinted'; ticketId: string; number: number; grade: FeatherGrade; milestone: MilestoneId; token: string; owner: string; txHash: string | null; day: number }
+  /** The player redeemed a ticket: its number is drawn and its mint goes out at once. */
+  | { kind: 'ticketRedeemed'; ticketId: string; grade: FeatherGrade; score: number; feeMilli: number; number: number | null }
+  /** A redeemed ticket's mint was sent to NEAR (the minting moment's first stage). */
+  | { kind: 'mintSent'; ticketId: string; number: number; grade: FeatherGrade }
+  /** A redeemed ticket's mint waits (no wallet linked, the chain paused or low): it goes out as soon as it can, at the latest at a day close. */
+  | { kind: 'mintWaiting'; ticketId: string; note: string }
+  /** A mint did not go through after its retries: the ticket is held again and its fee refunded. */
+  | { kind: 'mintFailed'; ticketId: string; note: string; refundMilli: number }
   /** A milestone's one roll for a Feather Ticket, at a day close. */
   | { kind: 'milestoneRoll'; milestone: MilestoneId; won: boolean; ticketId: string | null; next: MilestoneId | null; left: number; roll: number; odds: number }
   | { kind: 'feedBought'; tier: FeedTier; bags: number; costMilli: number; supplier: string; /** Poured in by the feed hopper. */ auto?: boolean }
