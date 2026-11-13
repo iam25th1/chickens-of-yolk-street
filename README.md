@@ -399,6 +399,21 @@ on every step the box stays on screen, off its target and clear of the UI zones,
 **CI.** The browser checks (`e2e/`) run in their own workflow, `layout`, on pull requests only, and not for changes to
 docs alone.
 
+**Checked live** (yolkstreet.25th.dev, 13 November, two temporary players signed in the way an email sign-in does, with
+made-up emails whose name guards alone reached the server; both removed afterwards): one shuffled, chose a name, then
+renamed it in Settings (the next rename waits a week); the other kept the generated name. Every WebSocket message they
+received and the public market and mint payloads held no email-like text, no five-letter piece of either made-up email,
+and no run of letters matching any stored name guard (the three renamed farms' old names included, checked by hash).
+The same hash check over every tracked text file and every commit message in the repository finds none. On a phone
+whose farm is too short for the tour box beside its target, the box now sits below the farm, pointing up.
+
+| | Step 1 | Step 4 | Step 10 |
+|---|---|---|---|
+| 1920x1080 | ![Tour step 1 live: collect an egg](docs/screenshots/tour-live-step-1-1920x1080.png) | ![Tour step 4 live: glut or shortage](docs/screenshots/tour-live-step-4-1920x1080.png) | ![Tour step 10 live: rivals go bust](docs/screenshots/tour-live-step-10-1920x1080.png) |
+| 390x844 | ![The same on a phone](docs/screenshots/tour-live-step-1-390x844.png) | ![The same on a phone](docs/screenshots/tour-live-step-4-390x844.png) | ![The same on a phone](docs/screenshots/tour-live-step-10-390x844.png) |
+
+![Name your farm, live: the farm's sign with the suggestion, SHUFFLE, CONFIRM and KEEP](docs/screenshots/name-your-farm-live-1920x1080.png)
+
 
 ## Scaling, no scrollbars, a clean conveyor and the 777 restored (12 November 2026)
 
