@@ -52,7 +52,7 @@ import {
 } from '@coys/shared';
 import { num, type Db, type Queryable } from '../db/db';
 import { migrate } from '../db/migrations';
-import { decide, type BrainOptions, type DecisionResult } from '../agents/brain';
+import { decide, reflect, type BrainOptions, type DecisionResult, type Tokens } from '../agents/brain';
 import type { FarmAction } from '../agents/decision';
 import type { MintedFeather } from '../chain/batch';
 import { missedDays, storeLateDays, type ChainWriter, type MintResult } from '../chain/chain';
@@ -64,10 +64,17 @@ import {
   buildContext,
   chargeForThinking,
   ensureCast,
+  enterAiFarms,
   loyalistCreditQuote,
   openAgents,
+  recordReason,
+  startWeek,
+  storeReflection,
+  streetView,
   supplierQuote,
   turnOverStock,
+  weekNow,
+  weekToReflect,
   type CreateFarm,
 } from './cast-runtime';
 import { closeContracts, closeDebts, contractViews, debtViews, deliverContract } from './contracts';
@@ -84,6 +91,7 @@ import {
   type Ctx,
   type Farm,
   type Outbound,
+  type WeekStart,
 } from './ctx';
 import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
 import { featherCount, featherSlots, managementScore, milestoneViews, nextMilestone, rarityEstimates, redeemTicket, rollMilestones, standing, ticketViews } from './feathers';
@@ -116,12 +124,28 @@ export interface GameOptions {
   log?: (line: string) => void;
   /** Open the seven agents (default true; some tests run a quiet market). */
   cast?: boolean;
+  /** New AI farms enter the street by the entry rule (default true, with the cast). */
+  entrants?: boolean;
   /** In-game day length in ms (default ECONOMY.day.lengthMs; DEMO_DAY_SECONDS shortens it). */
   dayLengthMs?: number;
   /** GAME_SEASON. A fresh database takes it (or makes a dev season); an existing one must match. */
   season?: string | null;
   /** SHA-256 of founders.json (the 777 Founding Hens the Feathers are planned to hatch into). */
   provenance?: string;
+}
+
+/** The newest public reason in an agent's stored reasons, or null. */
+function lastReason(raw: unknown): string | null {
+  const list = (typeof raw === 'string' ? JSON.parse(raw) : raw) as { text?: string }[] | null;
+  return list?.at(-1)?.text ?? null;
+}
+
+/** One agent's turn, gathered before the day close: its decision, and its weekly reflection or the start of its first week. */
+interface Gathered {
+  agentId: string;
+  result: DecisionResult;
+  reflection: { text: string; brain: string; now: WeekStart; tokens: Tokens | null } | null;
+  firstWeek: WeekStart | null;
 }
 
 /** A season id for a fresh database started without GAME_SEASON: unique, so it never collides on chain. */
@@ -137,6 +161,7 @@ export class Game {
   private readonly rng: Rng;
   private readonly log: (line: string) => void;
   private readonly withCast: boolean;
+  private readonly withEntrants: boolean;
   private readonly provenance: string;
   private readonly wantSeason: string | null;
   private readonly dayMs: number;
@@ -151,8 +176,8 @@ export class Game {
   private mintAgain = false;
   private clock = { day: 1, dayStartedAt: 0 };
   private ticking = false;
-  /** Decisions and calls per day, for reports and tests. */
-  readonly stats = { decisions: 0, modelCalls: 0, fallbacks: 0, skipped: 0 };
+  /** Decisions, reflections and model calls (by tier, with their tokens), for reports and tests. */
+  readonly stats = { decisions: 0, modelCalls: 0, fallbacks: 0, skipped: 0, reflections: 0, reflectionCalls: 0, mainCalls: 0, cheapCalls: 0, promptTokens: 0, completionTokens: 0 };
 
   constructor(opts: GameOptions) {
     this.db = opts.db;
@@ -162,6 +187,7 @@ export class Game {
     this.log = opts.log ?? ((line) => console.log(line));
     this.brain = { ...opts.brain, log: this.log };
     this.withCast = opts.cast ?? true;
+    this.withEntrants = this.withCast && (opts.entrants ?? true);
     this.provenance = opts.provenance ?? '';
     this.wantSeason = opts.season ?? null;
     this.dayMs = opts.dayLengthMs ?? ECONOMY.day.lengthMs;
@@ -497,7 +523,7 @@ export class Game {
 
   private async orderViews(where: string, params: unknown[], viewerFarmId: string | null): Promise<OrderView[]> {
     const rows = await this.db.query(
-      `SELECT o.id, o.side, o.grade, o.qty, o.filled_qty, o.price_milli, o.expires_day, o.farm_id, f.name AS farm_name, a.name AS agent_name
+      `SELECT o.id, o.side, o.grade, o.qty, o.filled_qty, o.price_milli, o.expires_day, o.farm_id, f.name AS farm_name, f.owner_kind, a.name AS agent_name
        FROM orders o LEFT JOIN farms f ON f.id = o.farm_id LEFT JOIN agents a ON a.id = o.agent_id
        WHERE o.status = 'open' AND o.kind = 'limit' AND ${where}
        ORDER BY o.side, CASE WHEN o.side = 'buy' THEN -o.price_milli ELSE o.price_milli END LIMIT 30`,
@@ -507,7 +533,7 @@ export class Game {
       id: String(r.id),
       side: r.side as 'buy' | 'sell',
       owner: String(r.farm_name ?? r.agent_name ?? 'Unknown'),
-      ownerKind: r.farm_id ? 'player' : 'agent',
+      ownerKind: r.farm_id && r.owner_kind === 'player' ? 'player' : 'agent',
       mine: viewerFarmId !== null && r.farm_id === viewerFarmId,
       grade: r.grade as EggGrade,
       qty: num(r.qty) - num(r.filled_qty),
@@ -543,7 +569,10 @@ export class Game {
               (SELECT count(*) FROM hens h WHERE h.farm_id = f.id AND h.status = 'alive') AS hens
        FROM farms f LEFT JOIN agents a ON a.farm_id = f.id ORDER BY (f.bust_day IS NULL) DESC, f.cash_milli DESC LIMIT 12`,
     );
-    const trades = await this.db.query('SELECT * FROM trades ORDER BY total_milli DESC, id DESC LIMIT 200');
+    const trades = await this.db.query(
+      `SELECT t.*, (t.seller_agent IS NOT NULL OR sf.owner_kind = 'agent') AS seller_ai, (t.buyer_agent IS NOT NULL OR bf.owner_kind = 'agent') AS buyer_ai
+       FROM trades t LEFT JOIN farms sf ON sf.id = t.seller_farm LEFT JOIN farms bf ON bf.id = t.buyer_farm ORDER BY t.total_milli DESC, t.id DESC LIMIT 200`,
+    );
     const recentBig = trades
       .filter((t) => num(t.day) >= day - 1)
       .slice(0, 12)
@@ -556,6 +585,8 @@ export class Game {
         priceMilli: num(t.price_milli),
         totalMilli: num(t.total_milli),
         via: t.via as MarketState['trades'][number]['via'],
+        sellerAi: Boolean(t.seller_ai),
+        buyerAi: Boolean(t.buyer_ai),
       }));
     return {
       season: this.season,
@@ -580,6 +611,7 @@ export class Game {
         generation: num(a.generation),
         hens: a.farm_id ? num(a.hens) : null,
         account: (a.near_account_id as string | null) ?? null,
+        reason: lastReason(a.reasons),
       })),
       book: await this.orderViews('true', [], null),
       trades: recentBig,
@@ -964,8 +996,20 @@ export class Game {
     return { feedGramsUsed, fedMultiplier };
   }
 
-  /** Builds each open agent's context and asks its brain, before taking the lock. */
-  private async gatherDecisions(): Promise<{ agentId: string; result: DecisionResult }[]> {
+  /** Tallies a model call's tier and tokens (a call whose reply was unusable still used them). */
+  private count(tokens: Tokens | null): void {
+    if (!tokens) return;
+    if (tokens.model === this.brain.model) this.stats.mainCalls++;
+    else this.stats.cheapCalls++;
+    this.stats.promptTokens += tokens.prompt;
+    this.stats.completionTokens += tokens.completion;
+  }
+
+  /**
+   * Builds each open agent's context and asks its brain, before taking the lock. An agent whose week
+   * is up reflects on it first, so the day's decision already reads the new reflection.
+   */
+  private async gatherDecisions(): Promise<Gathered[]> {
     if (!this.withCast) return [];
     const ctx = this.makeCtx(this.db);
     const agents = await openAgents(ctx);
@@ -975,12 +1019,20 @@ export class Game {
     const [today] = await this.db.query('SELECT supply, multiplier FROM market_days WHERE day = $1', [ctx.day]);
     history.push({ day: ctx.day, supply: num(today?.supply ?? 0), multiplier: num(today?.multiplier ?? 1) });
     const [auction] = await this.db.query(`SELECT count(*) AS n FROM hens WHERE status = 'auction'`);
-    const out: { agentId: string; result: DecisionResult }[] = [];
+    const street = await streetView(ctx);
+    const out: Gathered[] = [];
     // one at a time keeps model calls polite; each is bounded by its own timeout
     for (const agent of agents) {
-      const c = await buildContext(ctx, agent, history, num(auction?.n));
+      const c = await buildContext(ctx, agent, history, num(auction?.n), street);
+      const due = await weekToReflect(ctx, agent);
+      let reflection: Gathered['reflection'] = null;
+      if (due) {
+        const r = await reflect(c, due.week, this.brain);
+        reflection = { text: r.text, brain: r.model ?? 'rules', now: due.now, tokens: r.tokens ?? null };
+        c.agent.reflection = r.text;
+      }
       const result = await decide(c, this.brain);
-      out.push({ agentId: agent.id, result });
+      out.push({ agentId: agent.id, result, reflection, firstWeek: !due && !agent.weekStart ? await weekNow(ctx, agent) : null });
     }
     return out;
   }
@@ -1022,10 +1074,16 @@ export class Game {
         await expireOrders(ctx);
         // 3. the cast acts
         const acted: { agentId: string; result: DecisionResult }[] = [];
-        for (const { agentId, result } of decisions) {
+        for (const { agentId, result, reflection, firstWeek } of decisions) {
           const [row] = await q.query(`SELECT ${AGENT_COLUMNS} FROM agents WHERE id = $1 AND status = 'open'`, [agentId]);
           if (!row) continue;
           const agent = toAgent(row);
+          if (reflection) {
+            await storeReflection(ctx, agent, reflection.text, reflection.now, reflection.brain);
+            this.stats.reflections++;
+            if (reflection.brain !== 'rules') this.stats.reflectionCalls++;
+            this.count(reflection.tokens);
+          } else if (firstWeek) await startWeek(ctx, agent, firstWeek);
           await turnOverStock(ctx, agent);
           if (result.brain !== 'skipped') {
             await applyDecision(ctx, agent, result.decision, this.applyFarmAction, 'close');
@@ -1037,6 +1095,8 @@ export class Game {
           if (result.brain === 'nearai') this.stats.modelCalls++;
           if (result.fallback) this.stats.fallbacks++;
           if (result.brain === 'skipped') this.stats.skipped++;
+          this.count(result.tokens ?? null);
+          await recordReason(ctx, agent, result.decision.reason);
           await q.query('UPDATE agents SET last_decided_day = $2, last_brain = $3 WHERE id = $1', [agent.id, day, result.brain]);
           await bustIfBroke(ctx, agent);
         }
@@ -1078,6 +1138,8 @@ export class Game {
         await q.query('DELETE FROM lay_events WHERE day < $1', [newDay - 1]);
         await this.refreshShop(ctx);
         if (this.withCast) await ensureCast(ctx, this.createFarmFn);
+        // a new AI farm may enter: when eggs ran short for days, a rival went bust, or too few are open
+        if (this.withEntrants) await enterAiFarms(ctx, this.createFarmFn);
         // orders, fills and offers price against the new day's market
         const candidates: Candidate[] = [];
         for (const { agentId, result } of acted) {

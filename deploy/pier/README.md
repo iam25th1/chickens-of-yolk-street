@@ -64,8 +64,10 @@ Set these on the service. Values marked secret never go in the repo, a chat or a
 Leave unset in production: `ALLOW_DEV_LOGIN`, `DEMO_DAY_SECONDS`, `DEMO_MODE`,
 `ALLOW_PGLITE_IN_PRODUCTION`. Optional with defaults: `NEAR_TESTNET_RPC_URL`,
 `NEAR_GAME_CONTRACT_ID`, `CHAIN_MINT_NEAR`, `CHAIN_MIN_BALANCE_NEAR`,
-`AGENT_ACCOUNT_FUNDING_NEAR`, `NEARAI_BASE_URL`, `NEARAI_MODEL`, `NEARAI_CHEAP_MODEL`. Every
-variable is described in [.env.example](../../.env.example).
+`AGENT_ACCOUNT_FUNDING_NEAR`, `NEARAI_BASE_URL`, `NEARAI_MODEL`, `NEARAI_CHEAP_MODEL`,
+`NEARAI_AGENT_DAILY_CAP_USD`, `NEARAI_AGENT_DAILY_CALLS`, `NEARAI_MAIN_PRICE`, `NEARAI_CHEAP_PRICE`
+(see [docs/agents.md](../../docs/agents.md) for the credits they imply). Every variable is described
+in [.env.example](../../.env.example).
 
 The boot log lists every variable as `set` or `unset` (never a value) and warns loudly about
 anything missing.

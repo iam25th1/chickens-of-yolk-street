@@ -74,6 +74,19 @@ export function placeTourBox(target: Rect | null, sizes: { w: number; h: number 
       }
     }
   }
+  // no room beside it (a small window, the target in a corner): anywhere in the area that keeps the
+  // target and the zones clear, the nearest to the target first; the box says what to do, unpointed
+  for (const s of fits) {
+    let best: { x: number; y: number; d: number } | null = null;
+    for (let y = area.y; y + s.h <= area.y + area.h; y += 2) {
+      for (let x = area.x; x + s.w <= area.x + area.w; x += 2) {
+        if (!ok({ x, y, w: s.w, h: s.h }, clear)) continue;
+        const d = Math.hypot(x + s.w / 2 - cx, y + s.h / 2 - cy);
+        if (!best || d < best.d) best = { x, y, d };
+      }
+    }
+    if (best) return { x: best.x, y: best.y, w: s.w, h: s.h, side: 'center', pointer: 0 };
+  }
   return null;
 }
 
@@ -89,4 +102,28 @@ function slide(ideal: number, lo: number, hi: number, valid: (p: number) => bool
     if (start + d <= hi && valid(start + d)) return start + d;
   }
   return null;
+}
+
+/**
+ * The tour's placement: beside the target in the world zone (or anywhere there that keeps it clear);
+ * on a tall window whose farm has no such room, in the side panel's zone below the farm, pointing up
+ * at it; with no target (or no room at all), centred in the world zone.
+ */
+export function placeForTour(
+  target: Rect | null,
+  sizes: { w: number; h: number }[],
+  zones: { world: Rect; side: Rect; tracker: Rect; toasts: Rect },
+  portrait: boolean,
+): Placement | null {
+  const area = { x: zones.world.x + 4, y: zones.world.y + 4, w: zones.world.w - 8, h: zones.world.h - 8 };
+  const avoid = [zones.tracker, zones.toasts].map((r) => ({ x: r.x - 2, y: r.y - 2, w: r.w + 4, h: r.h + 4 }));
+  const fit = (s: { w: number; h: number }, a: Rect) => ({ w: Math.min(s.w, a.w), h: s.h });
+  const inWorld = placeTourBox(target, sizes.map((s) => fit(s, area)), area, avoid);
+  if (inWorld || !target) return inWorld ?? placeTourBox(null, sizes.map((s) => fit(s, area)), area, avoid);
+  if (portrait) {
+    const below = { x: zones.side.x + 4, y: zones.side.y + 4, w: zones.side.w - 8, h: zones.side.h - 8 };
+    const there = placeTourBox(target, sizes.map((s) => fit(s, below)), below, []);
+    if (there) return there;
+  }
+  return placeTourBox(null, sizes.map((s) => fit(s, area)), area, avoid);
 }

@@ -1,0 +1,1885 @@
+{
+  "about": "Recorded agent replies for the 30-day model-vs-rules comparison (apps/server/test/agent-compare.test.ts). Written by scripts/record-agent-decisions.ts.",
+  "source": "authored",
+  "samples": {
+    "upstart": {
+      "glut": {
+        "sample": {
+          "cash": 70,
+          "own": {
+            "hens": 26,
+            "capacity": 30,
+            "crate": {
+              "white": 10,
+              "cream": 6,
+              "brown": 3,
+              "golden": 0
+            },
+            "feedGrams": 6000
+          },
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Flooded! Everything must go, cheap. I will be back bigger.",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 10,
+                  "cream": 6,
+                  "brown": 3,
+                  "golden": 0
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "cheap",
+                "bags": 1
+              }
+            ],
+            "sellOrders": [
+              {
+                "grade": "white",
+                "qty": 13,
+                "priceShare": 0.55
+              },
+              {
+                "grade": "cream",
+                "qty": 7,
+                "priceShare": 0.55
+              },
+              {
+                "grade": "brown",
+                "qty": 3,
+                "priceShare": 0.55
+              }
+            ],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "undercut",
+                "farmId": "player-0",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              },
+              {
+                "kind": "undercut",
+                "farmId": "player-1",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "Everyone is scared. I am buying hens while they are cheap!",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 10,
+                  "cream": 6,
+                  "brown": 3,
+                  "golden": 0
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "cheap",
+                "bags": 1
+              },
+              {
+                "t": "buyHens",
+                "count": 6
+              }
+            ],
+            "sellOrders": [
+              {
+                "grade": "white",
+                "qty": 13,
+                "priceShare": 0.7
+              },
+              {
+                "grade": "cream",
+                "qty": 7,
+                "priceShare": 0.7
+              },
+              {
+                "grade": "brown",
+                "qty": 3,
+                "priceShare": 0.7
+              }
+            ],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "undercut",
+                "farmId": "player-0",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              },
+              {
+                "kind": "undercut",
+                "farmId": "player-1",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "Holding some eggs a day. Prices bounce back, right?",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 5,
+                  "cream": 3,
+                  "brown": 1,
+                  "golden": 0
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "cheap",
+                "bags": 1
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "undercut",
+                "farmId": "player-0",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              },
+              {
+                "kind": "undercut",
+                "farmId": "player-1",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      },
+      "scarcity": {
+        "sample": {
+          "cash": 70,
+          "own": {
+            "hens": 26,
+            "capacity": 30,
+            "crate": {
+              "white": 10,
+              "cream": 6,
+              "brown": 3,
+              "golden": 0
+            },
+            "feedGrams": 6000
+          },
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Eggs are short! Ten more hens and a new coop, let us go!",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 10,
+                  "cream": 6,
+                  "brown": 3,
+                  "golden": 0
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "cheap",
+                "bags": 1
+              },
+              {
+                "t": "buyHens",
+                "count": 10
+              },
+              {
+                "t": "buildCoop",
+                "kind": "red"
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "undercut",
+                "farmId": "player-0",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              },
+              {
+                "kind": "undercut",
+                "farmId": "player-1",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "Borrowing feed so every coin goes into hens!",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 10,
+                  "cream": 6,
+                  "brown": 3,
+                  "golden": 0
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "cheap",
+                "bags": 1
+              },
+              {
+                "t": "buyFeedOnCredit",
+                "tier": "cheap",
+                "bags": 3
+              },
+              {
+                "t": "buyHens",
+                "count": 8
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "undercut",
+                "farmId": "player-0",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              },
+              {
+                "kind": "undercut",
+                "farmId": "player-1",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "Short supply, high prices. Selling it all, undercutting the slow.",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 10,
+                  "cream": 6,
+                  "brown": 3,
+                  "golden": 0
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "cheap",
+                "bags": 1
+              },
+              {
+                "t": "buyHens",
+                "count": 2
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "undercut",
+                "farmId": "player-0",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.88,
+                "line": ""
+              },
+              {
+                "kind": "undercut",
+                "farmId": "player-1",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.88,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      },
+      "normal": {
+        "sample": {
+          "cash": 70,
+          "own": {
+            "hens": 26,
+            "capacity": 30,
+            "crate": {
+              "white": 10,
+              "cream": 6,
+              "brown": 3,
+              "golden": 0
+            },
+            "feedGrams": 6000
+          },
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Steady day. Selling everything, undercutting the slow ones.",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 10,
+                  "cream": 6,
+                  "brown": 3,
+                  "golden": 0
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "cheap",
+                "bags": 1
+              },
+              {
+                "t": "buyHens",
+                "count": 1
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "undercut",
+                "farmId": "player-0",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.9,
+                "line": ""
+              },
+              {
+                "kind": "undercut",
+                "farmId": "player-1",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.9,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "A few more hens. Always be growing!",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 10,
+                  "cream": 6,
+                  "brown": 3,
+                  "golden": 0
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "cheap",
+                "bags": 1
+              },
+              {
+                "t": "buyHens",
+                "count": 4
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "undercut",
+                "farmId": "player-0",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              },
+              {
+                "kind": "undercut",
+                "farmId": "player-1",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 0.92,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      }
+    },
+    "old-money": {
+      "glut": {
+        "sample": {
+          "cash": 420,
+          "own": {
+            "hens": 100,
+            "capacity": 102,
+            "crate": {
+              "white": 30,
+              "cream": 35,
+              "brown": 30,
+              "golden": 3
+            },
+            "feedGrams": 60000
+          },
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "We hold seventy percent of our eggs. Gluts pass.",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 9,
+                  "cream": 10,
+                  "brown": 9,
+                  "golden": 0
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "premium",
+                "bags": 2
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "buyout-offer",
+                "farmId": "player-0",
+                "hens": 4,
+                "priceShare": 0.85,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "We hold half and buy cheap hens from the fallen.",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 15,
+                  "cream": 17,
+                  "brown": 15,
+                  "golden": 1
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "premium",
+                "bags": 2
+              },
+              {
+                "t": "buyHens",
+                "count": 10
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "buyout-offer",
+                "farmId": "player-0",
+                "hens": 4,
+                "priceShare": 0.85,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "The plain eggs go. The golden ones wait for a better day.",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 30,
+                  "cream": 35,
+                  "brown": 30,
+                  "golden": 0
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "premium",
+                "bags": 2
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "buyout-offer",
+                "farmId": "player-0",
+                "hens": 4,
+                "priceShare": 0.85,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      },
+      "scarcity": {
+        "sample": {
+          "cash": 420,
+          "own": {
+            "hens": 100,
+            "capacity": 102,
+            "crate": {
+              "white": 30,
+              "cream": 35,
+              "brown": 30,
+              "golden": 3
+            },
+            "feedGrams": 60000
+          },
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Scarcity rewards the patient. We sell all and add hens.",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 30,
+                  "cream": 35,
+                  "brown": 30,
+                  "golden": 3
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "premium",
+                "bags": 2
+              },
+              {
+                "t": "buyHens",
+                "count": 10
+              },
+              {
+                "t": "buyUnlock",
+                "unlock": "grader"
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "buyout-offer",
+                "farmId": "player-0",
+                "hens": 4,
+                "priceShare": 0.85,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "A good price. We sell, and we keep our cash.",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 30,
+                  "cream": 35,
+                  "brown": 30,
+                  "golden": 3
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "premium",
+                "bags": 2
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "buyout-offer",
+                "farmId": "player-0",
+                "hens": 4,
+                "priceShare": 0.85,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      },
+      "normal": {
+        "sample": {
+          "cash": 420,
+          "own": {
+            "hens": 100,
+            "capacity": 102,
+            "crate": {
+              "white": 30,
+              "cream": 35,
+              "brown": 30,
+              "golden": 3
+            },
+            "feedGrams": 60000
+          },
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Business as usual. We sell at a fair price.",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 30,
+                  "cream": 35,
+                  "brown": 30,
+                  "golden": 3
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "premium",
+                "bags": 2
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "buyout-offer",
+                "farmId": "player-0",
+                "hens": 4,
+                "priceShare": 0.85,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "We offer to take a struggling neighbour off its hens. A kindness.",
+            "farmActions": [
+              {
+                "t": "sell",
+                "items": {
+                  "white": 30,
+                  "cream": 35,
+                  "brown": 30,
+                  "golden": 3
+                }
+              },
+              {
+                "t": "buyFeed",
+                "tier": "premium",
+                "bags": 2
+              }
+            ],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "buyout-offer",
+                "farmId": "player-0",
+                "hens": 4,
+                "priceShare": 0.8,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      }
+    },
+    "squeezer": {
+      "glut": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {
+            "cheap": 28,
+            "standard": 45,
+            "premium": 20
+          }
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Eggs are cheap, feed is not. Pay up.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "feed-deal",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 1.25,
+                "line": ""
+              },
+              {
+                "kind": "feed-deal",
+                "farmId": "player-1",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 1.25,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 9,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1.1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "Gluts make farms desperate. Prices up.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "feed-deal",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 1.4575,
+                "line": ""
+              },
+              {
+                "kind": "feed-deal",
+                "farmId": "player-1",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 1.2000000000000002,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 9,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1.2
+          }
+        ]
+      },
+      "scarcity": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {
+            "cheap": 28,
+            "standard": 45,
+            "premium": 20
+          }
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Everyone is buying hens. Feed costs more now.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "feed-deal",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 1.4575,
+                "line": ""
+              },
+              {
+                "kind": "feed-deal",
+                "farmId": "player-1",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 1.2000000000000002,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 9,
+              "standard": 80,
+              "premium": 0
+            },
+            "markup": 1.3
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "Busy street, thin barns. My price went up.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "feed-deal",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 1.4575,
+                "line": ""
+              },
+              {
+                "kind": "feed-deal",
+                "farmId": "player-1",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 1.2000000000000002,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 9,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1.25
+          }
+        ]
+      },
+      "normal": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {
+            "cheap": 28,
+            "standard": 45,
+            "premium": 20
+          }
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Same as ever: my price. Take it or leave it.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "feed-deal",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 1.4575,
+                "line": ""
+              },
+              {
+                "kind": "feed-deal",
+                "farmId": "player-1",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 1.2000000000000002,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 9,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1.15
+          }
+        ]
+      }
+    },
+    "loyalist": {
+      "glut": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {
+            "cheap": 28,
+            "standard": 45,
+            "premium": 20
+          }
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Hard times, friend. Credit for regulars, a little off the list.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "credit-terms",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 2,
+                "priceShare": 0.95,
+                "line": ""
+              },
+              {
+                "kind": "credit-terms",
+                "farmId": "player-1",
+                "tier": "standard",
+                "bags": 2,
+                "priceShare": 0.95,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 9,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 0.92
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "Rough week on the street. Same fair price, friend.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "credit-terms",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 0.94,
+                "line": ""
+              },
+              {
+                "kind": "feed-deal",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 0.94,
+                "line": ""
+              },
+              {
+                "kind": "feed-deal",
+                "farmId": "player-1",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 0.98,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 9,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 0.95
+          }
+        ]
+      },
+      "scarcity": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {
+            "cheap": 28,
+            "standard": 45,
+            "premium": 20
+          }
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Demand is up. Barn stocked so nobody goes hungry.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "credit-terms",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 0.94,
+                "line": ""
+              },
+              {
+                "kind": "feed-deal",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 0.94,
+                "line": ""
+              },
+              {
+                "kind": "feed-deal",
+                "farmId": "player-1",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 0.98,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 60,
+              "standard": 100,
+              "premium": 40
+            },
+            "markup": 1
+          }
+        ]
+      },
+      "normal": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {
+            "cheap": 28,
+            "standard": 45,
+            "premium": 20
+          }
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Fair price for regulars, as always.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [],
+            "offers": [
+              {
+                "kind": "credit-terms",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 0.94,
+                "line": ""
+              },
+              {
+                "kind": "feed-deal",
+                "farmId": "player-0",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 0.94,
+                "line": ""
+              },
+              {
+                "kind": "feed-deal",
+                "farmId": "player-1",
+                "tier": "standard",
+                "bags": 1,
+                "priceShare": 0.98,
+                "line": ""
+              }
+            ],
+            "fills": [],
+            "restock": {
+              "cheap": 9,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 0.98
+          }
+        ]
+      }
+    },
+    "bakery": {
+      "glut": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Cheap eggs! Filling the larder for the week.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [
+              {
+                "grade": "white",
+                "qty": 50,
+                "priceShare": 0.9
+              },
+              {
+                "grade": "cream",
+                "qty": 50,
+                "priceShare": 0.9
+              }
+            ],
+            "offers": [
+              {
+                "kind": "standing-contract",
+                "farmId": "player-0",
+                "qtyPerDay": 7,
+                "days": 7,
+                "priceShare": 1.1,
+                "line": ""
+              },
+              {
+                "kind": "standing-contract",
+                "farmId": "player-1",
+                "qtyPerDay": 8,
+                "days": 5,
+                "priceShare": 1.1,
+                "line": ""
+              }
+            ],
+            "fills": [
+              {
+                "orderId": "sell-0",
+                "qty": 10
+              }
+            ],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "The ovens are hungry and eggs are cheap. Buying.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [
+              {
+                "grade": "white",
+                "qty": 40,
+                "priceShare": 0.95
+              },
+              {
+                "grade": "cream",
+                "qty": 40,
+                "priceShare": 0.95
+              }
+            ],
+            "offers": [
+              {
+                "kind": "standing-contract",
+                "farmId": "player-0",
+                "qtyPerDay": 7,
+                "days": 7,
+                "priceShare": 1.15,
+                "line": ""
+              },
+              {
+                "kind": "standing-contract",
+                "farmId": "player-1",
+                "qtyPerDay": 8,
+                "days": 5,
+                "priceShare": 1.15,
+                "line": ""
+              }
+            ],
+            "fills": [
+              {
+                "orderId": "sell-0",
+                "qty": 10
+              }
+            ],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      },
+      "scarcity": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Eggs are scarce. Locking in contracts for the ovens.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [
+              {
+                "grade": "white",
+                "qty": 10,
+                "priceShare": 1
+              }
+            ],
+            "offers": [
+              {
+                "kind": "standing-contract",
+                "farmId": "player-0",
+                "qtyPerDay": 7,
+                "days": 8,
+                "priceShare": 1.2,
+                "line": ""
+              },
+              {
+                "kind": "standing-contract",
+                "farmId": "player-1",
+                "qtyPerDay": 8,
+                "days": 8,
+                "priceShare": 1.2,
+                "line": ""
+              }
+            ],
+            "fills": [
+              {
+                "orderId": "sell-0",
+                "qty": 10
+              }
+            ],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      },
+      "normal": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Steady baking. Contracts for reliable farms.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [
+              {
+                "grade": "white",
+                "qty": 30,
+                "priceShare": 0.97
+              },
+              {
+                "grade": "cream",
+                "qty": 30,
+                "priceShare": 0.97
+              }
+            ],
+            "offers": [
+              {
+                "kind": "standing-contract",
+                "farmId": "player-0",
+                "qtyPerDay": 7,
+                "days": 7,
+                "priceShare": 1.12,
+                "line": ""
+              },
+              {
+                "kind": "standing-contract",
+                "farmId": "player-1",
+                "qtyPerDay": 8,
+                "days": 5,
+                "priceShare": 1.12,
+                "line": ""
+              }
+            ],
+            "fills": [
+              {
+                "orderId": "sell-0",
+                "qty": 10
+              }
+            ],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      }
+    },
+    "trader": {
+      "glut": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Fine eggs going cheap. Buying for the town stall.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [
+              {
+                "grade": "brown",
+                "qty": 30,
+                "priceShare": 0.95
+              },
+              {
+                "grade": "golden",
+                "qty": 4,
+                "priceShare": 0.95
+              }
+            ],
+            "offers": [
+              {
+                "kind": "premium-order",
+                "farmId": "player-0",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 1.1,
+                "line": ""
+              },
+              {
+                "kind": "premium-order",
+                "farmId": "player-1",
+                "grade": "brown",
+                "qty": 11,
+                "priceShare": 1.1,
+                "line": ""
+              }
+            ],
+            "fills": [
+              {
+                "orderId": "sell-1",
+                "qty": 6
+              }
+            ],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      },
+      "scarcity": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Good browns are rare. I pay well for quality.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [
+              {
+                "grade": "brown",
+                "qty": 8,
+                "priceShare": 1.1
+              }
+            ],
+            "offers": [
+              {
+                "kind": "premium-order",
+                "farmId": "player-0",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 1.3,
+                "line": ""
+              },
+              {
+                "kind": "premium-order",
+                "farmId": "player-1",
+                "grade": "brown",
+                "qty": 11,
+                "priceShare": 1.3,
+                "line": ""
+              }
+            ],
+            "fills": [
+              {
+                "orderId": "sell-1",
+                "qty": 6
+              }
+            ],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      },
+      "normal": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Quality at a fair premium. Bring me browns.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [
+              {
+                "grade": "brown",
+                "qty": 20,
+                "priceShare": 1.05
+              },
+              {
+                "grade": "golden",
+                "qty": 20,
+                "priceShare": 1.05
+              }
+            ],
+            "offers": [
+              {
+                "kind": "premium-order",
+                "farmId": "player-0",
+                "grade": "brown",
+                "qty": 5,
+                "priceShare": 1.2,
+                "line": ""
+              },
+              {
+                "kind": "premium-order",
+                "farmId": "player-1",
+                "grade": "brown",
+                "qty": 11,
+                "priceShare": 1.2,
+                "line": ""
+              }
+            ],
+            "fills": [
+              {
+                "orderId": "sell-1",
+                "qty": 6
+              }
+            ],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      }
+    },
+    "wholesaler": {
+      "glut": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Glut. Buying deep and cheap.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [
+              {
+                "grade": "white",
+                "qty": 80,
+                "priceShare": 0.62
+              },
+              {
+                "grade": "cream",
+                "qty": 80,
+                "priceShare": 0.62
+              },
+              {
+                "grade": "brown",
+                "qty": 80,
+                "priceShare": 0.62
+              },
+              {
+                "grade": "golden",
+                "qty": 80,
+                "priceShare": 0.62
+              }
+            ],
+            "offers": [
+              {
+                "kind": "bulk-order",
+                "farmId": "player-0",
+                "qty": 25,
+                "priceShare": 0.65,
+                "line": ""
+              },
+              {
+                "kind": "bulk-order",
+                "farmId": "player-1",
+                "qty": 31,
+                "priceShare": 0.65,
+                "line": ""
+              }
+            ],
+            "fills": [
+              {
+                "orderId": "sell-1",
+                "qty": 6
+              }
+            ],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          },
+          {
+            "note": "recorded stand-in",
+            "reason": "Glut. Carts out. Paying a little more for volume.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [
+              {
+                "grade": "white",
+                "qty": 60,
+                "priceShare": 0.68
+              },
+              {
+                "grade": "cream",
+                "qty": 60,
+                "priceShare": 0.68
+              },
+              {
+                "grade": "brown",
+                "qty": 60,
+                "priceShare": 0.68
+              },
+              {
+                "grade": "golden",
+                "qty": 60,
+                "priceShare": 0.68
+              }
+            ],
+            "offers": [
+              {
+                "kind": "bulk-order",
+                "farmId": "player-0",
+                "qty": 25,
+                "priceShare": 0.72,
+                "line": ""
+              },
+              {
+                "kind": "bulk-order",
+                "farmId": "player-1",
+                "qty": 31,
+                "priceShare": 0.72,
+                "line": ""
+              }
+            ],
+            "fills": [
+              {
+                "orderId": "sell-1",
+                "qty": 6
+              }
+            ],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      },
+      "scarcity": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Scarce. Buying light.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [
+              {
+                "grade": "white",
+                "qty": 15,
+                "priceShare": 0.72
+              },
+              {
+                "grade": "cream",
+                "qty": 15,
+                "priceShare": 0.72
+              }
+            ],
+            "offers": [],
+            "fills": [
+              {
+                "orderId": "sell-1",
+                "qty": 6
+              }
+            ],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      },
+      "normal": {
+        "sample": {
+          "cash": 520,
+          "own": null,
+          "stock": {}
+        },
+        "replies": [
+          {
+            "note": "recorded stand-in",
+            "reason": "Volume at the right price.",
+            "farmActions": [],
+            "sellOrders": [],
+            "buyOrders": [
+              {
+                "grade": "white",
+                "qty": 40,
+                "priceShare": 0.7
+              },
+              {
+                "grade": "cream",
+                "qty": 40,
+                "priceShare": 0.7
+              },
+              {
+                "grade": "brown",
+                "qty": 40,
+                "priceShare": 0.7
+              },
+              {
+                "grade": "golden",
+                "qty": 16,
+                "priceShare": 0.7
+              }
+            ],
+            "offers": [
+              {
+                "kind": "bulk-order",
+                "farmId": "player-0",
+                "qty": 25,
+                "priceShare": 0.72,
+                "line": ""
+              },
+              {
+                "kind": "bulk-order",
+                "farmId": "player-1",
+                "qty": 31,
+                "priceShare": 0.72,
+                "line": ""
+              }
+            ],
+            "fills": [
+              {
+                "orderId": "sell-1",
+                "qty": 6
+              }
+            ],
+            "restock": {
+              "cheap": 0,
+              "standard": 0,
+              "premium": 0
+            },
+            "markup": 1
+          }
+        ]
+      }
+    }
+  },
+  "invalid": [
+    "I think I will buy some eggs today.",
+    "{\"note\":\"forgot the rest\"}",
+    "{\"note\":\"too keen\",\"reason\":\"Markup to the moon.\",\"farmActions\":[],\"sellOrders\":[],\"buyOrders\":[],\"offers\":[],\"fills\":[],\"restock\":{\"cheap\":0,\"standard\":0,\"premium\":0},\"markup\":9}",
+    "{\"note\":\"cut off\",\"reason\":\"Half a reply\",\"farmActions\":[],\""
+  ],
+  "reflections": {
+    "upstart": [
+      "Big week! More hens than ever, and sure, the glut stung, but I am still here. Next week I keep a little feed money back. A little.",
+      "Rough one. I grew into a flood and paid for it. Next week I watch the street before I buy hens. Then I buy hens."
+    ],
+    "old-money": [
+      "A satisfactory week. We held our eggs through the slump and sold into the recovery, as always. Next week: the same patience, and an eye on the auction.",
+      "Upstarts flooded the street and the price suffered for it. We lost a little, they lost more. Next week we hold more and buy their hens."
+    ],
+    "squeezer": [
+      "Hungry farms paid my price, mostly. A few walked. Next week I squeeze the desperate ones and leave the rest be.",
+      "Thin week: too many refusals. Next week I trim the list price a hair, only a hair."
+    ],
+    "loyalist": [
+      "The regulars kept coming and paid what they owed. Next week I keep the barn full and a little credit ready for anyone short.",
+      "A hard week for the street, friend. Next week a little off the list for the regulars, and credit for the honest ones."
+    ],
+    "bakery": [
+      "The ovens stayed full and the contracts mostly delivered. Next week I lock in a longer contract with the farm that never missed.",
+      "A lean week: two missed deliveries and dear eggs. Next week fewer contracts, steadier farms."
+    ],
+    "trader": [
+      "Good browns moved at good prices; one farm slipped on quality and I walked. Next week I pay up only where the quality holds.",
+      "A thin week at the stall. Next week I buy deeper while fine eggs are cheap."
+    ],
+    "wholesaler": [
+      "Volume moved. Margin held. Next week: more carts in the glut.",
+      "Bought too dear on a scarce day. Next week: lighter bids when eggs are short."
+    ]
+  }
+}

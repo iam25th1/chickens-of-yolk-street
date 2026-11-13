@@ -184,9 +184,28 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
   // the market board swaps the canvas to the town square (on a phone the farm stays behind it);
   // the farm keeps running either way
   const marketOpen = modal?.kind === 'market' && !v.portrait;
+  // the town square's art comes with the later groups: a board opened before they arrive loads them
+  // first (the farm stays behind the board meanwhile) instead of drawing art that is not there
+  const townReady = () => assets.has('27-town-square-plate') && assets.has('27-town-square-anim');
+  const [townArt, setTownArt] = useState(townReady);
+  useEffect(() => {
+    if (!marketOpen || townArt) return;
+    let live = true;
+    void assets
+      .loadGroups(['market'], v.p, { quick: true })
+      .then(() => {
+        if (live) setTownArt(townReady());
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+    // townReady reads the store
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marketOpen, townArt, assets, v.p]);
   useEffect(() => {
     if (!scene.current) return;
-    if (marketOpen && !town.current) {
+    if (marketOpen && townArt && !town.current) {
       town.current = new TownScene(assets, audio);
       pixi.setScene(town.current, { keep: true });
       audio.play('16-ticker', { volume: 0.4 });
@@ -194,7 +213,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       pixi.setScene(scene.current);
       town.current = null;
     }
-  }, [marketOpen, assets, audio, pixi]);
+  }, [marketOpen, townArt, assets, audio, pixi]);
 
   // the farm's music starts once its sharp art is in (the stream would otherwise share the line)
   const crashed = market ? isCrash(market.multiplier) : false;

@@ -18,7 +18,7 @@ import {
   type UnlockId,
 } from '@coys/shared';
 import { num } from '../db/db';
-import { CAST, lineFor, replyFor, reserveFor } from '../agents/cast';
+import { lineFor, personalityFor, replyFor, reserveFor } from '../agents/cast';
 import type { Offer } from '../agents/decision';
 import { haggleStep } from '../agents/haggle';
 import {
@@ -209,7 +209,7 @@ export async function createCards(ctx: Ctx, candidates: Candidate[], playerTrade
         const p = price(item.offer, m);
         const kind = item.agent.kind as AgentKind;
         const memory = await loadMemory(ctx.q, item.agent.id, farmId);
-        const reserve = p.side === 'none' ? p.unit : Math.round(reserveFor(kind, p.unit, p.side, memory));
+        const reserve = p.side === 'none' ? p.unit : Math.round(reserveFor(kind, p.unit, p.side, memory, personalityFor(kind, item.agent.entrant)));
         const due = item.offer.kind === 'credit-terms' ? coins(Math.round(creditDue((p.unit * p.qty) / 1000) * 1000)) : '';
         const line =
           item.offer.line.trim().slice(0, 160) ||
@@ -441,7 +441,7 @@ export async function respondCard(ctx: Ctx, farm: Farm, cardId: string, choice: 
       const agent = await agentFor(ctx, card);
       const kind = agent.kind as AgentKind;
       const askMilli = toMilli(ask);
-      const result = haggleStep({ offer: card.offerMilli, reserve: card.reserveMilli, round: card.round, side: card.side }, askMilli, CAST[kind].personality);
+      const result = haggleStep({ offer: card.offerMilli, reserve: card.reserveMilli, round: card.round, side: card.side }, askMilli, personalityFor(kind, agent.entrant));
       if (result.outcome === 'accept') {
         await remember(ctx, agent.id, farm.id, { haggles_won: 1 });
         card.line = replyFor(kind, 'win', { price: coins(askMilli) });

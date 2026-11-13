@@ -111,10 +111,19 @@ export const ECONOMY = {
     bustBelowCash: 0,
     /** Bust hens are auctioned at this fraction of the hen price. */
     auctionPriceFactor: 0.5,
-    /** Below this cash an agent thinks only every other day, on the cheaper model. */
+    /** Below this cash an agent thinks only every other day (on the main model: a hard day). */
     struggleCash: 40,
     /** Days after a bust before a new agent of the same role opens. */
     replaceAfterDays: 3,
+    /** In-game days between an agent's weekly reflections. */
+    reflectEveryDays: 7,
+    /**
+     * New AI farms. At each day close, while the open AI farms are under the cap, one enters with
+     * this chance when supply stayed under demand for the last `scarceDays` closed days or a rival
+     * went bust in the last `bustLookbackDays`. Under the floor one enters whatever the chance. The
+     * cap is the larger of `capFloor` and `capPerPlayerFarm` times the open player farms, rounded down.
+     */
+    entry: { chance: 0.25, minAiFarms: 2, capFloor: 4, capPerPlayerFarm: 1.5, scarceDays: 3, bustLookbackDays: 5 },
   },
   /** Feed suppliers buy bags wholesale and sell them to farms. */
   suppliers: {
@@ -304,6 +313,12 @@ export const fromMilli = (milli: number): number => milli / 1000;
 /** The live market's reference supply: demand per active farm times the active farms (at least one). */
 export function marketReference(activeFarms: number): number {
   return Math.max(1, Math.floor(activeFarms)) * ECONOMY.market.demandPerActiveFarm;
+}
+
+/** Most AI farms open at once: the cap floor, or more with more open player farms. */
+export function aiFarmCap(openPlayerFarms: number): number {
+  const e = ECONOMY.agents.entry;
+  return Math.max(e.capFloor, Math.floor(e.capPerPlayerFarm * Math.max(0, openPlayerFarms)));
 }
 
 /**

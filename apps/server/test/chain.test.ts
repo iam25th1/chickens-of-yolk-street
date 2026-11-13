@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ECONOMY } from '@coys/shared';
 import { buildDayBatch, buildLateSettlement, commitBatch, digestOf } from '../src/chain/batch';
-import { NoopChain, agentAccountName, agentPublicKey, assertTestnetConfig, lateDaysToSend, mintsAffordable, refusedByRpc, settledCountsAgree, withBackoff } from '../src/chain/chain';
+import { NoopChain, agentAccountName, agentPublicKey, assertTestnetConfig, freeWallet, lateDaysToSend, mintsAffordable, refusedByRpc, settledCountsAgree, walletPool, withBackoff } from '../src/chain/chain';
 import { FeatherRenderer } from '../src/chain/feather-image';
 import { decodePng } from '../src/chain/png';
 import { openDb } from '../src/db/db';
@@ -279,15 +279,51 @@ describe('the Feather reserve', () => {
 });
 
 describe('agent wallets', () => {
-  it("a bust agent's successor takes over its wallet instead of a new funded one", async () => {
-    const { successorWallet } = await import('../src/chain/chain');
-    const t = await makeGame({ cast: true });
-    const [upstart] = await t.db.query(`SELECT id, kind FROM agents WHERE kind = 'upstart' LIMIT 1`);
-    expect(await successorWallet(t.db, 'upstart')).toBeNull();
-    await t.db.query(`UPDATE agents SET status = 'bust', bust_day = 1, near_account_id = 'upstart1.game.testnet' WHERE id = $1`, [upstart?.id]);
-    expect(await successorWallet(t.db, 'upstart')).toBe('upstart1.game.testnet');
-    // another kind's wallet is never taken over
-    expect(await successorWallet(t.db, 'old-money')).toBeNull();
+  it('are a pool: a new agent of any kind takes a bust agent\'s wallet before one is created and funded', async () => {
+    const chain = new RecordingChain('game.testnet');
+    const t = await makeGame({ cast: true, chain });
+    expect(await freeWallet(t.db)).toBeNull();
+    await chain.linkWallets(t.db);
+    // the seven base agents each get a new funded wallet, named by kind and generation as before
+    expect(chain.created).toHaveLength(7);
+    expect(chain.created).toContain('upstart1.game.testnet');
+    expect(await walletPool(t.db)).toEqual({ poolSize: 7, free: 0, inUse: 7, created: 7, nearSpent: 0.35 });
+    expect(chain.walletLog.at(-1)).toMatch(/pool 7 \(7 in use, 0 free\), 7 created, 0\.35 NEAR spent/);
+
+    // the Upstart and the Bakery go bust: their wallets are free, for any kind
+    await t.db.query(`UPDATE agents SET status = 'bust', bust_day = 1 WHERE kind IN ('upstart', 'bakery')`);
+    expect(await walletPool(t.db)).toMatchObject({ free: 2, inUse: 5 });
+    expect(await freeWallet(t.db)).toBe('bakery1.game.testnet');
+    // an entering AI farm and the next Bakery take them; nothing new is created or funded
+    await t.db.query(
+      `INSERT INTO agents (id, kind, role, name, generation, opened_day, entrant_key) VALUES ('e1', 'old-money', 'rival', 'Gilded Roost Estates', 1, 2, 'gilded-roost'),
+       ('b2', 'bakery', 'buyer', 'Rise and Shine Bakes', 2, 2, NULL)`,
+    );
+    await chain.linkWallets(t.db);
+    const held = await t.db.query(`SELECT id, near_account_id FROM agents WHERE id IN ('e1', 'b2') ORDER BY id`);
+    expect(held.map((r) => r.near_account_id).sort()).toEqual(['bakery1.game.testnet', 'upstart1.game.testnet']);
+    expect(chain.created).toHaveLength(7);
+    expect(await walletPool(t.db)).toEqual({ poolSize: 7, free: 0, inUse: 7, created: 7, nearSpent: 0.35 });
+    // with no free wallet, the next one is created for the entrant's own key and funded once
+    await t.db.query(`INSERT INTO agents (id, kind, role, name, generation, opened_day, entrant_key) VALUES ('e2', 'upstart', 'rival', 'Early Bird Eggs', 1, 3, 'early-bird')`);
+    await chain.linkWallets(t.db);
+    expect(chain.created.at(-1)).toBe('earlybird1.game.testnet');
+    expect(await walletPool(t.db)).toEqual({ poolSize: 8, free: 0, inUse: 8, created: 8, nearSpent: 0.4 });
+    const [row] = await t.db.query(`SELECT key_seed, key_generation, funded_near, created_for FROM agent_wallets WHERE account = 'earlybird1.game.testnet'`);
+    expect(row).toMatchObject({ key_seed: 'early-bird', key_generation: 1, funded_near: 0.05, created_for: 'e2' });
+    await t.db.close();
+  });
+
+  it('a bust agent\'s farm holds no wallet: its eggs leave the account that passes to the next agent', async () => {
+    const chain = new RecordingChain('game.testnet');
+    const t = await makeGame({ cast: true, chain });
+    t.clock.t += ECONOMY.day.lengthMs;
+    await t.game.endDay();
+    const [up] = await t.db.query(`SELECT id, farm_id, near_account_id FROM agents WHERE kind = 'upstart'`);
+    await t.db.query(`UPDATE farms SET crate_white = 30 WHERE id = $1`, [up?.farm_id]);
+    await t.db.query(`UPDATE agents SET status = 'bust', bust_day = 2 WHERE id = $1`, [up?.id]);
+    const built = await buildDayBatch(t.db, t.game.season, 1, { feathers: null, renderer: null });
+    expect(built.batch.eggs.some((m) => m.to === up?.near_account_id && m.kind === 'Mint')).toBe(false);
     await t.db.close();
   });
 });

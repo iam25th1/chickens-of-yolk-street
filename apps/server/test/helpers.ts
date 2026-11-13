@@ -1,8 +1,8 @@
 import { openDb, type Db } from '../src/db/db';
 import { InferenceBudget } from '../src/agents/brain';
-import type { NearAiClient } from '../src/ai/nearai';
+import { NEARAI_DEFAULT_CHEAP_MODEL, NEARAI_DEFAULT_MODEL, type NearAiClient } from '../src/ai/nearai';
 import { buildDayBatch, buildLateSettlement, commitBatch, digestOf, type DayBatch } from '../src/chain/batch';
-import { NoopChain, agentAccountName, type ChainWriter, type LateResult, type MintRequest, type MintResult, type SettleResult } from '../src/chain/chain';
+import { NoopChain, assignAgentWallets, type ChainWriter, type LateResult, type MintRequest, type MintResult, type SettleResult } from '../src/chain/chain';
 import { tokenFor, type Collection } from '../src/chain/mint';
 import { Game } from '../src/game/game';
 import { seededRng } from '../src/game/rng';
@@ -15,8 +15,9 @@ export interface TestGame {
 }
 
 /**
- * A chain writer that does everything the testnet writer does except sign: it names agent wallets
- * under the game account, builds each day's batch (which never mints: Feathers mint at once), keeps
+ * A chain writer that does everything the testnet writer does except sign: it gives agents wallets
+ * under the game account from the same pool (a free one first, else a new one it records as funded
+ * with `fundingNear`), builds each day's batch (which never mints: Feathers mint at once), keeps
  * it, and commits the balances it implies, returning a receipt id per (season, day). Its mints keep
  * the contract's rules (a token id once, the 777 for the live season, a test collection otherwise),
  * and `script` makes the next mints refused by the RPC, waiting, or taken.
@@ -40,6 +41,10 @@ export class RecordingChain implements ChainWriter {
   readonly tokens = new Map<string, MintRequest>();
   /** What the next mints do instead of minting: refused by the RPC (after its retries), waiting, or a number taken. */
   script: ('refuse' | 'wait' | 'taken')[] = [];
+  /** Agent wallets it created (funded), in order, and the pool's log lines. */
+  readonly created: string[] = [];
+  readonly walletLog: string[] = [];
+  fundingNear = 0.05;
   constructor(
     readonly gameAccount = 'game.testnet',
     /** Unused since Feathers mint at once; kept so older tests construct the same way. */
@@ -65,9 +70,7 @@ export class RecordingChain implements ChainWriter {
   }
 
   async settleDay(db: Db, season: string, day: number): Promise<SettleResult> {
-    for (const a of await db.query('SELECT id, kind, generation FROM agents WHERE near_account_id IS NULL')) {
-      await db.query('UPDATE agents SET near_account_id = $2 WHERE id = $1', [a.id, agentAccountName(String(a.kind), Number(a.generation), this.gameAccount)]);
-    }
+    await this.linkWallets(db);
     // as the testnet writer: a day's settlement never mints Feathers
     const feathers = this.featherMinted === null ? null : { cap: 0, base: this.featherMinted };
     const built = await buildDayBatch(db, season, day, { feathers, renderer: null });
@@ -78,6 +81,20 @@ export class RecordingChain implements ChainWriter {
     const result: SettleResult = { status: 'sent', txHash, minted: built.minted, settlement: built.settlement, digest: built.batch.digest };
     this.settlements.push(result);
     return result;
+  }
+
+  /** What the testnet writer does at each settlement: every open agent without a wallet gets one from the pool. */
+  async linkWallets(db: Db): Promise<void> {
+    await assignAgentWallets(
+      db,
+      this.gameAccount,
+      async ({ account }) => {
+        this.created.push(account);
+        return this.fundingNear;
+      },
+      (line) => this.walletLog.push(line),
+      () => 0,
+    );
   }
 
   async settleLateDays(db: Db, season: string, days: number[]): Promise<LateResult> {
@@ -93,7 +110,17 @@ export class RecordingChain implements ChainWriter {
 }
 
 export async function makeGame(
-  opts: { cast?: boolean; seed?: number; client?: NearAiClient | null; capUsd?: number; season?: string; db?: Db; chain?: ChainWriter } = {},
+  opts: {
+    cast?: boolean;
+    seed?: number;
+    client?: NearAiClient | null;
+    capUsd?: number;
+    season?: string;
+    db?: Db;
+    chain?: ChainWriter;
+    /** The real model names, priced as the server prices them (ASSUMED_PRICING), instead of the test pair. */
+    realModels?: boolean;
+  } = {},
 ): Promise<TestGame> {
   const db = opts.db ?? (await openDb('memory://'));
   const clock = { t: Date.UTC(2026, 10, 11, 12) };
@@ -110,12 +137,14 @@ export async function makeGame(
     brain: {
       client: opts.client ?? null,
       budget: new InferenceBudget(db, opts.capUsd ?? 1, () => clock.t),
-      model: 'test/main',
-      cheapModel: 'test/cheap',
-      pricing: new Map([
-        ['test/main', { input: 1, output: 5 }],
-        ['test/cheap', { input: 0.1, output: 0.5 }],
-      ]),
+      model: opts.realModels ? NEARAI_DEFAULT_MODEL : 'test/main',
+      cheapModel: opts.realModels ? NEARAI_DEFAULT_CHEAP_MODEL : 'test/cheap',
+      pricing: opts.realModels
+        ? new Map()
+        : new Map([
+            ['test/main', { input: 1, output: 5 }],
+            ['test/cheap', { input: 0.1, output: 0.5 }],
+          ]),
     },
   });
   await game.init();

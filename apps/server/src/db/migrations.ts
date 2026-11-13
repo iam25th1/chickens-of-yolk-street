@@ -476,6 +476,51 @@ ALTER TABLE feather_tickets ADD COLUMN mint_note text;
 ALTER TABLE feather_tickets ADD COLUMN mint_tries integer NOT NULL DEFAULT 0;
 `,
   },
+  {
+    id: 13,
+    name: 'agent upgrades and ai farm entry',
+    sql: `
+-- What an agent keeps between decisions: its weekly reflection (under 400 characters) and the day it
+-- was written, the numbers its week started from (day, cash, deals, refusals), and its last few
+-- public one-line reasons (newest last), which players see on the market board.
+ALTER TABLE agents ADD COLUMN reflection text;
+ALTER TABLE agents ADD COLUMN reflection_day integer;
+ALTER TABLE agents ADD COLUMN week_start jsonb;
+ALTER TABLE agents ADD COLUMN reasons jsonb NOT NULL DEFAULT '[]';
+-- AI farms that enter the street (the entrant registry, agents/entrants.ts) are rivals keyed by their
+-- registry entry. Base cast members have none and stay one agent per kind and generation; an
+-- entrant numbers its own generations.
+ALTER TABLE agents ADD COLUMN entrant_key text;
+ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_kind_generation_key;
+CREATE UNIQUE INDEX agents_base_generation ON agents (kind, generation) WHERE entrant_key IS NULL;
+CREATE UNIQUE INDEX agents_entrant_generation ON agents (entrant_key, generation) WHERE entrant_key IS NOT NULL;
+
+-- NEAR AI Cloud calls and spend per agent per UTC day, against the per-agent cap
+CREATE TABLE agent_inference_usage (
+  agent_id text NOT NULL,
+  utc_day text NOT NULL,
+  calls integer NOT NULL DEFAULT 0,
+  fallbacks integer NOT NULL DEFAULT 0,
+  spend_micro_usd bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (agent_id, utc_day)
+);
+
+-- Agent wallets: a pool. Every sub-account the game created (or linked) for an agent, with the key
+-- seed it was made from and the NEAR it was funded with. A wallet whose agents are all bust is free
+-- for the next agent of any kind. Wallets made before the pool are listed with unknown funding.
+CREATE TABLE agent_wallets (
+  account text PRIMARY KEY,
+  key_seed text NOT NULL,
+  key_generation integer NOT NULL,
+  funded_near double precision,
+  created_for text,
+  created_at bigint NOT NULL
+);
+INSERT INTO agent_wallets (account, key_seed, key_generation, funded_near, created_for, created_at)
+SELECT DISTINCT ON (near_account_id) near_account_id, kind, generation, NULL, id, 0
+FROM agents WHERE near_account_id IS NOT NULL ORDER BY near_account_id, generation;
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

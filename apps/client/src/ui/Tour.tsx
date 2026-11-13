@@ -13,7 +13,7 @@ import type { Action } from '../net/socket';
 import { events } from '../state/game';
 import { createStore, useStore } from '../state/store';
 import { motion } from '../motion/ui';
-import { placeTourBox, type Placement } from './tourPlace';
+import { placeForTour, type Placement } from './tourPlace';
 import { finishTour, tour, tourStep } from '../state/tour';
 import { closeModal, openModal, ui, uiEvents, type ModalState, type UiEvent } from '../state/ui';
 import { uiFx } from './FxLayer';
@@ -312,10 +312,12 @@ export function TourBox({ ctx, send }: { ctx: TourCtx; send: (a: Action) => Prom
     };
   }, [t.active, audio]);
 
-  // NEXT shows after a few seconds on a step (at once when the step cannot happen now)
+  // NEXT shows after a few seconds on a step (at once when the step cannot happen now); coming back
+  // to a step starts its few seconds again
   const [waited, setWaited] = useState(-1);
   useEffect(() => {
     if (!t.active) return;
+    setWaited(-1);
     const id = setTimeout(() => setWaited(t.step), NEXT_AFTER_S * 1000);
     return () => clearTimeout(id);
   }, [t.active, t.step]);
@@ -332,11 +334,8 @@ export function TourBox({ ctx, send }: { ctx: TourCtx; send: (a: Action) => Prom
     const hs = [...m.children].map((c) => (c as HTMLElement).offsetHeight);
     if (hs.join() !== heights.join()) setHeights(hs);
   }, [heights, t.step, ending, waited, refusedAt, v.uiW, v.uiH]);
-  const z = v.zones;
-  const area = { x: z.world.x + 4, y: z.world.y + 4, w: z.world.w - 8, h: z.world.h - 8 };
-  const avoid = [z.tracker, z.toasts].map((r) => ({ x: r.x - 2, y: r.y - 2, w: r.w + 4, h: r.h + 4 }));
-  const sizes = BOX_WIDTHS.map((w, i) => ({ w: Math.min(w, area.w), h: heights[i] ?? 0 })).filter((s) => s.h > 0);
-  const place: Placement | null = sizes.length ? (placeTourBox(target, sizes, area, avoid) ?? placeTourBox(null, sizes, area, avoid)) : null;
+  const sizes = BOX_WIDTHS.map((w, i) => ({ w, h: heights[i] ?? 0 })).filter((s) => s.h > 0);
+  const place: Placement | null = sizes.length ? placeForTour(target, sizes, v.zones, v.portrait) : null;
   // a new step drops in
   useEffect(() => {
     if (boxRef.current && t.active) motion.enter(boxRef.current);
@@ -439,7 +438,7 @@ export function TourBox({ ctx, send }: { ctx: TourCtx; send: (a: Action) => Prom
     <>
       <div ref={measureRef} className="paged-measure" aria-hidden="true">
         {BOX_WIDTHS.map((w) => (
-          <div key={w}>{content(Math.min(w, area.w), false)}</div>
+          <div key={w}>{content(Math.min(w, v.zones.world.w - 8), false)}</div>
         ))}
       </div>
       {place && (
