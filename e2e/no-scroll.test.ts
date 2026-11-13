@@ -131,10 +131,11 @@ describe('no scrollbars and nothing cut off', () => {
       const check = async (screen: string) => {
         await page.waitForTimeout(350);
         for (const p of await page.evaluate(overflowing)) problems.push(`${size} ${screen}: ${p}`);
-        const key = screen.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+        // one picture per screen, tab and tour step (not every further page), at CSS pixels
+        const key = screen.replace(/ page \d+$/, '').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
         if (process.env.SCREENSHOTS && SHOTS.has(size) && !seen.has(key)) {
           seen.add(key);
-          await page.screenshot({ path: `${shotsDir}${key}-${size}.png` });
+          await page.screenshot({ path: `${shotsDir}${key}-${size}.png`, scale: 'css' });
         }
       };
       try {

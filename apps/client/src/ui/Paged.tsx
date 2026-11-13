@@ -129,6 +129,12 @@ export function Paged({
 
   const n = pages.length;
   const page = Math.min(at, n - 1);
+  // a narrow panel (the side panel's desk) gets the short controls: < 1/2 >
+  const [narrow, setNarrow] = useState(false);
+  useLayoutEffect(() => {
+    const w = self.current?.clientWidth ?? 0;
+    if (w > 0 && w < 220 !== narrow) setNarrow(w < 220);
+  }, [narrow, v.uiW, v.uiH]);
   const shown = pages[page] ?? [];
   const edges = onPrevEdge !== undefined || onNextEdge !== undefined;
   const nav = n > 1 || edges;
@@ -171,11 +177,13 @@ export function Paged({
           data-ui="pager"
         >
           <button className="btn" aria-label="Previous page" data-ui="page-prev" disabled={page === 0 && !onPrevEdge} onClick={() => go(-1)}>
-            {'< PREV'}
+            {narrow ? '<' : '< PREV'}
           </button>
-          <span data-ui="page-label">{n > 1 ? `PAGE ${page + 1} OF ${n}${label ? ` (${label})` : ''}` : (label ?? '')}</span>
+          <span data-ui="page-label" style={{ whiteSpace: 'nowrap' }}>
+            {n > 1 ? (narrow ? `${page + 1}/${n}` : `PAGE ${page + 1} OF ${n}${label ? ` (${label})` : ''}`) : (label ?? '')}
+          </span>
           <button className="btn" aria-label="Next page" data-ui="page-next" disabled={page >= n - 1 && !onNextEdge} onClick={() => go(1)}>
-            {'NEXT >'}
+            {narrow ? '>' : 'NEXT >'}
           </button>
         </div>
       )}
