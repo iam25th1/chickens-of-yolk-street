@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ECONOMY } from '@coys/shared';
+import { ProviderChain } from '../src/ai/chain';
 import { NearAiClient } from '../src/ai/nearai';
-import { DECISION_MAX_TOKENS, InferenceBudget, SYSTEM, decide, estimateTokens, reflect } from '../src/agents/brain';
+import { AGENT_DAILY_CALLS, DECISION_MAX_TOKENS, InferenceBudget, SYSTEM, decide, decisionFormat, decisionMessages, promptTokens, reflect, reserveUsd } from '../src/agents/brain';
 import { CAST, reserveFor } from '../src/agents/cast';
 import { cleanText, decisionJsonSchema, emptyDecision, parseDecision, validateDecision, type AgentContext, type WeekNumbers } from '../src/agents/decision';
 import { ENTRANTS } from '../src/agents/entrants';
@@ -232,18 +233,20 @@ describe('weekly reflections', () => {
     let reply = 'A hard week: too many hens into a glut. Next week I hold back and keep cash for feed.';
     const client = new NearAiClient({
       apiKey: 'k',
+      model: 'main',
+      cheapModel: 'cheap',
       fetchImpl: (async (_url: string, init: RequestInit) => {
         bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
         return new Response(JSON.stringify({ choices: [{ message: { content: reply } }], usage: { prompt_tokens: 600, completion_tokens: 60 } }));
       }) as typeof fetch,
     });
-    const opts = { client, budget: new InferenceBudget(db, 1), model: 'main', cheapModel: 'cheap', pricing: new Map(), log: () => undefined };
+    const opts = { chain: new ProviderChain([client]), budget: new InferenceBudget(db, 1), pricing: new Map(), log: () => undefined };
     expect(await reflect(ctx('upstart'), week, opts)).toMatchObject({ brain: 'nearai', model: 'main', text: reply });
     expect(bodies[0]?.model).toBe('main');
     expect(bodies[0]?.response_format).toBeUndefined();
     reply = '  ';
     expect(await reflect(ctx('upstart'), week, opts)).toMatchObject({ brain: 'rules', fallback: true, text: ruleReflection(ctx('upstart'), week) });
-    expect(await reflect(ctx('upstart'), week, { ...opts, client: null })).toMatchObject({ brain: 'rules', fallback: false });
+    expect(await reflect(ctx('upstart'), week, { ...opts, chain: new ProviderChain([]) })).toMatchObject({ brain: 'rules', fallback: false });
     await db.close();
   });
 });
@@ -274,6 +277,8 @@ describe('model decisions', () => {
   const clientReturning = (content: string, calls: { body: Record<string, unknown> }[]) =>
     new NearAiClient({
       apiKey: 'k',
+      model: 'main',
+      cheapModel: 'cheap',
       fetchImpl: (async (_url: string, init: RequestInit) => {
         calls.push({ body: JSON.parse(String(init.body)) as Record<string, unknown> });
         return new Response(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 1000, completion_tokens: 200 } }));
@@ -285,10 +290,8 @@ describe('model decisions', () => {
     return {
       db,
       opts: {
-        client,
+        chain: new ProviderChain([client]),
         budget: new InferenceBudget(db, capUsd, Date.now, agentCap),
-        model: 'main',
-        cheapModel: 'cheap',
         pricing: new Map([['main', { input: 1, output: 5 }]]),
         log: () => undefined,
       },
@@ -323,9 +326,9 @@ describe('model decisions', () => {
 
   it('once the daily spend cap is reached, agents use rules', async () => {
     const calls: { body: Record<string, unknown> }[] = [];
-    // the cap fits exactly one call's reserve (the prompt and a full reply); the agent's own cap is set wide
+    // the cap fits exactly one call's reserve (the prompt with its margin and a full reply); the agent's own cap is set wide
     const c = ctx('bakery');
-    const reserve = (estimateTokens(`${SYSTEM(c)}\n${JSON.stringify(c)}`) * 1 + DECISION_MAX_TOKENS * 5) / 1e6;
+    const reserve = reserveUsd({ input: 1, output: 5 }, promptTokens(decisionMessages(c), decisionFormat(), 0), DECISION_MAX_TOKENS);
     const { db, opts } = await brainOpts(clientReturning(JSON.stringify(okDecision), calls), reserve, { usd: 1 });
     await decide(ctx('bakery'), opts);
     await decide(ctx('bakery'), opts);
@@ -370,9 +373,9 @@ describe('model decisions', () => {
     // the spend cap: a reserve bigger than the agent's daily USD is refused at once
     const poor = await brainOpts(clientReturning(JSON.stringify(okDecision), []), 1, { usd: 0.0001 });
     expect(await decide(ctx('bakery'), poor.opts)).toMatchObject({ brain: 'rules', fallback: true });
-    expect(poor.opts.budget.agentCap).toEqual({ calls: 40, usd: 0.0001 });
-    // defaults: a quarter of the global cap and 40 calls
-    expect(new InferenceBudget(db, 2).agentCap).toEqual({ calls: 40, usd: 0.5 });
+    expect(poor.opts.budget.agentCap).toEqual({ calls: AGENT_DAILY_CALLS, usd: 0.0001 });
+    // defaults: a quarter of the global cap and AGENT_DAILY_CALLS calls
+    expect(new InferenceBudget(db, 2).agentCap).toEqual({ calls: AGENT_DAILY_CALLS, usd: 0.5 });
     await db.close();
     await poor.db.close();
   });

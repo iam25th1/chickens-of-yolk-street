@@ -1,6 +1,7 @@
 import { openDb, type Db } from '../src/db/db';
-import { InferenceBudget } from '../src/agents/brain';
-import { NEARAI_DEFAULT_CHEAP_MODEL, NEARAI_DEFAULT_MODEL, type NearAiClient } from '../src/ai/nearai';
+import { InferenceBudget, type Pricing } from '../src/agents/brain';
+import { ProviderChain } from '../src/ai/chain';
+import type { InferenceProvider } from '../src/ai/provider';
 import { buildDayBatch, buildLateSettlement, commitBatch, digestOf, type DayBatch } from '../src/chain/batch';
 import { NoopChain, assignAgentWallets, type ChainWriter, type LateResult, type MintRequest, type MintResult, type SettleResult } from '../src/chain/chain';
 import { tokenFor, type Collection } from '../src/chain/mint';
@@ -113,12 +114,14 @@ export async function makeGame(
   opts: {
     cast?: boolean;
     seed?: number;
-    client?: NearAiClient | null;
+    client?: InferenceProvider | null;
+    /** The whole provider chain, in order, instead of one client. */
+    providers?: InferenceProvider[];
     capUsd?: number;
     season?: string;
     db?: Db;
     chain?: ChainWriter;
-    /** The real model names, priced as the server prices them (ASSUMED_PRICING), instead of the test pair. */
+    /** Priced as the server prices the models (ASSUMED_PRICING), instead of 1 in, 5 out for main models and 0.1 in, 0.5 out for cheap ones. */
     realModels?: boolean;
   } = {},
 ): Promise<TestGame> {
@@ -126,6 +129,8 @@ export async function makeGame(
   const clock = { t: Date.UTC(2026, 10, 11, 12) };
   const logs: string[] = [];
   const log = (line: string) => logs.push(line);
+  const providers = opts.providers ?? (opts.client ? [opts.client] : []);
+  const testPrices = new Map<string, Pricing>(providers.flatMap((p): [string, Pricing][] => [[p.cheapModel, { input: 0.1, output: 0.5 }], [p.model, { input: 1, output: 5 }]]));
   const game = new Game({
     db,
     chain: opts.chain ?? new NoopChain('test', log),
@@ -135,16 +140,10 @@ export async function makeGame(
     cast: opts.cast ?? false,
     season: opts.season ?? null,
     brain: {
-      client: opts.client ?? null,
+      // pacing gaps are not waited for in tests
+      chain: new ProviderChain(providers, { sleep: async () => undefined }),
       budget: new InferenceBudget(db, opts.capUsd ?? 1, () => clock.t),
-      model: opts.realModels ? NEARAI_DEFAULT_MODEL : 'test/main',
-      cheapModel: opts.realModels ? NEARAI_DEFAULT_CHEAP_MODEL : 'test/cheap',
-      pricing: opts.realModels
-        ? new Map()
-        : new Map([
-            ['test/main', { input: 1, output: 5 }],
-            ['test/cheap', { input: 0.1, output: 0.5 }],
-          ]),
+      pricing: opts.realModels ? new Map() : testPrices,
     },
   });
   await game.init();
