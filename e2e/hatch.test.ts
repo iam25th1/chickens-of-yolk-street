@@ -58,7 +58,8 @@ async function buyAndHatch(page: Page, count: number, size: string): Promise<voi
   const seen: { x: number; y: number }[] = [];
   const started = Date.now();
   let frame = 0;
-  while (Date.now() - started < 9_000) {
+  // (a slow machine draws few frames, and each frame moves the art at most 100 ms, so allow time)
+  while (Date.now() - started < 40_000) {
     const f = await farm(page);
     most = Math.max(most, f.eggs.length);
     for (const e of f.eggs) if (!seen.some((s) => Math.abs(s.x - e.x) < 2 && Math.abs(s.y - e.y) < 2)) seen.push(e);
@@ -95,6 +96,8 @@ describe('new hens hatch', () => {
       const size = `${w}x${h}`;
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: w < 600, hasTouch: w < 600 });
       const page = await ctx.newPage();
+      // CPU_THROTTLE=6 runs the check as a slow CI machine would
+      if (process.env.CPU_THROTTLE) await (await ctx.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.CPU_THROTTLE) });
       const name = `Hatch Check ${size}`;
       try {
         await page.goto(`${server.url}/`);
