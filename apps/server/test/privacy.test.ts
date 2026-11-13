@@ -122,3 +122,11 @@ describe('player emails never reach anyone', () => {
     expect(rows.flatMap((r) => leaks(JSON.stringify(r)))).toEqual([]);
   });
 });
+
+describe('logs', () => {
+  it('replace anything shaped like an email address', async () => {
+    const { redactEmails } = await import('../src/redact');
+    expect(redactEmails('[http] POST /api/login/privy failed for someone.name+tag@mail.example.co.uk today')).toBe('[http] POST /api/login/privy failed for [email] today');
+    expect(redactEmails('[chain] season s1 day 3 settled: 4ZbiAX13 (play.coys-game.testnet)')).toBe('[chain] season s1 day 3 settled: 4ZbiAX13 (play.coys-game.testnet)');
+  });
+});
