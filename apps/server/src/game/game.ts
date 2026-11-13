@@ -49,6 +49,9 @@ import {
   type Rarity,
   type ServerMessage,
   type ShopHenView,
+  type ProfileData,
+  type PublicProfile,
+  topBadges,
 } from '@coys/shared';
 import { num, type Db, type Queryable } from '../db/db';
 import { migrate } from '../db/migrations';
@@ -99,12 +102,17 @@ import { claimGoal, goalViews, markGoal, markToured, toured } from './goals';
 import { checkChosenName, nameTaken, renameLegacyFarms, setFarmName, uniqueFarmName } from './names';
 import { conveyorCarry, hopperRefill, loadMachines, logMachine, logSale, machineDay, machineViews, repairMachine, wearMachines, type Machines } from './machines';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
+import { ACTION_BADGES, badgeViews, evaluateBadges, loadFacts } from './badges';
+import { backfillProfiles, bumpStats, earnedBadges, layTally, noteAction, profileFor, publicProfileFor, rememberTraits, snapshotDay, statBrokeDown, statRepaired } from './profile';
 
 export { ActionError } from './ctx';
 export type { Outbound } from './ctx';
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
-export type PlayerAction = DistributiveOmit<Exclude<ActionMessage, { t: 'linkWallet' | 'getLedger' }>, 'rid'>;
+export type PlayerAction = DistributiveOmit<Exclude<ActionMessage, { t: 'linkWallet' | 'getLedger' | 'getProfile' }>, 'rid'>;
+
+/** Actions that are business on the farm (the night owl and the rooster crow count them); settings and the tour are not. */
+const BUSINESS = new Set<string>(['buyHens', 'buyHen', 'buyFeed', 'buyFeedOnCredit', 'buildCoop', 'upgradeCoop', 'buyUnlock', 'repairMachine', 'sell', 'collect', 'claimGoal', 'redeemTicket', 'respondCard', 'deliverContract', 'placeOrder', 'cancelOrder', 'fillOrder']);
 
 export type ActionResult = { ok: true; events: GameEvent[] } | { ok: false; code: ErrorCode; message: string };
 
@@ -282,6 +290,12 @@ export class Game {
           ctx.marketChanged = true;
         }
         if (this.withCast) await ensureCast(ctx, this.createFarmFn);
+        // farms from before the profile: their records and badges, filled in once from their history
+        const filled = await backfillProfiles(ctx);
+        if (filled.length) {
+          await evaluateBadges(ctx, filled, { quiet: true, backfilled: true });
+          this.log(`[profile] filled in ${filled.length} farm${filled.length === 1 ? '' : 's'} from their history`);
+        }
         const [listed] = await ctx.q.query(`SELECT count(*) AS n FROM hens WHERE status = 'forsale'`);
         if (num(listed?.n) === 0) await this.refreshShop(ctx);
       }),
@@ -297,7 +311,8 @@ export class Game {
     await this.serial(() =>
       this.inTx(async (ctx) => {
         await arriveCards(ctx);
-        await conveyorCarry(ctx);
+        const carried = await conveyorCarry(ctx);
+        if (carried.length) await evaluateBadges(ctx, carried, { categories: ['eggs'] });
       }),
     );
   }
@@ -396,6 +411,8 @@ export class Game {
       [farmId, spec.ownerKind, spec.playerId, spec.agentKey, spec.name, spec.feed.tier, spec.feed.kg * 1000, ctx.day, spec.nameSource, spec.needsName],
     );
     await moveCash(ctx, farmId, 'start', toMilli(spec.cash), 'opening balance');
+    // a new farm's profile counters start here (a farm without them is filled in from history at boot)
+    await ctx.q.query('INSERT INTO farm_stats (farm_id) VALUES ($1) ON CONFLICT (farm_id) DO NOTHING', [farmId]);
     for (const [plot, kind] of spec.coops.entries()) {
       await ctx.q.query('INSERT INTO coops (id, farm_id, kind, plot, built_day) VALUES ($1, $2, $3, $4, $5)', [newId(), farmId, kind, plot, ctx.day]);
     }
@@ -565,10 +582,12 @@ export class Game {
       [day - 3],
     );
     const ranking = await this.db.query(
-      `SELECT f.name, f.owner_kind, f.cash_milli, f.bust_day, a.kind AS agent_kind,
+      `SELECT f.id, f.name, f.owner_kind, f.cash_milli, f.bust_day, a.kind AS agent_kind,
               (SELECT count(*) FROM hens h WHERE h.farm_id = f.id AND h.status = 'alive') AS hens
        FROM farms f LEFT JOIN agents a ON a.farm_id = f.id ORDER BY (f.bust_day IS NULL) DESC, f.cash_milli DESC LIMIT 12`,
     );
+    // each ranked farm's best few badges, for a small row beside its name
+    const marks = await earnedBadges(this.db, ranking.map((r) => String(r.id)));
     const trades = await this.db.query(
       `SELECT t.*, (t.seller_agent IS NOT NULL OR sf.owner_kind = 'agent') AS seller_ai, (t.buyer_agent IS NOT NULL OR bf.owner_kind = 'agent') AS buyer_ai
        FROM trades t LEFT JOIN farms sf ON sf.id = t.seller_farm LEFT JOIN farms bf ON bf.id = t.buyer_farm ORDER BY t.total_milli DESC, t.id DESC LIMIT 200`,
@@ -616,11 +635,13 @@ export class Game {
       book: await this.orderViews('true', [], null),
       trades: recentBig,
       ranking: ranking.map((r) => ({
+        farmId: String(r.id),
         name: String(r.name),
         kind: r.owner_kind === 'agent' ? ((r.agent_kind as AgentKind) ?? 'upstart') : 'player',
         hens: num(r.hens),
         cashMilli: num(r.cash_milli),
         bust: r.bust_day !== null,
+        badges: topBadges(marks.get(String(r.id)) ?? [], 3),
       })),
       explorer: this.chain.explorer,
       minting: this.chain.minting,
@@ -666,6 +687,17 @@ export class Game {
     };
   }
 
+  /** The player's own profile (private: sent only to its player). */
+  async getProfile(farmId: string): Promise<ProfileData> {
+    const facts = (await loadFacts(this.db, [farmId], this.clock.day, ['daysNoBreakdown', 'bigTrades'])).get(farmId) ?? {};
+    return profileFor(this.db, farmId, this.clock.day, facts, await badgeViews(this.db, farmId));
+  }
+
+  /** A farm's public profile (GET /api/profile/:farmId): a whitelist of public fields, or null. */
+  async getPublicProfile(farmId: string): Promise<PublicProfile | null> {
+    return publicProfileFor(this.db, farmId, this.clock.day);
+  }
+
   async getLedger(farmId: string): Promise<LedgerDay[]> {
     const rows = await this.db.query(
       `SELECT l.day, l.kind, SUM(l.amount_milli) AS amount FROM ledger l WHERE l.farm_id = $1 AND l.day >= $2 GROUP BY l.day, l.kind ORDER BY l.day DESC`,
@@ -703,6 +735,11 @@ export class Game {
       if (info) this.emit(playerId, { t: 'ledger', days: await this.getLedger(info.farmId) });
       return { ok: true, events: [] };
     }
+    if (action.t === 'getProfile') {
+      const info = await this.playerInfo(playerId);
+      if (info) this.emit(playerId, { t: 'profile', profile: await this.getProfile(info.farmId) });
+      return { ok: true, events: [] };
+    }
     // a redemption draws its number in the collection its season mints into (the contract says which)
     if (action.t === 'redeemTicket' && this.collection === null) {
       try {
@@ -727,6 +764,10 @@ export class Game {
           const { rid: _rid, ...rest } = action;
           await this.applyPlayerAction(ctx, farm, rest as PlayerAction);
           ctx.touched.add(farm.id);
+          // the badges this action can move (and the night owl and the rooster crow, for business)
+          const cats = [...(ACTION_BADGES[action.t] ?? [])];
+          if (BUSINESS.has(action.t) && (await noteAction(ctx, farm.id))) cats.push('fun');
+          if (cats.length) await evaluateBadges(ctx, [farm.id], { categories: cats });
         });
         return { ok: true, events: [] };
       } catch (err) {
@@ -796,6 +837,7 @@ export class Game {
     const cost = toMilli(ECONOMY.hen.price * (h.status === 'auction' ? ECONOMY.agents.auctionPriceFactor : 1));
     await spend(ctx, farm, 'hens', cost, `hen ${henId.slice(0, 8)}`);
     await ctx.q.query(`UPDATE hens SET status = 'alive', farm_id = $1, lay_progress = 0 WHERE id = $2`, [farm.id, henId]);
+    if (h.status === 'auction') await bumpStats(ctx.q, farm.id, { auction_hens: 1 });
     emit(ctx, farm, { kind: 'hensBought', count: 1, fromAuction: h.status === 'auction' ? 1 : 0, costMilli: cost, henIds: [henId] });
   }
 
@@ -813,6 +855,7 @@ export class Game {
         await spend(ctx, farm, 'hens', cost, `${action.count} hens`);
         if (auction.length) {
           await ctx.q.query(`UPDATE hens SET status = 'alive', farm_id = $1, lay_progress = 0 WHERE id = ANY($2::text[])`, [farm.id, auction.map((h) => h.id)]);
+          await bumpStats(ctx.q, farm.id, { auction_hens: auction.length });
           ctx.marketChanged = true;
         }
         const born = await this.insertHens(ctx, farm.id, fresh);
@@ -869,7 +912,9 @@ export class Game {
         return;
       }
       case 'repairMachine': {
+        const [was] = await ctx.q.query('SELECT broken FROM unlocks WHERE farm_id = $1 AND unlock_id = $2', [farm.id, action.unlock]);
         const cost = await repairMachine(ctx, farm, action.unlock);
+        await statRepaired(ctx.q, farm.id, Boolean(was?.broken));
         emit(ctx, farm, { kind: 'machineRepaired', unlock: action.unlock, costMilli: cost });
         return;
       }
@@ -892,6 +937,7 @@ export class Game {
         const grade = egg.grade as EggGrade;
         await ctx.q.query('UPDATE lay_events SET collected = true WHERE id = $1', [action.eggId]);
         await ctx.q.query(`UPDATE farms SET crate_${grade} = crate_${grade} + 1 WHERE id = $1`, [farm.id]);
+        await bumpStats(ctx.q, farm.id, { eggs_collected: 1, eggs_picked: 1, golden_collected: grade === 'golden' ? 1 : 0 });
         emit(ctx, farm, { kind: 'collected', eggId: action.eggId, grade });
         await markGoal(ctx.q, farm.id, 'collect');
         return;
@@ -1050,6 +1096,8 @@ export class Game {
         const ctx = this.makeCtx(q);
         ctxOut = ctx;
         const day = ctx.day;
+        // the day's eggs as they lay before the close, for the profile
+        const lay = await layTally(q, day);
         // 1. every laid egg goes into its crate
         const collected = new Map<string, number>();
         for (const p of await q.query(`SELECT farm_id, grade, count(*) AS n FROM lay_events WHERE day = $1 AND NOT collected AND NOT broken GROUP BY farm_id, grade`, [day])) {
@@ -1067,6 +1115,7 @@ export class Game {
         await closeDebts(ctx);
         // machines that worked today wear; a worn-out one may break down
         for (const b of await wearMachines(ctx, day, this.rng)) {
+          await statBrokeDown(q, b.farmId, day);
           const farm = await loadFarm(q, b.farmId);
           emit(ctx, farm, { kind: 'machineBroke', unlock: b.unlock });
         }
@@ -1119,6 +1168,11 @@ export class Game {
             });
           }
         }
+        // 4c. the profile's record of the day, and the badges it moved (players hear them after the close)
+        await snapshotDay(ctx, day, lay);
+        const playerFarms = (await q.query<{ id: string }>(`SELECT id FROM farms WHERE owner_kind = 'player' ORDER BY id`)).map((r) => String(r.id));
+        await rememberTraits(q, playerFarms);
+        await evaluateBadges(ctx, playerFarms, { atClose: true });
         // 5. the next day opens
         const newDay = day + 1;
         let start = this.clock.dayStartedAt + this.dayMs;
