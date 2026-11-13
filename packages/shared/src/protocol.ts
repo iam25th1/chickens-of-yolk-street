@@ -276,6 +276,9 @@ export interface TradeView {
   priceMilli: number;
   totalMilli: number;
   via: 'street' | 'order' | 'card' | 'contract' | 'resale' | 'player';
+  /** The seller or buyer is an AI (an agent, or an AI farm); absent on live trade events. */
+  sellerAi?: boolean;
+  buyerAi?: boolean;
 }
 
 export interface AgentView {
@@ -290,6 +293,8 @@ export interface AgentView {
   hens: number | null;
   /** NEAR testnet sub-account that holds the agent's tokens, once created. */
   account: string | null;
+  /** Its latest public one-line reason (under 80 characters), or null before its first decision. */
+  reason: string | null;
 }
 
 export interface MachineView {

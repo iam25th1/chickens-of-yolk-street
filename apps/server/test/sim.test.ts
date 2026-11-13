@@ -79,7 +79,9 @@ async function runSeed(seed: number): Promise<{ report: SeedReport; t: TestGame;
       const body = JSON.parse(String(init?.body)) as { messages: { content: string }[] };
       const c = JSON.parse(body.messages[1]?.content ?? '{}') as AgentContext;
       const content = calls % 4 === 0 ? 'I think I will buy some eggs.' : JSON.stringify(ruleDecision(c));
-      return new Response(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 2500, completion_tokens: 300 } }));
+      // usage as a real tokenizer would count it: about 3 characters a token for JSON
+      const prompt = body.messages.reduce((n, m) => n + m.content.length, 0);
+      return new Response(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: Math.ceil(prompt / 3), completion_tokens: Math.ceil(content.length / 3) } }));
     }) as typeof fetch,
   });
   const capUsd = 0.25;
