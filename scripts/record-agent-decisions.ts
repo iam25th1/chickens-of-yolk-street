@@ -13,8 +13,8 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { AGENT_KINDS } from '@coys/shared';
 import { NearAiClient } from '../apps/server/src/ai/nearai';
-import { REFLECT_SYSTEM, SYSTEM } from '../apps/server/src/agents/brain';
-import { cleanText, decisionJsonSchema, validateDecision, type WeekNumbers } from '../apps/server/src/agents/decision';
+import { DECISION_MAX_TOKENS, REFLECT_SYSTEM, REFLECTION_MAX_TOKENS, decisionFormat, decisionMessages } from '../apps/server/src/agents/brain';
+import { cleanText, validateDecision, type WeekNumbers } from '../apps/server/src/agents/decision';
 import { SITUATIONS, authoredReplies, sampleContext, type AgentReplies } from '../apps/server/test/recorded-model';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -32,13 +32,8 @@ async function record(fixture: AgentReplies): Promise<AgentReplies> {
       const c = sampleContext(kind, situation);
       const kept = [];
       for (let i = 0; i < 3; i++) {
-        const { content } = await client.chat(
-          [
-            { role: 'system', content: SYSTEM(c) },
-            { role: 'user', content: JSON.stringify(c) },
-          ],
-          { maxTokens: 1500, timeoutMs: 60_000, responseFormat: { type: 'json_schema', json_schema: { name: 'decision', strict: true, schema: decisionJsonSchema() } } },
-        );
+        // the prompt, reply cap and response format the server sends
+        const { content } = await client.chat(decisionMessages(c), { maxTokens: DECISION_MAX_TOKENS, timeoutMs: 60_000, responseFormat: decisionFormat() });
         const d = validateDecision(content, c);
         if (d) kept.push(d);
       }
@@ -53,7 +48,7 @@ async function record(fixture: AgentReplies): Promise<AgentReplies> {
           { role: 'system', content: REFLECT_SYSTEM(c) },
           { role: 'user', content: JSON.stringify({ week, cash: c.agent.cash, lastReflection: null, reasons: [], trend: c.market.trend }) },
         ],
-        { maxTokens: 200, timeoutMs: 60_000 },
+        { maxTokens: REFLECTION_MAX_TOKENS, timeoutMs: 60_000 },
       );
       const text = cleanText(content, 400);
       if (text.length >= 20) texts.push(text);
