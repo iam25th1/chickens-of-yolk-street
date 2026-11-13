@@ -125,6 +125,11 @@ export function App() {
     if (location.pathname === MINT_PATH) history.pushState(null, '', '/');
     setScreen('title');
   };
+  // the mint's own tab title
+  useEffect(() => {
+    const base = 'Chickens of Yolk Street (Beta): an egg farm in a market of AI agents';
+    document.title = screen === 'mint' ? 'Feather Mint: Chickens of Yolk Street (Beta)' : base;
+  }, [screen]);
   // the browser's back and forward move between the title and the mint
   useEffect(() => {
     const onPop = () => setScreen((s) => (s === 'title' && location.pathname === MINT_PATH ? 'mint' : s === 'mint' && location.pathname !== MINT_PATH ? 'title' : s));
