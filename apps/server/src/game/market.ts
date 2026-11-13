@@ -13,7 +13,7 @@ import {
   type EggStock,
   type GameEvent,
   type TradeView,
-  type UnlockId,
+  type Unlocks,
 } from '@coys/shared';
 import { num, type Queryable } from '../db/db';
 import { ActionError, eggTotal, loadFarm, moveAgentCash, moveCash, newId, setAgentStock, toAgent, AGENT_COLUMNS, type AgentRow, type Ctx, type Farm } from './ctx';
@@ -72,7 +72,7 @@ export function emit(ctx: Ctx, farm: Farm | null, event: GameEvent): void {
 }
 
 /** Instant sell to the street at the live price (the existing market sell). */
-export async function streetSell(ctx: Ctx, farm: Farm, items: Partial<EggStock>, unlocks: UnlockId[]): Promise<{ totalMilli: number; multiplier: number; sold: EggStock }> {
+export async function streetSell(ctx: Ctx, farm: Farm, items: Partial<EggStock>, unlocks: Unlocks): Promise<{ totalMilli: number; multiplier: number; sold: EggStock }> {
   const sold = emptyEggStock();
   for (const g of EGG_GRADES) {
     const n = items[g] ?? 0;

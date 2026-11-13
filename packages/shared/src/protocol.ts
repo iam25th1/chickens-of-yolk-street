@@ -85,6 +85,8 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('setFarmName'), rid, name: z.string().min(1).max(64) }).strict(),
   /** Keep the generated farm name (the naming screen skipped or closed). */
   z.object({ t: z.literal('keepFarmName'), rid }).strict(),
+  /** Repair a machine to 100% (its price share for what is missing). */
+  z.object({ t: z.literal('repairMachine'), rid, unlock: z.enum(UNLOCK_IDS) }).strict(),
 ]);
 
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
@@ -288,6 +290,16 @@ export interface AgentView {
   account: string | null;
 }
 
+export interface MachineView {
+  /** 1 new, 0 worn out. */
+  condition: number;
+  broken: boolean;
+  /** Share of its full effect it gives now (0 when broken). */
+  effect: number;
+  /** Milli-coins to repair it to 100%. */
+  repairMilli: number;
+}
+
 export interface FarmState {
   farmId: string;
   /** The in-game day this state (and its lay plan) belongs to. */
@@ -319,6 +331,8 @@ export interface FarmState {
   goals: GoalView[];
   /** What each machine did today. */
   machines: Partial<Record<UnlockId, MachineTally>>;
+  /** Each owned machine's condition, its effect now, whether it is broken, and its repair price. */
+  machineState: Partial<Record<UnlockId, MachineView>>;
   /** The feed hopper's price cap per bag in milli-coins (0: the list price). */
   hopperCapMilli: number;
   /** The player has done the how-to-play tour (it shows once per player). */
@@ -444,6 +458,9 @@ export type GameEvent =
   | { kind: 'coopBuilt'; coopId: string; coopKind: CoopKind; plot: number; costMilli: number }
   | { kind: 'coopUpgraded'; coopId: string; coopKind: CoopKind; costMilli: number }
   | { kind: 'unlockBought'; unlock: UnlockId; costMilli: number }
+  /** A worn machine broke down at the day close: it stops until repaired. */
+  | { kind: 'machineBroke'; unlock: UnlockId }
+  | { kind: 'machineRepaired'; unlock: UnlockId; costMilli: number }
   | { kind: 'sold'; items: EggStock; totalMilli: number; multiplier: number }
   | { kind: 'collected'; eggId: string; grade: EggGrade; /** Carried in by the conveyor, not picked up by hand. */ auto?: boolean }
   | { kind: 'dayEnded'; summary: DaySummary }

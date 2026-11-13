@@ -24,6 +24,8 @@ export class FrameSprite extends Container {
   speed = 1;
   /** The row to settle on after a play-once row ends (see rest). */
   private base: string | null = null;
+  /** Rows asked for are shown as other rows (a worn machine works in its worn row whatever it is asked). */
+  alias: ((row: string) => string) | null = null;
 
   constructor(
     private readonly assets: AssetStore,
@@ -61,6 +63,7 @@ export class FrameSprite extends Container {
   }
 
   play(row: string, opts: { loop?: boolean; onDone?: () => void; restart?: boolean } = {}): this {
+    if (this.alias) row = this.alias(row);
     if (row === this.row && !opts.restart && !this.ended) {
       if (opts.onDone) this.onDone = opts.onDone;
       return this;

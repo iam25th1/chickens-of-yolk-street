@@ -30,6 +30,7 @@ import { Spotlight, TOUR, TourBox } from '../ui/Tour';
 import { GRADE_LABEL, MintPage, RevealPanel, type RevealState } from '../ui/Feathers';
 import { HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
 import { NameFarm } from '../ui/NameFarm';
+import { MACHINE_NAME } from '../pixi/farm/FarmScene';
 
 /** What clicking each thing on the farm opens. */
 function modalFor(t: WorldTarget): ModalState {
@@ -229,6 +230,12 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
             break;
           case 'sold':
             uiFx.emit({ kind: 'stamp', row: 'sold', coins: e.totalMilli / 1000 });
+            break;
+          case 'machineBroke':
+            uiFx.emit({ kind: 'toast', text: `YOUR ${MACHINE_NAME[e.unlock]} BROKE DOWN. TAP IT TO REPAIR IT.`, tone: 'bad' });
+            break;
+          case 'machineRepaired':
+            uiFx.emit({ kind: 'toast', text: `${MACHINE_NAME[e.unlock]} REPAIRED: -${(e.costMilli / 1000).toFixed(2)}` });
             break;
           case 'refused':
             // a refused farm name is explained on the naming screen itself

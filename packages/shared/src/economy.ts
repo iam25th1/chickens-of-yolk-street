@@ -209,14 +209,22 @@ export const ECONOMY = {
     feed: { tier: 'standard' as FeedTier, kg: 25 },
   },
   unlocks: {
-    /** Eggs ride the belt into the crate carryMs after they are laid. */
-    conveyor: { price: 40, breakage: 0.02, carryMs: 5000 },
-    grader: { price: 80, eggPriceBonus: 0.1 },
-    cart: { price: 120 },
+    /** Eggs ride the belt into the crate carryMs after they are laid. wear: condition lost a day it runs. */
+    conveyor: { price: 40, breakage: 0.02, carryMs: 5000, wear: 0.01 },
+    grader: { price: 80, eggPriceBonus: 0.1, wear: 0.015 },
+    /** wear: condition lost per delivery. */
+    cart: { price: 35, wear: 0.01 },
     /** Pours feed in at day close when the trough holds less than refillBelowDays, up to fillToDays. */
-    hopper: { price: 100, feedCostDiscount: 0.1, refillBelowDays: 1.5, fillToDays: 3 },
-    clerk: { price: 160, revenueBonus: 0.05 },
-  } satisfies Record<UnlockId, { price: number; [effect: string]: number }>,
+    hopper: { price: 60, feedCostDiscount: 0.1, refillBelowDays: 1.5, fillToDays: 3, wear: 0.01 },
+    clerk: { price: 60, revenueBonus: 0.05, wear: 0.01 },
+  } satisfies Record<UnlockId, { price: number; wear: number; [effect: string]: number }>,
+  /**
+   * Machines wear: condition runs from 100% to 0%, falling each in-game day a machine works (the
+   * cart: each delivery). Full effect at fullEffectAbove and over, then falling in line with the
+   * condition. Below breakdownBelow, each day close may break it (breakdownChance): it stops until
+   * repaired. A repair to 100% costs repairShare of the price for a machine at 0%, in proportion.
+   */
+  wear: { fullEffectAbove: 0.5, breakdownBelow: 0.2, breakdownChance: 0.15, repairShare: 0.4, hintBelow: 0.3 },
   /**
    * The Feathers (beta): testnet NFTs that are claim tickets for the 777 Founding Hens, planned to
    * be revealed and minted as hens at the mainnet launch. Ordinary hens are never minted. A farm in
@@ -262,10 +270,32 @@ export const ECONOMY = {
   },
 } as const;
 
-export type Unlocks = ReadonlySet<UnlockId> | readonly UnlockId[];
+/** How much of each machine's effect a farm gets (0 to 1): its condition, 0 when broken. */
+export interface MachinePower {
+  readonly power: Partial<Record<UnlockId, number>>;
+}
 
-const has = (unlocks: Unlocks, id: UnlockId): boolean =>
-  Array.isArray(unlocks) ? unlocks.includes(id) : (unlocks as ReadonlySet<UnlockId>).has(id);
+export type Unlocks = ReadonlySet<UnlockId> | readonly UnlockId[] | MachinePower;
+
+/** A machine's effect share: 1 at full strength (or when the list just says the farm has it), 0 when absent. */
+export function power(unlocks: Unlocks, id: UnlockId): number {
+  if (Array.isArray(unlocks)) return unlocks.includes(id) ? 1 : 0;
+  if ('power' in unlocks) return clamp01((unlocks as MachinePower).power[id] ?? 0);
+  return (unlocks as ReadonlySet<UnlockId>).has(id) ? 1 : 0;
+}
+
+const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
+
+/** A machine's effect at a condition: full at fullEffectAbove and over, then in line with the condition; 0 when broken. */
+export function machineEffect(condition: number, broken: boolean): number {
+  if (broken) return 0;
+  return clamp01(condition / ECONOMY.wear.fullEffectAbove);
+}
+
+/** Coins to repair a machine to 100% from a condition. */
+export function repairCost(unlock: UnlockId, condition: number): number {
+  return Math.round(ECONOMY.unlocks[unlock].price * ECONOMY.wear.repairShare * clamp01(1 - condition) * 100) / 100;
+}
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
@@ -317,10 +347,10 @@ export function coopUpgradeCost(from: CoopKind, to: CoopKind): number {
 }
 
 export const breakageRate = (unlocks: Unlocks): number =>
-  has(unlocks, 'conveyor') ? ECONOMY.unlocks.conveyor.breakage : ECONOMY.eggs.breakage;
+  ECONOMY.eggs.breakage - (ECONOMY.eggs.breakage - ECONOMY.unlocks.conveyor.breakage) * power(unlocks, 'conveyor');
 
 export function feedBagPrice(tier: FeedTier, unlocks: Unlocks): number {
-  const discount = has(unlocks, 'hopper') ? ECONOMY.unlocks.hopper.feedCostDiscount : 0;
+  const discount = ECONOMY.unlocks.hopper.feedCostDiscount * power(unlocks, 'hopper');
   return ECONOMY.feed.tiers[tier].bagPrice * (1 - discount);
 }
 
@@ -333,7 +363,7 @@ export function feedCostPerHenDay(tier: FeedTier, unlocks: Unlocks): number {
 
 /** Price of one egg of a grade at the live multiplier, with the grader bonus. */
 export function eggPrice(grade: EggGrade, multiplier: number, unlocks: Unlocks): number {
-  const bonus = has(unlocks, 'grader') ? ECONOMY.unlocks.grader.eggPriceBonus : 0;
+  const bonus = ECONOMY.unlocks.grader.eggPriceBonus * power(unlocks, 'grader');
   return ECONOMY.eggs.basePrice[grade] * multiplier * (1 + bonus);
 }
 
@@ -343,7 +373,7 @@ export type EggCounts = Partial<Record<EggGrade, number>>;
 export function saleValue(items: EggCounts, multiplier: number, unlocks: Unlocks): number {
   let total = 0;
   for (const grade of EGG_GRADES) total += (items[grade] ?? 0) * eggPrice(grade, multiplier, unlocks);
-  const clerk = has(unlocks, 'clerk') ? ECONOMY.unlocks.clerk.revenueBonus : 0;
+  const clerk = ECONOMY.unlocks.clerk.revenueBonus * power(unlocks, 'clerk');
   return total * (1 + clerk);
 }
 
@@ -414,6 +444,74 @@ export function henDailyMargin(input: MarginInput): number {
 export function henPaybackDays(input: MarginInput): number {
   const margin = henDailyMargin(input);
   return margin > 0 ? ECONOMY.hen.price / margin : Number.POSITIVE_INFINITY;
+}
+
+/**
+ * The farm machine payback is measured on: mid-game (20 hens), standard feed, a 1.00x market, and
+ * one standing bakery contract of 6 eggs a day that a player without the cart misses 3 days in 10.
+ */
+export const MACHINE_REFERENCE = { hens: 20, tier: 'standard' as FeedTier, multiplier: 1, contractEggsPerDay: 6, missRateWithoutCart: 0.3 };
+
+/** Coins a day a machine earns on the reference farm at full effect. */
+export function machineDailyBenefit(u: UnlockId, ref: typeof MACHINE_REFERENCE = MACHINE_REFERENCE): number {
+  const tier = ECONOMY.feed.tiers[ref.tier];
+  const laid = ref.hens * ECONOMY.hen.baseLaying * tier.laying;
+  const perEgg = averageEggBasePrice(ref.tier) * ref.multiplier;
+  const sold = laid * (1 - ECONOMY.eggs.breakage) * perEgg;
+  switch (u) {
+    case 'conveyor':
+      return laid * (ECONOMY.eggs.breakage - ECONOMY.unlocks.conveyor.breakage) * perEgg;
+    case 'grader':
+      return sold * ECONOMY.unlocks.grader.eggPriceBonus;
+    case 'clerk':
+      return sold * ECONOMY.unlocks.clerk.revenueBonus;
+    case 'hopper':
+      return ref.hens * feedCostPerHenDay(ref.tier, []) * ECONOMY.unlocks.hopper.feedCostDiscount;
+    case 'cart': {
+      const b = ECONOMY.buyers.bakery;
+      return ref.missRateWithoutCart * b.missPenaltyShare * ref.contractEggsPerDay * ECONOMY.eggs.basePrice.white * b.priceShare * ref.multiplier;
+    }
+  }
+}
+
+/**
+ * A machine's payback on the reference farm: days to earn its price at full effect, and whether it
+ * earns its price before its first repair is due (when its condition reaches the breakdown zone),
+ * counting the days below full effect at their share.
+ */
+export function machinePayback(u: UnlockId, ref: typeof MACHINE_REFERENCE = MACHINE_REFERENCE): { benefit: number; paybackDays: number; daysToRepair: number; earnedBeforeRepair: number; paysBeforeRepair: boolean } {
+  const w = ECONOMY.wear;
+  const rate = ECONOMY.unlocks[u].wear; // a day of work (the cart: one delivery a day on the reference farm)
+  const benefit = machineDailyBenefit(u, ref);
+  const fullDays = (1 - w.fullEffectAbove) / rate;
+  const fadingDays = (w.fullEffectAbove - w.breakdownBelow) / rate;
+  const fadingShare = (1 + w.breakdownBelow / w.fullEffectAbove) / 2;
+  const earnedBeforeRepair = benefit * (fullDays + fadingDays * fadingShare);
+  const price = ECONOMY.unlocks[u].price;
+  return { benefit, paybackDays: price / benefit, daysToRepair: fullDays + fadingDays, earnedBeforeRepair, paysBeforeRepair: earnedBeforeRepair >= price };
+}
+
+/**
+ * Net coins from owning a machine for `days` on the reference farm: repaired whenever it reaches the
+ * repair hint, or never repaired (it fades, then breaks down at breakdownChance a day and stops).
+ * Expected values, no randomness.
+ */
+export function machineNet(u: UnlockId, days: number, repair: boolean, ref: typeof MACHINE_REFERENCE = MACHINE_REFERENCE): number {
+  const w = ECONOMY.wear;
+  const rate = ECONOMY.unlocks[u].wear;
+  const benefit = machineDailyBenefit(u, ref);
+  let net = -ECONOMY.unlocks[u].price;
+  let condition = 1;
+  let working = 1; // the chance it has not broken down yet
+  for (let d = 0; d < days; d++) {
+    net += benefit * machineEffect(condition, false) * working;
+    condition = Math.max(0, condition - rate * working);
+    if (repair && condition < w.hintBelow) {
+      net -= repairCost(u, condition);
+      condition = 1;
+    } else if (condition < w.breakdownBelow) working *= 1 - w.breakdownChance;
+  }
+  return net;
 }
 
 export interface ReinvestInput {

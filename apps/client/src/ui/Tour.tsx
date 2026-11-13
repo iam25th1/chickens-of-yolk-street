@@ -1,4 +1,4 @@
-// The how-to-play tour: eleven steps that teach the whole game by doing it. Each step dims
+// The how-to-play tour: steps that teach the whole game by doing it. Each step dims
 // everything but the thing to do (a spotlight that follows it, even a hen or an egg on the farm),
 // and its box sits beside it with a pointer (never over it; centred when there is no target).
 // A step moves on when the player does the thing; NEXT appears after a few seconds so nobody is
@@ -127,6 +127,13 @@ export const TOUR: TourStep[] = [
       return c.modal ? close : { dom: 'shop', tag: 'THE SHOP' };
     },
     done: (s) => s.from === 'ui' && s.e.kind === 'opened' && s.e.modal.kind === 'machine' && s.e.modal.unlock === 'conveyor',
+  },
+  {
+    title: 'MACHINES WEAR',
+    text: 'A MACHINE WEARS AS IT WORKS. UNDER 50% IT DOES LESS, UNDER 20% IT MAY BREAK DOWN. TAP ONE TO SEE ITS CONDITION AND REPAIR IT.',
+    target: (c) => (c.modal?.kind === 'machine' ? { dom: 'machine-saves', tag: 'CONDITION AND REPAIR' } : c.modal ? close : null),
+    // nothing to do here but read: NEXT moves on
+    done: () => false,
   },
   {
     title: 'RIVALS GO BUST',

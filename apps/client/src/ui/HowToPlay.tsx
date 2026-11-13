@@ -136,6 +136,21 @@ const SECTIONS: Section[] = [
     ),
   },
   {
+    id: 'wear',
+    title: 'MACHINES WEAR OUT',
+    short: 'WEAR AND REPAIR',
+    picture: () => <Art id="19c-egg-grader-wear" row="worn" />,
+    body: (
+      <>
+        <p>
+          A MACHINE WEARS A LITTLE EACH DAY IT WORKS (THE CART: EACH DELIVERY). DOWN TO {pct(ECONOMY.wear.fullEffectAbove)} IT GIVES ITS FULL EFFECT; BELOW THAT IT GIVES LESS. UNDER{' '}
+          {pct(ECONOMY.wear.breakdownBelow)} IT MAY BREAK DOWN AT A DAY CLOSE AND STOP UNTIL YOU REPAIR IT.
+        </p>
+        <p>TAP A MACHINE TO SEE ITS CONDITION. A REPAIR TO 100% COSTS UP TO {pct(ECONOMY.wear.repairShare)} OF ITS PRICE, LESS THE LESS IT IS WORN. EACH MACHINE PAYS FOR ITSELF BEFORE ITS FIRST REPAIR.</p>
+      </>
+    ),
+  },
+  {
     id: 'rivals',
     title: 'RIVALS AND BUSTS',
     short: 'RIVALS AND BUSTS',
@@ -274,12 +289,12 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
     <Modal title="HOW TO PLAY" onClose={onClose} w={520} h={320} className="guide-page">
       <div className="row" style={{ alignItems: 'flex-start', gap: 8 }} data-ui="guide">
         {wide && (
-          <nav className="col" style={{ width: 150, flex: 'none', gap: 2 }} aria-label="Sections">
+          <nav className="col" style={{ width: 150, flex: 'none', gap: 1 }} aria-label="Sections">
             {SECTIONS.map((x, i) => (
               <button
                 key={x.id}
                 className={`btn ${i === at ? 'red' : ''}`}
-                style={{ justifyContent: 'flex-start', width: '100%', whiteSpace: 'nowrap' }}
+                style={{ justifyContent: 'flex-start', width: '100%', whiteSpace: 'nowrap', height: 13 }}
                 title={x.title}
                 data-tour={`guide-${x.id}`}
                 onClick={() => go(i)}

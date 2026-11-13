@@ -2,8 +2,8 @@
   "version": 1,
   "source": {
     "repo": "iam25th1/coys-assets",
-    "commit": "5aa7a9a6c6708aa49813c4acfc28683bb1c908d2",
-    "manifestSha256": "b4031c4b0ecd710dab4421f86f169a10ca5795495df05d7debd1529d7592441d"
+    "commit": "33b909b1edef99624d1cbd3864ceb8a2ecbd0e84",
+    "manifestSha256": "62f6369648382f21518c1bfba259a9c4da29b83ac432a153b1390a9ec0064889"
   },
   "sprites": {
     "01-hen-base": {
@@ -2939,6 +2939,170 @@
           "vanish": false,
           "frameCount": 1,
           "totalMs": 0
+        }
+      }
+    },
+    "18c-conveyor-wear": {
+      "json": "sprites/18c-conveyor-wear.json",
+      "png": "sprites/18c-conveyor-wear.png",
+      "sha256": "7bf5cf2814930b97ecc7a850919375b5cc4dad663cd41a0c0545b7deb37c869c",
+      "source": "art/18c-conveyor-wear/18c-conveyor-wear.png",
+      "role": "alternate",
+      "docTracker": "18",
+      "label": "egg conveyor, worn and broken",
+      "width": 512,
+      "height": 768,
+      "grid": 8,
+      "anchor": "center",
+      "static": false,
+      "rows": {
+        "worn-start": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "worn-horizontal": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "worn-end": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "broken-start": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "broken-horizontal": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        },
+        "broken-end": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 400
+        }
+      }
+    },
+    "19c-egg-grader-wear": {
+      "json": "sprites/19c-egg-grader-wear.json",
+      "png": "sprites/19c-egg-grader-wear.png",
+      "sha256": "b6093597db9e821603b1d3d3daedd24331715ad4e3452ffe7cc78998ae6719eb",
+      "source": "art/19c-egg-grader-wear/19c-egg-grader-wear.png",
+      "role": "alternate",
+      "docTracker": "19",
+      "label": "egg grader, worn and broken",
+      "width": 1024,
+      "height": 512,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "worn": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "broken": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 960
+        }
+      }
+    },
+    "20c-delivery-cart-wear": {
+      "json": "sprites/20c-delivery-cart-wear.json",
+      "png": "sprites/20c-delivery-cart-wear.png",
+      "sha256": "7dd1fb96c0ea5fb5171efcb5d1f0220abe1633b76c19e97eec34735a58e3dcc3",
+      "source": "art/20c-delivery-cart-wear/20c-delivery-cart-wear.png",
+      "role": "alternate",
+      "docTracker": "20",
+      "label": "delivery cart, worn and broken",
+      "width": 1024,
+      "height": 512,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "worn": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "broken": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 960
+        }
+      }
+    },
+    "21c-feed-hopper-wear": {
+      "json": "sprites/21c-feed-hopper-wear.json",
+      "png": "sprites/21c-feed-hopper-wear.png",
+      "sha256": "eff6d1b5362f43c5ab04401fad766c9ed1fc36be073f253701a8700463a04804",
+      "source": "art/21c-feed-hopper-wear/21c-feed-hopper-wear.png",
+      "role": "alternate",
+      "docTracker": "21",
+      "label": "feed hopper, worn and broken",
+      "width": 1024,
+      "height": 768,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "worn": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "broken": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 960
+        }
+      }
+    },
+    "22c-sales-clerk-wear": {
+      "json": "sprites/22c-sales-clerk-wear.json",
+      "png": "sprites/22c-sales-clerk-wear.png",
+      "sha256": "72d4c1fe7cba27d2b3b66cc965b67039c27cc82727073c214c6fd33ee323eacb",
+      "source": "art/22c-sales-clerk-wear/22c-sales-clerk-wear.png",
+      "role": "alternate",
+      "docTracker": "22",
+      "label": "sales clerk, worn and broken",
+      "width": 1024,
+      "height": 512,
+      "grid": 1,
+      "anchor": "feet",
+      "static": false,
+      "rows": {
+        "worn": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 720
+        },
+        "broken": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 4,
+          "totalMs": 960
         }
       }
     }

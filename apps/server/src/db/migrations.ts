@@ -448,6 +448,16 @@ ALTER TABLE players ADD COLUMN name_guard_sha256 text;
 ALTER TABLE players ADD COLUMN name_guard_len integer;
 `,
   },
+  {
+    id: 11,
+    name: 'machine wear',
+    sql: `
+-- Machines wear: condition 1 (new) to 0, falling each in-game day a machine works (the cart: each
+-- delivery). Below a threshold a day close may break it; a broken machine stops until repaired.
+ALTER TABLE unlocks ADD COLUMN condition double precision NOT NULL DEFAULT 1 CHECK (condition >= 0 AND condition <= 1);
+ALTER TABLE unlocks ADD COLUMN broken boolean NOT NULL DEFAULT false;
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

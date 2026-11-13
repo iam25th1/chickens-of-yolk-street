@@ -2,7 +2,8 @@
 // stacked above it, the toast area: the one hint the farm needs most right now, then the news. The
 // tour's step box keeps clear of both.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { coopCapacity, feedGramsPerHenDay, type FarmState, type GoalId } from '@coys/shared';
+import { ECONOMY, coopCapacity, feedGramsPerHenDay, type FarmState, type GoalId, type MachineView, type UnlockId } from '@coys/shared';
+import { MACHINE_NAME } from '../pixi/farm/FarmScene';
 import { uiSound, useServices } from '../app/services';
 import type { Rect } from '../app/viewport';
 import type { Action } from '../net/socket';
@@ -25,6 +26,12 @@ export function hint(farm: FarmState): string | null {
   const feed = farm.feedGrams.cheap + farm.feedGrams.standard + farm.feedGrams.premium;
   const days = farm.hens.length ? feed / (farm.hens.length * feedGramsPerHenDay()) : 99;
   if (days < 1) return 'FEED IS RUNNING OUT: TAP THE TROUGH TO BUY MORE.';
+  // a broken machine first, then the most worn one under the hint line
+  const machines = Object.entries(farm.machineState ?? {}) as [UnlockId, MachineView][];
+  const broken = machines.find(([, m]) => m.broken);
+  if (broken) return `YOUR ${MACHINE_NAME[broken[0]]} BROKE DOWN: TAP IT TO REPAIR IT.`;
+  const worn = machines.filter(([, m]) => m.condition < ECONOMY.wear.hintBelow).sort((a, b) => a[1].condition - b[1].condition)[0];
+  if (worn) return `YOUR ${MACHINE_NAME[worn[0]]} IS WORN (${Math.round(worn[1].condition * 100)}%): REPAIR IT FROM ITS CARD.`;
   const crate = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
   if (crate >= 30) return 'YOUR CRATE IS FILLING UP: SELL IT FROM THE CRATE CARD.';
   const now = dayElapsed();

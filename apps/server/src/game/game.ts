@@ -5,6 +5,8 @@ import { randomBytes } from 'node:crypto';
 import {
   BODY_COLOURS,
   ECONOMY,
+  power,
+  type Unlocks,
   FARM_NAME_PROBLEM_TEXT,
   RENAME_EVERY_DAYS,
   checkFarmName,
@@ -12,7 +14,6 @@ import {
   FEATHER_GRADES,
   FEED_TIERS,
   RARITIES,
-  UNLOCK_IDS,
   breakageRate,
   coopCapacity,
   coopUpgradeCost,
@@ -47,7 +48,6 @@ import {
   type Rarity,
   type ServerMessage,
   type ShopHenView,
-  type UnlockId,
 } from '@coys/shared';
 import { num, type Db, type Queryable } from '../db/db';
 import { migrate } from '../db/migrations';
@@ -73,6 +73,7 @@ import {
   ActionError,
   AGENT_COLUMNS,
   FARM_COLUMNS,
+  loadFarm,
   moveCash,
   newId,
   spend,
@@ -86,7 +87,7 @@ import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSel
 import { featherCount, featherSlots, managementScore, milestoneViews, nextMilestone, rarityEstimates, redeemTicket, rollMilestones, standing, ticketViews } from './feathers';
 import { claimGoal, goalViews, markGoal, markToured, toured } from './goals';
 import { checkChosenName, nameTaken, renameLegacyFarms, setFarmName, uniqueFarmName } from './names';
-import { conveyorCarry, hopperRefill, logMachine, logSale, machineDay } from './machines';
+import { conveyorCarry, hopperRefill, loadMachines, logMachine, logSale, machineDay, machineViews, repairMachine, wearMachines, type Machines } from './machines';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
 
 export { ActionError } from './ctx';
@@ -446,7 +447,8 @@ export class Game {
       hens: hens.map(henView),
       coops: coops.map((c) => ({ id: String(c.id), kind: c.kind as CoopKind, plot: num(c.plot) })),
       crate: farm.crate,
-      unlocks,
+      unlocks: unlocks.owned,
+      machineState: machineViews(unlocks),
       layPlan: eggs.map((e) => ({
         id: String(e.id),
         henId: String(e.hen_id),
@@ -808,11 +810,16 @@ export class Game {
         return;
       }
       case 'buyUnlock': {
-        if (unlocks.includes(action.unlock)) throw new ActionError('invalid_action', `${action.unlock} already bought`);
+        if (unlocks.owned.includes(action.unlock)) throw new ActionError('invalid_action', `${action.unlock} already bought`);
         const cost = toMilli(ECONOMY.unlocks[action.unlock].price);
         await spend(ctx, farm, 'unlock', cost, action.unlock);
         await ctx.q.query('INSERT INTO unlocks (farm_id, unlock_id, bought_day) VALUES ($1, $2, $3)', [farm.id, action.unlock, ctx.day]);
         emit(ctx, farm, { kind: 'unlockBought', unlock: action.unlock, costMilli: cost });
+        return;
+      }
+      case 'repairMachine': {
+        const cost = await repairMachine(ctx, farm, action.unlock);
+        emit(ctx, farm, { kind: 'machineRepaired', unlock: action.unlock, costMilli: cost });
         return;
       }
       case 'sell': {
@@ -843,9 +850,8 @@ export class Game {
     }
   };
 
-  private async loadUnlocks(q: Queryable, farmId: string): Promise<UnlockId[]> {
-    const rows = await q.query<{ unlock_id: string }>('SELECT unlock_id FROM unlocks WHERE farm_id = $1', [farmId]);
-    return UNLOCK_IDS.filter((u) => rows.some((r) => r.unlock_id === u));
+  private loadUnlocks(q: Queryable, farmId: string): Promise<Machines> {
+    return loadMachines(q, farmId);
   }
 
   // ---- the day --------------------------------------------------------------------------------
@@ -856,10 +862,10 @@ export class Game {
    * discount when it has one. With a cap it is the hopper buying on its own: it skips a price over
    * the cap, buys only what the farm can pay for, and returns what it bought (null for nothing).
    */
-  private async buyFeedFor(ctx: Ctx, farm: Farm, tier: FeedTier, bags: number, unlocks: UnlockId[], capMilli: number | null): Promise<{ bags: number; unitMilli: number } | null> {
+  private async buyFeedFor(ctx: Ctx, farm: Farm, tier: FeedTier, bags: number, unlocks: Unlocks, capMilli: number | null): Promise<{ bags: number; unitMilli: number } | null> {
     const [h] = await ctx.q.query(`SELECT count(*) AS n FROM hens WHERE farm_id = $1 AND status = 'alive'`, [farm.id]);
     const quote = await supplierQuote(ctx, farm, tier, num(h?.n));
-    const unit = Math.round(quote.unitMilli * (unlocks.includes('hopper') ? 1 - ECONOMY.unlocks.hopper.feedCostDiscount : 1));
+    const unit = Math.round(quote.unitMilli * (1 - ECONOMY.unlocks.hopper.feedCostDiscount * power(unlocks, 'hopper')));
     const auto = capMilli !== null;
     if (auto) {
       if (unit > capMilli) return null;
@@ -988,6 +994,11 @@ export class Game {
         // 2. contracts, credit, cards and orders close for the day
         const tally = await closeContracts(ctx);
         await closeDebts(ctx);
+        // machines that worked today wear; a worn-out one may break down
+        for (const b of await wearMachines(ctx, day, this.rng)) {
+          const farm = await loadFarm(q, b.farmId);
+          emit(ctx, farm, { kind: 'machineBroke', unlock: b.unlock });
+        }
         await expireCards(ctx);
         await expireOrders(ctx);
         // 3. the cast acts
@@ -1039,8 +1050,9 @@ export class Game {
         ctx.day = newDay;
         ctx.elapsed = ctx.now - start;
         // the feed hoppers top up low troughs before the hens eat at dawn
-        for (const f of await q.query<{ farm_id: string }>(`SELECT u.farm_id FROM unlocks u JOIN farms f ON f.id = u.farm_id WHERE u.unlock_id = 'hopper' AND f.bust_day IS NULL`)) {
-          await hopperRefill(ctx, f.farm_id, (c, farm, tier, bags, cap) => this.buyFeedFor(c, farm, tier, bags, ['hopper'], cap));
+        for (const f of await q.query<{ farm_id: string }>(`SELECT u.farm_id FROM unlocks u JOIN farms f ON f.id = u.farm_id WHERE u.unlock_id = 'hopper' AND NOT u.broken AND f.bust_day IS NULL`)) {
+          const m = await loadMachines(q, f.farm_id);
+          await hopperRefill(ctx, f.farm_id, (c, farm, tier, bags, cap) => this.buyFeedFor(c, farm, tier, bags, m, cap));
         }
         const plans = new Map<string, { feedGramsUsed: number; fedMultiplier: number }>();
         for (const f of await q.query<{ id: string }>('SELECT id FROM farms WHERE bust_day IS NULL')) plans.set(f.id, await this.planFarmDay(q, f.id, newDay));

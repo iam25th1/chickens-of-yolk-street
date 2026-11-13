@@ -7,10 +7,108 @@
 // - Feed hopper: -10% on feed; at day close it pours feed in when the trough runs low, from the
 //   farm's supplier, only at or under the farm's price cap.
 // - Sales clerk: +5% on sales and takes good offers on its own (cards.ts).
-import { ECONOMY, feedBagPrice, feedGramsPerHenDay, saleValue, type EggGrade, type EggStock, type FeedTier, type UnlockId } from '@coys/shared';
+//
+// Every machine wears (config in ECONOMY.unlocks[*].wear and ECONOMY.wear): its condition falls each
+// day it works (the cart: each delivery), its effect is full at 50% and over and falls in line
+// below, under 20% a day close may break it (it stops until repaired), and a repair to 100% costs a
+// share of its price in proportion to what is missing.
+import {
+  ECONOMY,
+  UNLOCK_IDS,
+  feedBagPrice,
+  feedGramsPerHenDay,
+  machineEffect,
+  repairCost,
+  saleValue,
+  toMilli,
+  type EggGrade,
+  type EggStock,
+  type FeedTier,
+  type MachinePower,
+  type MachineView,
+  type UnlockId,
+} from '@coys/shared';
 import { num, type Queryable } from '../db/db';
-import { loadFarm, type Ctx, type Farm } from './ctx';
+import { ActionError, loadFarm, moveCash, type Ctx, type Farm } from './ctx';
 import { emit } from './market';
+
+/** A farm's machines: which it owns, each one's condition, and the effect share the price formulas use. */
+export interface Machines extends MachinePower {
+  owned: UnlockId[];
+  state: Partial<Record<UnlockId, { condition: number; broken: boolean }>>;
+}
+
+export async function loadMachines(q: Queryable, farmId: string): Promise<Machines> {
+  const rows = await q.query<{ unlock_id: string; condition: number; broken: boolean }>('SELECT unlock_id, condition, broken FROM unlocks WHERE farm_id = $1', [farmId]);
+  const owned = UNLOCK_IDS.filter((u) => rows.some((r) => r.unlock_id === u));
+  const state: Machines['state'] = {};
+  const power: Partial<Record<UnlockId, number>> = {};
+  for (const r of rows) {
+    const u = r.unlock_id as UnlockId;
+    state[u] = { condition: num(r.condition), broken: Boolean(r.broken) };
+    power[u] = machineEffect(num(r.condition), Boolean(r.broken));
+  }
+  return { owned, state, power };
+}
+
+/** What the machine cards show: condition, effect now, whether it is broken, and the repair price. */
+export function machineViews(m: Machines): Partial<Record<UnlockId, MachineView>> {
+  const out: Partial<Record<UnlockId, MachineView>> = {};
+  for (const u of m.owned) {
+    const s = m.state[u] ?? { condition: 1, broken: false };
+    out[u] = { condition: s.condition, broken: s.broken, effect: machineEffect(s.condition, s.broken), repairMilli: toMilli(repairCost(u, s.condition)) };
+  }
+  return out;
+}
+
+/** Wears a machine by an amount (a day's work, or one delivery). */
+export async function wearMachine(q: Queryable, farmId: string, u: UnlockId, amount: number): Promise<void> {
+  await q.query('UPDATE unlocks SET condition = GREATEST(0, condition - $3) WHERE farm_id = $1 AND unlock_id = $2', [farmId, u, amount]);
+}
+
+/**
+ * Day close: every machine that worked today wears (the cart wore at each delivery), and one under
+ * the breakdown line may break. Returns the machines that broke, for the farms' owners to hear.
+ */
+export async function wearMachines(ctx: Ctx, day: number, rnd: () => number): Promise<{ farmId: string; unlock: UnlockId }[]> {
+  const broke: { farmId: string; unlock: UnlockId }[] = [];
+  const rows = await ctx.q.query<{ farm_id: string; unlock_id: string; condition: number; broken: boolean }>(
+    `SELECT u.farm_id, u.unlock_id, u.condition, u.broken FROM unlocks u JOIN farms f ON f.id = u.farm_id WHERE f.bust_day IS NULL ORDER BY u.farm_id, u.unlock_id`,
+  );
+  const worked = new Set(
+    (await ctx.q.query<{ farm_id: string; machine: string }>('SELECT farm_id, machine FROM machine_days WHERE day = $1 AND (units > 0 OR milli > 0)', [day])).map((r) => `${r.farm_id}|${r.machine}`),
+  );
+  for (const r of rows) {
+    const u = r.unlock_id as UnlockId;
+    if (r.broken) continue;
+    let condition = num(r.condition);
+    if (u !== 'cart' && worked.has(`${r.farm_id}|${u}`)) {
+      condition = Math.max(0, condition - ECONOMY.unlocks[u].wear);
+      await ctx.q.query('UPDATE unlocks SET condition = $3 WHERE farm_id = $1 AND unlock_id = $2', [r.farm_id, u, condition]);
+    }
+    if (condition < ECONOMY.wear.breakdownBelow && rnd() < ECONOMY.wear.breakdownChance) {
+      await ctx.q.query('UPDATE unlocks SET broken = true WHERE farm_id = $1 AND unlock_id = $2', [r.farm_id, u]);
+      broke.push({ farmId: String(r.farm_id), unlock: u });
+      ctx.touched.add(String(r.farm_id));
+    }
+  }
+  return broke;
+}
+
+/** Repairs a machine to 100%: pays its repair price, and it works again. */
+export async function repairMachine(ctx: Ctx, farm: Farm, u: UnlockId): Promise<number> {
+  const [row] = await ctx.q.query<{ condition: number; broken: boolean }>('SELECT condition, broken FROM unlocks WHERE farm_id = $1 AND unlock_id = $2', [farm.id, u]);
+  if (!row) throw new ActionError('not_found', 'the farm has no such machine');
+  const condition = num(row.condition);
+  if (condition >= 1 && !row.broken) throw new ActionError('invalid_action', 'it needs no repair');
+  const cost = toMilli(repairCost(u, condition));
+  if (farm.cashMilli < cost) throw new ActionError('insufficient_funds', 'not enough coins for the repair');
+  await moveCash(ctx, farm.id, 'repair', -cost, `${u} repaired`);
+  farm.cashMilli -= cost;
+  await ctx.q.query('UPDATE unlocks SET condition = 1, broken = false WHERE farm_id = $1 AND unlock_id = $2', [farm.id, u]);
+  ctx.touched.add(farm.id);
+  return cost;
+}
 
 export interface MachineTally {
   units: number;
@@ -40,7 +138,7 @@ export async function conveyorCarry(ctx: Ctx): Promise<void> {
   const cutoff = ctx.elapsed - ECONOMY.unlocks.conveyor.carryMs;
   if (cutoff < 0) return;
   const rows = await ctx.q.query(
-    `SELECT l.id, l.farm_id, l.grade FROM lay_events l JOIN unlocks u ON u.farm_id = l.farm_id AND u.unlock_id = 'conveyor'
+    `SELECT l.id, l.farm_id, l.grade FROM lay_events l JOIN unlocks u ON u.farm_id = l.farm_id AND u.unlock_id = 'conveyor' AND NOT u.broken
      WHERE l.day = $1 AND NOT l.collected AND NOT l.broken AND l.at_ms <= $2 ORDER BY l.farm_id, l.at_ms`,
     [ctx.day, cutoff],
   );
@@ -63,14 +161,14 @@ export async function conveyorCarry(ctx: Ctx): Promise<void> {
   }
 }
 
-/** A street sale's machine tally: what the grader's +10% and the clerk's +5% added. */
-export async function logSale(ctx: Ctx, farm: Farm, sold: Partial<EggStock>, multiplier: number, unlocks: UnlockId[]): Promise<void> {
+/** A street sale's machine tally: what the grader's +10% and the clerk's +5% added (at their effect now). */
+export async function logSale(ctx: Ctx, farm: Farm, sold: Partial<EggStock>, multiplier: number, m: MachinePower): Promise<void> {
   const eggs = Object.values(sold).reduce((a, b) => a + (b ?? 0), 0);
-  const plain = saleValue(sold, multiplier, unlocks.filter((u) => u !== 'grader' && u !== 'clerk'));
-  const graded = saleValue(sold, multiplier, unlocks.filter((u) => u !== 'clerk'));
-  const all = saleValue(sold, multiplier, unlocks);
-  if (unlocks.includes('grader')) await logMachine(ctx.q, farm.id, ctx.day, 'grader', { units: eggs, milli: (graded - plain) * 1000 });
-  if (unlocks.includes('clerk')) await logMachine(ctx.q, farm.id, ctx.day, 'clerk', { milli: (all - graded) * 1000 });
+  const plain = saleValue(sold, multiplier, { power: {} });
+  const graded = saleValue(sold, multiplier, { power: { grader: m.power.grader ?? 0 } });
+  const all = saleValue(sold, multiplier, m);
+  if ((m.power.grader ?? 0) > 0) await logMachine(ctx.q, farm.id, ctx.day, 'grader', { units: eggs, milli: (graded - plain) * 1000 });
+  if ((m.power.clerk ?? 0) > 0) await logMachine(ctx.q, farm.id, ctx.day, 'clerk', { milli: (all - graded) * 1000 });
 }
 
 /** The price cap the hopper buys under, in milli-coins per bag (the farm's own, or the list price). */

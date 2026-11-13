@@ -80,3 +80,92 @@ describe('machines at work', () => {
     await t.db.close();
   });
 });
+
+describe('machine wear', () => {
+  const setup = async () => {
+    const t = await makeGame({ cast: true, seed: 33 });
+    const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-wear', 'Wren');
+    await t.game.withCtx((ctx) => moveCash(ctx, farmId, 'start', toMilli(2000), 'test funds'));
+    for (const unlock of UNLOCK_IDS) expect(await t.game.act(playerId, { t: 'buyUnlock', rid: `u-${unlock}`, unlock })).toMatchObject({ ok: true });
+    const closeDay = async () => {
+      t.clock.t = t.game.getClock().dayStartedAt + ECONOMY.day.lengthMs;
+      await t.game.endDay();
+    };
+    return { t, playerId, farmId, closeDay };
+  };
+
+  it('a machine that works loses its daily wear; one that stands idle does not', async () => {
+    const { t, playerId, farmId, closeDay } = await setup();
+    // a sale works the grader and the clerk; nothing works the hopper (the trough is full)
+    await t.db.query(`UPDATE farms SET crate_white = 10, feed_standard_g = $2 WHERE id = $1`, [farmId, feedGramsPerHenDay() * 400]);
+    expect(await t.game.act(playerId, { t: 'sell', rid: 's', items: { white: 10 } })).toMatchObject({ ok: true });
+    await closeDay();
+    const s = (await t.game.getFarmState(farmId)).machineState;
+    expect(s.grader?.condition).toBeCloseTo(1 - ECONOMY.unlocks.grader.wear);
+    expect(s.clerk?.condition).toBeCloseTo(1 - ECONOMY.unlocks.clerk.wear);
+    expect(s.hopper?.condition).toBe(1);
+    expect(s.grader?.effect).toBe(1);
+    await t.db.close();
+  });
+
+  it('a worn machine gives less, a broken one nothing, and a repair restores it for its price share', async () => {
+    const { t, playerId, farmId } = await setup();
+    const sale = async (rid: string) => {
+      await t.db.query(`UPDATE farms SET crate_white = 10 WHERE id = $1`, [farmId]);
+      const before = (await t.game.getFarmState(farmId)).cashMilli;
+      expect(await t.game.act(playerId, { t: 'sell', rid, items: { white: 10 } })).toMatchObject({ ok: true });
+      return (await t.game.getFarmState(farmId)).cashMilli - before;
+    };
+    const full = await sale('full');
+    // the grader at 25%: half its +10%; broken: none of it
+    await t.db.query(`UPDATE unlocks SET condition = 0.25 WHERE farm_id = $1 AND unlock_id = 'grader'`, [farmId]);
+    const worn = await sale('worn');
+    await t.db.query(`UPDATE unlocks SET broken = true WHERE farm_id = $1 AND unlock_id = 'grader'`, [farmId]);
+    const broken = await sale('broken');
+    expect(worn).toBeLessThan(full);
+    expect(broken).toBeLessThan(worn);
+    expect((full - broken) / (full - worn)).toBeCloseTo(2, 0);
+    const state = (await t.game.getFarmState(farmId)).machineState.grader;
+    expect(state).toMatchObject({ broken: true, effect: 0 });
+    expect(state?.repairMilli).toBe(toMilli(ECONOMY.unlocks.grader.price * ECONOMY.wear.repairShare * 0.75));
+    const cash = (await t.game.getFarmState(farmId)).cashMilli;
+    expect(await t.game.act(playerId, { t: 'repairMachine', rid: 'fix', unlock: 'grader' })).toMatchObject({ ok: true });
+    const after = await t.game.getFarmState(farmId);
+    expect(after.machineState.grader).toMatchObject({ condition: 1, broken: false, effect: 1, repairMilli: 0 });
+    expect(cash - after.cashMilli).toBe(state?.repairMilli);
+    expect(await t.game.act(playerId, { t: 'repairMachine', rid: 'again', unlock: 'grader' })).toMatchObject({ ok: false, code: 'invalid_action' });
+    expect(await t.game.ledgerTotal(farmId)).toBe(after.cashMilli);
+    await t.db.close();
+  });
+
+  it('under 20% a machine breaks down at a day close sooner or later, and a broken machine stops', async () => {
+    const { t, farmId, closeDay } = await setup();
+    await t.db.query(`UPDATE unlocks SET condition = 0.1 WHERE farm_id = $1`, [farmId]);
+    for (let i = 0; i < 40; i++) {
+      await closeDay();
+      const s = (await t.game.getFarmState(farmId)).machineState;
+      if (UNLOCK_IDS.every((u) => s[u]?.broken)) break;
+    }
+    const s = (await t.game.getFarmState(farmId)).machineState;
+    expect(UNLOCK_IDS.every((u) => s[u]?.broken), JSON.stringify(s)).toBe(true);
+    // a broken conveyor carries nothing: late in the day the eggs are still on the ground
+    const clock = t.game.getClock();
+    t.clock.t = clock.dayStartedAt + Math.floor(ECONOMY.day.lengthMs * 0.9);
+    await t.game.tick();
+    const farm = await t.game.getFarmState(farmId);
+    expect(farm.layPlan.filter((e) => !e.broken && e.atMs < ECONOMY.day.lengthMs * 0.5).every((e) => !e.collected)).toBe(true);
+    await t.db.close();
+  });
+
+  it('the cart wears at each delivery', async () => {
+    const { t, playerId, farmId, closeDay } = await setup();
+    void playerId;
+    const [bakery] = await t.db.query(`SELECT id FROM agents WHERE kind = 'bakery'`);
+    const day0 = t.game.getClock().day;
+    await t.db.query(`INSERT INTO contracts (id, farm_id, agent_id, grade, qty_per_day, price_milli, start_day, end_day) VALUES ($1, $2, $3, 'any', 2, 1200, $4, $5)`, [newId(), farmId, bakery?.id, day0, day0 + 5]);
+    await t.db.query(`UPDATE farms SET crate_white = 20 WHERE id = $1`, [farmId]);
+    await closeDay();
+    expect((await t.game.getFarmState(farmId)).machineState.cart?.condition).toBeCloseTo(1 - ECONOMY.unlocks.cart.wear);
+    await t.db.close();
+  });
+});

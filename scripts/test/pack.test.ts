@@ -28,8 +28,8 @@ describe('packed assets trace to the coys-assets manifest', () => {
 
   it('every packed PNG is byte-identical to its manifest entry', () => {
     const sprites = Object.values(index.sprites);
-    // 67 easel sheets and extras, the Feathers beta's 4 feathers and 5 card frames, and the clean conveyor, from Spawn
-    expect(sprites.length).toBe(67 + 9 + 1);
+    // 67 easel sheets and extras; from Spawn: the Feathers beta's 4 feathers and 5 card frames, the clean conveyor, and 5 machine wear sheets
+    expect(sprites.length).toBe(67 + 9 + 1 + 5);
     for (const s of sprites) {
       expect(manifestHashes.get(s.source), s.source).toBe(s.sha256);
       expect(sha(join(out, s.png)), s.png).toBe(s.sha256);

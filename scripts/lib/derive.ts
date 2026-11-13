@@ -99,6 +99,11 @@ export const PAINTED: Record<string, PaintedSpec> = {
   '17-sign-farm': world('sign', '17-sign-farm'),
   '19-egg-grader': world('grader', '19-egg-grader'),
   '20-delivery-cart': world('cart', '20-delivery-cart'),
+  // worn and broken looks, drawn at exactly their machine's size (measured on the machine's own sheet)
+  '19c-egg-grader-wear': world('grader', '19-egg-grader'),
+  '20c-delivery-cart-wear': world('cart', '20-delivery-cart'),
+  '21c-feed-hopper-wear': world('hopper', '21-feed-hopper'),
+  '22c-sales-clerk-wear': world('clerk', '22-sales-clerk'),
   '21-feed-hopper': world('hopper', '21-feed-hopper'),
   '22-sales-clerk': world('clerk', '22-sales-clerk'),
   // the rival farms' signs at the farm's edge (and on the market board)
@@ -130,6 +135,7 @@ export const EXACT_GROUP: Record<string, Group> = {
   '30-stamps': 'fx',
   // the belt without the eggs painted on it (Spawn upload conveyor-clean), so only real eggs ride it
   '18b-conveyor-clean': 'farm',
+  '18c-conveyor-wear': 'farm',
   '23-farm-tileset': 'farm',
   '24-farm-props': 'farm',
   '27-town-square-plate': 'market',

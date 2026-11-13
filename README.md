@@ -112,9 +112,9 @@ The tour and the modals, at 1280x720. The market board shows the temporary check
 
 | Tour step 1: collect | Tour step 4: gluts |
 |---|---|
-| ![The spotlight dims everything but an egg on the ground, tagged TAP THE EGG; the step box reads 1/10 COLLECT AN EGG with progress dots, BACK and SKIP](docs/screenshots/live-tour-collect.png) | ![The market board open, the supply meter spotlit with TAP THE METER; the step box explains gluts and shortages](docs/screenshots/live-tour-glut.png) |
+| ![The spotlight dims everything but an egg on the ground, tagged TAP THE EGG; the step box reads 1/10 COLLECT AN EGG with progress dots, BACK and SKIP](docs/screenshots/live-tour-collect.png) | ![The tour's glut step over the market board (test server, made-up names; replaced on 13 November 2026): the box beside the spotlit supply meter with its pointer, STEP 4, BACK, SKIP STEP and END TOUR](docs/screenshots/live-tour-glut.png) |
 | **A card, composed** | **Market board** |
-| ![The Wholesaler's bulk order as one panel: portrait and line on top, what accepting means, the card art upright beside it, the answers in one row](docs/screenshots/live-card.png) | ![Today's price per grade on split flaps, the street's sales against what it needs, and the farms ranked with the bust ones](docs/screenshots/live-board.png) |
+| ![The Wholesaler's bulk order as one panel: portrait and line on top, what accepting means, the card art upright beside it, the answers in one row](docs/screenshots/live-card.png) | ![The market board's FARMS tab (test server, made-up names; replaced on 13 November 2026): the rival signs and the farms ranked](docs/screenshots/live-board.png) |
 | **Shop** | **A hen's card** |
 | ![The shop's hens: each one of a kind, drawn from her trait layers at full detail, with how she lays and her price](docs/screenshots/live-shop.png) | ![A hen's portrait at twice her farm size, her traits in words, and her certificate: pending while recording on NEAR is paused](docs/screenshots/live-hen.png) |
 | **Feed** | **Ledger** |
@@ -151,6 +151,63 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 ([wide](docs/screenshots/live-resize-1-wide-1600x760.png), [narrow](docs/screenshots/live-resize-2-narrow-900x760.png),
 [tall](docs/screenshots/live-resize-3-tall-560x1000.png), [wide again](docs/screenshots/live-resize-4-wide-1600x760.png))
 and the [belt](docs/screenshots/live-belt-clean.png), which carries only real eggs.
+
+## Farm zones and machine wear (13 November 2026)
+
+**Zones with real room.** The grader, the clerk's desk and the delivery cart used to stand crammed together at the
+belt's end, touching, under labels stacked on top of each other (the layout tests checked only that footprints did not
+overlap and that connections met). The layout spec ([pixi/farm/layout.ts](apps/client/src/pixi/farm/layout.ts)) now
+lays the farm out in zones: the coops and the straw yard; the **feed corner** at the yard's far end (the trough, the
+hopper behind it with its spout over the feed, the sack a hen's width away); the farmhouse; the **production line**
+(the belt runs from the field, through the grader partway along it, and ends at the crate, which stands clear); the
+**market stall**, the clerk's desk by the path facing it (by the gate on a tall farm, at the line's end on a short one);
+and the **cart bay** on the path by the gate, from where the cart drives out. Labels show on hover, for a moment after a
+tap, and once when a machine arrives, one at a time, where they cover nothing else.
+
+Every two things standing on the ground keep at least a hen's width between their footprints, except the pairs built to
+touch (belt and grader, belt and crate, hopper and trough), which meet only at their connection points; zones keep at
+least 8 world pixels apart; and each machine's label has a place that covers nothing else. `test/spacing.test.ts`
+checks all of it at 41 window sizes and ratios, and the hen tests still check every walk.
+
+| | 1280x720 | 1920x1080 | 390x844 |
+|---|---|---|---|
+| Before | ![The machines crammed at the belt's end: grader, crate, clerk desk and cart touching, permanent labels](docs/screenshots/machines-before-1280x720.png) | ![The same at 1920x1080](docs/screenshots/machines-before-1920x1080.png) | ![The same on a phone](docs/screenshots/machines-before-390x844.png) |
+| After | ![The grader partway along the belt, the crate clear at its end, the clerk's stall by the gate facing the path, the cart in its bay](docs/screenshots/machines-after-1280x720.png) | ![The same at 1920x1080](docs/screenshots/machines-after-1920x1080.png) | ![The same on a phone](docs/screenshots/machines-after-390x844.png) |
+
+**Machine wear.** A machine used to work forever once bought. Now each has a condition from 100% to 0%, falling each
+in-game day it works (conveyor 1%, grader 1.5%, hopper 1%, clerk 1%) and 1% per delivery for the cart. Its effect is
+full at 50% and over and falls in line below; under 20% each day close may break it (15%), and a broken machine stops
+(the belt carries nothing, the grader and clerk add nothing, the cart delivers nothing, the hopper pours nothing) until
+it is repaired from its card. For a machine $m$ at condition $c$:
+
+$$
+\text{effect}(c) = \min\left(1, \frac{c}{0.5}\right)\ (0 \text{ when broken}), \qquad \text{repair}(c) = 0.4 \times \text{price}_m \times (1 - c)
+$$
+
+The card shows the condition, the effect now and **REPAIR FOR** its price; hints come under 30% and on a breakdown. A
+worn machine (under 50%) shows its worn look and wobbles as it works; a broken one stands still, greyed, with smoke
+rising, and its sound stops. The breakdown is a last sputter, a clunk, dust and steam; the repair is hammer taps, a
+sparkle and the start-up sound. The worn and broken looks are new sheets made from the machines' own art (rust and dents
+in their own pixels, the particle sheet's steam), uploaded to `@25th/game-11` by the Spawn agent account `gama` (Spawn
+commit `cd7282d`) and backed up in coys-assets (PR #4, `18c` to `22c`). How to play and the tour explain wear.
+
+**Payback.** Measured on a reference farm (20 hens, standard feed, a 1.00x market, one bakery contract of 6 eggs a day
+that a player without the cart misses 3 days in 10; `machinePayback` in `packages/shared`). "Earned before repair"
+counts the days from 100% to the breakdown zone, those under 50% at their share. At the old prices the cart (231 days to
+pay back), the hopper (104) and the clerk (170) did not earn their price before their first repair; the config now has
+cart 35 (was 120), hopper 60 (was 100) and clerk 60 (was 160). Nothing else changed.
+
+| Machine | Price | Wear | Coins a day | Days to pay back | Repair due (day) | Earned before repair | Net over 150 days, repaired | Never repaired |
+|---|---|---|---|---|---|---|---|---|
+| Conveyor | 40 | 1.0% a day | 0.60 | 67 | 80 | 42 | 22 | 4 |
+| Grader | 80 | 1.5% a day | 1.88 | 42 | 53 | 89 | 120 | 14 |
+| Delivery cart | 35 | 1.0% a delivery | 0.52 | 68 | 80 | 37 | 19 | 3 |
+| Feed hopper | 60 | 1.0% a day | 0.96 | 63 | 80 | 68 | 43 | 10 |
+| Sales clerk | 60 | 1.0% a day | 0.94 | 64 | 80 | 67 | 41 | 9 |
+
+Owning all five without ever repairing earns 40 over 150 days against 245 when they are kept repaired (expected values;
+a test holds every machine to paying back before its repair and never-repairing to under half). The five-seed market
+simulation still meets its targets.
 
 ## Farm names, privacy and the new tour (13 November 2026)
 
@@ -578,7 +635,7 @@ service stopped; no trades with anyone). One check farm owned all five machines.
 
 | How to play | Sound settings | Market board |
 |---|---|---|
-| ![The guide: eleven sections on the left, Founding Hens open on the right with its picture](docs/screenshots/founders-guide-founding.png) | ![Twelve sound groups, each with a slider, a percentage and a mute, a reset button, reduce motion, How to play and Replay the tour](docs/screenshots/founders-settings-sound.png) | ![The board with FOUNDING HENS: 773 OF 777 LEFT TO WIN, 4 WAITING (while the check farms were in play)](docs/screenshots/founders-board-founding.png) |
+| ![The guide: eleven sections on the left, Founding Hens open on the right with its picture](docs/screenshots/founders-guide-founding.png) | ![Twelve sound groups, each with a slider, a percentage and a mute, a reset button, reduce motion, How to play and Replay the tour](docs/screenshots/founders-settings-sound.png) | ![The board at 2560x1440 (test server, made-up names; replaced on 13 November 2026): today's prices on split flaps, the supply meter and the Feathers left](docs/screenshots/founders-board-founding.png) |
 | **Ledger** | **An ordinary hen** | **A machine's card** |
 | ![The ledger: machine lines per day, Founding Hen certificates, every milestone with its state, and good standing](docs/screenshots/founders-ledger-milestones.png) | ![An ordinary hen's card: not recorded on NEAR; only Founding Hens, won at milestones, are](docs/screenshots/founders-hen-ordinary.png) | ![The conveyor's card: what it does and what it did today](docs/screenshots/founders-machine-conveyor.png) |
 
@@ -1061,6 +1118,14 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
 **Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, NEAR AI decisions without credits, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
+
+### Brief 9, stage 2: farm zones and machine wear (13 November 2026)
+
+- **Layout.** Zones in the layout spec; a hen's width between every two things standing on the ground (except designed
+  connections), zones apart, labels on hover, tap and arrival only. Tests at 41 window sizes; before and after pictures.
+- **Wear.** Condition, effect by condition, breakdowns, repairs (migration 11), worn and broken looks made from the
+  machines' own art (Spawn, coys-assets #4), the breakdown and repair moments, card, hints, guide and tour.
+- **Tuning.** Config only: cart, hopper and clerk prices, so each machine pays back before its first repair.
 
 ### Brief 9, stage 1: farm names, privacy, the new tour (13 November 2026)
 

@@ -5,15 +5,17 @@
 // derived atlases, and connection points from the art itself (ART below, measured in source
 // pixels on coys-assets' sheets).
 //
-// The farm: the coops along the top, the farmhouse top right with the path running from its porch
-// steps straight down through a gate in a fence that runs the whole width. The straw yard fills
-// the middle, with the trough at its centre, the feed sack beside it and the feed hopper behind it,
-// its spout over the trough. Along the yard's foot the conveyor runs from the field, under the
-// grader (inline: the belt passes through its base) and on into the crate, which stands at the
-// path's edge. The sales clerk's desk stands just above the crate, facing the path; the delivery
-// cart is parked on the path beside the crate, ready to drive down through the gate. The farm's
-// own sign stands by the path under the porch; the rivals' signs stand across the path. In
-// landscape the goal tracker and toasts sit over the bottom-left corner: only ground goes there.
+// The farm in zones, each with room around it (tests keep a hen's width between every two things
+// that stand on the ground, and zones apart): the coops along the top and the straw yard where the
+// hens live below them; the feed corner at the yard's far end (the trough, the feed hopper behind
+// it with its spout over the feed, the sack beside it); the farmhouse top right with the path
+// running from its porch steps straight down through a gate in a fence that runs the whole width;
+// the production line along the yard's foot (the belt runs from the field, through the grader
+// partway along it, and ends at the crate, which stands clear of everything); the market stall
+// (the sales clerk's desk) by the path near the gate, facing the path; and the cart bay on the path
+// by the gate, from where the cart drives out. The farm's own sign stands by the path under the
+// porch; the rivals' signs across the path. In landscape the goal tracker and toasts sit over the
+// bottom-left corner: only ground goes there.
 import derivedJson from '../../assets/derived.json';
 
 export interface Point {
@@ -33,6 +35,11 @@ export const MIN_W = 500;
 export const MIN_H = 274;
 
 export type MachineSpot = 'conveyor' | 'grader' | 'cart' | 'hopper' | 'clerk';
+
+/** One hen's width (world pixels): the least room between two things standing on the ground. */
+export const HEN_W = 20;
+
+export type ZoneName = 'coops' | 'yard' | 'feed' | 'production' | 'farmhouse' | 'stall' | 'cartBay';
 
 /** One world object in the spec: its sheet, its anchor (feet), art bounds, footprint and connection points. */
 export interface SpecObject {
@@ -78,6 +85,8 @@ export interface FarmLayout {
   props: { row: 'hay-bale' | 'flowers' | 'puddle'; x: number; y: number }[];
   /** Rival farms' signs at the farm's edge. */
   rivals: Point[];
+  /** The farm's zones (the boxes around what stands in each). */
+  zones: Record<ZoneName, Box>;
   /** Every object with its anchor, bounds, footprint and connection points, and what must line up. */
   spec: { objects: Record<string, SpecObject>; connections: Connection[] };
 }
@@ -172,13 +181,44 @@ export function farmLayout(w: number, h: number, guide: { w: number; h: number }
   const farmhouseAt = pivotFor('farmhouse', [ART.farmhouse.x.steps, ART.farmhouse.ground], { x: pathX, y: houseGround });
   objects.farmhouse = artObject('farmhouse', farmhouseAt, { steps: add(farmhouseAt, { x: dx('farmhouse', ART.farmhouse.x.steps), y: dy('farmhouse', ART.farmhouse.ground) }) });
 
-  // the belt row along the yard's foot (above the guide band), its ground shared by belt, grader, crate and cart
-  const beltGround = Math.min(h - 38, guideTop - 8);
+  // the belt row along the yard's foot (above the guide band, and above the stall by the gate with
+  // room between), its ground shared by belt, grader and crate
+  const clerkH = Math.ceil(artBox(ART.clerk.sprite, ART.clerk.row).bottom - artBox(ART.clerk.sprite, ART.clerk.row).top);
+  // a tall enough farm has the stall below the line by the gate; a short one, at the line's end by the path
+  const lowLine = Math.min(h - 38, guideTop - 8, fenceY - 10 - clerkH - 18);
+  const lowStall = lowLine - 48 - (houseGround + 6) >= 90;
+  const beltGround = lowStall ? lowLine : Math.min(h - 38, guideTop - 8);
   const beltY = beltGround - 8;
 
-  // the crate at the path's left edge (its outermost pixel, a bolt, touches the path); the belt ends at its side
+  // the cart bay: on the path by the gate, its back at the path's middle (inside the farm)
+  const stallGround = fenceY - 10;
+  const cartArt = artBox(ART.cart.sprite, ART.cart.row);
+  // (placed by its wheel: on the path, as far right as keeps the whole cart inside the farm)
+  const wheelMax = Math.floor(w - 1 - (cartArt.right - dx('cart', ART.cart.x.wheel)));
+  const wheelX = Math.max(pathLeft + 2, Math.min(pathX + 8, pathRight - 2, wheelMax));
+  const cartAt = pivotFor('cart', [ART.cart.x.wheel, ART.cart.ground], { x: wheelX, y: stallGround });
+  const cartBoxLeft = cartAt.x + cartArt.left;
+  // the market stall: the clerk's desk left of the path near the gate, facing the path, a hen's
+  // width and more from the cart
+  const clerkArt = artBox(ART.clerk.sprite, ART.clerk.row);
+  const clerkOverhang = clerkArt.right - dx('clerk', ART.clerk.x.right);
+  const stallPoint = { x: Math.floor(Math.min(pathLeft - 6, cartBoxLeft - HEN_W - clerkOverhang - 1)), y: lowStall ? stallGround : beltGround };
+  objects.cart = artObject('cart', cartAt, {
+    back: add(cartAt, { x: dx('cart', ART.cart.x.back), y: dy('cart', ART.cart.ground) }),
+    wheel: add(cartAt, { x: dx('cart', ART.cart.x.wheel), y: dy('cart', ART.cart.ground) }),
+  });
+
+  const clerkAt = pivotFor('clerk', [ART.clerk.x.right, ART.clerk.ground], stallPoint);
+  objects.clerk = artObject('clerk', clerkAt, {
+    deskRight: add(clerkAt, { x: dx('clerk', ART.clerk.x.right), y: dy('clerk', ART.clerk.ground) }),
+    deskLeft: add(clerkAt, { x: dx('clerk', ART.clerk.x.left), y: dy('clerk', ART.clerk.ground) }),
+  });
+
+  // the crate at the belt's end, set back from the path so it stands clear (the stall and the cart bay are by the gate)
   const crateArt = artBox(ART.crate.sprite, ART.crate.row);
-  const crateAt = { x: Math.floor(pathLeft - crateArt.right), y: Math.round(beltGround - dy('crate', ART.crate.ground)) };
+  // (on a short farm the stall stands at the line's end: the crate keeps a hen's width and more from it)
+  const crateRight = lowStall ? pathLeft - 28 : Math.floor((objects.clerk?.box.left ?? pathLeft) - HEN_W - 3);
+  const crateAt = { x: Math.floor(crateRight - crateArt.right), y: Math.round(beltGround - dy('crate', ART.crate.ground)) };
   const crateIn = add(crateAt, { x: dx('crate', ART.crate.x.in), y: dy('crate', ART.crate.ground) - 8 });
   const crateSide = { x: crateAt.x + crateArt.right, y: crateAt.y + dy('crate', ART.crate.ground) };
   const crateTop = crateAt.y + dy('crate', ART.crate.top);
@@ -198,35 +238,26 @@ export function farmLayout(w: number, h: number, guide: { w: number; h: number }
     points: { start: { x: beltFrom, y: beltY }, end: { x: beltTo, y: beltY }, groundStart: { x: beltFrom, y: beltGround }, groundEnd: { x: beltTo, y: beltGround } },
   };
 
-  // the grader stands on the belt one tile before the crate: the belt runs in under it and out to the crate
-  const graderAt = pivotFor('grader', [ART.grader.x.out, ART.grader.ground], { x: beltTo - TILE, y: beltGround });
+  // the grader stands partway along the belt (the belt runs in under it and on to the crate), a
+  // hen's width and more clear of the crate
+  const graderOutWorld = dx('grader', ART.grader.x.out) - artBox(ART.grader.sprite, ART.grader.row).right;
+  const graderOutX = Math.min(beltFrom + Math.round((beltTo - beltFrom) * 0.55), Math.round(objects.crate.box.left - 2 * HEN_W + graderOutWorld));
+  const graderAt = pivotFor('grader', [ART.grader.x.out, ART.grader.ground], { x: graderOutX, y: beltGround });
   objects.grader = artObject('grader', graderAt, {
     in: add(graderAt, { x: dx('grader', ART.grader.x.in), y: dy('grader', ART.grader.ground) }),
     out: add(graderAt, { x: dx('grader', ART.grader.x.out), y: dy('grader', ART.grader.ground) }),
   });
 
-  // the cart parked on the path beside the crate, its back against the crate's side
-  const cartAt = pivotFor('cart', [ART.cart.x.back, ART.cart.ground], { x: crateSide.x, y: beltGround });
-  objects.cart = artObject('cart', cartAt, {
-    back: add(cartAt, { x: dx('cart', ART.cart.x.back), y: dy('cart', ART.cart.ground) }),
-    wheel: add(cartAt, { x: dx('cart', ART.cart.x.wheel), y: dy('cart', ART.cart.ground) }),
-  });
+  // the yard: below the coops, left of the farm sign, above the production line
+  const lineTop = Math.min(objects.grader.box.top, objects.crate.box.top, beltY - 8);
+  const signBox = artBox('17-sign-farm', 'sway');
+  const sign = { x: Math.round(pathLeft - 3 - signBox.right), y: houseGround + 48 };
+  const yard: Box = { left: yardLeft, top: houseGround + 6, right: Math.round(Math.min(pathLeft - 22, sign.x + signBox.left - 6)), bottom: Math.round(lineTop) - 4 };
 
-  // the clerk's desk stands on the crate's top line, behind it, its right end over the crate's side, facing the path
-  const clerkAt = pivotFor('clerk', [ART.clerk.x.right, ART.clerk.ground], crateTopSide);
-  objects.clerk = artObject('clerk', clerkAt, {
-    deskRight: add(clerkAt, { x: dx('clerk', ART.clerk.x.right), y: dy('clerk', ART.clerk.ground) }),
-    deskLeft: add(clerkAt, { x: dx('clerk', ART.clerk.x.left), y: dy('clerk', ART.clerk.ground) }),
-  });
-
-  // the yard: below the coops, left of the clerk and the farm sign, above the belt row's machines
-  const graderTop = objects.grader.box.top;
-  const yard: Box = { left: yardLeft, top: houseGround + 6, right: Math.round(objects.clerk.box.left) - 22, bottom: Math.round(graderTop) - 4 };
-
-  // the trough at the yard's centre; the hopper behind it with its spout over the feed
-  const troughX = Math.round((yard.left + yard.right) / 2);
+  // the feed corner at the yard's far end: the trough, the hopper behind it with its spout over the feed
+  const troughX = Math.round(Math.max((yard.left + yard.right) / 2, yard.right - 64));
   // (64 px down a shallow yard, the middle of a deep one: a phone's yard runs far down the screen)
-  const troughGround = Math.min(Math.max(yard.top + 64, Math.round((yard.top + yard.bottom) / 2)), yard.bottom - 6);
+  const troughGround = Math.min(Math.max(yard.top + 64, Math.round((yard.top + yard.bottom) / 2)), yard.bottom - 14);
   const troughAt = pivotFor('trough', [192, ART.trough.ground], { x: troughX, y: troughGround });
   const rimY = troughAt.y + dy('trough', ART.trough.rim);
   objects.trough = artObject('trough', troughAt, {
@@ -238,24 +269,22 @@ export function farmLayout(w: number, h: number, guide: { w: number; h: number }
   const hopperAt = pivotFor('hopper', [ART.hopper.spout[0], ART.hopper.spout[1]], spoutTarget);
   objects.hopper = artObject('hopper', hopperAt, { spout: add(hopperAt, { x: dx('hopper', ART.hopper.spout[0]), y: dy('hopper', ART.hopper.spout[1]) }) });
 
-  // the feed sack beside the trough
+  // the feed sack beside the trough, a hen's width away (hens eat between them)
   const sackBox = artBox('13-sack-standard', 'idle');
-  const sack = { x: Math.round(objects.trough.box.left - 6 - sackBox.right), y: troughAt.y };
+  const sack = { x: Math.round(objects.trough.box.left - HEN_W - 1 - sackBox.right), y: troughAt.y };
   objects.sack = object('13-sack-standard', 'idle', sack);
 
   // coops along the top, spread between the yard's left and the farmhouse
   const coopBox = artBox('15-coop-deluxe', 'idle');
   const half = Math.ceil(Math.max(-coopBox.left, coopBox.right));
   const plotsFrom = yardLeft + half;
-  const plotsTo = Math.max(plotsFrom + 3 * (2 * half + 8), Math.floor(objects.farmhouse.box.left) - 6 - half);
+  const plotsTo = Math.max(plotsFrom + 3 * (2 * half + HEN_W), Math.floor(objects.farmhouse.box.left) - HEN_W - half);
   const plots = [0, 1, 2, 3].map((i) => ({ x: Math.round(plotsFrom + ((plotsTo - plotsFrom) * i) / 3), y: houseGround }));
   plots.forEach((p, i) => {
     objects[`coop${i}`] = object('15-coop-deluxe', 'idle', p);
   });
 
   // the farm's own sign by the path under the porch; the rivals' signs across the path
-  const signBox = artBox('17-sign-farm', 'sway');
-  const sign = { x: Math.round(pathLeft - 3 - signBox.right), y: houseGround + 48 };
   objects.sign = object('17-sign-farm', 'sway', sign);
   const rivalBox = artBox('17-sign-old-money', 'sway');
   const stripX = Math.round(pathRight + 3 - rivalBox.left);
@@ -273,9 +302,10 @@ export function farmLayout(w: number, h: number, guide: { w: number; h: number }
     { row: 'hay-bale', x: yardLeft + 2, y: troughGround + 40 > yard.bottom ? yard.top + 30 : troughGround + 40 },
     { row: 'flowers', x: Math.round((plots[3]?.x ?? 0) + (objects.farmhouse.box.left - (plots[3]?.x ?? 0)) / 2), y: houseGround + 30 },
   ];
-  // in the guide band only flowers in the grass (the band is ground only); the puddle by the gate
-  if (guide.w < pathLeft - 120) props.push({ row: 'flowers', x: Math.round((guide.w + pathLeft) / 2) - 30, y: fenceY - 4 });
-  props.push({ row: 'puddle', x: pathLeft - 30, y: fenceY - 4 });
+  // flowers and a puddle in the grass by the fence (ground only, as the guide band allows), clear of the stall
+  const stallLeft = Math.round(objects.clerk.box.left);
+  if (guide.w < stallLeft - 100) props.push({ row: 'flowers', x: Math.round((guide.w + stallLeft) / 2), y: fenceY - 4 });
+  props.push({ row: 'puddle', x: Math.max(30, Math.round(Math.min(guide.w, stallLeft - HEN_W) / 2)), y: fenceY - 4 });
   props.forEach((p, i) => {
     objects[`prop${i}`] = object('24-farm-props', p.row, p);
   });
@@ -306,7 +336,14 @@ export function farmLayout(w: number, h: number, guide: { w: number; h: number }
     at: { x: pathX, y: houseGround },
     box: { left: pathLeft, top: houseGround, right: pathRight, bottom: fenceY },
     footprint: { left: pathLeft, top: houseGround, right: pathRight, bottom: houseGround },
-    points: { top: { x: pathX, y: houseGround }, bottom: { x: pathX, y: fenceY }, left: { x: pathLeft, y: beltGround }, right: { x: pathRight, y: beltGround } },
+    points: {
+      top: { x: pathX, y: houseGround },
+      bottom: { x: pathX, y: fenceY },
+      // the cart bay's span across the path, on the cart's ground
+      left: { x: pathLeft, y: objects.cart.points.wheel?.y ?? stallGround },
+      right: { x: pathRight, y: objects.cart.points.wheel?.y ?? stallGround },
+      stall: stallPoint,
+    },
   };
 
   const connections: Connection[] = [
@@ -314,16 +351,30 @@ export function farmLayout(w: number, h: number, guide: { w: number; h: number }
     { kind: 'over', point: 'grader.in', span: ['conveyor.groundStart', 'conveyor.groundEnd'], what: 'the belt runs in under the grader' },
     { kind: 'over', point: 'grader.out', span: ['conveyor.groundStart', 'conveyor.groundEnd'], what: 'the belt runs out of the grader' },
     { kind: 'over', point: 'hopper.spout', span: ['trough.rimLeft', 'trough.rimRight'], what: 'the hopper spout is over the trough' },
-    { kind: 'meet', a: 'cart.back', b: 'crate.side', what: 'the cart is parked against the crate' },
-    { kind: 'over', point: 'cart.wheel', span: ['path.left', 'path.right'], what: 'the cart stands on the path' },
-    { kind: 'meet', a: 'clerk.deskRight', b: 'crate.topSide', what: 'the clerk desk is beside the crate, facing the path' },
+    { kind: 'over', point: 'cart.wheel', span: ['path.left', 'path.right'], what: 'the cart stands in its bay on the path' },
+    { kind: 'meet', a: 'clerk.deskRight', b: 'path.stall', what: 'the clerk stall stands by the path, facing it' },
     { kind: 'meet', a: 'farmhouse.steps', b: 'path.top', what: 'the path starts at the porch steps' },
     { kind: 'meet', a: 'path.bottom', b: 'gate.centre', what: 'the path runs through the gate' },
   ];
 
+  const around = (...names: string[]): Box => {
+    const bs = names.map((n) => objects[n]?.box).filter((b): b is Box => !!b);
+    return { left: Math.min(...bs.map((b) => b.left)), top: Math.min(...bs.map((b) => b.top)), right: Math.max(...bs.map((b) => b.right)), bottom: Math.max(...bs.map((b) => b.bottom)) };
+  };
+  const zones: Record<ZoneName, Box> = {
+    coops: around('coop0', 'coop1', 'coop2', 'coop3'),
+    yard,
+    feed: around('trough', 'hopper', 'sack'),
+    production: around('conveyor', 'grader', 'crate'),
+    farmhouse: around('farmhouse'),
+    stall: around('clerk'),
+    cartBay: around('cart'),
+  };
+
   return {
     w,
     h,
+    zones,
     guide: { left: 0, top: guideTop, right: guide.w, bottom: h },
     yard,
     plots,
@@ -400,4 +451,53 @@ export function spreadSpot(r: Box, others: Point[], tries = 6): Point {
     }
   }
   return best;
+}
+
+/** Things that lie on the ground (walked over, never standing in the way): no room needed round them. */
+export const FLOOR_OBJECTS = (name: string, o: SpecObject): boolean => ['conveyor', 'path', 'gate'].includes(name) || (o.sprite === '24-farm-props' && o.row !== 'hay-bale');
+
+/** Pairs that are built to touch (a connection), so the room rule does not apply to them. */
+export const DESIGNED_PAIRS: [string, string][] = [
+  ['conveyor', 'grader'],
+  ['conveyor', 'crate'],
+  ['trough', 'hopper'],
+];
+
+/** The room between two boxes (0 when they overlap or touch). */
+export function boxGap(a: Box, b: Box): number {
+  const gx = Math.max(0, a.left - b.right, b.left - a.right);
+  const gy = Math.max(0, a.top - b.bottom, b.top - a.bottom);
+  return Math.hypot(gx, gy);
+}
+
+const hit = (a: Box, b: Box): boolean => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+
+/**
+ * Where an object's name label goes (shown on hover or tap, and once when the thing arrives): above
+ * it, else below, left or right, the first place inside the farm that covers no other object.
+ */
+export function labelSpot(l: FarmLayout, name: string, w: number, h = 11): Box | null {
+  const o = l.spec.objects[name];
+  if (!o) return null;
+  const others = Object.entries(l.spec.objects)
+    .filter(([k]) => k !== name && !(k === 'path' || k === 'gate'))
+    .map(([, x]) => x.box);
+  const cy = (o.box.top + o.box.bottom) / 2;
+  const tries: Box[] = [];
+  // above or below, at the middle first, then along the thing (a long belt has a grader at its middle)
+  const along = [0.5, 0.25, 0.75, 0.12, 0.88].map((f) => o.box.left + (o.box.right - o.box.left) * f);
+  for (const d of [2, 6, 10]) {
+    for (const x of along) {
+      tries.push({ left: x - w / 2, top: o.box.top - d - h, right: x + w / 2, bottom: o.box.top - d });
+      tries.push({ left: x - w / 2, top: o.box.bottom + d, right: x + w / 2, bottom: o.box.bottom + d + h });
+    }
+    tries.push({ left: o.box.left - d - w, top: cy - h / 2, right: o.box.left - d, bottom: cy + h / 2 });
+    tries.push({ left: o.box.right + d, top: cy - h / 2, right: o.box.right + d + w, bottom: cy + h / 2 });
+  }
+  for (const r of tries) {
+    const b = { left: Math.round(r.left), top: Math.round(r.top), right: Math.round(r.right), bottom: Math.round(r.bottom) };
+    if (b.left < 0 || b.top < 0 || b.right > l.w || b.bottom > l.h) continue;
+    if (!others.some((x) => hit(b, x))) return b;
+  }
+  return null;
 }
