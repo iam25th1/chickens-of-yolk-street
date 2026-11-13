@@ -166,6 +166,22 @@ describe('derived sprites', () => {
     expect(shape(sourceJson('18b-conveyor-clean'))).toEqual(shape(sourceJson('18-conveyor')));
   });
 
+  it('the crate carries no stray egg: no full-crate frame reaches below its feet, the pile stays whole, and only the egg-drop row has a falling egg', () => {
+    // the egg-drop row's falling egg sits mostly in the overflow cell of the sheet; it once became that
+    // cell's main body and showed up bobbing under every full crate, while the pile's top was cut off
+    const s = manifest.sprites['12-crate'];
+    expect(s).toBeDefined();
+    for (const [level, rows] of Object.entries(s?.frames ?? {})) {
+      for (const row of ['empty', 'half', 'full', 'overflow']) {
+        for (const [, , , h, , py] of rows[row] ?? []) expect(h, `${row} at ${level}: reaches ${h - (py ?? 0)} texels below the feet`).toBeLessThanOrEqual(py ?? 0);
+      }
+      const tallest = (row: string) => Math.max(...(rows[row] ?? []).map((f) => f[3]));
+      // the overflowing pile is taller than a full crate, and the falling egg makes egg-drop taller than an empty crate
+      expect(tallest('overflow'), `overflow at ${level}`).toBeGreaterThan(tallest('full') * 1.3);
+      expect(tallest('egg-drop'), `egg-drop at ${level}`).toBeGreaterThan(tallest('empty') * 1.3);
+    }
+  });
+
   it('draws the world at the design sizes: a hen 32 world pixels, a coop and the farmhouse 96', () => {
     const tallest = (id: string, row: string) => Math.max(...(manifest.sprites[id]?.frames['4']?.[row] ?? []).map((f) => f[3])) / 4;
     expect(tallest('02-body', 'idle')).toBeGreaterThan(20);

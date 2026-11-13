@@ -111,10 +111,10 @@ Painted pages are WebP (quality 90, alpha lossless); exact pages are lossless PN
 | farm@4 | 4091x775 | 877.6 KB |
 | farm@6 | 4096x1646 | 1614.1 KB |
 | farm@8 | 4092x2874 | 2321.6 KB |
-| farm.wide@2 | 4092x564 | 912.4 KB |
-| farm.wide@3 | 4057x1158 | 1700.8 KB |
-| farm.wide@4 | 4085x1421 | 1863.7 KB |
-| farm.wide@6 | 3999x732 | 790.1 KB |
+| farm.wide@2 | 4074x561 | 911.3 KB |
+| farm.wide@3 | 4070x1157 | 1696.0 KB |
+| farm.wide@4 | 4093x1414 | 1864.1 KB |
+| farm.wide@6 | 3938x719 | 787.3 KB |
 | market | 899x362 | 10.9 KB |
 | cards | 901x3275 | 40.3 KB |
 | cards.wide@2 | 4076x716 | 1084.2 KB |

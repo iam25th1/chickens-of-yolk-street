@@ -163,6 +163,12 @@ export const EXACT_GROUP: Record<string, Group> = {
   '29-card-player-trade': 'cards',
 };
 
+/**
+ * Sheets whose loose blobs fall into the body below them: the crate's egg-drop row has an egg falling
+ * into its crate from the cell above, which the nearest-body rule gave to the full crate above.
+ */
+export const FALL_INTO_BODY_BELOW: readonly string[] = ['12-crate'];
+
 /** In the packed set but not drawn by the game (measured for the report only). */
 export const UNUSED = ['01-hen-base', '01-hen-anims', '03-chick', '19b-egg-sorter', '18-conveyor'];
 
@@ -479,9 +485,13 @@ function spread(owner: Int32Array, width: number, height: number, maxDist = Infi
  * holds 85% of is two bodies touching: each pixel stays in the cell it sits in. Every other blob (a
  * comb a pixel above the head, a dropped egg, a sweat drop) belongs to the nearest main body, by
  * pixel distance, even when it pokes into the next cell: that is how a comb stays on its own hen and
- * never shows up under the hen in the row above.
+ * never shows up under the hen in the row above. With `fallBelow` (sheets in FALL_INTO_BODY_BELOW),
+ * a loose blob belongs to the main body straight below it when there is one: the crate's falling
+ * egg drops into its own crate, not into the full crate in the row above (where it showed up as a
+ * stray egg bobbing under a full crate), and a body poking into the row above (the crate's egg pile)
+ * belongs to the cell holding most of it rather than being split between the two.
  */
-export function cellOwners(mask: Uint8Array, width: number, height: number, cw: number, ch: number): Int32Array {
+export function cellOwners(mask: Uint8Array, width: number, height: number, cw: number, ch: number, fallBelow = false): Int32Array {
   const { labels, count } = label(mask, width, height);
   const cols = Math.round(width / cw);
   const rowsN = Math.round(height / ch);
@@ -508,7 +518,8 @@ export function cellOwners(mask: Uint8Array, width: number, height: number, cw: 
         bestN = n;
         best = c;
       }
-    return bestN >= 0.85 * (total[l] ?? 1) ? best : -1;
+    // a falling sheet's tall bodies (an egg pile poking into the row above) belong to the cell holding most of them
+    return bestN >= (fallBelow ? 0.5 : 0.85) * (total[l] ?? 1) ? best : -1;
   });
   const main = new Map<number, number>();
   for (let l = 0; l < count; l++) {
@@ -526,9 +537,43 @@ export function cellOwners(mask: Uint8Array, width: number, height: number, cw: 
   const { near, dist } = spread(seed, width, height);
   const attach = new Array<number>(count).fill(-1);
   const closest = new Array<number>(count).fill(Infinity);
+  // with fallBelow, a loose blob falls into the main body straight below it (overlapping columns, the
+  // nearest top under the blob's bottom)
+  const ownCell = new Array<number>(count).fill(-1);
+  if (fallBelow) {
+    const box = Array.from({ length: count }, () => ({ x0: Infinity, x1: -1, y0: Infinity, y1: -1 }));
+    for (let p = 0; p < labels.length; p++) {
+      const l = labels[p] ?? -1;
+      if (l < 0) continue;
+      const y = (p / width) | 0;
+      const x = p - y * width;
+      const b = box[l] as { x0: number; x1: number; y0: number; y1: number };
+      if (x < b.x0) b.x0 = x;
+      if (x > b.x1) b.x1 = x;
+      if (y < b.y0) b.y0 = y;
+      if (y > b.y1) b.y1 = y;
+    }
+    // a small blob straddling two cells (no cell holds 85% of it) falls too; a big one is two bodies touching
+    const smallest = Math.min(...[...main.values()].map((m) => total[m] ?? 0));
+    for (let l = 0; l < count; l++) {
+      if (isMain.has(l) || ((dominant[l] ?? -1) === -1 && (total[l] ?? 0) > smallest / 4)) continue;
+      const b = box[l] as { x0: number; x1: number; y0: number; y1: number };
+      let best = -1;
+      let gap = Infinity;
+      for (const [cell, m] of main) {
+        const mb = box[m] as { x0: number; x1: number; y0: number; y1: number };
+        if (mb.x1 < b.x0 || mb.x0 > b.x1 || mb.y0 < b.y1 - 2) continue;
+        if (mb.y0 - b.y1 < gap) {
+          gap = mb.y0 - b.y1;
+          best = cell;
+        }
+      }
+      ownCell[l] = best;
+    }
+  }
   for (let p = 0; p < labels.length; p++) {
     const l = labels[p] ?? -1;
-    if (l < 0 || isMain.has(l) || dominant[l] === -1) continue;
+    if (l < 0 || isMain.has(l) || dominant[l] === -1 || (ownCell[l] ?? -1) >= 0) continue;
     const d = dist[p] ?? -1;
     if (d >= 0 && d < (closest[l] ?? Infinity)) {
       closest[l] = d;
@@ -540,7 +585,8 @@ export function cellOwners(mask: Uint8Array, width: number, height: number, cw: 
     const l = labels[p] ?? -1;
     if (l < 0) continue;
     const d = dominant[l] ?? -1;
-    if (d < 0) owner[p] = cellOf(p);
+    if ((ownCell[l] ?? -1) >= 0) owner[p] = ownCell[l] as number;
+    else if (d < 0) owner[p] = cellOf(p);
     else if (isMain.has(l)) owner[p] = d;
     else owner[p] = (attach[l] ?? -1) >= 0 ? (attach[l] as number) : d;
   }
@@ -553,7 +599,7 @@ export function cellOwners(mask: Uint8Array, width: number, height: number, cw: 
  * body they touch along the most pixels (far blobs join the nearest body). Soft edge pixels (below
  * half alpha) join the owner of the nearest solid pixel within three pixels; fainter specks are dropped.
  */
-export function layerOwners(layers: Rgba[], width: number, height: number, cw: number, ch: number): Int32Array {
+export function layerOwners(layers: Rgba[], width: number, height: number, cw: number, ch: number, fallBelow = false): Int32Array {
   const n = width * height;
   const solid = layers.map((l) => {
     const d = new Uint8Array(l.data);
@@ -562,7 +608,7 @@ export function layerOwners(layers: Rgba[], width: number, height: number, cw: n
   });
   const primary = new Uint8Array(n);
   for (let p = 0; p < n; p++) primary[p] = (solid[0]?.[p * 4 + 3] ?? 0) > 0 ? 1 : 0;
-  const owner = cellOwners(primary, width, height, cw, ch);
+  const owner = cellOwners(primary, width, height, cw, ch, fallBelow);
   if (layers.length > 1) {
     const { near, dist } = spread(owner, width, height);
     const rest = new Uint8Array(n);
@@ -937,7 +983,7 @@ export function derive(input: DeriveInput): DeriveOutput {
     });
     if (factor !== 1) throw new Error(`derive: ${ids.join(', ')} passes at factor ${factor}; painted sheets are expected to keep their resolution`);
     const cols = Math.round(first.png.width / cw);
-    const owner = layerOwners(sheets, first.png.width, first.png.height, cw, ch);
+    const owner = layerOwners(sheets, first.png.width, first.png.height, cw, ch, ids.some((id) => FALL_INTO_BODY_BELOW.includes(id)));
     const cuts = cutsFor(first.json, cw, ch);
     // the body's palette swaps come from the full-resolution body, so they share its cut
     const layers = [...sheets];
