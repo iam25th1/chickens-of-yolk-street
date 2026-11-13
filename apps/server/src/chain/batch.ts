@@ -104,12 +104,15 @@ export const featherToken = (n: number): string => String(n).padStart(3, '0');
 /** SHA-256 (hex) of a value's JSON. */
 export const digestOf = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
-/** Each farm's NEAR testnet account (its player's, or its agent's), where it has one. */
+/**
+ * Each farm's NEAR testnet account (its player's, or its open agent's), where it has one. A bust
+ * agent's wallet goes back to the pool for the next agent of any kind, so its farm holds none.
+ */
 async function farmAccountMap(db: Db): Promise<Map<string, string>> {
   const farmAccounts = new Map<string, string>();
   for (const r of await db.query(
     `SELECT f.id, COALESCE(p.near_account_id, a.near_account_id) AS account FROM farms f
-     LEFT JOIN players p ON p.id = f.player_id LEFT JOIN agents a ON a.farm_id = f.id`,
+     LEFT JOIN players p ON p.id = f.player_id LEFT JOIN agents a ON a.farm_id = f.id AND a.status = 'open'`,
   )) {
     if (r.account) farmAccounts.set(String(r.id), String(r.account));
   }

@@ -4,7 +4,8 @@
 // version 4 contract stores only a fixed-size head per season, so a settled day adds no storage
 // (measured on s1 before: 179 bytes a day, 480 days a real day, about 0.86 NEAR a real day; gas
 // is about 0.0004 NEAR a day either way). Agents get testnet sub-accounts of the game account
-// (funded from it) so their tokens have a home. Without testnet credentials, or before the
+// (funded from it, and kept in a pool: a bust agent's wallet goes to the next new agent of any
+// kind) so their tokens have a home. Without testnet credentials, or before the
 // contract is deployed, every day is built the same way and recorded as a loud no-op.
 //
 // Feathers are minted one at a time, at once, as tickets are redeemed (mintFeather: version 6's
@@ -23,7 +24,7 @@ import { createHmac } from 'node:crypto';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { Account, JsonRpcProvider, KeyPairSigner, baseEncode, nearToYocto, teraToGas } from 'near-api-js';
 import type { KeyPairString } from 'near-api-js';
-import { num, type Db } from '../db/db';
+import { num, type Db, type Queryable } from '../db/db';
 import { ECONOMY, type FeatherGrade, type MilestoneId } from '@coys/shared';
 import { buildDayBatch, buildLateSettlement, commitBatch, digestOf, featherToken, type FullSettlement, type MintedFeather } from './batch';
 import type { FeatherRenderer } from './feather-image';
@@ -190,18 +191,79 @@ export function agentPublicKey(gamePrivateKey: string, kind: string, generation:
 
 export const agentAccountName = (kind: string, generation: number, game: string): string => `${kind.replace(/[^a-z0-9]/g, '')}${generation}.${game}`;
 
+/** Every wallet the pool knows: those it recorded, and any an agent holds (linked before the pool). */
+const POOL = `SELECT account FROM agent_wallets UNION SELECT near_account_id AS account FROM agents WHERE near_account_id IS NOT NULL`;
+const IN_USE = `EXISTS (SELECT 1 FROM agents a WHERE a.near_account_id = w.account AND a.status = 'open')`;
+
 /**
- * The wallet a new agent takes over: the most recent bust agent of the same kind's, if any. A rival
- * that goes bust is replaced by a successor of its kind (often, in a lively market: on s1 about 30
- * times a real day at 3-minute days), and a fresh funded sub-account for each would cost about
- * 0.057 NEAR every time, so the successor carries on in its predecessor's wallet instead.
+ * A free wallet from the pool, or null: one whose agents are all bust (of any kind), or that no agent
+ * holds. Rivals go bust and AI farms come and go (on s1 a bust about 30 times a real day at 3-minute
+ * days), and a fresh funded sub-account for each would cost its funding every time, so a new agent
+ * always takes a free wallet before one is created. The same order every time: by account name.
  */
-export async function successorWallet(db: Db, kind: string): Promise<string | null> {
-  const [prev] = await db.query<{ near_account_id: string }>(
-    `SELECT near_account_id FROM agents WHERE kind = $1 AND status = 'bust' AND near_account_id IS NOT NULL ORDER BY generation DESC LIMIT 1`,
-    [kind],
+export async function freeWallet(q: Queryable): Promise<string | null> {
+  const [r] = await q.query<{ account: string }>(`SELECT w.account FROM (${POOL}) w WHERE NOT ${IN_USE} ORDER BY w.account LIMIT 1`);
+  return r?.account ?? null;
+}
+
+export interface WalletPool {
+  /** Wallets in the pool. */
+  poolSize: number;
+  free: number;
+  inUse: number;
+  /** Wallets the game created and funded. */
+  created: number;
+  /** NEAR sent to fund them (wallets made before the pool are not counted). */
+  nearSpent: number;
+}
+
+export async function walletPool(q: Queryable): Promise<WalletPool> {
+  const [r] = await q.query(
+    `SELECT (SELECT count(*) FROM (${POOL}) w) AS pool, (SELECT count(*) FROM (${POOL}) w WHERE ${IN_USE}) AS in_use,
+            (SELECT count(*) FROM agent_wallets WHERE funded_near > 0) AS created, (SELECT COALESCE(SUM(funded_near), 0) FROM agent_wallets) AS near`,
   );
-  return prev?.near_account_id ?? null;
+  const poolSize = num(r?.pool);
+  const inUse = num(r?.in_use);
+  return { poolSize, free: poolSize - inUse, inUse, created: num(r?.created), nearSpent: Math.round(num(r?.near) * 1e6) / 1e6 };
+}
+
+/**
+ * Makes a wallet for a new agent: creates and funds the named sub-account (keyed by the seed and
+ * generation), or links it if it already exists. Returns the NEAR sent (0 when only linked), or null
+ * when it cannot now (the game account is low, or the call failed); the agent then waits.
+ */
+export type WalletMaker = (w: { account: string; seed: string; generation: number }) => Promise<number | null>;
+
+/**
+ * Gives every open agent without a wallet one: a free pool wallet when there is one (never funding
+ * then), else a new one from `make`, recorded in agent_wallets with its funding. Each creation logs
+ * the pool's size and the NEAR spent so far.
+ */
+export async function assignAgentWallets(db: Db, gameAccount: string, make: WalletMaker, log: (line: string) => void, now: () => number = Date.now): Promise<void> {
+  const agents = await db.query(`SELECT id, name, kind, generation, entrant_key FROM agents WHERE status = 'open' AND near_account_id IS NULL ORDER BY opened_day, kind, generation`);
+  for (const a of agents) {
+    const free = await freeWallet(db);
+    if (free) {
+      await db.query('UPDATE agents SET near_account_id = $2 WHERE id = $1', [a.id, free]);
+      log(`[chain] ${String(a.name)} takes over the free pool wallet ${free}`);
+      continue;
+    }
+    // base agents keep the names (and keys) they always had: kind and generation; an entrant its registry key
+    const seed = String(a.entrant_key ?? a.kind);
+    const account = agentAccountName(seed, num(a.generation), gameAccount);
+    const funded = await make({ account, seed, generation: num(a.generation) });
+    if (funded === null) continue;
+    await db.query(
+      `INSERT INTO agent_wallets (account, key_seed, key_generation, funded_near, created_for, created_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (account) DO NOTHING`,
+      [account, seed, num(a.generation), funded, a.id, now()],
+    );
+    await db.query('UPDATE agents SET near_account_id = $2 WHERE id = $1', [a.id, account]);
+    const pool = await walletPool(db);
+    log(
+      `[chain] ${funded > 0 ? `created agent wallet ${account}, funded with ${funded} NEAR` : `linked existing agent wallet ${account}`} for ${String(a.name)}; ` +
+        `pool ${pool.poolSize} (${pool.inUse} in use, ${pool.free} free), ${pool.created} created, ${pool.nearSpent} NEAR spent`,
+    );
+  }
 }
 
 export class NoopChain implements ChainWriter {
@@ -339,49 +401,38 @@ export class TestnetChain implements ChainWriter {
   }
 
   /**
-   * Each open agent gets a funded sub-account of the game account. A wallet that already exists on
-   * chain only needs linking (its egg balances then take a little state); creating one also needs
-   * its funding. Both wait while the game account is under its margin.
+   * Each open agent gets a wallet: a free one from the pool, else a funded sub-account of the game
+   * account. A wallet that already exists on chain only needs linking (its egg balances then take a
+   * little state); creating one also needs its funding. Both wait while the game account is under
+   * its margin.
    */
   private async ensureAgentAccounts(db: Db): Promise<void> {
-    const agents = await db.query(`SELECT id, kind, generation FROM agents WHERE status = 'open' AND near_account_id IS NULL ORDER BY kind`);
-    if (!agents.length) return;
+    const [waiting] = await db.query(`SELECT count(*) AS n FROM agents WHERE status = 'open' AND near_account_id IS NULL`);
+    if (!num(waiting?.n)) return;
     if ((await this.balanceNear()) < this.cfg.minBalanceNear) {
-      this.log(`[chain] game account under its ${this.cfg.minBalanceNear} NEAR margin; ${agents.length} agent wallets wait to be linked`);
+      this.log(`[chain] game account under its ${this.cfg.minBalanceNear} NEAR margin; ${num(waiting?.n)} agent wallets wait to be linked`);
       return;
     }
     let lowSaid = false;
-    for (const a of agents) {
-      const inherited = await successorWallet(db, String(a.kind));
-      if (inherited) {
-        await db.query('UPDATE agents SET near_account_id = $2 WHERE id = $1', [a.id, inherited]);
-        this.log(`[chain] ${String(a.kind)} ${num(a.generation)} takes over its predecessor's wallet ${inherited}`);
-        continue;
-      }
-      const name = agentAccountName(String(a.kind), num(a.generation), this.cfg.accountId);
+    await assignAgentWallets(db, this.cfg.accountId, async ({ account, seed, generation }) => {
       try {
-        const exists = await new Account(name, this.provider).getState().then(
+        const exists = await new Account(account, this.provider).getState().then(
           () => true,
           () => false,
         );
-        if (!exists && (await this.balanceNear()) < this.cfg.minBalanceNear + this.cfg.agentFundingNear) {
+        if (exists) return 0;
+        if ((await this.balanceNear()) < this.cfg.minBalanceNear + this.cfg.agentFundingNear) {
           if (!lowSaid) this.log('[chain] game account balance is low; new agent sub-accounts wait');
           lowSaid = true;
-          continue;
+          return null;
         }
-        if (!exists) {
-          await this.account.createSubAccount({
-            accountOrPrefix: name,
-            publicKey: agentPublicKey(this.cfg.privateKey, String(a.kind), num(a.generation)),
-            nearToTransfer: nearToYocto(this.cfg.agentFundingNear),
-          });
-          this.log(`[chain] created agent wallet ${name}`);
-        }
-        await db.query('UPDATE agents SET near_account_id = $2 WHERE id = $1', [a.id, name]);
+        await this.account.createSubAccount({ accountOrPrefix: account, publicKey: agentPublicKey(this.cfg.privateKey, seed, generation), nearToTransfer: nearToYocto(this.cfg.agentFundingNear) });
+        return this.cfg.agentFundingNear;
       } catch (err) {
-        this.log(`[chain] could not create ${name}: ${err instanceof Error ? err.message : String(err)}`);
+        this.log(`[chain] could not create ${account}: ${err instanceof Error ? err.message : String(err)}`);
+        return null;
       }
-    }
+    }, this.log);
   }
 
   async settleDay(db: Db, season: string, day: number): Promise<SettleResult> {
