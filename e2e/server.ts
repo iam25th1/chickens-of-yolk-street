@@ -2,13 +2,15 @@
 // no-op), the local dev login, the built client (apps/client/dist), and a clock the test can move
 // forward to close days. Never touches NEAR: its Feather mints are a stand-in that answers after a
 // short wait (the next ones can be made to fail, as NEAR refusing them would). A named farm can be
-// given every machine, a handful of Feather tickets and a wallet, so every screen has content to page.
+// given every machine, a handful of Feather tickets and a wallet, so every screen has content to page,
+// and a badge, so its player sees the unlock moment.
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { InferenceBudget } from '../apps/server/src/agents/brain';
 import { createSessionSigner } from '../apps/server/src/auth/session';
 import { NoopChain, type ChainWriter, type MintResult } from '../apps/server/src/chain/chain';
 import { openDb } from '../apps/server/src/db/db';
+import { grantBadge } from '../apps/server/src/game/badges';
 import { Game } from '../apps/server/src/game/game';
 import { createGameServer } from '../apps/server/src/net/server';
 
@@ -37,6 +39,8 @@ export interface TestServer {
   failMints(n: number): void;
   /** Sets the condition (and broken flag) of the named farm's machines. */
   wear(name: string, machines: Record<string, { condition: number; broken?: boolean }>): Promise<void>;
+  /** Gives the named farm a badge at a level now: its player hears it at once (the unlock moment). */
+  badge(name: string, badge: string, level: 'bronze' | 'silver' | 'gold' | 'plain'): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -129,6 +133,11 @@ export async function startTestServer(): Promise<TestServer> {
       for (const [u, s] of Object.entries(machines)) {
         await db.query('UPDATE unlocks SET condition = $3, broken = $4 WHERE farm_id = $1 AND unlock_id = $2', [farm.id, u, s.condition, s.broken ?? false]);
       }
+    },
+    async badge(name, badge, level) {
+      const [farm] = await db.query<{ id: string }>('SELECT id FROM farms WHERE name LIKE $1 LIMIT 1', [`${name}%`]);
+      if (!farm) throw new Error(`no farm named ${name}`);
+      await game.withCtx((ctx) => grantBadge(ctx, farm.id, badge, level));
     },
     async close() {
       clearInterval(timer);
