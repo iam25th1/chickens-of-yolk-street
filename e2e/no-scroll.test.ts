@@ -9,6 +9,7 @@ import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Browser } from 'playwright-core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { overflowing } from './overflow';
 import { startTestServer, type TestServer } from './server';
 
 const ALL_SIZES: [number, number, number][] = [
@@ -30,81 +31,6 @@ const SIZES = process.env.E2E_SIZES ? ALL_SIZES.filter(([w, h]) => process.env.E
 /** The sizes whose screens are saved as screenshots (desktop and phone). */
 const SHOTS = new Set(['1280x720', '390x844']);
 const shotsDir = fileURLToPath(new URL('../docs/screenshots/', import.meta.url));
-
-/**
- * Run in the page: every element that scrolls (overflow auto or scroll, with more content than room),
- * every element that clips content (overflow hidden, or an ellipsis, with a piece of text, a button
- * or a picture reaching past its edge), and the page itself if it scrolls. A marquee ([data-marquee],
- * the price ticker) runs its text past on purpose and is left out.
- */
-function overflowing(): string[] {
-  const out: string[] = [];
-  const isContent = (e: Element): boolean => {
-    if (e.closest('[data-marquee]')) return false;
-    if (/^(BUTTON|INPUT|IMG|A)$/.test(e.tagName) || (e.tagName === 'CANVAS' && e.classList.contains('sprite'))) return true;
-    for (const n of e.childNodes) if (n.nodeType === 3 && (n.textContent ?? '').trim()) return true;
-    return false;
-  };
-  /** Where a content element really draws: its own box, or for text the text itself (a centred line is narrower than its box). */
-  const drawn = (e: Element): DOMRect => {
-    if (/^(BUTTON|INPUT|IMG|A|CANVAS)$/.test(e.tagName)) return e.getBoundingClientRect();
-    const range = document.createRange();
-    let rect: DOMRect | null = null;
-    for (const n of e.childNodes) {
-      if (n.nodeType !== 3 || !(n.textContent ?? '').trim()) continue;
-      range.selectNodeContents(n);
-      const r = range.getBoundingClientRect();
-      rect = rect ? new DOMRect(Math.min(rect.left, r.left), Math.min(rect.top, r.top), Math.max(rect.right, r.right) - Math.min(rect.left, r.left), Math.max(rect.bottom, r.bottom) - Math.min(rect.top, r.top)) : r;
-    }
-    return rect ?? e.getBoundingClientRect();
-  };
-  const shown = (e: Element): boolean => {
-    const cs = getComputedStyle(e);
-    return cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) > 0;
-  };
-  for (const el of document.querySelectorAll<HTMLElement>('body *')) {
-    if (el.tagName === 'CANVAS' || el.closest('[data-marquee]')) continue;
-    if (!shown(el)) continue;
-    const cs = getComputedStyle(el);
-    const sy = el.scrollHeight - el.clientHeight;
-    const sx = el.scrollWidth - el.clientWidth;
-    if (sy <= 1 && sx <= 1) continue;
-    const ov = `${cs.overflowX} ${cs.overflowY}`;
-    const name = (el.dataset.ui ?? el.dataset.tour ?? (String(el.className) || el.tagName)).slice(0, 32);
-    if (/auto|scroll/.test(ov)) {
-      out.push(`SCROLLS ${name}${sx > 1 ? ` x+${sx}` : ''}${sy > 1 ? ` y+${sy}` : ''} "${(el.textContent ?? '').trim().slice(0, 32)}"`);
-      continue;
-    }
-    if (!/hidden|clip/.test(ov) && cs.textOverflow !== 'ellipsis') continue;
-    // which content pokes out of this box
-    const box = el.getBoundingClientRect();
-    if (cs.textOverflow === 'ellipsis' && isContent(el)) {
-      out.push(`CUTS ${name} "${(el.textContent ?? '').trim().slice(0, 40)}"`);
-      continue;
-    }
-    for (const c of el.querySelectorAll('*')) {
-      if (!isContent(c) || !shown(c)) continue;
-      const r = drawn(c);
-      if (r.width === 0 || r.height === 0) continue;
-      if (r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1) {
-        out.push(`CLIPS ${name}: "${(c.textContent ?? c.tagName).trim().slice(0, 40)}" at ${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)} in ${Math.round(box.left)},${Math.round(box.top)} ${Math.round(box.width)}x${Math.round(box.height)}`);
-        break;
-      }
-    }
-  }
-  // nothing is cut by the window either
-  for (const c of document.querySelectorAll('body *')) {
-    if (!isContent(c) || !shown(c)) continue;
-    const r = drawn(c);
-    if (r.width === 0 || r.height === 0) continue;
-    if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) {
-      out.push(`OFF SCREEN "${(c.textContent ?? c.tagName).trim().slice(0, 40)}" at ${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`);
-    }
-  }
-  const d = document.scrollingElement;
-  if (d && (d.scrollHeight > innerHeight + 1 || d.scrollWidth > innerWidth + 1)) out.push(`PAGE SCROLLS x+${d.scrollWidth - innerWidth} y+${d.scrollHeight - innerHeight}`);
-  return out;
-}
 
 let server: TestServer;
 let browser: Browser;
@@ -203,13 +129,25 @@ describe('no scrollbars and nothing cut off', () => {
         await walk('settings');
         await open('help');
         await walk('guide', 80);
-        // the mint page and its tabs (the grid's pages are all alike: a few are enough)
+        // the Feather Mint: its sections' pages, and a few of the grid's (they are all alike)
         await open('feathers');
         await page.locator('[data-ui="mint-page"]').waitFor();
-        for (const label of ['YOUR TICKETS', 'ALL 777', 'ODDS', 'ABOUT']) {
-          await page.locator('[data-ui="mint-tabs"] button', { hasText: label }).first().click();
-          await page.waitForTimeout(500);
-          await walk(`mint page ${label.toLowerCase()}`, label === 'ALL 777' ? 3 : 12);
+        await page.waitForTimeout(500);
+        await check('mint');
+        for (const [part, max] of [
+          ['mint-info', 5],
+          ['mint-grid', 3],
+        ] as const) {
+          for (let i = 0; i < max; i++) {
+            const next = page.locator(`[data-ui="${part}"] [data-ui="page-next"]:not([disabled])`).first();
+            if (!(await next.count())) break;
+            await next.click();
+            await check(`mint ${part} page ${i + 2}`);
+          }
+        }
+        for (const label of ['NOT MINTED', 'GOLDEN QUILL']) {
+          await page.locator('[data-ui="mint-filters"] button', { hasText: label }).first().click();
+          await check(`mint filter ${label.toLowerCase()}`);
         }
         // the cards the farm's things open, and a waiting offer
         await page.keyboard.press('Escape');

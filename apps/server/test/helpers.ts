@@ -2,7 +2,8 @@ import { openDb, type Db } from '../src/db/db';
 import { InferenceBudget } from '../src/agents/brain';
 import type { NearAiClient } from '../src/ai/nearai';
 import { buildDayBatch, buildLateSettlement, commitBatch, digestOf, type DayBatch } from '../src/chain/batch';
-import { NoopChain, agentAccountName, seasonMayMint, type ChainWriter, type LateResult, type SettleResult } from '../src/chain/chain';
+import { NoopChain, agentAccountName, type ChainWriter, type LateResult, type MintRequest, type MintResult, type SettleResult } from '../src/chain/chain';
+import { tokenFor, type Collection } from '../src/chain/mint';
 import { Game } from '../src/game/game';
 import { seededRng } from '../src/game/rng';
 
@@ -15,8 +16,10 @@ export interface TestGame {
 
 /**
  * A chain writer that does everything the testnet writer does except sign: it names agent wallets
- * under the game account, builds each day's batch, keeps it, and commits the balances it implies,
- * returning a receipt id per (season, day).
+ * under the game account, builds each day's batch (which never mints: Feathers mint at once), keeps
+ * it, and commits the balances it implies, returning a receipt id per (season, day). Its mints keep
+ * the contract's rules (a token id once, the 777 for the live season, a test collection otherwise),
+ * and `script` makes the next mints refused by the RPC, waiting, or taken.
  */
 export class RecordingChain implements ChainWriter {
   readonly mode = 'near-testnet' as const;
@@ -32,21 +35,42 @@ export class RecordingChain implements ChainWriter {
   liveSeason: string | null | undefined = undefined;
   /** Days recorded late, in call order. */
   readonly late: LateResult[] = [];
+  /** Every mint asked for, in order, and the tokens the contract holds (token id: the request). */
+  readonly mints: MintRequest[] = [];
+  readonly tokens = new Map<string, MintRequest>();
+  /** What the next mints do instead of minting: refused by the RPC (after its retries), waiting, or a number taken. */
+  script: ('refuse' | 'wait' | 'taken')[] = [];
   constructor(
     readonly gameAccount = 'game.testnet',
-    /** Feathers minted per day (0: none). Minting uses a stand-in card image, not the packed art. */
+    /** Unused since Feathers mint at once; kept so older tests construct the same way. */
     readonly mintCap = 0,
   ) {}
+
+  async collectionFor(season: string): Promise<Collection> {
+    return this.liveSeason === undefined || this.liveSeason === season ? 'live' : 'test';
+  }
+
+  async mintFeather(req: MintRequest): Promise<MintResult> {
+    this.mints.push(req);
+    const none = { txHash: null, token: null, mediaSha256: null };
+    const next = this.script.shift();
+    if (next === 'refuse') return { status: 'failed', ...none, note: 'NEAR testnet refused the call, even after a few tries' };
+    if (next === 'wait') return { status: 'waiting', ...none, note: 'the game account is low on testnet NEAR' };
+    const collection = await this.collectionFor(req.season);
+    const token = tokenFor(collection, req.season, req.number);
+    if (next === 'taken' || this.tokens.has(token)) return { status: 'failed', ...none, taken: true, note: `Feather ${token} is taken on chain` };
+    this.tokens.set(token, req);
+    if (collection === 'live' && this.featherMinted !== null) this.featherMinted += 1;
+    return { status: 'sent', txHash: `minted-${token}`, token, mediaSha256: `stand-in-${req.grade}-${req.number}` };
+  }
 
   async settleDay(db: Db, season: string, day: number): Promise<SettleResult> {
     for (const a of await db.query('SELECT id, kind, generation FROM agents WHERE near_account_id IS NULL')) {
       await db.query('UPDATE agents SET near_account_id = $2 WHERE id = $1', [a.id, agentAccountName(String(a.kind), Number(a.generation), this.gameAccount)]);
     }
-    const renderer = this.mintCap
-      ? { render: (grade: string, n: number) => ({ dataUri: `data:image/png;base64,${grade}${n}`, sha256Base64: 'stand-in', sha256Hex: `stand-in-${grade}-${n}` }) }
-      : null;
-    const feathers = this.featherMinted === null ? null : { cap: seasonMayMint(this.liveSeason, season) ? this.mintCap : 0, base: this.featherMinted };
-    const built = await buildDayBatch(db, season, day, { feathers, renderer: renderer as never });
+    // as the testnet writer: a day's settlement never mints Feathers
+    const feathers = this.featherMinted === null ? null : { cap: 0, base: this.featherMinted };
+    const built = await buildDayBatch(db, season, day, { feathers, renderer: null });
     this.batches.push(built.batch);
     const txHash = `recorded-${season}-${day}`;
     await commitBatch(db, built, txHash);

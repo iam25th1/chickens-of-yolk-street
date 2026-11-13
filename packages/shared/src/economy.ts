@@ -243,8 +243,6 @@ export const ECONOMY = {
     eggsSold: 500,
     hagglesWon: 10,
     topRank: 3,
-    /** Feather mints in one day's settlement (keeps one settle_day call well inside its gas). */
-    mintsPerBatch: 20,
     /** Coins to redeem one ticket. */
     redeemFee: 25,
     /**

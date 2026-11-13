@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { ECONOMY, FEATHER_GRADES, MILESTONE_IDS, UNLOCK_IDS, type GameEvent } from '@coys/shared';
 import { MIGRATIONS } from '../src/db/migrations';
 import { featherCount, gradeFor, managementScore, rarityEstimates, reached, redeemTicket, rollFor, rollMilestones, standing } from '../src/game/feathers';
+import { drawFeatherNumber, featherSeed } from '../src/chain/mint';
 import { RecordingChain, makeGame, type TestGame } from './helpers';
 
 const F = ECONOMY.feathers;
@@ -220,7 +221,16 @@ describe('redemption', () => {
     expect(farm.cashMilli).toBe(cash - F.redeemFee * 1000);
     expect(await t.game.ledgerTotal(farmId)).toBe(farm.cashMilli);
     const view = farm.tickets.find((x) => x.id === id);
-    expect(view).toMatchObject({ status: 'queued', grade: farm.score.grade, number: null });
+    expect(view).toMatchObject({ status: 'queued', grade: farm.score.grade });
+    // its number is drawn at once, from the seed kept with the ticket
+    expect(view?.number).toBeGreaterThanOrEqual(1);
+    expect(view?.number).toBeLessThanOrEqual(777);
+    const [kept] = await t.db.query('SELECT number_seed, number_anchor, token_id FROM feather_tickets WHERE id = $1', [id]);
+    expect(kept?.number_seed).toBe(featherSeed(t.game.season, id, String(kept?.number_anchor)));
+    expect(kept?.token_id).toBe(String(view?.number).padStart(3, '0'));
+    // no chain here: the mint waits, the ticket is not lost
+    await t.game.mintsIdle();
+    expect((await t.game.getFarmState(farmId)).tickets.find((x) => x.id === id)?.mint).toEqual({ state: 'waiting', note: 'this server has no chain to mint on' });
 
     const twice = await t.game.act(playerId, { t: 'redeemTicket', rid: 'r2', ticketId: id });
     expect(twice).toMatchObject({ ok: false, code: 'invalid_action' });
@@ -239,53 +249,161 @@ describe('redemption', () => {
   });
 });
 
-describe('minting at the day close', () => {
-  it('mints queued Feathers in redemption order to the player wallet, numbered from the contract; nothing else mints', async () => {
-    const chain = new RecordingChain('game.testnet', F.mintsPerBatch);
-    const t = await makeGame({ cast: true, chain, season: 'fx', seed: 5 });
-    const { playerId, farmId } = await player(t);
+describe('minting at once', () => {
+  async function setup(chain: RecordingChain, season = 'fx') {
+    const t = await makeGame({ cast: true, chain, season, seed: 5 });
+    const ada = await player(t);
     const bo = await player(t, 'Bo');
-    await t.game.act(playerId, { t: 'linkWallet', rid: 'w1', accountId: 'ada.testnet' });
+    await t.game.act(ada.playerId, { t: 'linkWallet', rid: 'w1', accountId: 'ada.testnet' });
     for (const [f, ids] of [
-      [farmId, ['a1', 'a2']],
+      [ada.farmId, ['a1', 'a2']],
       [bo.farmId, ['b1']],
     ] as const) {
-      for (const id of ids) await t.db.query(`INSERT INTO feather_tickets (id, farm_id, milestone, season, day, created_at) VALUES ($1, $2, 'full-coop', 'fx', 1, 0)`, [id, f]);
+      for (const id of ids) await t.db.query(`INSERT INTO feather_tickets (id, farm_id, milestone, season, day, created_at) VALUES ($1, $2, 'full-coop', $3, 1, 0)`, [id, f, season]);
     }
-    chain.featherMinted = 40;
-    const sent: GameEvent[] = [];
+    const heard = new Map<string, GameEvent[]>();
     t.game.on((o) => {
-      if (o.playerId === playerId && o.msg.t === 'event') sent.push(o.msg.event);
+      if (o.playerId && o.msg.t === 'event') heard.set(o.playerId, [...(heard.get(o.playerId) ?? []), o.msg.event]);
     });
-    await t.game.act(playerId, { t: 'redeemTicket', rid: 'r1', ticketId: 'a2' });
-    await t.game.act(playerId, { t: 'redeemTicket', rid: 'r2', ticketId: 'a1' });
-    await t.game.act(bo.playerId, { t: 'redeemTicket', rid: 'r3', ticketId: 'b1' });
+    return { t, ada, bo, heard };
+  }
+
+  it('redeeming mints at once, game-paid, with a random number from a logged seed; sent then confirmed; nothing mints in a day settlement', async () => {
+    const chain = new RecordingChain('game.testnet');
+    const { t, ada, heard } = await setup(chain);
+    await t.game.act(ada.playerId, { t: 'redeemTicket', rid: 'r1', ticketId: 'a2' });
+    await t.game.act(ada.playerId, { t: 'redeemTicket', rid: 'r2', ticketId: 'a1' });
+    await t.game.mintsIdle();
+    // in redemption order, to the player's wallet, each with the number drawn for it
+    const rows = await t.db.query(`SELECT id, number, token_id, status, mint_tx, number_seed, number_anchor FROM feather_tickets WHERE farm_id = $1 ORDER BY redeemed_seq`, [ada.farmId]);
+    expect(rows.map((r) => [r.id, r.status])).toEqual([
+      ['a2', 'minted'],
+      ['a1', 'minted'],
+    ]);
+    expect(chain.mints.map((m) => [m.owner, m.season, m.number])).toEqual(rows.map((r) => ['ada.testnet', 'fx', Number(r.number)]));
+    for (const r of rows) {
+      const n = Number(r.number);
+      expect(r.token_id).toBe(String(n).padStart(3, '0'));
+      expect(r.mint_tx).toBe(`minted-${String(r.token_id)}`);
+      // anyone can replay the draw from the ticket, the season and the anchor transaction
+      expect(drawFeatherNumber(featherSeed('fx', String(r.id), String(r.number_anchor)), new Set(rows.filter((o) => o.id !== r.id && o.id === 'a2').map((o) => Number(o.number))))).toBe(n);
+      expect(t.logs.some((l) => l.includes(`ticket ${String(r.id)} drew Feather ${String(r.token_id)}`) && l.includes(`seed ${String(r.number_seed)}`))).toBe(true);
+    }
+    // random, not in mint order: the two numbers are not 1 and 2
+    expect(rows.map((r) => Number(r.number))).not.toEqual([1, 2]);
+    const kinds = (heard.get(ada.playerId) ?? []).map((e) => e.kind).filter((k) => k === 'ticketRedeemed' || k === 'mintSent' || k === 'featherMinted');
+    expect(kinds).toEqual(['ticketRedeemed', 'ticketRedeemed', 'mintSent', 'featherMinted', 'mintSent', 'featherMinted']);
+    const page = await t.game.getMintPage();
+    expect(page.slots.map((s) => s.number).sort((a, b) => a - b)).toEqual(rows.map((r) => Number(r.number)).sort((a, b) => a - b));
+    expect(page.minted).toBe(2);
+    // the day's settlement is unchanged and mints nothing
     t.clock.t = t.game.getClock().dayStartedAt + ECONOMY.day.lengthMs;
     await t.game.endDay();
-
-    const batch = chain.batches.at(-1);
-    // Bo has no wallet linked: his Feather waits; Ada's two mint in the order she redeemed them
-    expect(batch?.feather_mints?.map((m) => [m.owner_id, m.grade, m.milestone])).toEqual([
-      ['ada.testnet', expect.any(String), 'full-coop'],
-      ['ada.testnet', expect.any(String), 'full-coop'],
-    ]);
-    expect(batch?.hen_mints).toEqual([]);
-    const minted = await t.db.query(`SELECT id, number, token_id, status FROM feather_tickets WHERE status = 'minted' ORDER BY number`);
-    expect(minted.map((m) => [m.id, Number(m.number), m.token_id])).toEqual([
-      ['a2', 41, '041'],
-      ['a1', 42, '042'],
-    ]);
-    const [waiting] = await t.db.query(`SELECT status FROM feather_tickets WHERE id = 'b1'`);
-    expect(waiting?.status).toBe('queued');
-    expect(sent.filter((e) => e.kind === 'featherMinted').map((e) => (e.kind === 'featherMinted' ? e.number : 0))).toEqual([41, 42]);
-    const page = await t.game.getMintPage();
-    expect(page.slots.map((s) => [s.number, s.farm])).toEqual([
-      [41, 'Ada'],
-      [42, 'Ada'],
-    ]);
+    expect(chain.batches.at(-1)?.feather_mints).toEqual([]);
+    expect(chain.batches.at(-1)?.hen_mints).toEqual([]);
     await t.db.close();
   });
 
+  it('a player without a wallet waits; linking one mints it; a waiting chain is caught up at the day close', async () => {
+    const chain = new RecordingChain('game.testnet');
+    const { t, bo, heard } = await setup(chain);
+    await t.game.act(bo.playerId, { t: 'redeemTicket', rid: 'r3', ticketId: 'b1' });
+    await t.game.mintsIdle();
+    expect(chain.mints).toEqual([]);
+    expect((heard.get(bo.playerId) ?? []).find((e) => e.kind === 'mintWaiting')).toMatchObject({ ticketId: 'b1', note: expect.stringMatching(/link your NEAR wallet/) });
+    chain.script = ['wait'];
+    await t.game.act(bo.playerId, { t: 'linkWallet', rid: 'w2', accountId: 'bo.testnet' });
+    await t.game.mintsIdle();
+    expect(chain.mints).toHaveLength(1);
+    expect((await t.game.getFarmState(bo.farmId)).tickets[0]).toMatchObject({ status: 'queued', mint: { state: 'waiting', note: 'the game account is low on testnet NEAR' } });
+    t.clock.t = t.game.getClock().dayStartedAt + ECONOMY.day.lengthMs;
+    await t.game.endDay();
+    await t.game.mintsIdle();
+    expect((await t.game.getFarmState(bo.farmId)).tickets[0]).toMatchObject({ status: 'minted', owner: 'bo.testnet', mint: null });
+    await t.db.close();
+  });
+
+  it('a mint refused by the RPC after its retries holds the ticket again and refunds its fee; trying again draws the same number', async () => {
+    const chain = new RecordingChain('game.testnet');
+    const { t, ada, heard } = await setup(chain);
+    const cash = (await t.game.getFarmState(ada.farmId)).cashMilli;
+    chain.script = ['refuse'];
+    await t.game.act(ada.playerId, { t: 'redeemTicket', rid: 'r1', ticketId: 'a1' });
+    await t.game.mintsIdle();
+    const farm = await t.game.getFarmState(ada.farmId);
+    expect(farm.tickets.find((x) => x.id === 'a1')).toMatchObject({ status: 'held', grade: null, number: null, mint: null });
+    expect(farm.cashMilli).toBe(cash);
+    expect(await t.game.ledgerTotal(ada.farmId)).toBe(farm.cashMilli);
+    expect((heard.get(ada.playerId) ?? []).find((e) => e.kind === 'mintFailed')).toEqual({
+      kind: 'mintFailed',
+      ticketId: 'a1',
+      note: 'NEAR testnet refused the call, even after a few tries',
+      refundMilli: F.redeemFee * 1000,
+    });
+    const first = chain.mints[0]?.number;
+    await t.game.act(ada.playerId, { t: 'redeemTicket', rid: 'r2', ticketId: 'a1' });
+    await t.game.mintsIdle();
+    expect(chain.mints.map((m) => m.number)).toEqual([first, first]);
+    expect((await t.game.getFarmState(ada.farmId)).tickets.find((x) => x.id === 'a1')).toMatchObject({ status: 'minted', number: first });
+    await t.db.close();
+  });
+
+  it('a number the contract holds already is replaced by the next free one in the same seed stream', async () => {
+    const chain = new RecordingChain('game.testnet');
+    const { t, ada } = await setup(chain);
+    chain.script = ['taken'];
+    await t.game.act(ada.playerId, { t: 'redeemTicket', rid: 'r1', ticketId: 'a1' });
+    await t.game.mintsIdle();
+    const [a, b] = chain.mints.map((m) => m.number);
+    expect(a).not.toBe(b);
+    const [row] = await t.db.query(`SELECT number, number_seed, status FROM feather_tickets WHERE id = 'a1'`);
+    expect(row?.status).toBe('minted');
+    expect(Number(row?.number)).toBe(b);
+    expect(drawFeatherNumber(String(row?.number_seed), new Set([a ?? 0]))).toBe(b);
+    await t.db.close();
+  });
+
+  it('a test season mints into its own collection, never one of the 777', async () => {
+    const chain = new RecordingChain('game.testnet');
+    chain.liveSeason = 's1';
+    const { t, ada } = await setup(chain, 'verify-mint-1');
+    await t.game.act(ada.playerId, { t: 'redeemTicket', rid: 'r1', ticketId: 'a1' });
+    await t.game.mintsIdle();
+    const [row] = await t.db.query(`SELECT number, token_id, status FROM feather_tickets WHERE id = 'a1'`);
+    expect(row?.status).toBe('minted');
+    expect(row?.token_id).toBe(`test-verify-mint-1-${String(row?.number).padStart(3, '0')}`);
+    expect(chain.featherMinted).toBe(0);
+    const page = await t.game.getMintPage();
+    expect(page.minted).toBe(0);
+    expect(page.slots).toEqual([]);
+    await t.db.close();
+  });
+
+  it('draws: the same seed and taken set give the same number; numbers spread over 1 to 777; a taken number is skipped', () => {
+    const seed = featherSeed('s1', 'ticket-1', 'TxAnchor');
+    expect(seed).toBe(createHash('sha256').update('coys-mint|s1|ticket-1|TxAnchor').digest('hex'));
+    const n = drawFeatherNumber(seed, new Set());
+    expect(n).toBe(1 + (createHash('sha256').update(`${seed}|0`).digest().readUInt32BE(0) % 777));
+    expect(drawFeatherNumber(seed, new Set())).toBe(n);
+    expect(drawFeatherNumber(seed, new Set([n]))).not.toBe(n);
+    const counts = new Array<number>(778).fill(0);
+    for (let i = 0; i < 77_700; i++) {
+      const k = drawFeatherNumber(featherSeed('s1', `t${i}`, 'a'), new Set());
+      counts[k] = (counts[k] ?? 0) + 1;
+    }
+    const used = counts.slice(1);
+    expect(Math.min(...used)).toBeGreaterThan(50);
+    expect(Math.max(...used)).toBeLessThan(160);
+    // the last free number is always found
+    const all = new Set(Array.from({ length: 777 }, (_, i) => i + 1));
+    all.delete(500);
+    expect(drawFeatherNumber(seed, all)).toBe(500);
+    all.add(500);
+    expect(() => drawFeatherNumber(seed, all)).toThrow(/every Feather number is taken/);
+  });
+});
+
+describe('day settlements', () => {
   it('the batch carries the full settlement digest; the database keeps the settlement it hashes', async () => {
     const chain = new RecordingChain('game.testnet', 0);
     const t = await makeGame({ cast: true, chain, season: 'cs', seed: 7 });
@@ -367,25 +485,29 @@ describe('the mint page', () => {
         ];
       }
     }
-    const chain = new ChainWithTokens('game.testnet', F.mintsPerBatch);
+    const chain = new ChainWithTokens('game.testnet');
     chain.featherMinted = 2;
     const t = await makeGame({ cast: true, chain, season: 'mp' });
     const { playerId, farmId } = await player(t);
     await t.game.act(playerId, { t: 'linkWallet', rid: 'w1', accountId: 'ada.testnet' });
     await t.db.query(`INSERT INTO feather_tickets (id, farm_id, milestone, season, day, created_at) VALUES ('m1', $1, 'good-week', 'mp', 1, 0)`, [farmId]);
     await t.game.act(playerId, { t: 'redeemTicket', rid: 'r1', ticketId: 'm1' });
-    t.clock.t = t.game.getClock().dayStartedAt + ECONOMY.day.lengthMs;
-    await t.game.endDay();
+    await t.game.mintsIdle();
+    const [m1] = await t.db.query(`SELECT number FROM feather_tickets WHERE id = 'm1'`);
+    const n = Number(m1?.number);
     const page = await t.game.getMintPage();
-    expect(page.slots.map((s) => [s.number, s.farm])).toEqual([
-      [1, 'TEST SEASON VERIFY-FEATHERS-1'],
-      [2, 'TEST SEASON VERIFY-FEATHERS-1'],
-      [3, 'Ada'],
-    ]);
+    expect(page.slots.map((s) => [s.number, s.farm])).toEqual(
+      [
+        [1, 'TEST SEASON VERIFY-FEATHERS-1'],
+        [2, 'TEST SEASON VERIFY-FEATHERS-1'],
+        [n, 'Ada'],
+      ].sort((a, b) => Number(a[0]) - Number(b[0])),
+    );
     expect(page.minted).toBe(3);
     expect(page.left).toBe(774);
     expect(page.byGrade.fluff + page.byGrade.quill + page.byGrade.plume + page.byGrade['golden-quill']).toBe(3);
-    expect(page.recent.map((s) => s.number)).toEqual([3, 2, 1]);
+    // the most recent mint first, whatever its number
+    expect(page.recent.map((s) => s.number)).toEqual([n, 2, 1]);
     await t.db.close();
   });
 });

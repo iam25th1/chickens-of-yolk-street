@@ -32,7 +32,7 @@ export function layingWords(trait: number): string {
 }
 
 /** Every hen is an ordinary hen: hens are never minted. Feathers, won as tickets at milestones, are. */
-export const HEN_CHAIN_LINE = 'AN ORDINARY HEN: HENS ARE NEVER MINTED. FEATHERS ARE: WIN A TICKET AT A MILESTONE AND REDEEM IT ON THE MINT PAGE (BETA, NEAR TEST NETWORK).';
+export const HEN_CHAIN_LINE = 'AN ORDINARY HEN: HENS ARE NEVER MINTED. FEATHERS ARE: WIN A TICKET AT A MILESTONE AND MINT IT IN THE FEATHER MINT (BETA, NEAR TEST NETWORK).';
 
 export function HenPanel({ hen, onClose }: { hen: HenView; onClose: () => void }) {
   return (

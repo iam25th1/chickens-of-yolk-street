@@ -128,15 +128,17 @@ export function MarketBoard({
               onClick={onFeathers}
             >
               <span className="panel-title small" style={{ fontSize: 8, lineHeight: '8px', margin: 0 }}>
-                FEATHERS (BETA)
+                THE FEATHER MINT (BETA)
               </span>
               <span>
                 {market.feathers.left} OF {market.feathers.max} LEFT TO MINT
               </span>
               <span style={{ lineHeight: '10px', color: '#8b5a2b' }}>
-                {market.feathers.minted} MINTED ON NEAR TESTNET{market.feathers.tickets ? `, ${market.feathers.tickets} TICKET${market.feathers.tickets === 1 ? '' : 'S'} WAITING` : ''}. WON AT MILESTONES.
+                {market.feathers.minted} MINTED ON NEAR TESTNET{market.feathers.tickets ? `, ${market.feathers.tickets} TICKET${market.feathers.tickets === 1 ? '' : 'S'} WAITING` : ''}. TICKETS ARE WON AT MILESTONES.
               </span>
-              <span style={{ color: '#2f6f9e' }}>OPEN THE MINT PAGE</span>
+              <span style={{ color: '#2f6f9e' }} data-ui="board-mint-link">
+                OPEN THE MINT
+              </span>
             </button>,
           ]}
         />

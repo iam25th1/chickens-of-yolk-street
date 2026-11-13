@@ -14,7 +14,7 @@ import { TownScene } from '../pixi/TownScene';
 import { events, game } from '../state/game';
 import { useStore } from '../state/store';
 import { startTourFor, tour } from '../state/tour';
-import { closeModal, openModal, ui, type ModalState } from '../state/ui';
+import { OPEN_MINT_KEY, closeModal, openModal, ui, type ModalState } from '../state/ui';
 import { CardOverlay, type OverlayResult } from '../ui/CardOverlay';
 import { LOOK } from '../ui/cast';
 import { SidePanel } from '../ui/Desk';
@@ -27,12 +27,20 @@ import { HowToPlay, MILESTONE_TEXT } from '../ui/HowToPlay';
 import { Modal } from '../ui/Modal';
 import { SettingsBody, ShopPanel } from '../ui/Panels';
 import { Spotlight, TOUR, TourBox } from '../ui/Tour';
-import { GRADE_LABEL, MintPage, RevealPanel, type RevealState } from '../ui/Feathers';
+import { RevealPanel, type RevealState } from '../ui/Feathers';
+import { FeatherMint } from '../ui/FeatherMint';
+import { MintMoment } from '../ui/MintMoment';
 import { HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
 import { NameFarm } from '../ui/NameFarm';
 import { MACHINE_NAME } from '../pixi/farm/FarmScene';
 
 /** What clicking each thing on the farm opens. */
+/** Whether the minting moment is showing this ticket's mint. */
+function mintingNow(ticketId: string): boolean {
+  const m = ui.get().modal;
+  return m?.kind === 'minting' && m.ticketId === ticketId;
+}
+
 function modalFor(t: WorldTarget): ModalState {
   switch (t.kind) {
     case 'hen':
@@ -115,7 +123,12 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     openModal({ kind: 'name', mode: 'first' });
   }, [farmId, needsName]);
   useEffect(() => {
-    if (farmId && !needsName) startTourFor(farmId, tourDone);
+    if (!farmId || needsName) return;
+    // signed in from the open Feather Mint: a player past the tour goes back to the mint
+    const fromMint = sessionStorage.getItem(OPEN_MINT_KEY);
+    sessionStorage.removeItem(OPEN_MINT_KEY);
+    if (fromMint && tourDone) openModal({ kind: 'feathers' });
+    else startTourFor(farmId, tourDone);
     // the farm's first named state decides
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [farmId, needsName]);
@@ -207,6 +220,18 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     if (next) openModal({ kind: 'reveal', ...next });
   }, [modal, farm]);
 
+  /** Mints a held ticket: the minting moment opens at once and follows the mint's stages. */
+  const startMint = useCallback(
+    (ticketId: string) => {
+      openModal({ kind: 'minting', ticketId, attempt: Date.now() });
+      void send({ t: 'redeemTicket', ticketId }).then((ok) => {
+        // refused (the coins, say): the toast says why, and the mint page comes back
+        if (!ok) openModal({ kind: 'feathers' });
+      });
+    },
+    [send],
+  );
+
   const openCard = useCallback((card: CardView) => {
     setCardState({ card, result: null, mood: null });
     openModal({ kind: 'card', cardId: card.id });
@@ -254,19 +279,22 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
             }
             break;
           }
+          // a mint the minting moment is showing is its own; any other (a catch-up at a day close) gets the reveal
           case 'featherMinted':
-            reveals.current.push({ ticketId: e.ticketId, number: e.number, grade: e.grade, milestone: e.milestone, txHash: e.txHash, day: e.day });
+            if (!mintingNow(e.ticketId)) reveals.current.push({ ticketId: e.ticketId, number: e.number, grade: e.grade, milestone: e.milestone, txHash: e.txHash, day: e.day });
             break;
-          case 'ticketRedeemed':
-            audio.play('18-stamp', { volume: 0.6 });
-            uiFx.emit({ kind: 'toast', tone: 'good', text: `TICKET REDEEMED AS A ${GRADE_LABEL[e.grade]} FOR ${(e.feeMilli / 1000).toFixed(0)} COINS: ITS FEATHER MINTS AT THE NEXT DAY CLOSE.` });
+          case 'mintFailed':
+            if (!mintingNow(e.ticketId)) uiFx.emit({ kind: 'toast', tone: 'bad', text: `A FEATHER MINT DID NOT GO THROUGH: YOUR TICKET AND ${(e.refundMilli / 1000).toFixed(0)} COINS ARE BACK. MINT IT AGAIN FROM THE MINT.` });
+            break;
+          case 'mintWaiting':
+            if (!mintingNow(e.ticketId)) uiFx.emit({ kind: 'toast', text: `A FEATHER MINT WAITS: ${e.note.toUpperCase()}` });
             break;
           case 'milestoneRoll': {
             const what = MILESTONE_TEXT[e.milestone];
             const next = e.next ? ` NEXT: ${MILESTONE_TEXT[e.next]}.` : '';
             if (e.won) {
               audio.play('19-haggle-win', { volume: 0.7 });
-              uiFx.emit({ kind: 'toast', tone: 'good', text: `MILESTONE: ${what}! YOU WON A FEATHER TICKET. REDEEM IT ON THE MINT PAGE. ${e.left} OF ${ECONOMY.feathers.maxSupply} FEATHERS LEFT.` });
+              uiFx.emit({ kind: 'toast', tone: 'good', text: `MILESTONE: ${what}! YOU WON A FEATHER TICKET. MINT IT IN THE FEATHER MINT. ${e.left} OF ${ECONOMY.feathers.maxSupply} FEATHERS LEFT.` });
             } else {
               uiFx.emit({
                 kind: 'toast',
@@ -359,7 +387,19 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       {modal?.kind === 'reveal' && (
         <RevealPanel reveal={modal} market={market} onLedger={() => openModal({ kind: 'ledger' })} onMintPage={() => openModal({ kind: 'feathers' })} onClose={closeModal} />
       )}
-      {modal?.kind === 'feathers' && <MintPage farm={farm} market={market} send={send} onClose={closeModal} />}
+      {modal?.kind === 'feathers' && (
+        <FeatherMint farm={farm} market={market} onMint={startMint} onSignIn={null} onClose={closeModal} closeLabel="BACK TO THE FARM" />
+      )}
+      {modal?.kind === 'minting' && (
+        <MintMoment
+          key={`${modal.ticketId}-${modal.attempt}`}
+          ticketId={modal.ticketId}
+          explorer={market.explorer}
+          onRetry={startMint}
+          onLedger={() => openModal({ kind: 'ledger' })}
+          onClose={() => openModal({ kind: 'feathers' })}
+        />
+      )}
       {modal?.kind === 'market' && (
         <MarketBoard
           farm={farm}

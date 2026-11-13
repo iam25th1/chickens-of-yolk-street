@@ -6,20 +6,26 @@
 //!   its grade (fluff, plume, quill or golden-quill), the milestone it was won at, the season and
 //!   day, and a still image of its Feather card. Ordinary hens are never minted.
 //! - Eggs are NEP-245 multi-tokens (near-sdk-contract-tools), one token id per grade.
-//! - `settle_day` is the only way the game writes: once per in-game day of a season it mints, moves
-//!   and burns egg tokens and mints the day's Feathers. It stores only a fixed-size head per season
-//!   (the last day, its settlement digest and a running hash chain), so a settled day adds no
-//!   storage. The full settlement stays in the game's database; its SHA-256 is the day's digest.
+//! - `settle_day` is the game's day close: once per in-game day of a season it mints, moves and
+//!   burns egg tokens and may mint Feathers. It stores only a fixed-size head per season (the last
+//!   day, its settlement digest and a running hash chain), so a settled day adds no storage. The
+//!   full settlement stays in the game's database; its SHA-256 is the day's digest.
 //! - Version 2 kept a record per settled day. `prune_days` releases those records in order, folding
 //!   each into the season's archive hash, so the history stays verifiable from the database.
 //! - `commit_provenance` stores, once, the SHA-256 of founders.json: the 777 Founding Hens the
 //!   Feathers are planned to hatch into, generated before the first Feather is minted.
 //! - Version 5: only the live season (`set_live_season`) mints Feathers against the 777; a test
-//!   season's Feathers can be burnt (`burn_test_feathers`) and their numbers return to the supply,
-//!   reused smallest first. A day whose settlement failed is caught up later by its digest
-//!   (`settle_late_days`), folded into the season's late record, so no day stays unrecorded.
+//!   season's numbered Feathers can be burnt (`burn_test_feathers`) and their numbers are free
+//!   again. A day whose settlement failed is caught up later by its digest (`settle_late_days`),
+//!   folded into the season's late record, so no day stays unrecorded.
+//! - Version 6: a Feather's number (1 to 777) is drawn at random by the game server, from a seed it
+//!   logs so anyone can check the draw, and sent with the mint. `mint_feather` mints one at once, at
+//!   any time, not only in a day close. A day close may still carry Feathers: each takes its drawn
+//!   number, or else (an older caller) the smallest free one. A test season's Feathers go into their
+//!   own collection (token ids "test-{season}-{number}") that never counts toward the 777.
 //! - Only the owner (the game account) may write; holders use the standard `nft_*` and `mt_*`
-//!   methods for their own tokens. `migrate` upgrades a version 2 contract in place.
+//!   methods for their own tokens. `migrate` upgrades a version 5 contract in place, `migrate_v2`
+//!   a version 2 one.
 
 use std::collections::HashMap;
 
@@ -83,21 +89,21 @@ pub struct Contract {
     last_days: LookupMap<String, u32>,
     /// One fixed-size head per season: everything a settled day keeps on chain.
     heads: LookupMap<String, SeasonHead>,
-    /// Feathers minted so far (never more than FEATHER_MAX).
-    feathers_minted: u32,
+    /// Feathers of the live collection (token ids "001" to "777") that exist: never more than FEATHER_MAX.
+    live_count: u32,
     /// SHA-256 (hex) of founders.json, committed once.
     provenance: Option<String>,
-    /// Feather numbers returned to the supply by a burn, reused smallest first.
-    returned: Vec<u32>,
-    /// The only season whose day closes mint Feathers against the 777.
+    /// The only season that mints Feathers against the 777.
     live_season: Option<String>,
     /// Per season: days settled late (after a failed day close), by digest.
     late: LookupMap<String, LateRecord>,
+    /// Test Feathers (token ids "test-...") that exist. They never count toward the 777.
+    test_minted: u32,
 }
 
-/// Version 4 state, read once by `migrate`. Field order matches the version 4 struct.
+/// Version 5 state, read once by `migrate`. Field order matches the version 5 struct.
 #[near(serializers = [borsh])]
-struct ContractV4 {
+struct ContractV5 {
     feathers: NonFungibleToken,
     feather_metadata: LazyOption<NFTContractMetadata>,
     legacy_days: LookupMap<u32, DayRecord>,
@@ -106,6 +112,9 @@ struct ContractV4 {
     heads: LookupMap<String, SeasonHead>,
     feathers_minted: u32,
     provenance: Option<String>,
+    returned: Vec<u32>,
+    live_season: Option<String>,
+    late: LookupMap<String, LateRecord>,
 }
 
 /// Days of a season settled late, and sha256("{hash}|{season}|{day}|{digest}") over them in order of arrival.
@@ -207,7 +216,7 @@ pub struct EggMove {
     pub amount: U128,
 }
 
-/// A Feather to mint: the contract numbers it (#001 to #777, in mint order).
+/// A Feather to mint, with the number (#001 to #777) the game server drew for it.
 #[near(serializers = [json])]
 #[derive(Clone, Debug)]
 pub struct FeatherMint {
@@ -221,6 +230,10 @@ pub struct FeatherMint {
     /// A still image of its Feather card, as a data URI (stored with the token: it needs no host).
     pub media: String,
     pub media_hash: Base64VecU8,
+    /// The number the game server drew. `mint_feather` needs one; in a day close a Feather sent
+    /// without one (an older caller) takes the smallest free number.
+    #[serde(default)]
+    pub number: Option<u32>,
 }
 
 /// An ordinary hen, as older callers sent them. Never minted: a batch carrying one is refused.
@@ -318,6 +331,18 @@ pub fn feather_token_id(number: u32) -> TokenId {
     format!("{number:03}")
 }
 
+/// Test Feather token ids: "test-", the season, then the number, three digits. Never one of the 777.
+pub fn test_feather_token_id(season: &str, number: u32) -> TokenId {
+    format!("test-{season}-{number:03}")
+}
+
+/// The checks every Feather passes before it is minted.
+fn check_feather(f: &FeatherMint) {
+    require!(FEATHER_GRADES.contains(&f.grade.as_str()), "grade must be fluff, plume, quill or golden-quill");
+    require!(season_ok(&f.season), "season must be 1 to 32 characters of a-z, 0-9 and -");
+    require!(!f.milestone.is_empty() && f.milestone.len() <= 32, "milestone must be 1 to 32 characters");
+}
+
 fn grade_label(grade: &str) -> &'static str {
     match grade {
         "fluff" => "Fluff",
@@ -344,11 +369,11 @@ impl Contract {
             days: LookupMap::new(StorageKey::SeasonDays),
             last_days: LookupMap::new(StorageKey::SeasonLastDay),
             heads: LookupMap::new(StorageKey::SeasonHeads),
-            feathers_minted: 0,
+            live_count: 0,
             provenance: None,
-            returned: Vec::new(),
             live_season: None,
             late: LookupMap::new(StorageKey::LateDays),
+            test_minted: 0,
         };
         Owner::init(&mut contract, &owner_id);
         for grade in EGG_GRADES {
@@ -357,13 +382,13 @@ impl Contract {
         contract
     }
 
-    /// Upgrades version 4 state in place after the new code is deployed: every token, balance,
-    /// head and the provenance stay; no Feather number has been returned yet and no season mints
-    /// until `set_live_season`.
+    /// Upgrades version 5 state in place after the new code is deployed: every token, balance,
+    /// head, late record, the provenance and the live season stay. The live count is the numbered
+    /// Feathers that exist (minted less those burnt); the test collection starts empty.
     #[private]
     #[init(ignore_state)]
     pub fn migrate() -> Self {
-        let old: ContractV4 = env::state_read().unwrap_or_else(|| env::panic_str("no version 4 state to migrate"));
+        let old: ContractV5 = env::state_read().unwrap_or_else(|| env::panic_str("no version 5 state to migrate"));
         Self {
             feathers: old.feathers,
             feather_metadata: old.feather_metadata,
@@ -371,16 +396,16 @@ impl Contract {
             days: old.days,
             last_days: old.last_days,
             heads: old.heads,
-            feathers_minted: old.feathers_minted,
+            live_count: old.feathers_minted.saturating_sub(old.returned.len() as u32),
             provenance: old.provenance,
-            returned: Vec::new(),
-            live_season: None,
-            late: LookupMap::new(StorageKey::LateDays),
+            live_season: old.live_season,
+            late: old.late,
+            test_minted: 0,
         }
     }
 
-    /// Upgrades version 2 state in place (a contract that skipped version 4): egg balances, days and
-    /// the owner stay; the token collection becomes the Feathers (version 2 left it empty).
+    /// Upgrades version 2 state in place (a contract that skipped versions 4 and 5): egg balances,
+    /// days and the owner stay; the token collection becomes the Feathers (version 2 left it empty).
     #[private]
     #[init(ignore_state)]
     pub fn migrate_v2() -> Self {
@@ -392,18 +417,19 @@ impl Contract {
             days: old.days,
             last_days: old.last_days,
             heads: LookupMap::new(StorageKey::SeasonHeads),
-            feathers_minted: 0,
+            live_count: 0,
             provenance: None,
-            returned: Vec::new(),
             live_season: None,
             late: LookupMap::new(StorageKey::LateDays),
+            test_minted: 0,
         };
         require!(c.feathers.owner_by_id.len() == 0, "version 2 still holds hen tokens");
         c.feather_metadata.set(&feather_metadata());
         c
     }
 
-    /// The season whose day closes mint Feathers against the 777 (every other season's are refused). Owner only.
+    /// The season that mints Feathers against the 777. Every other season's `mint_feather` mints a
+    /// test Feather; its day closes mint none. Owner only.
     pub fn set_live_season(&mut self, season: String) -> String {
         Self::require_owner();
         require!(season_ok(&season), "season must be 1 to 32 characters of a-z, 0-9 and -");
@@ -411,8 +437,21 @@ impl Contract {
         season
     }
 
-    /// Burns Feathers a test season minted and returns their numbers to the supply (reused, smallest
-    /// first). Owner only; a Feather of the live season can never be burnt here.
+    /// Mints one Feather now, with the number the game server drew for it (1 to 777). Owner only;
+    /// at any time, not only in a day close. A Feather of the live season is one of the 777 (token
+    /// id "NNN"); any other season's is a test Feather in its own collection ("test-{season}-NNN")
+    /// that never counts toward them.
+    pub fn mint_feather(&mut self, mint: FeatherMint) -> TokenId {
+        Self::require_owner();
+        let number = mint.number.unwrap_or_else(|| env::panic_str("a Feather number is needed"));
+        check_feather(&mint);
+        let live = self.live_season.as_deref() == Some(mint.season.as_str());
+        self.mint_numbered(&mint, number, live)
+    }
+
+    /// Burns test Feathers: a test collection one ("test-..."), or a numbered one of a season that
+    /// is not live (as a test season minted before version 6), whose number is then free again.
+    /// Owner only; a Feather of the live season can never be burnt here.
     pub fn burn_test_feathers(&mut self, token_ids: Vec<TokenId>) -> FeatherSupply {
         Self::require_owner();
         let live = self.live_season.clone().unwrap_or_else(|| env::panic_str("set the live season first"));
@@ -441,12 +480,13 @@ impl Contract {
             if let Some(a) = self.feathers.approvals_by_id.as_mut() {
                 a.remove(id);
             }
-            if !self.returned.contains(&number) {
-                self.returned.push(number);
+            if id.starts_with("test-") {
+                self.test_minted = self.test_minted.saturating_sub(1);
+            } else {
+                self.live_count = self.live_count.saturating_sub(1);
             }
             NftBurn { owner_id: &owner, token_ids: &[id.as_str()], authorized_id: None, memo: Some(&season) }.emit();
         }
-        self.returned.sort_unstable();
         self.feather_supply()
     }
 
@@ -467,7 +507,7 @@ impl Contract {
         self.late.insert(season.clone(), rec.clone());
         env::log_str(&format!(
             "EVENT_JSON:{}",
-            near_sdk::serde_json::json!({ "standard": "coys", "version": "5.0.0", "event": "days_settled_late",
+            near_sdk::serde_json::json!({ "standard": "coys", "version": "6.0.0", "event": "days_settled_late",
                 "data": [{ "season": season, "days": days.iter().map(|d| near_sdk::serde_json::json!({ "day": d.day, "digest": d.digest })).collect::<Vec<_>>(), "hash": rec.hash }] })
         ));
         rec
@@ -486,14 +526,14 @@ impl Contract {
         self.provenance = Some(sha256.clone());
         env::log_str(&format!(
             "EVENT_JSON:{}",
-            near_sdk::serde_json::json!({ "standard": "coys", "version": "5.0.0", "event": "provenance", "data": [{ "sha256": sha256 }] })
+            near_sdk::serde_json::json!({ "standard": "coys", "version": "6.0.0", "event": "provenance", "data": [{ "sha256": sha256 }] })
         ));
         sha256
     }
 
     /// How many Feathers exist, of 777, how many are left, and the provenance hash.
     pub fn feather_supply(&self) -> FeatherSupply {
-        let minted = self.feathers_minted - self.returned.len() as u32;
+        let minted = self.live_count;
         FeatherSupply { minted, max: FEATHER_MAX, remaining: FEATHER_MAX - minted, provenance: self.provenance.clone(), live_season: self.live_season.clone() }
     }
 
@@ -562,57 +602,27 @@ impl Contract {
             }
         }
 
-        let room = FEATHER_MAX - (self.feathers_minted - self.returned.len() as u32);
+        let room = FEATHER_MAX - self.live_count;
         require!(batch.feather_mints.len() as u64 <= u64::from(room), "the Feathers are all minted: 777 is the limit");
         if !batch.feather_mints.is_empty() {
             require!(self.live_season.as_deref() == Some(batch.season.as_str()), "only the live season mints Feathers");
         }
         let mut feathers: Vec<TokenId> = Vec::with_capacity(batch.feather_mints.len());
+        // every number below this one is held (nothing is burnt in a day close), so each search goes on from the last
+        let mut free_from: u32 = 1;
         for f in &batch.feather_mints {
-            require!(FEATHER_GRADES.contains(&f.grade.as_str()), "grade must be fluff, plume, quill or golden-quill");
-            require!(season_ok(&f.season), "season must be 1 to 32 characters of a-z, 0-9 and -");
-            require!(!f.milestone.is_empty() && f.milestone.len() <= 32, "milestone must be 1 to 32 characters");
+            check_feather(f);
             require!(f.season == batch.season, "a Feather belongs to the season that mints it");
-            // a returned number first (smallest), then the next new one
-            let number = if self.returned.is_empty() {
-                self.feathers_minted += 1;
-                self.feathers_minted
-            } else {
-                self.returned.remove(0)
+            // the number the server drew, or else (an older caller) the smallest free one
+            let number = match f.number {
+                Some(n) => n,
+                None => {
+                    let n = self.smallest_free_number(free_from);
+                    free_from = n + 1;
+                    n
+                }
             };
-            let token_id = feather_token_id(number);
-            let extra = near_sdk::serde_json::json!({
-                "number": number, "of": FEATHER_MAX, "grade": f.grade, "milestone": f.milestone, "season": f.season, "day": f.day,
-                "provenance": self.provenance,
-            });
-            // the contract pays storage from its own balance: no deposit asked of the caller
-            self.feathers.internal_mint_with_refund(
-                token_id.clone(),
-                f.owner_id.clone(),
-                Some(TokenMetadata {
-                    title: Some(format!("Feather #{token_id} of {FEATHER_MAX}: {}", grade_label(&f.grade))),
-                    description: Some(format!(
-                        "A Yolk Street Feather (beta), grade {}, won at the milestone {} on day {} of season {}. A claim ticket planned to hatch into a Founding Hen at mainnet launch.",
-                        grade_label(&f.grade),
-                        f.milestone,
-                        f.day,
-                        f.season
-                    )),
-                    media: Some(f.media.clone()),
-                    media_hash: Some(f.media_hash.clone()),
-                    copies: Some(1),
-                    issued_at: Some(env::block_timestamp_ms().to_string()),
-                    expires_at: None,
-                    starts_at: None,
-                    updated_at: None,
-                    extra: Some(extra.to_string()),
-                    reference: None,
-                    reference_hash: None,
-                }),
-                None,
-            );
-            NftMint { owner_id: &f.owner_id, token_ids: &[token_id.as_str()], memo: Some(&f.grade) }.emit();
-            feathers.push(token_id);
+            feathers.push(self.mint_numbered(f, number, true));
         }
 
         head.chain = sha256_hex(&format!("{}|{}|{}|{}", head.chain, batch.season, batch.day, batch.digest));
@@ -624,15 +634,90 @@ impl Contract {
             "EVENT_JSON:{}",
             near_sdk::serde_json::json!({
                 "standard": "coys",
-                "version": "5.0.0",
+                "version": "6.0.0",
                 "event": "day_settled",
                 "data": [{ "season": batch.season, "day": batch.day, "digest": batch.digest, "chain": head.chain,
                            "supply": batch.supply, "multiplier_milli": batch.multiplier_milli, "farms": batch.farms.len(),
                            "eggs_minted": U128(minted), "eggs_burned": U128(burned), "egg_transfers": transfers,
-                           "feathers": feathers, "feathers_total": self.feathers_minted - self.returned.len() as u32 }],
+                           "feathers": feathers, "feathers_total": self.live_count }],
             })
         ));
         DaySettled { season: batch.season, day: batch.day, chain: head.chain, feathers, eggs_minted: U128(minted), eggs_burned: U128(burned), egg_transfers: transfers }
+    }
+
+    /// The smallest Feather number, from `from` on, that no Feather of the 777 holds.
+    fn smallest_free_number(&self, from: u32) -> u32 {
+        (from..=FEATHER_MAX)
+            .find(|n| !self.feathers.owner_by_id.contains_key(&feather_token_id(*n)))
+            .unwrap_or_else(|| env::panic_str("the Feathers are all minted: 777 is the limit"))
+    }
+
+    /// Mints a checked Feather under its number: one of the 777 if `live`, else a test Feather in
+    /// the test collection, which never counts toward them.
+    fn mint_numbered(&mut self, f: &FeatherMint, number: u32, live: bool) -> TokenId {
+        require!(number >= 1 && number <= FEATHER_MAX, "a Feather number is 1 to 777");
+        let token_id = if live {
+            require!(self.live_count < FEATHER_MAX, "the Feathers are all minted: 777 is the limit");
+            feather_token_id(number)
+        } else {
+            test_feather_token_id(&f.season, number)
+        };
+        require!(!self.feathers.owner_by_id.contains_key(&token_id), "that Feather number is taken");
+        if live {
+            self.live_count += 1;
+        } else {
+            self.test_minted += 1;
+        }
+        let mut extra = near_sdk::serde_json::json!({
+            "number": number, "of": FEATHER_MAX, "grade": f.grade, "milestone": f.milestone, "season": f.season, "day": f.day,
+            "provenance": self.provenance,
+        });
+        let (title, description) = if live {
+            (
+                format!("Feather #{token_id} of {FEATHER_MAX}: {}", grade_label(&f.grade)),
+                format!(
+                    "A Yolk Street Feather (beta), grade {}, won at the milestone {} on day {} of season {}. A claim ticket planned to hatch into a Founding Hen at mainnet launch.",
+                    grade_label(&f.grade),
+                    f.milestone,
+                    f.day,
+                    f.season
+                ),
+            )
+        } else {
+            extra["test"] = near_sdk::serde_json::json!(true);
+            (
+                format!("Test Feather #{number:03} (season {}): {}", f.season, grade_label(&f.grade)),
+                format!(
+                    "A test Feather of Yolk Street, grade {}, won at the milestone {} on day {} of the test season {}. Not one of the 777: it is no claim ticket.",
+                    grade_label(&f.grade),
+                    f.milestone,
+                    f.day,
+                    f.season
+                ),
+            )
+        };
+        // the contract pays storage from its own balance: no deposit asked of the caller
+        self.feathers.internal_mint_with_refund(
+            token_id.clone(),
+            f.owner_id.clone(),
+            Some(TokenMetadata {
+                title: Some(title),
+                description: Some(description),
+                media: Some(f.media.clone()),
+                media_hash: Some(f.media_hash.clone()),
+                copies: Some(1),
+                issued_at: Some(env::block_timestamp_ms().to_string()),
+                expires_at: None,
+                starts_at: None,
+                updated_at: None,
+                extra: Some(extra.to_string()),
+                reference: None,
+                reference_hash: None,
+            }),
+            None,
+        );
+        NftMint { owner_id: &f.owner_id, token_ids: &[token_id.as_str()], memo: Some(&f.grade) }.emit();
+        token_id
     }
 
     /// Releases version 2's day records for a season, oldest first, up to `through` and at most
@@ -770,6 +855,7 @@ mod tests {
             day: 4,
             media: "data:image/png;base64,AAAA".to_string(),
             media_hash: Base64VecU8(vec![1, 2, 3]),
+            number: None,
         }
     }
 
@@ -1022,7 +1108,7 @@ mod tests {
         ctx(accounts(0));
         let mut c = Contract::new(accounts(0));
         c.set_live_season("s1".into());
-        c.feathers_minted = 770;
+        c.live_count = 770;
         let mut b = batch(1);
         b.feather_mints = (0..8).map(|_| feather(accounts(1), "plume")).collect();
         c.settle_day(b);
@@ -1134,8 +1220,20 @@ mod tests {
         c.settle_day(b);
     }
 
+    /// A Feather with the number the game server drew for it.
+    fn drawn(owner: AccountId, grade: &str, season: &str, number: u32) -> FeatherMint {
+        let mut f = feather_in(owner, grade, season);
+        f.number = Some(number);
+        f
+    }
+
+    fn extra_of(c: &Contract, token_id: &str) -> near_sdk::serde_json::Value {
+        let extra = c.nft_token(token_id.into()).and_then(|t| t.metadata).and_then(|m| m.extra).unwrap_or_default();
+        near_sdk::serde_json::from_str(&extra).unwrap_or_default()
+    }
+
     #[test]
-    fn test_feathers_burn_and_their_numbers_return_smallest_first() {
+    fn numbered_test_feathers_burn_and_their_numbers_are_free_again() {
         ctx(accounts(0));
         let mut c = Contract::new(accounts(0));
         // as on testnet: three Feathers from a test season (before the gate existed), then the live season
@@ -1148,9 +1246,7 @@ mod tests {
         ];
         c.settle_day(b);
         c.set_live_season("s1".into());
-        let mut s1 = batch_in("s1", 1);
-        s1.feather_mints = vec![feather(accounts(1), "plume")];
-        assert_eq!(c.settle_day(s1).feathers, vec!["004".to_string()]);
+        assert_eq!(c.mint_feather(drawn(accounts(1), "plume", "s1", 4)), "004");
         assert_eq!(c.feather_supply().minted, 4);
         // the live season's own Feather is never burnt
         let live = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -1164,11 +1260,137 @@ mod tests {
         assert!(c.nft_token("001".into()).is_none());
         assert_eq!(c.nft_supply_for_owner(accounts(0)), U128(0));
         assert_eq!(c.nft_total_supply(), U128(1));
-        // the next Feathers take the returned numbers, smallest first, then new ones
+        // a day close without numbers takes the smallest free ones
         let mut s2 = batch_in("s1", 2);
         s2.feather_mints = (0..4).map(|_| feather(accounts(1), "fluff")).collect();
         assert_eq!(c.settle_day(s2).feathers, vec!["001", "002", "003", "005"].into_iter().map(String::from).collect::<Vec<_>>());
         assert_eq!(c.feather_supply().minted, 5);
+    }
+
+    #[test]
+    fn mint_feather_takes_the_number_the_server_drew() {
+        ctx(accounts(0));
+        let mut c = Contract::new(accounts(0));
+        c.set_live_season("s1".into());
+        assert_eq!(c.mint_feather(drawn(accounts(1), "plume", "s1", 500)), "500");
+        assert_eq!(c.mint_feather(drawn(accounts(1), "golden-quill", "s1", 7)), "007");
+        let token = c.nft_token("500".into()).and_then(|t| t.metadata).unwrap_or_else(|| panic!("no metadata"));
+        assert_eq!(token.title.as_deref(), Some("Feather #500 of 777: Plume"));
+        let extra = extra_of(&c, "500");
+        assert_eq!((extra["number"].clone(), extra["of"].clone(), extra["season"].clone()), (500.into(), 777.into(), "s1".into()));
+        assert!(extra["test"].is_null());
+        assert_eq!(c.feather_supply(), FeatherSupply { minted: 2, max: 777, remaining: 775, provenance: None, live_season: Some("s1".into()) });
+        assert_eq!(c.nft_supply_for_owner(accounts(1)), U128(2));
+        // a day close: a Feather without a number takes the smallest free one, a drawn one its own
+        let mut b = batch(1);
+        b.feather_mints = vec![feather(accounts(1), "fluff"), drawn(accounts(1), "fluff", "s1", 3), feather(accounts(1), "fluff"), feather(accounts(1), "fluff")];
+        assert_eq!(c.settle_day(b).feathers, vec!["001", "003", "002", "004"].into_iter().map(String::from).collect::<Vec<_>>());
+        assert_eq!(c.feather_supply().minted, 6);
+    }
+
+    #[test]
+    #[should_panic(expected = "that Feather number is taken")]
+    fn a_drawn_number_is_minted_once() {
+        ctx(accounts(0));
+        let mut c = Contract::new(accounts(0));
+        c.set_live_season("s1".into());
+        c.mint_feather(drawn(accounts(1), "plume", "s1", 500));
+        c.mint_feather(drawn(accounts(2), "quill", "s1", 500));
+    }
+
+    #[test]
+    #[should_panic(expected = "that Feather number is taken")]
+    fn a_day_close_cannot_take_a_held_number() {
+        ctx(accounts(0));
+        let mut c = Contract::new(accounts(0));
+        c.set_live_season("s1".into());
+        c.mint_feather(drawn(accounts(1), "plume", "s1", 7));
+        let mut b = batch(1);
+        b.feather_mints = vec![drawn(accounts(1), "fluff", "s1", 7)];
+        c.settle_day(b);
+    }
+
+    #[test]
+    #[should_panic(expected = "a Feather number is needed")]
+    fn mint_feather_needs_a_number() {
+        ctx(accounts(0));
+        let mut c = Contract::new(accounts(0));
+        c.set_live_season("s1".into());
+        c.mint_feather(feather(accounts(1), "fluff"));
+    }
+
+    #[test]
+    #[should_panic(expected = "a Feather number is 1 to 777")]
+    fn a_feather_number_is_1_to_777() {
+        ctx(accounts(0));
+        let mut c = Contract::new(accounts(0));
+        c.set_live_season("s1".into());
+        let zero = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            ctx(accounts(0));
+            c.mint_feather(drawn(accounts(1), "fluff", "s1", 0));
+        }));
+        assert!(zero.is_err());
+        ctx(accounts(0));
+        c.mint_feather(drawn(accounts(1), "fluff", "s1", 778));
+    }
+
+    #[test]
+    #[should_panic(expected = "777 is the limit")]
+    fn mint_feather_stops_at_777() {
+        ctx(accounts(0));
+        let mut c = Contract::new(accounts(0));
+        c.set_live_season("s1".into());
+        c.live_count = 777;
+        c.mint_feather(drawn(accounts(1), "fluff", "s1", 1));
+    }
+
+    #[test]
+    fn a_test_season_mints_its_own_collection_outside_the_777() {
+        ctx(accounts(0));
+        let mut c = Contract::new(accounts(0));
+        c.set_live_season("s1".into());
+        let id = c.mint_feather(drawn(accounts(1), "fluff", "verify-x", 7));
+        assert_eq!(id, "test-verify-x-007");
+        assert!(id.starts_with("test-"));
+        assert_eq!(c.feather_supply().minted, 0);
+        assert_eq!(c.test_minted, 1);
+        let token = c.nft_token(id.clone()).and_then(|t| t.metadata).unwrap_or_else(|| panic!("no metadata"));
+        assert_eq!(token.title.as_deref(), Some("Test Feather #007 (season verify-x): Fluff"));
+        let extra = extra_of(&c, &id);
+        assert_eq!((extra["test"].clone(), extra["number"].clone(), extra["season"].clone()), (true.into(), 7.into(), "verify-x".into()));
+        // the same number stays free in the live season and in another test season
+        assert_eq!(c.mint_feather(drawn(accounts(1), "plume", "s1", 7)), "007");
+        assert_eq!(c.mint_feather(drawn(accounts(1), "plume", "verify-y", 7)), "test-verify-y-007");
+        assert_eq!((c.feather_supply().minted, c.test_minted), (1, 2));
+        // within its own test season a number is taken once
+        let again = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            ctx(accounts(0));
+            c.mint_feather(drawn(accounts(1), "fluff", "verify-x", 7));
+        }));
+        assert!(again.is_err());
+        // burnt, the test Feathers leave the 777 as they were
+        ctx(accounts(0));
+        let supply = c.burn_test_feathers(vec!["test-verify-x-007".into(), "test-verify-y-007".into()]);
+        assert_eq!((supply.minted, supply.remaining), (1, 776));
+        assert_eq!(c.test_minted, 0);
+        assert_eq!(c.nft_total_supply(), U128(1));
+    }
+
+    #[test]
+    #[should_panic(expected = "Owner only")]
+    fn others_cannot_mint_a_feather() {
+        ctx(accounts(0));
+        let mut c = Contract::new(accounts(0));
+        c.set_live_season("s1".into());
+        ctx(accounts(4));
+        c.mint_feather(drawn(accounts(4), "golden-quill", "s1", 1));
+    }
+
+    #[test]
+    fn an_older_callers_feather_has_no_number() {
+        let json = r#"{"owner_id":"bob.near","grade":"fluff","milestone":"full-coop","season":"s1","day":4,"media":"data:image/png;base64,AAAA","media_hash":"AQID"}"#;
+        let f: FeatherMint = near_sdk::serde_json::from_str(json).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(f.number, None);
     }
 
     #[test]
@@ -1207,7 +1429,7 @@ mod tests {
     }
 
     #[test]
-    fn migrate_upgrades_version_4_in_place() {
+    fn migrate_upgrades_version_5_in_place() {
         ctx(accounts(0));
         let mut heads = LookupMap::new(StorageKey::SeasonHeads);
         heads.insert(
@@ -1215,7 +1437,10 @@ mod tests {
             SeasonHead { last_day: 520, last_digest: digest(520), chain: digest(1), days_settled: 30, v2_through: 489, pruned_through: 489, archive: digest(2) },
         );
         heads.flush();
-        let v4 = ContractV4 {
+        let mut late = LookupMap::new(StorageKey::LateDays);
+        late.insert("s1".to_string(), LateRecord { days: vec![519], hash: digest(3) });
+        late.flush();
+        let v5 = ContractV5 {
             feathers: NonFungibleToken::new(
                 StorageKey::HenOwners,
                 accounts(0),
@@ -1230,12 +1455,18 @@ mod tests {
             heads,
             feathers_minted: 3,
             provenance: Some(digest(7)),
+            returned: vec![2, 3],
+            live_season: Some("s1".into()),
+            late,
         };
-        env::state_write(&v4);
+        env::state_write(&v5);
         let mut c = Contract::migrate();
         Owner::init(&mut c, &accounts(0));
         assert_eq!(c.last_settled_day("s1".into()), 520);
-        assert_eq!(c.feather_supply(), FeatherSupply { minted: 3, max: 777, remaining: 774, provenance: Some(digest(7)), live_season: None });
+        assert_eq!(c.feather_supply().minted, 1);
+        assert_eq!(c.feather_supply(), FeatherSupply { minted: 1, max: 777, remaining: 776, provenance: Some(digest(7)), live_season: Some("s1".into()) });
+        assert_eq!(c.test_minted, 0);
+        assert_eq!(c.late_days("s1".into()), LateRecord { days: vec![519], hash: digest(3) });
         c.settle_day(batch(521));
         assert_eq!(c.season_head("s1".into()).days_settled, 31);
     }

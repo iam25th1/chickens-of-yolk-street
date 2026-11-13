@@ -99,6 +99,19 @@ export function Paged({
     for (const c of m.children) ro.observe(c);
     return () => ro.disconnect();
   }, [items.length]);
+  // a list that fills its parent fits again when the parent's height changes (a neighbour paged)
+  useEffect(() => {
+    const el = self.current;
+    if (!fill || !el || typeof ResizeObserver === 'undefined') return;
+    let last = el.clientHeight;
+    const ro = new ResizeObserver(() => {
+      if (el.clientHeight === last) return;
+      last = el.clientHeight;
+      setTick((n) => n + 1);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fill]);
 
   useLayoutEffect(() => {
     const el = self.current;

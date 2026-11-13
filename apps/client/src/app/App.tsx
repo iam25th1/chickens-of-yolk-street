@@ -1,4 +1,6 @@
-// Screen flow: boot loading, title, login, farm loading, farm. Settings opens over any screen.
+// Screen flow: boot loading, title, login, farm loading, farm. Settings opens over any screen. The
+// Feather Mint has its own address (/mint): it opens straight from the boot, or from the title,
+// without entering the farm; signing in from it goes to the farm with the mint open.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AssetStore } from '../assets/store';
 import { BOOT_GROUPS, BOOT_SOUNDS, FARM_GROUPS, FARM_SOUNDS, LATER_GROUPS, TITLE_GROUPS } from '../assets/catalog';
@@ -11,6 +13,8 @@ import { FarmScreen } from '../screens/FarmScreen';
 import { LoadingScreen } from '../screens/LoadingScreen';
 import { LoginScreen, type SignedIn } from '../screens/LoginScreen';
 import { TitleScreen } from '../screens/TitleScreen';
+import { FeatherMint } from '../ui/FeatherMint';
+import { OPEN_MINT_KEY } from '../state/ui';
 import { settings } from '../state/settings';
 import { Ticker } from '../ui/Hud';
 import { HowToPlay } from '../ui/HowToPlay';
@@ -19,7 +23,11 @@ import { ServicesContext, type Services } from './services';
 import { Stage, useViewport } from './Stage';
 import { viewport } from './viewport';
 
-type Screen = 'boot' | 'title' | 'login' | 'loadingFarm' | 'farm';
+type Screen = 'boot' | 'title' | 'mint' | 'login' | 'loadingFarm' | 'farm';
+
+/** The Feather Mint's own address. */
+const MINT_PATH = '/mint';
+
 
 const FONTS = ['16px "Pixelify Sans"', '8px Silkscreen', 'bold 8px Silkscreen'];
 
@@ -57,7 +65,9 @@ export function App() {
         let done = 0;
         const tick = () => setProgress(++done / total);
         await Promise.all([assets.loadGroups([...TITLE_GROUPS], v0.p, { onEach: tick }), ...FONTS.map((f) => document.fonts.load(f).then(tick, tick))]);
-        setScreen('title');
+        // the mint's own address opens the mint (it needs the card art)
+        if (location.pathname === MINT_PATH) await assets.loadGroups(['cards'], v0.p).catch(() => undefined);
+        setScreen(location.pathname === MINT_PATH ? 'mint' : 'title');
         void audio.load(BOOT_SOUNDS).catch(() => undefined);
         // stage 3 starts now: the farm's art downloads while the player reads the title
         void assets.loadGroups([...FARM_GROUPS], viewport.get().farm.k, { quick: true }).catch(() => undefined);
@@ -105,8 +115,31 @@ export function App() {
     void services.audio.ctx.resume().then(() => setAudioReady(true));
   };
 
+  const openMint = () => {
+    unlockAudio();
+    if (location.pathname !== MINT_PATH) history.pushState(null, '', MINT_PATH);
+    void services?.assets.loadGroups(['cards'], viewport.get().p).catch(() => undefined);
+    setScreen('mint');
+  };
+  const leaveMint = () => {
+    if (location.pathname === MINT_PATH) history.pushState(null, '', '/');
+    setScreen('title');
+  };
+  // the mint's own tab title
+  useEffect(() => {
+    const base = 'Chickens of Yolk Street (Beta): an egg farm in a market of AI agents';
+    document.title = screen === 'mint' ? 'Feather Mint: Chickens of Yolk Street (Beta)' : base;
+  }, [screen]);
+  // the browser's back and forward move between the title and the mint
+  useEffect(() => {
+    const onPop = () => setScreen((s) => (s === 'title' && location.pathname === MINT_PATH ? 'mint' : s === 'mint' && location.pathname !== MINT_PATH ? 'title' : s));
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   const play = () => {
     unlockAudio();
+    if (location.pathname === MINT_PATH) history.pushState(null, '', '/');
     const session = sessionStore.get();
     if (session) {
       setSignedIn({ session, accountId: null });
@@ -157,14 +190,29 @@ export function App() {
       {services && (
         <ServicesContext.Provider value={services}>
           <div ref={screenEl} className="layer">
-            {screen !== 'farm' && (
+            {screen !== 'farm' && screen !== 'mint' && (
               <div className="stage640">
                 {screen === 'boot' && <LoadingScreen progress={progress} label="WAKING THE HENS" />}
-                {screen === 'title' && <TitleScreen audioReady={audioReady} onPlay={play} onSettings={() => setSettingsOpen(true)} />}
+                {screen === 'title' && <TitleScreen audioReady={audioReady} onPlay={play} onMint={openMint} onSettings={() => setSettingsOpen(true)} />}
                 {screen === 'login' && config && (
                   <LoginScreen privyAppId={config.privyAppId} devLogin={config.devLogin} onSignedIn={onSignedIn} onBack={() => setScreen('title')} />
                 )}
                 {screen === 'loadingFarm' && <LoadingScreen progress={progress} label="LOADING THE FARM" />}
+              </div>
+            )}
+            {screen === 'mint' && (
+              <div className="layer">
+                <FeatherMint
+                  farm={null}
+                  market={null}
+                  onMint={null}
+                  onSignIn={() => {
+                    sessionStorage.setItem(OPEN_MINT_KEY, '1');
+                    play();
+                  }}
+                  onClose={leaveMint}
+                  closeLabel="TITLE"
+                />
               </div>
             )}
             {/* the title's live prices run along the whole window's foot */}

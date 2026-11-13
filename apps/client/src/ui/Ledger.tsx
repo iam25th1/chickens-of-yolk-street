@@ -83,8 +83,8 @@ export function LedgerPanel({ farm, send, onClose }: { farm: FarmState; send: (a
         {t.status === 'minted' && t.number
           ? `FEATHER #${String(t.number).padStart(3, '0')} (${(t.grade ?? '').toUpperCase().replace('-', ' ')}) DAY ${t.mintDay ?? '?'}`
           : t.status === 'queued'
-            ? `TICKET (${MILESTONE_TEXT[t.milestone]}): MINTS AT THE NEXT DAY CLOSE`
-            : `TICKET (${MILESTONE_TEXT[t.milestone]}): HELD, REDEEM ON THE MINT PAGE`}
+            ? `TICKET (${MILESTONE_TEXT[t.milestone]}): ${t.mint?.state === 'waiting' ? 'ITS MINT WAITS' : 'MINTING ON NEAR TESTNET'}`
+            : `TICKET (${MILESTONE_TEXT[t.milestone]}): HELD, MINT IT IN THE FEATHER MINT`}
       </span>
       {explorer && t.mintTx ? (
         <a href={`${explorer}${t.mintTx}`} target="_blank" rel="noreferrer" style={{ color: '#2f6f9e' }}>

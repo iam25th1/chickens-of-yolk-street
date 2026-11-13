@@ -7,14 +7,14 @@
 // (funded from it) so their tokens have a home. Without testnet credentials, or before the
 // contract is deployed, every day is built the same way and recorded as a loud no-op.
 //
-// Feathers are minted only by a contract that has them (version 4, which answers feather_supply),
-// and only as many as the game account's free balance can store: each mint keeps CHAIN_MINT_NEAR
-// in reserve on top of a CHAIN_MIN_BALANCE_NEAR margin (default 0.5 NEAR: a few real days of
-// settlement gas), so nothing optional (mints, linking or creating agent wallets) ever eats into
-// the days' own settlements. A redeemed ticket that cannot be minted yet waits for a later day.
-// From version 5 the contract names its live season and mints Feathers for that season only, so a
-// test season can never mint against the real 777: this writer sends no mints unless the server's
-// season is the contract's live season (and the contract refuses them anyway).
+// Feathers are minted one at a time, at once, as tickets are redeemed (mintFeather: version 6's
+// mint_feather, with the number the server drew), never in a day's settlement. A mint goes out only
+// while the game account's free balance can store it: each keeps CHAIN_MINT_NEAR in reserve on top
+// of a CHAIN_MIN_BALANCE_NEAR margin (default 0.5 NEAR: a few real days of settlement gas), so
+// nothing optional (mints, linking or creating agent wallets) ever eats into the days' own
+// settlements; a mint that cannot go out yet waits, at the latest for a day close. The contract
+// names its live season: that season's Feathers are the 777, any other season's go into its own
+// test collection, which never counts toward the 777.
 //
 // A day whose close failed to settle (a refused RPC call, say) is caught up later: the next day's
 // moves already bring every egg balance up to date, so the missed day is recorded by its digest
@@ -25,8 +25,9 @@ import { Account, JsonRpcProvider, KeyPairSigner, baseEncode, nearToYocto, teraT
 import type { KeyPairString } from 'near-api-js';
 import { num, type Db } from '../db/db';
 import { ECONOMY, type FeatherGrade, type MilestoneId } from '@coys/shared';
-import { buildDayBatch, buildLateSettlement, commitBatch, digestOf, type FullSettlement, type MintedFeather } from './batch';
+import { buildDayBatch, buildLateSettlement, commitBatch, digestOf, featherToken, type FullSettlement, type MintedFeather } from './batch';
 import type { FeatherRenderer } from './feather-image';
+import { testFeatherToken, type Collection } from './mint';
 
 export interface SettleResult {
   status: 'sent' | 'noop' | 'failed';
@@ -57,6 +58,60 @@ export interface ChainWriter {
   featherTokens?(): Promise<ChainFeather[]>;
   /** Records closed days of a season that failed to settle, once the season has moved past them; absent without a chain. */
   settleLateDays?(db: Db, season: string, days: number[]): Promise<LateResult>;
+  /** Which collection a season's Feathers go into: the 777 (the contract's live season) or a test one. Absent: the 777. */
+  collectionFor?(season: string): Promise<Collection>;
+  /** Mints one Feather now, with the number drawn for it (version 6); absent without a chain. */
+  mintFeather?(req: MintRequest): Promise<MintResult>;
+}
+
+/** One Feather to mint now: its ticket's details and the number drawn for it. */
+export interface MintRequest {
+  owner: string;
+  grade: FeatherGrade;
+  milestone: MilestoneId;
+  season: string;
+  day: number;
+  number: number;
+}
+
+/** How a mint went: sent (confirmed on chain), waiting (it cannot go out yet: no harm done), or failed. */
+export interface MintResult {
+  status: 'sent' | 'waiting' | 'failed';
+  /** The mint's transaction; null when an earlier send had landed unseen. */
+  txHash: string | null;
+  token: string | null;
+  mediaSha256: string | null;
+  /** Why it waits or failed, in plain words. */
+  note?: string;
+  /** The contract holds another Feather with this number: draw the next one. */
+  taken?: boolean;
+}
+
+/** Whether an RPC error is a refusal worth trying again (a burst limit, a dropped or timed-out connection). */
+export const refusedByRpc = (err: unknown): boolean =>
+  /\b429\b|rate.?limit|too many requests|ECONNRESET|ETIMEDOUT|ECONNREFUSED|fetch failed|socket hang up|\b50[234]\b|timed? ?out/i.test(err instanceof Error ? err.message : String(err));
+
+/**
+ * Runs a call, trying again with backoff while the RPC refuses it: waits base, 2 x base, 4 x base
+ * and so on, at most `tries` attempts in all. Any other error, or the last refusal, is thrown.
+ */
+export async function withBackoff<T>(
+  fn: () => Promise<T>,
+  opts: { tries?: number; baseMs?: number; sleep?: (ms: number) => Promise<void>; onRetry?: (attempt: number, err: unknown, waitMs: number) => void } = {},
+): Promise<T> {
+  const tries = opts.tries ?? 5;
+  const base = opts.baseMs ?? 1500;
+  const sleep = opts.sleep ?? pause;
+  for (let i = 0; ; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i >= tries - 1 || !refusedByRpc(err)) throw err;
+      const wait = base * 2 ** i;
+      opts.onRetry?.(i + 1, err, wait);
+      await sleep(wait);
+    }
+  }
 }
 
 /** The outcome of recording missed days late. */
@@ -87,11 +142,6 @@ export function lateDaysToSend(days: number[], head: SeasonHead, recorded: numbe
  */
 export function settledCountsAgree(head: SeasonHead, sentDays: number[], recorded: number[]): boolean {
   return sentDays.filter((d) => d > head.v2_through && d <= head.last_day && !recorded.includes(d)).length === head.days_settled;
-}
-
-/** Whether day closes may send Feather mints to this contract for this season: version 4 has no live season (always), version 5 only its live one. */
-export function seasonMayMint(liveSeason: string | null | undefined, season: string): boolean {
-  return liveSeason === undefined || liveSeason === season;
 }
 
 /** A Feather as the contract holds it: its number, grade, milestone, season, day and owner. */
@@ -223,6 +273,8 @@ export class TestnetChain implements ChainWriter {
         args: { from_index: String(from), limit: 100 },
       });
       for (const t of page ?? []) {
+        // a test collection's Feather is never one of the 777
+        if (t.token_id.startsWith('test-')) continue;
         try {
           const x = JSON.parse(t.metadata?.extra ?? '{}') as { number?: number; grade?: FeatherGrade; milestone?: MilestoneId; season?: string; day?: number };
           if (typeof x.number === 'number' && x.grade) list.push({ number: x.number, grade: x.grade, milestone: x.milestone ?? 'full-coop', season: x.season ?? '', day: x.day ?? 0, owner: t.owner_id });
@@ -341,22 +393,10 @@ export class TestnetChain implements ChainWriter {
       }
       await this.ensureAgentAccounts(db);
       this.feathers = await this.readFeathers();
-      const affordable = mintsAffordable(await this.balanceNear(), this.cfg, ECONOMY.feathers.mintsPerBatch);
-      this.low = affordable === 0;
-      const mayMint = this.feathers !== null && seasonMayMint(this.feathers.liveSeason, season);
-      const feathers = this.feathers === null ? null : { cap: mayMint ? affordable : 0, base: this.feathers.minted };
+      this.low = mintsAffordable(await this.balanceNear(), this.cfg, 1) === 0;
+      // Feathers mint at once now (mintFeather, version 6), never in a day's settlement
+      const feathers = this.feathers === null ? null : { cap: 0, base: this.feathers.minted };
       const built = await buildDayBatch(db, season, day, { feathers, renderer: this.renderer });
-      const waiting = await db.query(`SELECT count(*) AS n FROM feather_tickets WHERE status = 'queued' AND season = $1`, [season]);
-      const left = num(waiting[0]?.n) - built.minted.length;
-      if (left > 0) {
-        this.log(
-          this.feathers === null
-            ? `[chain] ${left} redeemed Feathers wait: the contract has no Feathers yet (upgrade to version 4)`
-            : !mayMint
-              ? `[chain] ${left} redeemed Feathers wait: season ${season} is not the contract's live season (${this.feathers.liveSeason ?? 'none set'}), so it mints none`
-              : `[chain] ${left} redeemed Feathers wait: the game account can store ${affordable} mints now (each keeps ${this.cfg.mintNear} NEAR), or their player has no wallet linked`,
-        );
-      }
       const outcome = await this.account.callFunctionRaw({
         contractId: this.cfg.contractId,
         methodName: 'settle_day',
@@ -377,6 +417,82 @@ export class TestnetChain implements ChainWriter {
       this.log(`[chain] season ${season} day ${day} FAILED on NEAR testnet: ${error.slice(0, 300)}`);
       return { status: 'failed', txHash: null, error: error.slice(0, 500) };
     }
+  }
+
+  /** The live season's collection or a test one, from the contract (read once, then at each day close). */
+  async collectionFor(season: string): Promise<Collection> {
+    if (this.feathers === null) this.feathers = await withBackoff(() => this.readFeathers());
+    // version 4 (no live season) has only the 777
+    return this.feathers === null || this.feathers.liveSeason === undefined || this.feathers.liveSeason === season ? 'live' : 'test';
+  }
+
+  /**
+   * Mints one Feather now (version 6's mint_feather), paced and retried with backoff while the RPC
+   * refuses. It waits, harmlessly, while the contract cannot mint at once yet, the game account is
+   * under its margin, or the chain is not reachable before the call. A number the contract refuses
+   * as taken is checked: if the Feather there is this very one (an earlier send that landed unseen),
+   * the mint counts as sent; otherwise the caller draws another number.
+   */
+  async mintFeather(req: MintRequest): Promise<MintResult> {
+    const none = { txHash: null, token: null, mediaSha256: null };
+    const retry = (what: string) => (attempt: number, err: unknown, wait: number) =>
+      this.log(`[chain] ${what} refused (try ${attempt}): ${(err instanceof Error ? err.message : String(err)).slice(0, 120)}; again in ${wait} ms`);
+    let token: string | null = null;
+    try {
+      await pause(PACE_MS);
+      const blocked = await withBackoff(() => this.preflight(), { onRetry: retry('status check') });
+      if (blocked) return { status: 'waiting', ...none, note: blocked };
+      await pause(PACE_MS);
+      this.feathers = await withBackoff(() => this.readFeathers(), { onRetry: retry('Feather supply read') });
+      if (this.feathers === null) return { status: 'waiting', ...none, note: 'the contract has no Feathers yet' };
+      await pause(PACE_MS);
+      const affordable = mintsAffordable(await withBackoff(() => this.balanceNear(), { onRetry: retry('balance read') }), this.cfg, 1);
+      this.low = affordable === 0;
+      if (!affordable) return { status: 'waiting', ...none, note: `the game account is low on testnet NEAR (each mint keeps ${this.cfg.mintNear} NEAR free)` };
+      const live = this.feathers.liveSeason === undefined || this.feathers.liveSeason === req.season;
+      token = live ? featherToken(req.number) : testFeatherToken(req.season, req.number);
+      const img = this.renderer.render(req.grade, req.number);
+      const mint = { owner_id: req.owner, grade: req.grade, milestone: req.milestone, season: req.season, day: req.day, media: img.dataUri, media_hash: img.sha256Base64, number: req.number };
+      try {
+        await pause(PACE_MS);
+        const outcome = await withBackoff(
+          () => this.account.callFunctionRaw({ contractId: this.cfg.contractId, methodName: 'mint_feather', args: { mint }, gas: teraToGas('100'), deposit: 0n }),
+          { onRetry: retry(`mint of Feather ${token}`) },
+        );
+        const txHash = outcome.transaction_outcome.id;
+        const got = returnedString(outcome);
+        if (got) token = got;
+        if (live) this.feathers.minted += 1;
+        this.tokens = null;
+        this.log(`[chain] Feather ${token} (${req.grade}, season ${req.season}) minted on NEAR testnet at once: ${txHash}`);
+        return { status: 'sent', txHash, token, mediaSha256: img.sha256Hex };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/MethodNotFound|method.*not found/i.test(msg)) return { status: 'waiting', ...none, note: 'the contract cannot mint at once yet (it needs version 6)' };
+        if (/number is taken/i.test(msg)) {
+          await pause(PACE_MS);
+          if (await this.isThisFeather(token, req).catch(() => false)) {
+            this.log(`[chain] Feather ${token} was already on chain: an earlier send had landed`);
+            this.tokens = null;
+            return { status: 'sent', txHash: null, token, mediaSha256: img.sha256Hex, note: 'an earlier send had landed' };
+          }
+          return { status: 'failed', ...none, taken: true, note: `Feather ${token} is taken on chain` };
+        }
+        throw err;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.log(`[chain] mint of Feather ${token ?? `#${req.number}`} for season ${req.season} FAILED on NEAR testnet: ${msg.slice(0, 300)}`);
+      return { status: 'failed', ...none, note: refusedByRpc(err) ? 'NEAR testnet refused the call, even after a few tries' : msg.slice(0, 200) };
+    }
+  }
+
+  /** Whether the Feather the contract holds under this token id is this request's (same owner, grade, milestone, season and day). */
+  private async isThisFeather(token: string, req: MintRequest): Promise<boolean> {
+    const t = await this.view<{ owner_id: string; metadata?: { extra?: string | null } | null } | null>('nft_token', { token_id: token });
+    if (!t) return false;
+    const x = JSON.parse(t.metadata?.extra ?? '{}') as { number?: number; grade?: string; milestone?: string; season?: string; day?: number };
+    return t.owner_id === req.owner && x.number === req.number && x.grade === req.grade && x.milestone === req.milestone && x.season === req.season && x.day === req.day;
   }
 
   /** A view call, retried with backoff when the RPC refuses a burst (429). */
@@ -457,6 +573,18 @@ export async function missedDays(db: Db, season: string, before: number): Promis
     [season, before],
   );
   return rows.map((r) => num(r.day));
+}
+
+/** A call's returned string (a JSON string in the receipt's SuccessValue), or null. */
+function returnedString(outcome: unknown): string | null {
+  const v = (outcome as { status?: { SuccessValue?: string } } | null)?.status?.SuccessValue;
+  if (!v) return null;
+  try {
+    const x: unknown = JSON.parse(Buffer.from(v, 'base64').toString('utf8'));
+    return typeof x === 'string' ? x : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The gap between this writer's calls to the public RPC, which refuses bursts. */

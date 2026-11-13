@@ -44,6 +44,7 @@ import {
   type MarketDay,
   type MarketState,
   type MintPageData,
+  type MilestoneId,
   type OrderView,
   type Rarity,
   type ServerMessage,
@@ -54,7 +55,8 @@ import { migrate } from '../db/migrations';
 import { decide, type BrainOptions, type DecisionResult } from '../agents/brain';
 import type { FarmAction } from '../agents/decision';
 import type { MintedFeather } from '../chain/batch';
-import { missedDays, storeLateDays, type ChainWriter } from '../chain/chain';
+import { missedDays, storeLateDays, type ChainWriter, type MintResult } from '../chain/chain';
+import { drawForTicket, type Collection } from '../chain/mint';
 import { arriveCards, buyBagsFrom, createCards, expireCards, farmCards, practiceCard, respondCard, type Candidate } from './cards';
 import {
   applyDecision,
@@ -142,6 +144,11 @@ export class Game {
   season = '';
   private readonly listeners = new Set<(out: Outbound) => void>();
   private queue: Promise<unknown> = Promise.resolve();
+  /** The collection this season's Feathers mint into, once the contract has said; null before. */
+  private collection: Collection | null = null;
+  /** The mint queue's run in progress, and whether it should go round once more when done. */
+  private mintRun: Promise<void> | null = null;
+  private mintAgain = false;
   private clock = { day: 1, dayStartedAt: 0 };
   private ticking = false;
   /** Decisions and calls per day, for reports and tests. */
@@ -621,7 +628,8 @@ export class Game {
       estimates: rarityEstimates(byGrade),
       rarityCounts: Object.fromEntries(RARITIES.map((r, i) => [r, F.rarityCounts[i] ?? 0])) as Record<Rarity, number>,
       gradeWeights: Object.fromEntries(FEATHER_GRADES.map((g) => [g, [...F.gradeWeights[g]]])) as Record<FeatherGrade, number[]>,
-      recent: [...slots].reverse().slice(0, 8),
+      // the most recent mints this server made, then (older) any the contract holds that it did not
+      recent: [...(await featherSlots(this.db, 'recent')), ...slots.filter((x) => !local.some((l) => l.number === x.number)).reverse()].slice(0, 8),
       slots,
     };
   }
@@ -663,7 +671,15 @@ export class Game {
       if (info) this.emit(playerId, { t: 'ledger', days: await this.getLedger(info.farmId) });
       return { ok: true, events: [] };
     }
-    return this.serial(async () => {
+    // a redemption draws its number in the collection its season mints into (the contract says which)
+    if (action.t === 'redeemTicket' && this.collection === null) {
+      try {
+        this.collection = this.chain.collectionFor ? await this.chain.collectionFor(this.season) : 'live';
+      } catch {
+        return { ok: false, code: 'invalid_action', message: 'NEAR testnet could not be reached just now; your ticket is safe, try again in a moment' };
+      }
+    }
+    const result = await this.serial(async (): Promise<ActionResult> => {
       try {
         await this.inTx(async (ctx) => {
           if (action.t === 'linkWallet') {
@@ -686,6 +702,9 @@ export class Game {
         throw err;
       }
     });
+    // a redeemed ticket mints at once; a newly linked wallet lets waiting mints go
+    if (result.ok && (action.t === 'redeemTicket' || action.t === 'linkWallet')) this.kickMints();
+    return result;
   }
 
   private async applyPlayerAction(ctx: Ctx, farm: Farm, action: PlayerAction): Promise<void> {
@@ -729,8 +748,8 @@ export class Game {
         await ctx.q.query('UPDATE farms SET needs_name = false WHERE id = $1', [farm.id]);
         return;
       case 'redeemTicket': {
-        const r = await redeemTicket(ctx, farm.id, action.ticketId);
-        emit(ctx, farm, { kind: 'ticketRedeemed', ticketId: action.ticketId, grade: r.grade, score: r.score, feeMilli: r.feeMilli });
+        const r = await redeemTicket(ctx, farm.id, action.ticketId, this.collection ?? 'live');
+        emit(ctx, farm, { kind: 'ticketRedeemed', ticketId: action.ticketId, grade: r.grade, score: r.score, feeMilli: r.feeMilli, number: r.number });
         ctx.marketChanged = true;
         return;
       }
@@ -1109,6 +1128,129 @@ export class Game {
     if (result.status === 'sent' && result.txHash && result.minted?.length) await this.announceMints(result.minted, result.txHash, closedDay);
     if (result.status === 'sent') await this.catchUpLateDays(closedDay);
     this.emit(null, { t: 'market', market: await this.getMarketState() });
+    // the day close's catch-up: any redeemed ticket whose mint is still waiting goes again
+    if (this.chain.collectionFor) this.collection = await this.chain.collectionFor(this.season).catch(() => this.collection);
+    this.kickMints();
+  }
+
+  // ---- instant mints --------------------------------------------------------------------------
+
+  /** Starts the mint queue, or (if it is running) has it go round once more. */
+  kickMints(): void {
+    if (this.mintRun) {
+      this.mintAgain = true;
+      return;
+    }
+    this.mintRun = this.pumpMints()
+      .catch((err: unknown) => this.log(`[mint] the queue stopped: ${err instanceof Error ? err.message : String(err)}`))
+      .finally(() => {
+        this.mintRun = null;
+      });
+  }
+
+  /** Waits until the mint queue is idle (tests and scripts). */
+  async mintsIdle(): Promise<void> {
+    while (this.mintRun) await this.mintRun;
+  }
+
+  /** Every redeemed ticket of this season, in redemption order, one mint at a time (paced by the chain writer). */
+  private async pumpMints(): Promise<void> {
+    do {
+      this.mintAgain = false;
+      const rows = await this.db.query<{ id: string }>(`SELECT id FROM feather_tickets WHERE status = 'queued' AND season = $1 ORDER BY redeemed_seq, id`, [this.season]);
+      for (const r of rows) await this.mintTicket(String(r.id));
+    } while (this.mintAgain);
+  }
+
+  private async mintTicket(ticketId: string): Promise<void> {
+    const [t] = await this.db.query(
+      `SELECT t.id, t.farm_id, t.grade, t.milestone, t.season, t.day, t.number, t.fee_milli, t.mint_state, t.mint_note, f.player_id, p.near_account_id AS account
+       FROM feather_tickets t JOIN farms f ON f.id = t.farm_id LEFT JOIN players p ON p.id = f.player_id WHERE t.id = $1 AND t.status = 'queued'`,
+      [ticketId],
+    );
+    if (!t) return;
+    const farmId = String(t.farm_id);
+    const playerId = t.player_id ? String(t.player_id) : null;
+    const grade = t.grade as FeatherGrade;
+    let state = { s: (t.mint_state as string | null) ?? null, note: (t.mint_note as string | null) ?? null };
+    const tell = async (event: GameEvent) => {
+      if (!playerId) return;
+      this.emit(playerId, { t: 'farm', farm: await this.getFarmState(farmId) });
+      this.emit(playerId, { t: 'event', event });
+    };
+    const wait = async (note: string) => {
+      if (state.s === 'waiting' && state.note === note) return;
+      await this.db.query(`UPDATE feather_tickets SET mint_state = 'waiting', mint_note = $2 WHERE id = $1 AND status = 'queued'`, [ticketId, note]);
+      state = { s: 'waiting', note };
+      this.log(`[mint] ticket ${ticketId} waits: ${note}`);
+      await tell({ kind: 'mintWaiting', ticketId, note });
+    };
+    if (!this.chain.mintFeather) return wait('this server has no chain to mint on');
+    if (!t.account) return wait('link your NEAR wallet in Settings: it mints the moment you do');
+    if (this.collection === null) {
+      try {
+        this.collection = this.chain.collectionFor ? await this.chain.collectionFor(this.season) : 'live';
+      } catch {
+        return wait('NEAR testnet could not be reached: it goes again at the next day close');
+      }
+    }
+    const collection = this.collection;
+    const draw = (alsoTaken: number[]) => this.serial(() => this.inTx((ctx) => drawForTicket(ctx.q, ticketId, this.season, collection, ctx.log, alsoTaken)));
+    let number = t.number === null || t.number === undefined ? (await draw([])).number : num(t.number);
+    const alsoTaken: number[] = [];
+    for (let attempt = 0; attempt < 4; attempt++) {
+      await this.db.query(`UPDATE feather_tickets SET mint_state = 'sending', mint_note = NULL, mint_tries = mint_tries + 1 WHERE id = $1`, [ticketId]);
+      state = { s: 'sending', note: null };
+      await tell({ kind: 'mintSent', ticketId, number, grade });
+      const r = await this.chain.mintFeather({ owner: String(t.account), grade, milestone: t.milestone as MilestoneId, season: String(t.season), day: num(t.day), number });
+      if (r.status === 'sent') return this.mintConfirmed(ticketId, farmId, playerId, number, String(t.account), r);
+      if (r.status === 'waiting') return wait(r.note ?? 'the chain is not ready: it goes again at the next day close');
+      if (!r.taken) return this.mintFailed(ticketId, farmId, playerId, num(t.fee_milli), r.note ?? 'the mint did not go through');
+      alsoTaken.push(number);
+      number = (await draw(alsoTaken)).number;
+    }
+    return this.mintFailed(ticketId, farmId, playerId, num(t.fee_milli), 'every number drawn was taken on chain');
+  }
+
+  private async mintConfirmed(ticketId: string, farmId: string, playerId: string | null, number: number, owner: string, r: MintResult): Promise<void> {
+    const day = this.clock.day;
+    const [t] = await this.serial(() =>
+      this.inTx(async (ctx) => {
+        await ctx.q.query(
+          `UPDATE feather_tickets SET status = 'minted', number = $2, token_id = COALESCE($3, token_id), owner_account = $4, media_sha256 = $5, mint_tx = $6, mint_day = $7,
+           mint_state = NULL, mint_note = NULL WHERE id = $1`,
+          [ticketId, number, r.token, owner, r.mediaSha256, r.txHash, day],
+        );
+        ctx.touched.add(farmId);
+        ctx.marketChanged = true;
+        return ctx.q.query('SELECT grade, milestone, token_id FROM feather_tickets WHERE id = $1', [ticketId]);
+      }),
+    );
+    this.log(`[mint] ticket ${ticketId} minted Feather ${String(t?.token_id)}: ${r.txHash ?? 'landed earlier'}`);
+    if (playerId && t) {
+      this.emit(playerId, {
+        t: 'event',
+        event: { kind: 'featherMinted', ticketId, number, grade: t.grade as FeatherGrade, milestone: t.milestone as MilestoneId, token: String(t.token_id), owner, txHash: r.txHash, day },
+      });
+    }
+  }
+
+  /** A mint that did not go through: the ticket is held again (its number's seed kept, so a new try draws the same number if free) and its fee refunded. */
+  private async mintFailed(ticketId: string, farmId: string, playerId: string | null, feeMilli: number, note: string): Promise<void> {
+    await this.serial(() =>
+      this.inTx(async (ctx) => {
+        await moveCash(ctx, farmId, 'feather-fee', feeMilli, ticketId);
+        await ctx.q.query(
+          `UPDATE feather_tickets SET status = 'held', grade = NULL, score = NULL, fee_milli = NULL, redeemed_day = NULL, redeemed_seq = NULL, number = NULL, token_id = NULL,
+           mint_state = NULL, mint_note = $2 WHERE id = $1`,
+          [ticketId, note],
+        );
+        ctx.touched.add(farmId);
+        ctx.marketChanged = true;
+      }),
+    );
+    this.log(`[mint] ticket ${ticketId} did not mint (${note}): held again, fee refunded`);
+    if (playerId) this.emit(playerId, { t: 'event', event: { kind: 'mintFailed', ticketId, note, refundMilli: feeMilli } });
   }
 
   /**

@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { ECONOMY } from '@coys/shared';
 import { buildDayBatch, buildLateSettlement, commitBatch, digestOf } from '../src/chain/batch';
-import { NoopChain, agentAccountName, agentPublicKey, assertTestnetConfig, lateDaysToSend, mintsAffordable, seasonMayMint, settledCountsAgree } from '../src/chain/chain';
+import { NoopChain, agentAccountName, agentPublicKey, assertTestnetConfig, lateDaysToSend, mintsAffordable, refusedByRpc, settledCountsAgree, withBackoff } from '../src/chain/chain';
 import { FeatherRenderer } from '../src/chain/feather-image';
 import { decodePng } from '../src/chain/png';
 import { openDb } from '../src/db/db';
@@ -156,11 +156,7 @@ describe('the daily batch', () => {
 });
 
 describe('test seasons and the real 777', () => {
-  it('only the contract\'s live season mints Feathers: a test season sends none, and a ticket mints only in its own season', async () => {
-    expect(seasonMayMint(undefined, 's1')).toBe(true); // version 4: no live season
-    expect(seasonMayMint('s1', 's1')).toBe(true);
-    expect(seasonMayMint('s1', 'verify-feathers-2')).toBe(false);
-    expect(seasonMayMint(null, 's1')).toBe(false); // version 5 before a live season is set
+  it('only the contract\'s live season mints the 777: a batch takes a season\'s own tickets only, and a test season mints into its own collection', async () => {
     const t = await makeGame({ cast: false });
     const { playerId, farmId } = await t.game.ensurePlayer('dev', 'device-0001', 'Ada');
     await t.game.act(playerId, { t: 'linkWallet', rid: 'w1', accountId: 'ada.testnet' });
@@ -179,8 +175,9 @@ describe('test seasons and the real 777', () => {
     expect(built.batch.feather_mints?.every((f) => f.season === t.game.season)).toBe(true);
     await t.db.close();
 
-    // a day close on a season that is not the contract's live one mints nothing, with tickets queued
-    const chain = new RecordingChain('game.testnet', 5);
+    // a day settlement mints nothing; a ticket queued before instant mints (no number drawn yet)
+    // draws one at the day close's catch-up and mints into its season's collection
+    const chain = new RecordingChain('game.testnet');
     chain.liveSeason = 'the-live-season';
     const u = await makeGame({ cast: false, chain });
     const ada = await u.game.ensurePlayer('dev', 'device-0001', 'Ada');
@@ -188,11 +185,12 @@ describe('test seasons and the real 777', () => {
     await u.db.query(`INSERT INTO feather_tickets (id, farm_id, milestone, season, day, status, grade, redeemed_seq, created_at) VALUES ('q', $1, 'full-coop', $2, 1, 'queued', 'fluff', 1, 0)`, [ada.farmId, u.game.season]);
     u.clock.t += ECONOMY.day.lengthMs;
     await u.game.endDay();
+    await u.game.mintsIdle();
     expect(chain.batches.at(-1)?.feather_mints).toEqual([]);
-    chain.liveSeason = u.game.season;
-    u.clock.t += ECONOMY.day.lengthMs;
-    await u.game.endDay();
-    expect(chain.batches.at(-1)?.feather_mints?.length).toBe(1);
+    const [q] = await u.db.query(`SELECT status, number, token_id FROM feather_tickets WHERE id = 'q'`);
+    expect(q?.status).toBe('minted');
+    expect(q?.token_id).toBe(`test-${u.game.season}-${String(q?.number).padStart(3, '0')}`);
+    expect(chain.featherMinted).toBe(0);
     await u.db.close();
   });
 });
@@ -291,5 +289,29 @@ describe('agent wallets', () => {
     // another kind's wallet is never taken over
     expect(await successorWallet(t.db, 'old-money')).toBeNull();
     await t.db.close();
+  });
+});
+
+describe('calls the RPC refuses', () => {
+  it('are tried again with backoff (1.5, 3, 6, 12 seconds), then given up; any other error is thrown at once', async () => {
+    const waits: number[] = [];
+    const sleep = async (ms: number) => {
+      waits.push(ms);
+    };
+    let calls = 0;
+    const flaky = () => {
+      calls++;
+      return calls < 3 ? Promise.reject(new Error('[429] Too Many Requests')) : Promise.resolve('ok');
+    };
+    expect(await withBackoff(flaky, { sleep })).toBe('ok');
+    expect(waits).toEqual([1500, 3000]);
+    waits.length = 0;
+    await expect(withBackoff(() => Promise.reject(new Error('fetch failed')), { sleep })).rejects.toThrow('fetch failed');
+    expect(waits).toEqual([1500, 3000, 6000, 12000]);
+    waits.length = 0;
+    await expect(withBackoff(() => Promise.reject(new Error('Smart contract panicked: that Feather number is taken')), { sleep })).rejects.toThrow(/taken/);
+    expect(waits).toEqual([]);
+    expect(refusedByRpc(new Error('Server error 503'))).toBe(true);
+    expect(refusedByRpc(new Error('MethodNotFound'))).toBe(false);
   });
 });

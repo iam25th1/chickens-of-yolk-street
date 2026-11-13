@@ -204,16 +204,16 @@ export function TopBar({
         style={{ height: 16, padding: '0 3px' }}
         data-tour="feathers"
         data-ui="feathers-button"
-        aria-label="Feathers: the mint page"
-        title="Feathers: the mint page"
-        data-tip="FEATHERS: TICKETS, THE MINT PAGE AND ALL 777"
+        aria-label="Mint: the Feather Mint"
+        title="Mint: the Feather Mint"
+        data-tip="MINT: YOUR TICKETS, THE FEATHER MINT AND ALL 777"
         onMouseEnter={() => uiSound(audio, 'hover')}
         onClick={() => {
           uiSound(audio, 'click');
           onFeathers();
         }}
       >
-        FEATHERS
+        MINT
         {farm.tickets.some((t) => t.status === 'held') && <span className="dot" aria-hidden="true" />}
       </button>
       {button('market', 'Market board: prices and rivals', onMarket, 'market')}
