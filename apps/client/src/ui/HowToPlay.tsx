@@ -289,12 +289,12 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
     <Modal title="HOW TO PLAY" onClose={onClose} w={520} h={320} className="guide-page">
       <div className="row" style={{ alignItems: 'flex-start', gap: 8 }} data-ui="guide">
         {wide && (
-          <nav className="col" style={{ width: 150, flex: 'none', gap: 2 }} aria-label="Sections">
+          <nav className="col" style={{ width: 150, flex: 'none', gap: 1 }} aria-label="Sections">
             {SECTIONS.map((x, i) => (
               <button
                 key={x.id}
                 className={`btn ${i === at ? 'red' : ''}`}
-                style={{ justifyContent: 'flex-start', width: '100%', whiteSpace: 'nowrap' }}
+                style={{ justifyContent: 'flex-start', width: '100%', whiteSpace: 'nowrap', height: 13 }}
                 title={x.title}
                 data-tour={`guide-${x.id}`}
                 onClick={() => go(i)}
