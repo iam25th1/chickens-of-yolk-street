@@ -2,15 +2,18 @@
 // once with the recorded stand-in model (recorded-model.ts, replaying test/fixtures/agent-replies.json,
 // with an unusable reply every 12th call) and once on the rules alone. It prints, per seed and brain,
 // the median and lowest multiplier, glut days, busts, entrants, every agent's final cash, fallbacks
-// and calls; then the credits-needed report: tokens per call measured here (real system prompt and
-// observation, 3 characters a token), calls per agent per in-game day, 480 in-game days a real day
-// on the live server, and the two models' prices (ASSUMED_PRICING), with and without the caps.
-// docs/agents.md quotes its numbers.
+// and calls; then the credits-needed report: calls per agent per in-game day under the days-that-matter
+// rule, tokens per call as the server estimates them (real system prompt, trimmed observation and
+// response schema, 4 characters a token), 480 in-game days a real day on the live server, and each
+// provider's default models at their prices (ASSUMED_PRICING), gated and at full use, per day and per
+// week. docs/agents.md quotes its numbers.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { AGENT_KINDS, ECONOMY } from '@coys/shared';
 import { NEARAI_DEFAULT_CHEAP_MODEL, NEARAI_DEFAULT_MODEL } from '../src/ai/nearai';
-import { ASSUMED_PRICING, SYSTEM, UNKNOWN_PRICING, priceOf } from '../src/agents/brain';
+import { SERV_DEFAULT_CHEAP_MODEL, SERV_DEFAULT_MODEL } from '../src/ai/serv';
+import { ASSUMED_PRICING, decisionFormat, priceOf } from '../src/agents/brain';
+import { DEFAULT_DAILY_CAP_USD } from '../src/env';
 import { validateDecision } from '../src/agents/decision';
 import { RecordingChain, makeGame } from './helpers';
 import { SITUATIONS, authoredReplies, recordedModel, sampleContext, type AgentReplies, type ReplayTally } from './recorded-model';
@@ -63,68 +66,76 @@ async function run(seed: number, brain: 'model' | 'rules'): Promise<Run> {
   return out;
 }
 
-const pct = (n: number, d: number): string => `${d ? Math.round((n / d) * 100) : 0}%`;
 const usd = (n: number): string => (n >= 100 ? n.toFixed(0) : n >= 1 ? n.toFixed(2) : n.toFixed(4));
 
-/** The credits-needed report from the model runs, at the live server's pace. */
-function creditsReport(runs: Run[]): {
-  lines: string[];
-  numbers: { calls: number; perCall: number; callsPerAgentDay: number; agentsPerDay: number; uncappedDay: number; cappedDay: number; worstDay: number };
-} {
+/** What one provider would cost at the live pace: per call by kind, and per real day gated and at full use. */
+interface ProviderCost {
+  name: string;
+  decision: number;
+  reflection: number;
+  gatedDay: number;
+  fullDay: number;
+}
+
+/**
+ * The credits-needed report from the model runs, at the live server's pace: calls measured here under
+ * the days-that-matter rule (brain.ts modelMoment), tokens as the server estimates them (4 characters a
+ * token, the response schema counted as prompt, SERV's 200 tokens of its own; replies at least what
+ * real models answered: 260 tokens a decision, as SERV's gpt-6-luna did live, and 100 a reflection),
+ * each provider's default models and prices, 480 in-game days a real day. Full use is a model decision
+ * on every agent day.
+ */
+function creditsReport(runs: Run[]): { lines: string[]; numbers: { callsPerAgentDay: number; callsDay: number; providers: ProviderCost[] } } {
   const model = runs.filter((r) => r.brain === 'model');
   const sum = (f: (r: Run) => number): number => model.reduce((n, r) => n + f(r), 0);
-  const tokens = (m: string, k: 'calls' | 'prompt' | 'completion'): number => sum((r) => r.tally?.tokens[m]?.[k] ?? 0);
-  const main = { calls: tokens(NEARAI_DEFAULT_MODEL, 'calls'), prompt: tokens(NEARAI_DEFAULT_MODEL, 'prompt'), completion: tokens(NEARAI_DEFAULT_MODEL, 'completion') };
-  const cheap = { calls: tokens(NEARAI_DEFAULT_CHEAP_MODEL, 'calls'), prompt: tokens(NEARAI_DEFAULT_CHEAP_MODEL, 'prompt'), completion: tokens(NEARAI_DEFAULT_CHEAP_MODEL, 'completion') };
-  const calls = main.calls + cheap.calls;
   const decisions = sum((r) => r.tally?.decisions ?? 0);
   const reflections = sum((r) => r.tally?.reflections ?? 0);
-  const t3 = (chars: number, n: number): number => Math.round(chars / 3 / Math.max(1, n));
-  const decisionIn = t3(
-    sum((r) => r.tally?.decisionPromptChars ?? 0),
-    decisions,
-  );
-  const decisionOut = t3(
-    sum((r) => r.tally?.decisionReplyChars ?? 0),
-    decisions,
-  );
-  const reflectIn = t3(
-    sum((r) => (r.tally?.promptChars ?? 0) - (r.tally?.decisionPromptChars ?? 0)),
-    reflections,
-  );
-  const reflectOut = t3(
-    sum((r) => (r.tally?.replyChars ?? 0) - (r.tally?.decisionReplyChars ?? 0)),
-    reflections,
-  );
-  const system = Math.round(SYSTEM(sampleContext('upstart', 'normal')).length / 3);
-  const priceMain = priceOf(new Map(), NEARAI_DEFAULT_MODEL);
-  const priceCheap = priceOf(new Map(), NEARAI_DEFAULT_CHEAP_MODEL);
-  const costAt = (pm: { input: number; output: number }, pc: { input: number; output: number }): number =>
-    (main.prompt * pm.input + main.completion * pm.output + cheap.prompt * pc.input + cheap.completion * pc.output) / 1e6 / calls;
-  const perCall = costAt(priceMain, priceCheap);
-  // agent-days: every open agent's day, thinking or skipping
+  const hardDecisions = sum((r) => r.stats.mainCalls) - reflections;
+  // agent days: every open agent's day, deciding or sitting out
   const agentDays = sum((r) => r.stats.decisions + r.stats.skipped);
-  const callsPerAgentDay = calls / agentDays;
-  const agentsPerDay = agentDays / (model.length * DAYS);
+  const decidingDays = sum((r) => r.stats.decisions);
   const realDay = (24 * 3600 * 1000) / ECONOMY.day.lengthMs;
+  const agentsPerDay = agentDays / (model.length * DAYS);
+  const perAgentDay = (n: number): number => n / agentDays;
+  const callsPerAgentDay = perAgentDay(decisions + reflections);
   const callsDay = callsPerAgentDay * agentsPerDay * realDay;
-  const uncappedDay = callsDay * perCall;
-  // the default caps: each agent 40 calls and a quarter of the global cap a UTC day, all of them the global 1 USD
-  const capUsd = 1;
-  const agentCalls = 40;
-  const capped = (cost: number): number => Math.min(Math.min(Math.min(callsPerAgentDay * realDay, agentCalls) * cost, capUsd / 4) * agentsPerDay, capUsd);
-  const cappedDay = capped(perCall);
-  const worst = costAt(UNKNOWN_PRICING, UNKNOWN_PRICING);
+  const t4 = (chars: number): number => Math.ceil(chars / 4);
+  const schema = JSON.stringify(decisionFormat()).length;
+  const decisionIn = t4(sum((r) => r.tally?.decisionPromptChars ?? 0) / Math.max(1, decisions) + schema);
+  const decisionOut = Math.max(260, t4(sum((r) => r.tally?.decisionReplyChars ?? 0) / Math.max(1, decisions)));
+  const reflectIn = t4(sum((r) => (r.tally?.promptChars ?? 0) - (r.tally?.decisionPromptChars ?? 0)) / Math.max(1, reflections));
+  const reflectOut = Math.max(100, t4(sum((r) => (r.tally?.replyChars ?? 0) - (r.tally?.decisionReplyChars ?? 0)) / Math.max(1, reflections)));
+  const cost = (price: { input: number; output: number }, prompt: number, completion: number): number => (prompt * price.input + completion * price.output) / 1e6;
+  const day = realDay * agentsPerDay;
+  const providers: ProviderCost[] = [
+    { name: 'nearai', main: NEARAI_DEFAULT_MODEL, cheap: NEARAI_DEFAULT_CHEAP_MODEL, overhead: 0, mainOnHardDays: true },
+    { name: 'serv', main: SERV_DEFAULT_MODEL, cheap: SERV_DEFAULT_CHEAP_MODEL, overhead: 200, mainOnHardDays: false },
+  ].map((p) => {
+    const main = priceOf(new Map(), p.main);
+    const cheap = priceOf(new Map(), p.cheap);
+    const hard = p.mainOnHardDays ? cost(main, decisionIn + p.overhead, decisionOut) : cost(cheap, decisionIn + p.overhead, decisionOut);
+    const routine = cost(cheap, decisionIn + p.overhead, decisionOut);
+    const reflection = cost(main, reflectIn + p.overhead, reflectOut);
+    const hardShare = hardDecisions / Math.max(1, decisions);
+    const decision = hardShare * hard + (1 - hardShare) * routine;
+    return {
+      name: p.name,
+      decision,
+      reflection,
+      gatedDay: (perAgentDay(decisions) * decision + perAgentDay(reflections) * reflection) * day,
+      fullDay: (perAgentDay(decidingDays) * decision + perAgentDay(reflections) * reflection) * day,
+    };
+  });
   const lines = [
-    `measured over ${model.length} seeds x ${DAYS} in-game days: ${calls} calls: ${decisions} decisions (${main.calls - reflections} on the main model on hard days, ${cheap.calls} on the cheap one) and ${reflections} weekly reflections (main); ${sum((r) => r.tally?.invalid ?? 0)} unusable replies`,
-    `tokens (3 characters a token): a decision ${decisionIn} in (system prompt ${system}, the rest the observation) + ${decisionOut} out; a reflection ${reflectIn} in + ${reflectOut} out`,
-    `prices per million tokens (assumed, config): main ${priceMain.input} in / ${priceMain.output} out, cheap ${priceCheap.input} / ${priceCheap.output}; an average call ${usd(perCall)} USD`,
-    `${callsPerAgentDay.toFixed(3)} calls per agent per in-game day, ${agentsPerDay.toFixed(2)} agents open on average, ${realDay} in-game days a real day: ${Math.round(callsDay)} calls a real day`,
-    `uncapped: ${usd(uncappedDay)} USD a real day, ${usd(uncappedDay * 30)} USD per 30 days (${usd(uncappedDay / agentsPerDay)} USD per agent a day)`,
-    `default caps (1 USD a day; each agent 40 calls, 0.25 USD): ${usd(cappedDay)} USD a real day, ${usd(cappedDay * 30)} USD per 30 days; the model makes ${pct(agentCalls, callsPerAgentDay * realDay)} of an agent's calls, rules the rest`,
-    `if both models cost ${UNKNOWN_PRICING.input}/${UNKNOWN_PRICING.output} (the server's price for an unknown model): ${usd(callsDay * worst)} USD a real day uncapped, ${usd(capped(worst))} capped`,
+    `measured over ${model.length} seeds x ${DAYS} in-game days: ${decisions + reflections} calls: ${decisions} decisions (${hardDecisions} on hard days) and ${reflections} weekly reflections; ${sum((r) => r.tally?.invalid ?? 0)} unusable replies`,
+    `${perAgentDay(decisions).toFixed(3)} decisions and ${perAgentDay(reflections).toFixed(3)} reflections per agent per in-game day (full use: ${perAgentDay(decidingDays).toFixed(3)} decisions), ${agentsPerDay.toFixed(2)} agents a day, ${realDay} in-game days a real day: ${Math.round(callsDay)} calls a real day (full use ${Math.round((perAgentDay(decidingDays) + perAgentDay(reflections)) * day)})`,
+    `tokens (4 characters a token): a decision ${decisionIn} in (the response schema ${t4(schema)} of it) + ${decisionOut} out; a reflection ${reflectIn} in + ${reflectOut} out; SERV adds 200 in to each`,
+    ...providers.map(
+      (p) =>
+        `${p.name}: a decision ${p.decision.toFixed(6)} USD, a reflection ${p.reflection.toFixed(6)} USD; ${usd(p.gatedDay)} USD a real day (${usd(p.gatedDay * 7)} a week), full use ${usd(p.fullDay)} USD a day (${usd(p.fullDay * 7)} a week); at the default cap of ${DEFAULT_DAILY_CAP_USD} USD: ${usd(Math.min(p.gatedDay, DEFAULT_DAILY_CAP_USD))} a day gated, ${usd(Math.min(p.fullDay, DEFAULT_DAILY_CAP_USD))} at full use`,
+    ),
   ];
-  return { lines, numbers: { calls, perCall, callsPerAgentDay, agentsPerDay, uncappedDay, cappedDay, worstDay: capped(worst) } };
+  return { lines, numbers: { callsPerAgentDay, callsDay, providers } };
 }
 
 describe('model against rules, 30 days', () => {
@@ -183,8 +194,10 @@ describe('model against rules, 30 days', () => {
       expect(r.tally?.invalid).toBeGreaterThan(0);
       expect(r.spendUsd).toBeLessThanOrEqual(CAP_USD);
     }
-    expect(credits.numbers.cappedDay).toBeLessThanOrEqual(1);
-    expect(credits.numbers.worstDay).toBeLessThanOrEqual(1);
-    expect(credits.numbers.uncappedDay).toBeGreaterThan(credits.numbers.cappedDay);
+    // at the measured pace the days that matter stay under the default shared cap on either provider; full use would not
+    for (const p of credits.numbers.providers) {
+      expect(p.gatedDay).toBeLessThanOrEqual(DEFAULT_DAILY_CAP_USD);
+      expect(p.fullDay).toBeGreaterThan(p.gatedDay * 2);
+    }
   }, 600_000);
 });

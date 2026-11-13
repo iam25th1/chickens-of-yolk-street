@@ -3,7 +3,10 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ECONOMY } from '@coys/shared';
-import { NEARAI_DEFAULT_CHEAP_MODEL, NearAiClient } from './ai/nearai';
+import { ProviderChain } from './ai/chain';
+import { NearAiClient } from './ai/nearai';
+import type { InferenceProvider } from './ai/provider';
+import { ServClient } from './ai/serv';
 import { InferenceBudget, priceOf, type Pricing } from './agents/brain';
 import { createPrivyVerifier } from './auth/privy';
 import { createSessionSigner } from './auth/session';
@@ -41,23 +44,34 @@ log(provenance ? `[feathers] founders.json provenance ${provenance}` : '[feather
 const chain = createChainWriter(process.env, renderer, log);
 if (chain.mode === 'noop') log('[chain] !!! NEAR testnet credentials missing: every daily settlement is a recorded NO-OP, nothing is signed');
 
-const nearAi = process.env.NEARAI_API_KEY
-  ? new NearAiClient({ apiKey: process.env.NEARAI_API_KEY, baseUrl: process.env.NEARAI_BASE_URL, model: process.env.NEARAI_MODEL })
-  : null;
-const cheapModel = process.env.NEARAI_CHEAP_MODEL || NEARAI_DEFAULT_CHEAP_MODEL;
+// the provider chain: NEAR AI Cloud, then SERV Reasoning, each only with its key; then the rules
 const inference = readInferenceConfig(process.env);
-// prices: NEARAI_MAIN_PRICE and NEARAI_CHEAP_PRICE first, then /v1/models, then the assumed ones (brain.ts)
-const pricing = nearAi ? await nearAi.pricing() : new Map<string, Pricing>();
+const env = process.env;
+const nearAi = env.NEARAI_API_KEY ? new NearAiClient({ apiKey: env.NEARAI_API_KEY, baseUrl: env.NEARAI_BASE_URL, model: env.NEARAI_MODEL, cheapModel: env.NEARAI_CHEAP_MODEL }) : null;
+const serv = env.SERV_API_KEY
+  ? new ServClient({ apiKey: env.SERV_API_KEY, baseUrl: env.SERV_BASE_URL, model: env.SERV_MODEL, cheapModel: env.SERV_CHEAP_MODEL, reasoningEffort: inference.servReasoningEffort })
+  : null;
+const providers: InferenceProvider[] = [nearAi, serv].filter((p): p is NearAiClient | ServClient => p !== null);
+// prices: the *_MAIN_PRICE and *_CHEAP_PRICE variables first, then what the provider says (NEAR AI's /v1/models, SERV's published list), then the assumed ones (brain.ts)
+const pricing = new Map<string, Pricing>();
+for (const p of providers) for (const [model, price] of await p.pricing()) pricing.set(model, price);
 if (nearAi && inference.mainPrice) pricing.set(nearAi.model, inference.mainPrice);
-if (inference.cheapPrice) pricing.set(cheapModel, inference.cheapPrice);
+if (nearAi && inference.cheapPrice) pricing.set(nearAi.cheapModel, inference.cheapPrice);
+if (serv && inference.servMainPrice) pricing.set(serv.model, inference.servMainPrice);
+if (serv && inference.servCheapPrice) pricing.set(serv.cheapModel, inference.servCheapPrice);
+const priced = (m: string): string => `${m} ${priceOf(pricing, m).input}/${priceOf(pricing, m).output}`;
+if (inference.capFrom === 'NEARAI_DAILY_SPEND_CAP_USD') log('[agents] NEARAI_DAILY_SPEND_CAP_USD is the old name of LLM_DAILY_CAP_USD (the cap now covers every provider): rename it');
 log(
-  nearAi
-    ? `[agents] agents decide on NEAR AI Cloud (${cheapModel} on routine days; ${nearAi.model} for weekly reflections and hard days), capped at ${inference.capUsd} USD per UTC day, ` +
-        `each agent at ${inference.agentCap.calls} calls and ${inference.agentCap.usd} USD; prices per million tokens: ${[nearAi.model, cheapModel]
-          .map((m) => `${m} ${priceOf(pricing, m).input}/${priceOf(pricing, m).output}`)
-          .join(', ')}`
-    : '[agents] NEARAI_API_KEY unset: agents use their rule policies',
+  providers.length
+    ? `[agents] agents run on their rule strategies; model decisions switch on once a provider answers. Chain: ${providers
+        .map((p) => `${p.label} (${p.cheapModel} for decisions${p.mainOnHardDays ? `, ${p.model} on hard days` : ''}, ${p.model} for weekly reflections)`)
+        .join(', then ')}, then the rules. ` +
+        `Awaiting a working provider: no model has answered yet. A model is asked only when it matters: an agent's first look, its weekly strategy, and at most once in ${inference.gapDays} in-game days a hard day or a price move of ${Math.round(inference.priceMove * 100)}%. ` +
+        `Capped at ${inference.capUsd} USD per UTC day for all providers, each agent at ${inference.agentCap.calls} calls and ${inference.agentCap.usd} USD, ${inference.closeBudgetMs / 1000} s of model time per day close; ` +
+        `prices per million tokens: ${providers.flatMap((p) => [p.model, p.cheapModel].map(priced)).join(', ')}`
+    : '[agents] NEARAI_API_KEY and SERV_API_KEY unset: agents run on their rule strategies (no model provider)',
 );
+const providerChain = new ProviderChain(providers, { closeBudgetMs: inference.closeBudgetMs });
 
 const game = new Game({
   db,
@@ -68,11 +82,11 @@ const game = new Game({
   settleEvery: config.settleEvery,
   provenance,
   brain: {
-    client: nearAi,
+    chain: providerChain,
     budget: new InferenceBudget(db, inference.capUsd, Date.now, inference.agentCap),
-    model: nearAi?.model ?? '',
-    cheapModel,
     pricing,
+    priceMove: inference.priceMove,
+    gapDays: inference.gapDays,
   },
 });
 await game.init();

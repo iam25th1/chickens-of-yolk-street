@@ -31,13 +31,31 @@ describe('configuration', () => {
     expect(() => readConfig({ DEMO_DAY_SECONDS: 'fast' }, '/repo')).toThrow(/20 to 3600/);
   });
 
-  it('NEAR AI caps: the global cap, a per-agent cap (a quarter of it and 40 calls by default), and prices per million tokens', () => {
-    expect(readInferenceConfig({})).toEqual({ capUsd: 1, agentCap: { usd: 0.25, calls: 40 }, mainPrice: null, cheapPrice: null });
-    expect(readInferenceConfig({ NEARAI_DAILY_SPEND_CAP_USD: '2' }).agentCap).toEqual({ usd: 0.5, calls: 40 });
+  it('model caps: one shared cap for every provider (LLM_, with the old NEARAI_ names still read), per-agent caps, prices, pacing', () => {
+    expect(readInferenceConfig({})).toEqual({
+      capUsd: 1.5,
+      capFrom: 'default',
+      agentCap: { usd: 0.375, calls: 240 },
+      mainPrice: null,
+      cheapPrice: null,
+      servMainPrice: null,
+      servCheapPrice: null,
+      priceMove: 0.15,
+      gapDays: 3,
+      closeBudgetMs: 60_000,
+      servReasoningEffort: 'none',
+    });
+    // the old name is read while the new one is unset, and the new one wins
+    expect(readInferenceConfig({ NEARAI_DAILY_SPEND_CAP_USD: '2' })).toMatchObject({ capUsd: 2, capFrom: 'NEARAI_DAILY_SPEND_CAP_USD', agentCap: { usd: 0.5, calls: 240 } });
+    expect(readInferenceConfig({ NEARAI_DAILY_SPEND_CAP_USD: '2', LLM_DAILY_CAP_USD: '0.8' })).toMatchObject({ capUsd: 0.8, capFrom: 'LLM_DAILY_CAP_USD' });
     const c = readInferenceConfig({ NEARAI_AGENT_DAILY_CAP_USD: '0.1', NEARAI_AGENT_DAILY_CALLS: '12', NEARAI_MAIN_PRICE: '0.3, 1.2', NEARAI_CHEAP_PRICE: '0.05,0.2' });
     expect(c).toMatchObject({ agentCap: { usd: 0.1, calls: 12 }, mainPrice: { input: 0.3, output: 1.2 }, cheapPrice: { input: 0.05, output: 0.2 } });
-    expect(() => readInferenceConfig({ NEARAI_AGENT_DAILY_CALLS: '2.5' })).toThrow(/whole number/);
+    const l = readInferenceConfig({ LLM_AGENT_DAILY_CAP_USD: '0.2', LLM_AGENT_DAILY_CALLS: '50', NEARAI_AGENT_DAILY_CALLS: '12', SERV_CHEAP_PRICE: '0.13,0.65', LLM_PRICE_MOVE: '0.2', LLM_DECISION_GAP_DAYS: '2', LLM_CLOSE_BUDGET_SECONDS: '30', SERV_REASONING_EFFORT: 'low' });
+    expect(l).toMatchObject({ agentCap: { usd: 0.2, calls: 50 }, servCheapPrice: { input: 0.13, output: 0.65 }, priceMove: 0.2, gapDays: 2, closeBudgetMs: 30_000, servReasoningEffort: 'low' });
+    expect(() => readInferenceConfig({ NEARAI_AGENT_DAILY_CALLS: '2.5' })).toThrow(/NEARAI_AGENT_DAILY_CALLS must be a whole number/);
+    expect(() => readInferenceConfig({ LLM_DAILY_CAP_USD: '-1' })).toThrow(/LLM_DAILY_CAP_USD must be a number of 0 or more/);
     expect(() => readInferenceConfig({ NEARAI_DAILY_SPEND_CAP_USD: '-1' })).toThrow(/0 or more/);
+    expect(() => readInferenceConfig({ SERV_REASONING_EFFORT: 'max' })).toThrow(/none, low, medium, high/);
     expect(() => readInferenceConfig({ NEARAI_MAIN_PRICE: 'cheap' })).toThrow(/input,output/);
   });
 });

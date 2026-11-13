@@ -2,14 +2,19 @@
 
 Stage 4 of the brief: agent upgrades (observations, personas, one validated action schema, public
 reasons, weekly reflections, model tiers, per-agent caps, better rules) and new AI farms entering the
-street (registry, entry rule, the AI tag, a reusable wallet pool). This page also holds the 30-day
-model-against-rules comparison and the NEAR AI credits the live server would need.
+street (registry, entry rule, the AI tag, a reusable wallet pool). Then the provider chain and cost
+control: every agent runs on its own rule-based strategy, with its own wallet, memory and
+personality, and model-driven decisions switch on only while a model provider answers (NEAR AI Cloud,
+integrated and awaiting credits; SERV Reasoning, the fallback). This page also holds the 30-day
+model-against-rules comparison and what a model would cost at the live pace.
 
 ## What an agent sees
 
 `AgentContext` in `apps/server/src/agents/decision.ts`, built by `buildContext` in
-`apps/server/src/game/cast-runtime.ts`, sent whole to the model as the user message on every call
-(numbers rounded to keep it small):
+`apps/server/src/game/cast-runtime.ts`. The rules read all of it. A model gets it trimmed (`observe` in
+`apps/server/src/agents/brain.ts`) as the user message: the six farms most relevant to the agent (player
+farms first, then those with a contract, a debt, sell orders for a buyer, short feed for a supplier),
+four sell orders each, five days of history, its last two reasons and three busts, numbers rounded:
 
 - **Itself**: cash, stock, whether it is struggling, its entrant key (AI farms that entered later),
   its latest **weekly reflection** and its **last three public reasons**.
@@ -19,11 +24,12 @@ model-against-rules comparison and the NEAR AI credits the live server would nee
     scarcity) and the multiplier's change per day across them;
   - `busts`: farms and agents that went bust in the last five days (name, AI or not, day);
   - `open`: open AI farms and open player farms.
-- **Its own farm** (rivals) and **every other farm**: hens, coop room, crate, daily lay, days of
+- **Its own farm** (rivals) and **the other farms**: hens, coop room, crate, daily lay, days of
   feed, cash, quality, open sell orders, and its memory of each farm.
 
-A decision prompt measured in the simulation is about 1,600 tokens: the system prompt about 640,
-the observation the rest.
+A decision prompt measured in the simulation is about 4,400 characters (the system prompt about
+1,950, the trimmed observation the rest), plus the response schema (about 6,400 characters): about
+2,700 tokens at 4 characters a token. A live SERV call on such a prompt counted 2,381.
 
 ## Who they are
 
@@ -31,12 +37,14 @@ Each kind has a persona in `apps/server/src/agents/cast.ts` (goals, temperament,
 it never does), and each entering AI farm its own in `apps/server/src/agents/entrants.ts`. The
 system prompt (`SYSTEM` in `apps/server/src/agents/brain.ts`) carries it with the haggling numbers,
 the market rules and what each role may do. Card lines and reasons stay in character; an agent too
-broke to think says so in its own voice.
+broke to pay for a decision sits the day out and says so in its own voice.
 
 ## One schema, one validation
 
-`decisionSchema` (zod) is the only action schema: the model gets it as its strict `json_schema`
-response format, and it now has `reason`, one public line under 80 characters. Every decision, from
+`decisionSchema` (zod) is the only action schema: a model gets it as its strict `json_schema`
+response format (`decisionFormat`: `oneOf` becomes `anyOf` and `$schema` is dropped, which strict modes
+need; the branches never overlap, so nothing else changes), and it now has `reason`, one public line
+under 80 characters. Every decision, from
 the model or the rules, goes through `validateDecision(raw, ctx)`:
 
 - free text is cleaned (no control characters, long dashes become commas, one line) and cut to its
@@ -56,33 +64,90 @@ The game still bounds every number when it applies a decision (price bands, stoc
   under each agent in WHAT THE AI TRADERS SAY, upper case, wrapping inside the row of the paged list.
 - **Weekly reflections**: every 7 in-game days per agent (`ECONOMY.agents.reflectEveryDays`), before
   its decision that day, the agent writes a reflection under 400 characters: what went well or badly
-  and what it will change. The main model writes it when the caps allow; otherwise `ruleReflection`
-  writes it from the agent's own numbers (cash at the start and end of the week, deals, refusals,
+  and what it will change. It is the week's strategy call: a provider's main model writes it when one
+  answers and the caps allow; otherwise `ruleReflection` writes it from the agent's own numbers (cash at the start and end of the week, deals, refusals,
   busts seen, the multiplier's range and glut days), in character. It is stored on the agent, logged
   (`[agents] <name> reflects on its week (<model or rules>): ...`), and in the next observations.
 
-## Model tiers and caps
+## Provider chain and cost control
 
-| Call | Model | Default |
+**The chain** (`apps/server/src/ai/`): every provider implements one small interface
+(`InferenceProvider` in `provider.ts`: a name, a main and a cheap model, `chat` returning the content
+and the token usage, its prices, its pacing gap and its own prompt overhead). `ProviderChain`
+(`chain.ts`) tries them in order: **NEAR AI Cloud** (`nearai.ts`), then **SERV Reasoning**
+(`serv.ts`, OpenServ's OpenAI-compatible API at `https://inference-api.openserv.ai/v1`: a system
+message always present, `max_completion_tokens`, `reasoning_effort: none`, the same strict schema),
+then the rules. A provider without its key is not in the chain. Each has a breaker held in memory:
+
+| Failure | Skipped for |
+|---|---|
+| 401, 402, 403 (a bad key or no credits) | 30 minutes, then tried once more |
+| 429 | 30 seconds, doubling each time, at most 10 minutes |
+| 5xx, a timeout, no connection, another 4xx | 2 minutes, doubling, at most 30 minutes |
+| an answer with no message in it | not skipped (that one request falls back) |
+
+A breaker logs its change once (`[ai] NEAR AI Cloud refused (a bad key or no credits) (HTTP 402):
+skipped for 30 min ...`, `[ai] SERV Reasoning is answering again`), never each skipped call; NEAR AI's
+402 used to cost about 4,400 failed requests and log lines a real day, now at most 48. SERV calls are
+at least a second apart. All model calls of one day close share `LLM_CLOSE_BUDGET_SECONDS` (60); no
+call starts with less than 5 seconds of it left, and the agents still waiting use their rules that
+day.
+
+**The days that matter** (`modelMoment` in `brain.ts`). A routine day runs on the rule strategy and
+makes no call. A model is asked for:
+
+| Moment | Model | Default |
 |---|---|---|
-| Routine decision | cheap | `NEARAI_CHEAP_MODEL`, `z-ai/glm-5.3-flash` |
-| Hard day: a crash or glut day (multiplier at or under 0.80, or today's supply past 1.1 x demand), or the agent's cash under its struggle line (40) | main | `NEARAI_MODEL`, `Qwen/Qwen3.6-35B-A3B-FP8` |
-| Weekly reflection | main | as above |
+| The agent's first look (no model decision yet: a new AI farm's first day, or the first day after this change) | cheap | |
+| A hard day: a crash or glut day (multiplier at or under 0.80, or today's supply past 1.1 x demand), or cash under the struggle line (40) | cheap (NEAR AI: main) | at most once in `LLM_DECISION_GAP_DAYS` (3) in-game days |
+| A price move: the multiplier moved `LLM_PRICE_MOVE` (15%) or more since its last model decision | cheap | at most once in 3 in-game days |
+| The weekly strategy: its reflection, every 7 in-game days | main | |
 
-A struggling agent still thinks only every other day. Caps, per UTC day:
+| Provider | Cheap model (decisions) | Main model (reflections) | USD per million tokens, in / out |
+|---|---|---|---|
+| NEAR AI Cloud | `NEARAI_CHEAP_MODEL`, `z-ai/glm-5.3-flash` | `NEARAI_MODEL`, `Qwen/Qwen3.6-35B-A3B-FP8` | assumed 0.10 / 0.40 and 0.20 / 0.80 (`NEARAI_*_PRICE`, else `/v1/models`) |
+| SERV Reasoning | `SERV_CHEAP_MODEL`, `gpt-6-luna` | `SERV_MODEL`, `gpt-5.4-mini` | published 0.13 / 0.65 and 1.00 / 6.00 (`SERV_*_PRICE`; confirm in the OpenServ console, Usage) |
+
+SERV's hard days stay on `gpt-6-luna`: `gpt-5.4-mini` costs about eight times as much, and hard days are
+about half of the model decisions. A struggling agent still sits out every other day (it saves the
+0.50-coin decision fee), before any of this.
+
+**Short prompts, capped replies.** The trimmed observation (above), replies capped at 400 tokens a
+decision (a live SERV decision took 258) and 200 a reflection, and the prompt asks for a note under
+ten words. The same prompt to the same model within a UTC day (a day close run again, say) reuses its
+validated decision or reflection: no second call.
+
+**One shared cap.** Per UTC day:
 
 | Cap | Variable | Default |
 |---|---|---|
-| Every agent together, USD | `NEARAI_DAILY_SPEND_CAP_USD` | 1 |
-| One agent, USD | `NEARAI_AGENT_DAILY_CAP_USD` | a quarter of the global cap |
-| One agent, calls | `NEARAI_AGENT_DAILY_CALLS` | 40 |
+| Every provider and agent together, USD | `LLM_DAILY_CAP_USD` (old name `NEARAI_DAILY_SPEND_CAP_USD`, still read when the new one is unset) | 1.50 |
+| One agent, USD | `LLM_AGENT_DAILY_CAP_USD` (or `NEARAI_AGENT_DAILY_CAP_USD`) | a quarter of the shared cap |
+| One agent, calls, failed ones included | `LLM_AGENT_DAILY_CALLS` (or `NEARAI_AGENT_DAILY_CALLS`) | 240 (the days that matter allow about 230) |
 
-Past any cap the agent uses its rules, counted as a fallback (globally and for the agent, in
-`agent_inference_usage`). Each call first reserves its most expensive cost (the prompt at 2
-characters a token plus 64, and a full reply: 1,500 tokens for a decision, 200 for a reflection), so a
-cap is never crossed. Prices come from `NEARAI_MAIN_PRICE` and `NEARAI_CHEAP_PRICE` ("input,output"
-USD per million tokens) first, then `/v1/models`, then `ASSUMED_PRICING` in `brain.ts`; a model with
-no known price is priced at 1 in, 5 out.
+Each call first reserves its cost: the prompt (messages and response schema at 4 characters a token,
+plus the provider's own overhead, 200 tokens for SERV) at 1.5 times that, and a full reply. A call that
+would cross a cap is not made, so the shared cap is a hard stop until 00:00 UTC (logged once:
+`[ai] today's AI spend cap (1.50 USD) is reached ...`). An answer is charged from the tokens the
+provider counted; a timed-out call is charged its prompt, since it may have run.
+
+**What is logged and kept.** Every call: `[ai] serv gpt-6-luna Yolk Street Bakery decision (price
+move): 2381+258 tokens, 0.000477 USD, answered` (or `failed (...)`). Per provider per UTC day in
+`provider_usage` (migration 15: calls, failures, tokens, estimated spend), and failures in
+`inference_usage` and `agent_inference_usage` too. Once a real hour, after a day close: `[ai] today:
+nearai 0 calls (1 failed) 0.0000 USD, serv 41 calls 0.0198 USD; cap 1.50 USD; mode serv`. `/healthz`
+carries `ai: { mode, providers: { nearai: { state }, serv: { state } }, todayUsd, capUsd, calls,
+failures }`, with each state `off`, `ready`, `answering` or `paused` (and the last HTTP status and
+seconds left while paused); never a key.
+
+**The mode.** `nearai`, `serv` or `rules`: the provider whose answer is the latest within the last 7
+in-game days (each agent's latest model answer is kept on the agent: provider, day, multiplier),
+unless that provider has been refused since or today's cap is spent; else `rules`. It goes out as
+`MarketState.aiMode` and, per agent, `AgentView.brain` (the rules unless that agent's own latest
+answer is recent). The client's words follow it: the AI tag's tooltip ("Run by an AI agent: rule-based
+strategy with its own wallet, memory and personality" on the rules; "decides with SERV Reasoning on the
+days that matter" when SERV answered), the How to play guide and an AI farm's public profile. Haggle
+replies stay on the rules (no model chatter).
 
 ## Better rules
 
@@ -151,93 +216,96 @@ on the live farm (share of the crate sold, days of feed, coop fill, share of cas
 targets), and answers every 12th call with an unusable reply.
 
 `apps/server/test/agent-compare.test.ts` runs seeds 1 to 5 for 30 days twice, on the recorded model
-and on the rules, with the same two headless players. One run:
+and on the rules, with the same two headless players. With the provider chain the model is asked only
+on the days that matter (above), so on the model side about 30% of decisions are the model's and the
+rest are the rules'. One run:
 
-| Seed | Brain | Median | Lowest | Glut days | Rival busts | Entrants | Fallbacks | Calls (main, cheap decisions) | Reflections |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | model | 1.47x | 0.68x | 2 | 5 | 3 | 18 | 265 (52, 195) | 29 |
-| 1 | rules | 1.10x | 0.53x | 12 | 1 | 1 | 0 | 0 | 28 |
-| 2 | model | 1.02x | 0.59x | 12 | 2 | 2 | 18 | 287 (132, 137) | 32 |
-| 2 | rules | 1.16x | 0.40x | 8 | 2 | 1 | 0 | 0 | 28 |
-| 3 | model | 1.04x | 0.70x | 4 | 4 | 3 | 19 | 269 (65, 185) | 30 |
-| 3 | rules | 1.11x | 0.49x | 7 | 1 | 2 | 0 | 0 | 30 |
-| 4 | model | 1.26x | 1.00x | 0 | 5 | 4 | 20 | 284 (43, 221) | 31 |
-| 4 | rules | 1.10x | 0.49x | 7 | 1 | 2 | 0 | 0 | 30 |
-| 5 | model | 1.45x | 1.00x | 0 | 4 | 3 | 18 | 274 (37, 219) | 30 |
-| 5 | rules | 1.04x | 0.40x | 8 | 1 | 2 | 0 | 0 | 30 |
+| Seed | Brain | Median | Lowest | Glut days | Rival busts | Entrants | Fallbacks | Calls (hard-day decisions on the main model, cheap decisions, reflections) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | model | 0.99x | 0.53x | 10 | 1 | 2 | 5 | 96 (27, 38, 31) |
+| 1 | rules | 1.17x | 0.46x | 9 | 2 | 2 | 0 | 0 |
+| 2 | model | 1.24x | 0.61x | 11 | 1 | 2 | 4 | 91 (27, 36, 28) |
+| 2 | rules | 1.13x | 0.51x | 9 | 1 | 2 | 0 | 0 |
+| 3 | model | 0.96x | 0.40x | 9 | 1 | 2 | 5 | 95 (31, 34, 30) |
+| 3 | rules | 1.09x | 0.41x | 7 | 1 | 2 | 0 | 0 |
+| 4 | model | 1.42x | 0.58x | 12 | 1 | 1 | 3 | 84 (29, 28, 27) |
+| 4 | rules | 1.20x | 0.47x | 8 | 2 | 1 | 0 | 0 |
+| 5 | model | 1.16x | 0.56x | 12 | 0 | 0 | 4 | 90 (30, 32, 28) |
+| 5 | rules | 1.09x | 0.41x | 7 | 1 | 2 | 0 | 0 |
 
-Final cash, seed 1 (coins): on the recorded model Old Money Farms 1,274, the Loyalist 1,398, the
-Trader 596, the Squeezer 631, the Wholesaler 906, the Bakery 864, Pennywise Poultry 579; bust: Upstart
-Eggs (day 7), Early Bird Eggs (13), Hatch and Dash (17), Dawn Patrol Poultry (25), Sunny Side Startup
-(29). On the rules Old Money Farms 5,709, the Loyalist 1,363, the Trader 590, the Squeezer 485, the
-Wholesaler 1,032, the Bakery 772, Cluck Collective 175, Hatch and Dash 117; bust: Upstart Eggs (14).
-The test prints every seed's.
+Final cash, seed 1 (coins): on the recorded model Old Money Farms 4,782, the Loyalist 1,922, the
+Trader 600, the Squeezer 485, the Wholesaler 927, the Bakery 764, Cluck Collective 212, Gilded Roost
+Estates 160, Hatch and Dash 62; bust: Upstart Eggs (day 20). On the rules Old Money Farms 4,708, the
+Loyalist 1,699, the Trader 596, the Squeezer 485, the Wholesaler 971, the Bakery 724, Pennywise Poultry
+181, Early Bird Eggs 21; bust: Upstart Eggs (14), Hatch and Dash (30). The test prints every seed's.
 
-Over three runs (ids are random, so runs differ a little):
+Over two runs (ids are random, so runs differ a little):
 
-| | Recorded model | Rules |
+| | Recorded model, days that matter | Rules |
 |---|---|---|
-| Median of the seeds' medians | 1.10x to 1.26x | 1.09x to 1.11x |
-| Lowest day | 0.46x to 0.59x | 0.40x |
-| Glut days (5 seeds) | 18 to 37 | 40 to 48 |
-| Rival busts (5 seeds) | 11 to 20 | 5 to 6 |
-| Fallbacks | 93 to 103 (every 12th reply unusable) | 0 |
-| Calls | 1,350 to 1,379 | 0 |
+| Median of the seeds' medians | 1.16x to 1.21x | 1.07x to 1.13x |
+| Lowest day | 0.40x | 0.40x to 0.41x |
+| Glut days (5 seeds) | 54 | 40 to 41 |
+| Rival busts (5 seeds) | 4 to 6 | 5 to 7 |
+| Fallbacks | 20 to 21 (every 12th reply unusable) | 0 |
+| Calls | 456 to 468 | 0 |
 
-What it shows: the recorded replies hold eggs back and bid deeper in gluts, so there are fewer and
-milder gluts, but they also grow into scarcity harder and buy hens through a glut now and then, so
-the Upstart and the entrants that look like it bust more and earlier (day 7 instead of day 14 or so),
-Old Money ends far poorer, and more AI farms enter to replace them. The fallbacks work: every
-unusable reply became the rule decision. These are authored stand-ins, not measured model behaviour;
-re-record with `--live` once there are credits and run the comparison again.
+What it shows: with a model only on the days that matter, the stand-in moves the market less than
+when it made every decision (before the chain, one call every agent day: 1,350 to 1,379 calls, 18 to
+37 glut days, 11 to 20 rival busts). Its hard-day replies hold eggs back and bid deeper, but the rules
+decide the routine days between, and the mix runs a little hotter (higher medians, more glut days)
+with about as many busts as the rules. The fallbacks work: every unusable reply became the rule
+decision. These are authored stand-ins, not measured model behaviour; re-record with `--live` once a
+provider answers and run the comparison again.
 
-## Credits needed
+## What a model costs
 
-From the recorded-model runs above (tokens at 3 characters a token, the usual rate for JSON-heavy
-prompts; the server counts the model's own `usage` when it answers):
+From the recorded-model runs above, at the live pace, as the test's credits report prints it
+(`creditsReport` in `agent-compare.test.ts`; tokens as the server estimates them, at 4 characters a
+token with the response schema, SERV's 200 tokens of its own on each call; replies at least 260
+tokens a decision, as SERV's `gpt-6-luna` answered live, and 100 a reflection):
 
 | | Value |
 |---|---|
-| Decision call | 1,611 tokens in (system prompt 636, observation the rest), 156 out |
-| Reflection call | 347 in, 38 out |
-| Calls | 1.10 per agent per in-game day: a decision on 98% of agent days (a struggling agent skips every other day) and a reflection every 7th day |
-| Tiers | 15% of decisions on the main model (hard days), 85% on the cheap one; reflections on the main one |
-| Agents open | 8.3 on average (7 base, plus entrants) |
-| Live pace | 480 in-game days per real day (3-minute days) |
+| Calls under the days-that-matter rule | 0.28 decisions and 0.13 reflections per agent per in-game day (46% of decisions on hard days) |
+| Calls at full use (a model on every agent day) | 0.97 decisions and 0.13 reflections per agent per in-game day |
+| Agents open | 7.4 a day on average (7 base, plus entrants, less busts) |
+| Live pace | 480 in-game days per real day (3-minute days): about 1,460 calls a real day (about 1,000 decisions, 460 reflections); 3,930 at full use |
+| Decision call | 2,688 tokens in (the response schema 1,593 of them) + 260 out |
+| Reflection call | 265 in + 100 out |
 
-Prices: NEAR AI Cloud did not answer while this was written, so these are **assumed** (USD per
-million tokens): main `Qwen/Qwen3.6-35B-A3B-FP8` 0.20 in, 0.80 out; cheap `z-ai/glm-5.3-flash` 0.10
-in, 0.40 out (`ASSUMED_PRICING` in `apps/server/src/agents/brain.ts`; set the real ones with
-`NEARAI_MAIN_PRICE` and `NEARAI_CHEAP_PRICE`, or let `/v1/models` say). An average call is then about
-0.00024 USD.
+| Provider (default models) | A decision | A reflection | Days that matter: a day, a week | Full use: a day, a week | At the default cap (1.50 USD a day) |
+|---|---|---|---|---|---|
+| NEAR AI Cloud, assumed prices (`z-ai/glm-5.3-flash` 0.10 / 0.40, `Qwen/Qwen3.6-35B-A3B-FP8` 0.20 / 0.80; hard days on the main model) | 0.00055 USD | 0.00013 USD | 0.61 USD, 4.24 USD | 1.95 USD, 13.65 USD | 0.61 a day (4.24 a week) as is; full use held at 1.50 a day (10.50 a week) |
+| SERV Reasoning, published prices (`gpt-6-luna` 0.13 / 0.65 for decisions, `gpt-5.4-mini` 1.00 / 6.00 for reflections) | 0.00054 USD | 0.00107 USD | 1.03 USD, 7.24 USD | 2.38 USD, 16.64 USD | 1.03 a day (7.24 a week) as is; full use held at 1.50 a day (10.50 a week) |
 
-| | Per real day | Per 30 real days |
-|---|---|---|
-| Without caps (about 4,400 calls a day, 0.13 USD per agent a day) | 1.07 USD | 32 USD |
-| At the default caps (1 USD a day; each agent 40 calls, 0.25 USD) | 0.08 USD | 2.41 USD |
-| Without caps, if both models cost 1 in, 5 out | 9.65 USD | 290 USD |
-| At the default caps, if both models cost 1 in, 5 out | 0.73 USD | 22 USD |
+The live check (one SERV decision and one reflection, a real observation from a memory game with
+three other farms): `gpt-6-luna` 200, 2,381 tokens in and 258 out, 0.000477 USD, valid; `gpt-5.4-mini`
+200, 564 in and 55 out, 0.000894 USD. The decision's prompt came in under the estimate (2,748); the
+reflection's over it (447), so SERV's own overhead is larger on `gpt-5.4-mini` than 200 tokens: the
+reserve's 1.5 margin covers it, and spend is always recorded from the counted tokens.
 
-Over three runs: 1.07 to 1.14 USD a real day without caps, 0.080 to 0.086 with them.
-
-At the default caps the binding one is the 40 calls per agent: an agent would make about 530 calls a
-real day, so the model makes about 8% of its decisions (the first 40 each UTC day) and the rules the
-rest; the 1 USD global cap is not reached at the assumed prices. To let the model make every
-decision for this street, set `NEARAI_AGENT_DAILY_CALLS` to about 600 and
-`NEARAI_DAILY_SPEND_CAP_USD` to about 1.5 at the assumed prices (about 10 if both models cost 1 in, 5
-out). The cost grows with the number of agents: each AI farm the entry rule opens adds about 0.13 USD
-a day uncapped, and the cap on AI farms grows with players (6 players: up to 9 AI farms, about 14
-agents, about 1.8 USD a day uncapped, a little more since every farm also lengthens each
-observation).
+SERV's reflections cost about half of its day: half the 1.03 USD is `gpt-5.4-mini` writing 460
+reflections. Setting `SERV_MODEL=gpt-6-luna` would bring a SERV day to about 0.60 USD. The cost grows
+with the number of agents: the cap on AI farms grows with players (6 players: up to 9 AI farms, about
+14 agents, about 2 USD a SERV day under the days-that-matter rule), and past the shared cap every
+agent runs on its rules until 00:00 UTC. NEAR AI's prices are assumed until it answers; set
+`NEARAI_MAIN_PRICE` and `NEARAI_CHEAP_PRICE` (or let `/v1/models` say). Confirm SERV's in the OpenServ
+console (Usage) and set `SERV_MAIN_PRICE` and `SERV_CHEAP_PRICE` if they differ.
 
 ## Files
 
 - `apps/server/src/agents/decision.ts`: observation, schema, `validateDecision`, `hardDay`.
-- `apps/server/src/agents/brain.ts`: prompts, tiers, caps, `decide`, `reflect`, prices.
+- `apps/server/src/agents/brain.ts`: prompts, the trimmed observation, the days that matter, caps,
+  cache, `decide`, `reflect`, prices, the spend line and the mode.
+- `apps/server/src/ai/provider.ts`, `nearai.ts`, `serv.ts`, `chain.ts`: the provider interface, NEAR
+  AI Cloud, SERV Reasoning, the chain with its breakers, pacing and time budget.
 - `apps/server/src/agents/cast.ts`, `entrants.ts`: personas, the entrant registry.
 - `apps/server/src/agents/rules.ts`: rule policies, reasons, `ruleReflection`.
 - `apps/server/src/game/cast-runtime.ts`: context, entry rule, reasons, weeks.
 - `apps/server/src/chain/chain.ts`: the wallet pool.
-- `apps/server/src/db/migrations.ts`: migration 13.
+- `apps/server/src/db/migrations.ts`: migration 13; migration 15 (`provider_usage`, failures, each
+  agent's latest model answer).
 - Tests: `agents.test.ts`, `entrants.test.ts`, `reflections.test.ts`, `chain.test.ts` (wallet pool),
-  `sim.test.ts` (five seeds with entrants), `agent-compare.test.ts` (model against rules, credits).
+  `sim.test.ts` (five seeds with entrants), `agent-compare.test.ts` (model against rules, costs),
+  `providers.test.ts` (the chain, breakers, caps, cache, mode, with fakes only).

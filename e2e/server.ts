@@ -9,6 +9,7 @@ import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import type { EggGrade } from '@coys/shared';
 import { InferenceBudget } from '../apps/server/src/agents/brain';
+import { ProviderChain } from '../apps/server/src/ai/chain';
 import { createSessionSigner } from '../apps/server/src/auth/session';
 import { NoopChain, type ChainWriter, type MintResult } from '../apps/server/src/chain/chain';
 import { openDb } from '../apps/server/src/db/db';
@@ -98,7 +99,7 @@ export async function startTestServer(): Promise<TestServer> {
     season: 'checks',
     dayLengthMs: DAY_MS,
     provenance: 'bd2daafdc6efe9a68f19d87291d0a41d9ca6cd98a1b1d47568fc06d410ac0651',
-    brain: { client: null, budget: new InferenceBudget(db, 0, now), model: 'none', cheapModel: 'none', pricing: new Map() },
+    brain: { chain: new ProviderChain([]), budget: new InferenceBudget(db, 0, now), pricing: new Map() },
   });
   await game.init();
   const server = createGameServer({

@@ -134,6 +134,10 @@ export interface AgentRow {
   bustDay: number | null;
   lastDecidedDay: number;
   lastBrain: string | null;
+  /** Its latest model answer: the provider, the in-game day and the multiplier it decided at (null before one). */
+  modelProvider: string | null;
+  modelDay: number | null;
+  modelMultiplier: number | null;
   account: string | null;
   /** The entrant registry entry of an AI farm that entered the street; null for the base cast. */
   entrant: string | null;
@@ -159,7 +163,7 @@ export interface WeekStart {
 }
 
 export const AGENT_COLUMNS =
-  'id, kind, role, name, generation, status, cash_milli, farm_id, stock, opened_day, bust_day, last_decided_day, last_brain, near_account_id, entrant_key, reasons, reflection, reflection_day, week_start';
+  'id, kind, role, name, generation, status, cash_milli, farm_id, stock, opened_day, bust_day, last_decided_day, last_brain, model_provider, model_day, model_multiplier, near_account_id, entrant_key, reasons, reflection, reflection_day, week_start';
 
 const json = <T>(v: unknown, fallback: T): T => (typeof v === 'string' ? (JSON.parse(v) as T) : ((v as T | null | undefined) ?? fallback));
 
@@ -179,6 +183,9 @@ export function toAgent(r: Record<string, unknown>): AgentRow {
     bustDay: r.bust_day === null || r.bust_day === undefined ? null : num(r.bust_day),
     lastDecidedDay: num(r.last_decided_day ?? 0),
     lastBrain: (r.last_brain as string | null) ?? null,
+    modelProvider: (r.model_provider as string | null) ?? null,
+    modelDay: r.model_day === null || r.model_day === undefined ? null : num(r.model_day),
+    modelMultiplier: r.model_multiplier === null || r.model_multiplier === undefined ? null : num(r.model_multiplier),
     account: (r.near_account_id as string | null) ?? null,
     entrant: (r.entrant_key as string | null) ?? null,
     reasons: json<AgentReason[]>(r.reasons, []),
