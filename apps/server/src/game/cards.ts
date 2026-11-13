@@ -247,7 +247,8 @@ export async function arriveCards(ctx: Ctx): Promise<void> {
     emit(ctx, farm, { kind: 'cardArrived', card: await cardView(ctx, card) });
     ctx.touched.add(farm.id);
     if (card.kind === 'bulk-order' || card.kind === 'premium-order') {
-      const [clerk] = await ctx.q.query(`SELECT 1 FROM unlocks WHERE farm_id = $1 AND unlock_id = 'clerk'`, [farm.id]);
+      // a broken-down clerk takes no offers
+      const [clerk] = await ctx.q.query(`SELECT 1 FROM unlocks WHERE farm_id = $1 AND unlock_id = 'clerk' AND NOT broken`, [farm.id]);
       const m = await liveMultiplier(ctx);
       const live = toMilli(eggPrice(card.grade && card.grade !== 'any' ? card.grade : 'white', m, []));
       if (clerk && card.offerMilli >= live * farm.clerkFloor) {
