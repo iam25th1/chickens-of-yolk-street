@@ -173,7 +173,8 @@ describe('no scrollbars and nothing cut off', () => {
           if (!t) continue;
           await page.keyboard.press('Escape');
           await page.waitForTimeout(200);
-          await page.mouse.click((t.x + t.w / 2) / dpr, (t.y + t.h / 2) / dpr);
+          // targets() boxes are CSS pixels already (the canvas uses autoDensity)
+          await page.mouse.click(t.x + t.w / 2, t.y + t.h / 2);
           await walk(`card ${kind}`);
         }
         await page.keyboard.press('Escape');
