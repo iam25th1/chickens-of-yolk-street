@@ -85,6 +85,8 @@ describe('no scrollbars and nothing cut off', () => {
         await field.press('Enter');
         await page.locator('[data-ui="topbar"]').waitFor({ timeout: 60_000 });
         await server.seed(name, 6);
+        // hens at auction (as after a bust), so the shop shows its AUCTION tags and the line about them
+        await server.auction(3);
         await server.closeDays(9);
         await page.waitForTimeout(1500);
 
