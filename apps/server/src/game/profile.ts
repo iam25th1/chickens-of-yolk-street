@@ -3,7 +3,7 @@
 // the one-time fill from history for farms older than the profile, and the two views: the player's
 // own profile (private, over the WebSocket) and a farm's public profile (a whitelist, for anyone).
 import {
-  BADGES,
+  BADGE_BY_ID,
   BADGE_RULES,
   ECONOMY,
   EGG_GRADES,
@@ -498,9 +498,9 @@ export async function rivalsOutlasted(q: Queryable, farmIds: string[]): Promise<
 export async function earnedBadges(q: Queryable, farmIds: string[]): Promise<Map<string, BadgeMark[]>> {
   const out = new Map<string, BadgeMark[]>();
   if (!farmIds.length) return out;
-  const known = new Set(BADGES.map((b) => b.id));
   for (const r of await q.query('SELECT farm_id, badge, tier FROM badges WHERE tier IS NOT NULL AND farm_id = ANY($1::text[])', [farmIds])) {
-    if (!known.has(String(r.badge))) continue;
+    // the catalog, and any league season's badge
+    if (!BADGE_BY_ID.has(String(r.badge))) continue;
     const list = out.get(String(r.farm_id)) ?? [];
     list.push({ id: String(r.badge), level: r.tier as BadgeLevel });
     out.set(String(r.farm_id), list);
@@ -508,8 +508,15 @@ export async function earnedBadges(q: Queryable, farmIds: string[]): Promise<Map
   return out;
 }
 
-/** The player's own profile. Private: sent only to the farm's player. */
-export async function profileFor(q: Queryable, farmId: string, day: number, facts: Partial<Record<string, number>>, badges: ProfileData['badges']): Promise<ProfileData> {
+/** The player's own profile. Private: sent only to the farm's player. `league`: its best league finishes (game/league.ts bestRanks). */
+export async function profileFor(
+  q: Queryable,
+  farmId: string,
+  day: number,
+  facts: Partial<Record<string, number>>,
+  badges: ProfileData['badges'],
+  league: ProfileData['league'] = { bestWeek: null, bestSeason: null },
+): Promise<ProfileData> {
   const [f] = await q.query('SELECT id, name, cash_milli, created_day, good_days, eggs_sold, haggles_won FROM farms WHERE id = $1', [farmId]);
   if (!f) throw new Error('farm not found');
   const [st] = await q.query('SELECT * FROM farm_stats WHERE farm_id = $1', [farmId]);
@@ -625,6 +632,7 @@ export async function profileFor(q: Queryable, farmId: string, day: number, fact
     },
     mint: { ticketsWon: num(tickets?.n), milestones: num(rolls?.n), minted },
     badges,
+    league,
   };
 }
 
@@ -639,7 +647,7 @@ export const PUBLIC_ID = /^[A-Za-z0-9-]{1,64}$/;
 export async function publicProfileFor(q: Queryable, farmId: string, day: number): Promise<PublicProfile | null> {
   if (!PUBLIC_ID.test(farmId)) return null;
   const [f] = await q.query(
-    `SELECT f.id, f.name, f.owner_kind, f.bust_day, f.created_day, f.eggs_sold, f.haggles_won, a.kind AS agent_kind,
+    `SELECT f.id, f.name, f.owner_kind, f.bust_day, f.busts, f.created_day, f.eggs_sold, f.haggles_won, a.kind AS agent_kind,
        (SELECT count(*) FROM hens h WHERE h.farm_id = f.id AND h.status = 'alive') AS hens,
        (SELECT p.auth_provider = 'guest' FROM players p WHERE p.id = f.player_id) AS guest
      FROM farms f LEFT JOIN agents a ON a.farm_id = f.id WHERE f.id = $1 LIMIT 1`,
@@ -655,6 +663,7 @@ export async function publicProfileFor(q: Queryable, farmId: string, day: number
     kind: isAgent ? ((f.agent_kind as AgentKind | null) ?? 'upstart') : 'player',
     guest: f.guest === true,
     bust: f.bust_day !== null && f.bust_day !== undefined,
+    busts: num(f.busts),
     rank: ranks.get(farmId) ?? null,
     farms: ranks.size,
     daysOnStreet: Math.max(0, day - num(f.created_day)),

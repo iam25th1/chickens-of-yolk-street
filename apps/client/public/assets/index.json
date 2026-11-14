@@ -2,8 +2,8 @@
   "version": 1,
   "source": {
     "repo": "iam25th1/coys-assets",
-    "commit": "a2a8ebbbf1bd414f55c14d3a3cb2a042f2cef0a9",
-    "manifestSha256": "fd9ca28e316ec1985e584f904a55b0c985cb247b7fc4072bec5822636c41796a"
+    "commit": "ec3286cf8631c9290d143f92612ed8d364ec78b8",
+    "manifestSha256": "e00fa5005326197b30818dda23a9b96b9afc3945fd7fc4a286c491db0bd2490e"
   },
   "sprites": {
     "01-hen-base": {
@@ -3195,13 +3195,13 @@
     "x-badge-icons": {
       "json": "sprites/x-badge-icons.json",
       "png": "sprites/x-badge-icons.png",
-      "sha256": "dd64889535e8d9ad546ab24fb62657da45ca0ace30eaf7b5ce8afb55c83b2d0a",
+      "sha256": "ddf48b65fba420b680f431f13c115a1ece8d448d37e909771628026dadb350ae",
       "source": "art/x-badge-icons/x-badge-icons.png",
       "role": "extra",
       "docTracker": null,
       "label": "badge icons",
       "width": 128,
-      "height": 5120,
+      "height": 5376,
       "grid": 8,
       "anchor": "center",
       "static": false,
@@ -3441,6 +3441,18 @@
           "totalMs": 1000
         },
         "sparkle": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "season": {
+          "mode": "loop",
+          "vanish": false,
+          "frameCount": 1,
+          "totalMs": 1000
+        },
+        "comeback": {
           "mode": "loop",
           "vanish": false,
           "frameCount": 1,

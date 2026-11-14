@@ -1,5 +1,6 @@
 export * from './badges';
 export * from './economy';
+export * from './league';
 export * from './market';
 export * from './names';
 export * from './pixels';

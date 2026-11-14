@@ -696,6 +696,68 @@ CREATE INDEX guest_starts_ip ON guest_starts (ip_hash, started_at);
 CREATE INDEX guest_starts_at ON guest_starts (started_at);
 `,
   },
+  {
+    id: 19,
+    name: 'league',
+    sql: `
+-- The league (game/league.ts, docs/league.md): weekly and seasonal leaderboards by profit at book
+-- values. busts: times a farm went bust (an AI farm broke, a guest farm idled or was retired, a
+-- player took a Fresh Start); every farm already bust counts once. grade_boost: steps the farm's next
+-- Feather redemption grade up (a season's top 10), capped at golden-quill, then back to 0.
+ALTER TABLE farms ADD COLUMN busts integer NOT NULL DEFAULT 0;
+UPDATE farms SET busts = 1 WHERE bust_day IS NOT NULL;
+ALTER TABLE farms ADD COLUMN grade_boost integer NOT NULL DEFAULT 0;
+-- a 'retired' holder of a farm the player chose not to keep: the account player it was split from,
+-- so a ticket queued on that farm still mints to the account's wallet
+ALTER TABLE players ADD COLUMN retired_from text;
+-- the windows: a week (w-YYYY-MM-DD, its Monday) or a season (s-<n>); warm-up weeks (before
+-- LEAGUE_START) score but reward nothing. A closed season keeps the SHA-256 of its canonical
+-- standings and the chain call that stored it (sent, noop or failed; retried at boot if failed).
+CREATE TABLE league_windows (
+  id text PRIMARY KEY,
+  kind text NOT NULL CHECK (kind IN ('week', 'season')),
+  seq integer NOT NULL,
+  starts_at bigint NOT NULL,
+  ends_at bigint NOT NULL,
+  warmup boolean NOT NULL DEFAULT false,
+  status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  closed_at bigint,
+  standings_sha256 text,
+  chain_tx text,
+  chain_status text
+);
+CREATE INDEX league_windows_open ON league_windows (kind, status);
+-- one farm in one window: its net worth at the start (taken at the window's open, or when the farm
+-- was made), at the end (the close, or frozen when it went bust), what is taken out of its profit
+-- (Fresh Start grants; player-to-player trades are taken out when scored), its final score, rank and
+-- bust count (null while open), and its rank at the last day close (the arrows)
+CREATE TABLE league_entries (
+  window_id text NOT NULL REFERENCES league_windows(id),
+  farm_id text NOT NULL REFERENCES farms(id),
+  start_worth_milli bigint NOT NULL,
+  start_at bigint NOT NULL,
+  end_worth_milli bigint,
+  excluded_milli bigint NOT NULL DEFAULT 0,
+  score_milli bigint,
+  rank integer,
+  bust boolean NOT NULL DEFAULT false,
+  busts_at_close integer,
+  prev_rank integer,
+  PRIMARY KEY (window_id, farm_id)
+);
+CREATE INDEX league_entries_farm ON league_entries (farm_id);
+-- every reward a window's close gave (ticket, grade-boost, badge, comeback): once each
+CREATE TABLE league_rewards (
+  window_id text NOT NULL REFERENCES league_windows(id),
+  farm_id text NOT NULL REFERENCES farms(id),
+  reward text NOT NULL,
+  granted_at bigint NOT NULL,
+  PRIMARY KEY (window_id, farm_id, reward)
+);
+-- player-to-player trades by time, for the league's exclusion of them
+CREATE INDEX trades_player_at ON trades (at) WHERE via = 'player';
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

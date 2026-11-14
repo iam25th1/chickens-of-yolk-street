@@ -47,6 +47,8 @@ export const BADGE_ICONS = [
   'mystery',
   'chick',
   'sparkle',
+  'season',
+  'comeback',
 ] as const;
 export type BadgeIcon = (typeof BADGE_ICONS)[number];
 
@@ -136,6 +138,8 @@ export const BADGE_METRICS = [
   'renamed',
   'landPlots',
   'landCoops',
+  'comebacks',
+  'seasonPlace',
 ] as const;
 export type BadgeMetric = (typeof BADGE_METRICS)[number];
 
@@ -248,6 +252,8 @@ export const BADGES: readonly BadgeDef[] = [
     { id: 'number-one', name: 'NUMBER ONE', icon: 'number-one', metric: 'firstDays', levels: [1, 7, 30], text: (n) => `CLOSE ${s(n, 'DAY')} AS THE RICHEST FARM ON THE STREET.` },
     { id: 'top-half', name: 'TOP HALF', icon: 'rank', metric: 'topHalfDays', levels: [1, 10, 50], text: (n) => `CLOSE ${s(n, 'DAY')} IN THE TOP HALF OF THE STREET.` },
     { id: 'climber', name: 'CLIMBER', icon: 'rank', metric: 'bestClimb', levels: [2, 5, 10], text: (n) => `CLIMB ${n} PLACES IN ONE DAY.` },
+    // granted at a league week's close (game/league.ts): the farm's comeback rewards count it
+    { id: 'comeback', name: 'COMEBACK', icon: 'comeback', metric: 'comebacks', levels: [1], text: () => 'COME BACK FROM A BUST AND FINISH A WEEK IN THE TOP 10.' },
   ]),
   ...group('feathers', [
     { id: 'ticket-holder', name: 'TICKET HOLDER', icon: 'ticket', metric: 'ticketsWon', levels: [1], text: () => 'WIN A FEATHER TICKET.' },
@@ -277,7 +283,43 @@ export const BADGES: readonly BadgeDef[] = [
   ]),
 ];
 
-export const BADGE_BY_ID: ReadonlyMap<string, BadgeDef> = new Map(BADGES.map((b) => [b.id, b]));
+/** A league season's badge id: season-<n>. */
+export const SEASON_BADGE_ID = /^season-([1-9][0-9]{0,5})$/;
+export const seasonBadgeId = (seq: number): string => `season-${seq}`;
+
+/** A season badge's line for a level's threshold: 1 bronze, 2 silver, 3 gold. */
+const seasonText = (n: string, level: number): string =>
+  level >= 3 ? `WIN SEASON ${n} OF THE LEAGUE.` : level === 2 ? `FINISH SEASON ${n} OF THE LEAGUE IN THE TOP 10.` : `SELL EGGS IN SEASON ${n} OF THE LEAGUE.`;
+
+/**
+ * A league season's badge, made on demand (one per season, never in BADGES): bronze for selling eggs
+ * in the season, silver for a top 10 finish, gold for first. Its count is the place level (1 to 3).
+ */
+export function seasonBadgeDef(id: string): BadgeDef | null {
+  const n = SEASON_BADGE_ID.exec(id)?.[1];
+  if (!n) return null;
+  return { id, name: `SEASON ${n}`, category: 'rivals', icon: 'season', secret: false, metric: 'seasonPlace', levels: [1, 2, 3], text: (lvl) => seasonText(n, lvl) };
+}
+
+/** The catalog by id: the badges in BADGES, and any season's badge (season-<n>), made on demand. */
+class BadgeCatalog extends Map<string, BadgeDef> {
+  private readonly seasons = new Map<string, BadgeDef>();
+  override get(id: string): BadgeDef | undefined {
+    const known = super.get(id);
+    if (known) return known;
+    let made = this.seasons.get(id);
+    if (!made) {
+      made = seasonBadgeDef(id) ?? undefined;
+      if (made) this.seasons.set(id, made);
+    }
+    return made;
+  }
+  override has(id: string): boolean {
+    return super.has(id) || SEASON_BADGE_ID.test(id);
+  }
+}
+
+export const BADGE_BY_ID: ReadonlyMap<string, BadgeDef> = new BadgeCatalog(BADGES.map((b) => [b.id, b]));
 
 /** The levels a badge has, lowest first: plain, or bronze, silver and gold. */
 export const badgeLevels = (b: BadgeDef): BadgeLevel[] => (b.levels.length === 1 ? ['plain'] : [...BADGE_TIERS]);

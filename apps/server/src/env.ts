@@ -1,7 +1,7 @@
 // Reads configuration from the environment. Variable names only are ever logged, never values.
 import { randomBytes } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
-import { ECONOMY } from '@coys/shared';
+import { ECONOMY, LEAGUE_DEFAULTS, type LeagueConfig } from '@coys/shared';
 import { AGENT_DAILY_CALLS, DECISION_GAP_DAYS, PRICE_MOVE } from './agents/brain';
 import { CLOSE_BUDGET_MS } from './ai/chain';
 import { SERV_REASONING_EFFORTS, type ServReasoningEffort } from './ai/serv';
@@ -35,6 +35,8 @@ export interface ServerConfig {
   settleEvery: number;
   /** Guest play's limits (GUEST_FARMS_PER_IP_PER_DAY, GUEST_FARMS_PER_HOUR), or null when either is 0 (guest play off). */
   guestLimits: GuestLimits | null;
+  /** The league: LEAGUE_START (ms) and LEAGUE_SEASON_DAYS. */
+  league: LeagueConfig;
 }
 
 /** Season ids as the game contract accepts them. */
@@ -85,7 +87,33 @@ export function readConfig(env: NodeJS.ProcessEnv, repoRoot: string): ServerConf
     demoDayIgnored: demoSeconds !== null && !demoAllowed,
     settleEvery: settleEveryDays(env.SETTLE_EVERY_DAYS),
     guestLimits: guestLimits(env),
+    league: leagueConfig(env),
   };
+}
+
+/**
+ * The league's windows: LEAGUE_START, an ISO date and time (default 2026-11-16T00:00:00Z, a Monday;
+ * the first league week is the one starting on the first Monday 00:00 UTC at or after it, and weeks
+ * before it are warm-ups), and LEAGUE_SEASON_DAYS, a whole number of days from 1 to 90 (default 14).
+ */
+export function leagueConfig(env: NodeJS.ProcessEnv): LeagueConfig {
+  const rawStart = env.LEAGUE_START;
+  let start = LEAGUE_DEFAULTS.start;
+  if (rawStart) {
+    // a date and time with its zone (Z or an offset), so the start never depends on the host's zone
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/.test(rawStart) || !Number.isFinite(Date.parse(rawStart))) {
+      throw new Error('LEAGUE_START must be an ISO date and time with its zone, for example 2026-11-16T00:00:00Z');
+    }
+    start = Date.parse(rawStart);
+  }
+  const rawDays = env.LEAGUE_SEASON_DAYS;
+  let seasonDays = LEAGUE_DEFAULTS.seasonDays;
+  if (rawDays) {
+    const n = Number(rawDays);
+    if (!Number.isInteger(n) || n < 1 || n > 90) throw new Error('LEAGUE_SEASON_DAYS must be a whole number from 1 to 90');
+    seasonDays = n;
+  }
+  return { start, seasonDays };
 }
 
 /** The guest limits: whole numbers from 0 (guest play off) to 100000; the defaults when unset. */
@@ -201,6 +229,8 @@ export const ENV_NAMES = [
   'GAME_SEASON',
   'DEMO_DAY_SECONDS',
   'SETTLE_EVERY_DAYS',
+  'LEAGUE_START',
+  'LEAGUE_SEASON_DAYS',
   'DEMO_MODE',
   'SESSION_SECRET',
   'ALLOW_DEV_LOGIN',

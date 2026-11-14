@@ -3,7 +3,7 @@
 // silhouette and the number only), and the reveal when a mint the player did not watch (a catch-up
 // at a day close) lands. The Feather Mint itself is FeatherMint.tsx; the minting moment MintMoment.tsx.
 import { useEffect, useState } from 'react';
-import { ECONOMY, type FeatherGrade, type MarketState, type MilestoneId, type Rarity } from '@coys/shared';
+import { ECONOMY, type FeatherGrade, type MarketState, type Rarity, type TicketMilestone } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { juice } from '../motion/juice';
 import { CardStamp } from './Cards';
@@ -70,7 +70,7 @@ export interface RevealState {
   ticketId: string;
   number: number;
   grade: FeatherGrade;
-  milestone: MilestoneId;
+  milestone: TicketMilestone;
   txHash: string | null;
   day: number;
 }

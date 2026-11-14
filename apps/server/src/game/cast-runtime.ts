@@ -42,6 +42,7 @@ import {
   type Farm,
   type WeekStart,
 } from './ctx';
+import { freezeEntries } from './league';
 import { activeFarms, executeFill, liveMultiplier, loadOrderById, openSells, placeBuyOrder, placeSellOrder, recordTrade } from './market';
 import { pick } from './rng';
 
@@ -458,8 +459,10 @@ export async function bustIfBroke(ctx: Ctx, agent: AgentRow): Promise<boolean> {
   if (cash >= toMilli(ECONOMY.agents.bustBelowCash)) return false;
   let hens = 0;
   if (agent.farmId) {
+    // its league scores freeze first, at what it holds now; then its hens go to auction
+    await freezeEntries(ctx, agent.farmId);
     hens = (await ctx.q.query(`UPDATE hens SET status = 'auction', farm_id = NULL WHERE farm_id = $1 AND status = 'alive' RETURNING id`, [agent.farmId])).length;
-    await ctx.q.query('UPDATE farms SET bust_day = $2 WHERE id = $1', [agent.farmId, ctx.day]);
+    await ctx.q.query('UPDATE farms SET bust_day = $2, busts = busts + 1 WHERE id = $1', [agent.farmId, ctx.day]);
   }
   await ctx.q.query(`UPDATE agents SET status = 'bust', bust_day = $2 WHERE id = $1`, [agent.id, ctx.day]);
   await ctx.q.query(`UPDATE orders SET status = 'cancelled' WHERE agent_id = $1 AND status = 'open'`, [agent.id]);
@@ -485,21 +488,31 @@ export async function loyalistCreditQuote(ctx: Ctx, farm: Farm, tier: FeedTier, 
   return { agent, unitMilli };
 }
 
-/** The farm's chosen supplier quotes a bag (the Squeezer prices desperation in; the Loyalist rewards loyalty). */
+/** The open feed suppliers. */
+export async function openSuppliers(ctx: Ctx): Promise<AgentRow[]> {
+  return loadAgents(ctx, `status = 'open' AND role = 'supplier'`);
+}
+
+/** One supplier's price for a bag of a tier for this farm (the Squeezer prices desperation in; the Loyalist rewards loyalty). */
+export async function quoteFrom(ctx: Ctx, farm: Farm, agent: AgentRow, tier: FeedTier, hens: number): Promise<number> {
+  const feed = farm.feed.cheap + farm.feed.standard + farm.feed.premium;
+  const feedDays = hens ? feed / (hens * feedGramsPerHenDay()) : 99;
+  const base =
+    agent.kind === 'squeezer' ? squeezerBagPrice(tier, desperation(feedDays, farm.cashMilli / 1000)) : loyalistBagPrice(tier, (await loadMemory(ctx.q, agent.id, farm.id)).deals);
+  return toMilli(base * (agent.stock.markup ?? 1));
+}
+
+/** With no supplier open (or none with the tier), the feed mill sells at list price plus a little. */
+export const millBagMilli = (tier: FeedTier): number => toMilli(ECONOMY.feed.tiers[tier].bagPrice * 1.15);
+
+/** The farm's chosen supplier quotes a bag (the other one when it has none of the tier, else the mill). */
 export async function supplierQuote(ctx: Ctx, farm: Farm, tier: FeedTier, hens: number): Promise<{ agent: AgentRow | null; unitMilli: number }> {
-  const agents = await loadAgents(ctx, `status = 'open' AND role = 'supplier'`);
+  const agents = await openSuppliers(ctx);
   const order = [farm.supplier, farm.supplier === 'squeezer' ? 'loyalist' : 'squeezer'];
   for (const kind of order) {
     const agent = agents.find((a) => a.kind === kind && (a.stock[tier] ?? 0) > 0);
     if (!agent) continue;
-    const feed = farm.feed.cheap + farm.feed.standard + farm.feed.premium;
-    const feedDays = hens ? feed / (hens * feedGramsPerHenDay()) : 99;
-    const base =
-      kind === 'squeezer'
-        ? squeezerBagPrice(tier, desperation(feedDays, farm.cashMilli / 1000))
-        : loyalistBagPrice(tier, (await loadMemory(ctx.q, agent.id, farm.id)).deals);
-    return { agent, unitMilli: toMilli(base * (agent.stock.markup ?? 1)) };
+    return { agent, unitMilli: await quoteFrom(ctx, farm, agent, tier, hens) };
   }
-  // no supplier open: the feed mill sells at list price plus a little
-  return { agent: null, unitMilli: toMilli(ECONOMY.feed.tiers[tier].bagPrice * 1.15) };
+  return { agent: null, unitMilli: millBagMilli(tier) };
 }

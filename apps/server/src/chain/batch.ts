@@ -224,15 +224,16 @@ async function eggMoves(db: Db, firstDay: number, lastDay: number): Promise<{ mo
 export async function buildDayBatch(db: Db, season: string, day: number, opts: { feathers: FeatherOpts | null; renderer: FeatherRenderer | null }): Promise<BuiltBatch> {
   const { moves, balances, farmAccounts } = await eggMoves(db, day, day);
 
-  // Feathers: redeemed tickets of this season, oldest redemption first, to the player's wallet (the
-  // contract mints a Feather only in the season that won it, and only in its live season)
+  // Feathers: redeemed tickets of this season, oldest redemption first, to the player's wallet (a
+  // retired holder's: its account's) (the contract mints a Feather only in the season that won it,
+  // and only in its live season)
   const minted: MintedFeather[] = [];
   const feather_mints: FeatherMint[] = [];
   if (opts.feathers && opts.renderer && opts.feathers.cap > 0) {
     const queued = await db.query(
-      `SELECT t.id, t.grade, t.milestone, t.season, t.day, p.near_account_id AS account FROM feather_tickets t
-       JOIN farms f ON f.id = t.farm_id LEFT JOIN players p ON p.id = f.player_id
-       WHERE t.status = 'queued' AND t.season = $2 AND p.near_account_id IS NOT NULL ORDER BY t.redeemed_seq, t.id LIMIT $1`,
+      `SELECT t.id, t.grade, t.milestone, t.season, t.day, COALESCE(p.near_account_id, r.near_account_id) AS account FROM feather_tickets t
+       JOIN farms f ON f.id = t.farm_id LEFT JOIN players p ON p.id = f.player_id LEFT JOIN players r ON r.id = p.retired_from
+       WHERE t.status = 'queued' AND t.season = $2 AND COALESCE(p.near_account_id, r.near_account_id) IS NOT NULL ORDER BY t.redeemed_seq, t.id LIMIT $1`,
       [opts.feathers.cap, season],
     );
     for (const t of queued) {

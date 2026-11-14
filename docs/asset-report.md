@@ -81,7 +81,7 @@ Factor 1 means no downscale passes: the art keeps its original resolution, and t
 | 34-cursor | exact | 512x384 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 55.96% | 8 | 0.00% | 8 | 0.00% |
 | 35-particles | exact | 768x1024 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 57.23% | 8 | 0.00% | 8 | 0.00% |
 | x-badge-frames | exact | 1024x1280 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 23.28% | 8 | 0.00% | 8 | 0.00% |
-| x-badge-icons | exact | 128x5120 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 42.62% | 8 | 0.00% | 8 | 0.00% |
+| x-badge-icons | exact | 128x5376 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 42.53% | 8 | 0.00% | 8 | 0.00% |
 | x-feather-fluff | exact | 1024x768 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 39.29% | 8 | 0.00% | 8 | 0.00% |
 | x-feather-golden-quill | exact | 1024x768 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 49.79% | 8 | 0.00% | 8 | 0.00% |
 | x-feather-plume | exact | 1024x768 | 2: 0.00%, 4: 0.00%, 8: 0.00%, 16: 37.56% | 8 | 0.00% | 8 | 0.00% |
@@ -123,5 +123,5 @@ Painted pages are WebP (quality 90, alpha lossless); exact pages are lossless PN
 | cards.wide@2 | 4076x716 | 1084.0 KB |
 | cards.wide@3 | 4096x1430 | 1945.5 KB |
 | cards.wide@4 | 4082x1896 | 2553.0 KB |
-| ui | 510x642 | 8.7 KB |
+| ui | 510x674 | 8.9 KB |
 | fx | 355x130 | 5.0 KB |

@@ -3,7 +3,8 @@ import { InferenceBudget, type Pricing } from '../src/agents/brain';
 import { ProviderChain } from '../src/ai/chain';
 import type { InferenceProvider } from '../src/ai/provider';
 import { buildDayBatch, buildLateSettlement, buildRangeBatch, commitBalances, commitBatch, digestOf, type DayBatch, type RangeBatch } from '../src/chain/batch';
-import { NoopChain, assignAgentWallets, type ChainWriter, type LateResult, type MintRequest, type MintResult, type RangeResult, type SettleResult } from '../src/chain/chain';
+import type { LeagueConfig } from '@coys/shared';
+import { NoopChain, assignAgentWallets, type ChainWriter, type LateResult, type MintRequest, type MintResult, type RangeResult, type SettleResult, type StandingsResult } from '../src/chain/chain';
 import { tokenFor, type Collection } from '../src/chain/mint';
 import { Game } from '../src/game/game';
 import { seededRng } from '../src/game/rng';
@@ -49,6 +50,9 @@ export class RecordingChain implements ChainWriter {
   /** Ranges settled in one call (SETTLE_EVERY_DAYS above 1), in order, and what the next range calls do instead of landing. */
   readonly ranges: { batch: RangeBatch; result: RangeResult }[] = [];
   rangeScript: 'fail'[] = [];
+  /** League seasons' standings stored, in call order, and what the next calls do instead of landing. */
+  readonly standings: { seq: number; digest: string; result: StandingsResult }[] = [];
+  standingsScript: 'fail'[] = [];
   constructor(
     readonly gameAccount = 'game.testnet',
     /** Unused since Feathers mint at once; kept so older tests construct the same way. */
@@ -111,6 +115,13 @@ export class RecordingChain implements ChainWriter {
     );
   }
 
+  async storeStandings(seq: number, digest: string): Promise<StandingsResult> {
+    const result: StandingsResult =
+      this.standingsScript.shift() === 'fail' ? { status: 'failed', txHash: null, error: 'NEAR testnet refused the call' } : { status: 'sent', txHash: `standings-league-${seq}` };
+    this.standings.push({ seq, digest, result });
+    return result;
+  }
+
   async settleLateDays(db: Db, season: string, days: number[]): Promise<LateResult> {
     const out: LateResult['days'] = [];
     for (const day of days) {
@@ -138,10 +149,14 @@ export async function makeGame(
     settleEvery?: number;
     /** Priced as the server prices the models (ASSUMED_PRICING), instead of 1 in, 5 out for main models and 0.1 in, 0.5 out for cheap ones. */
     realModels?: boolean;
+    /** A clock to share (a second game on the same database, say); a fresh one at 2026-11-11 12:00 UTC by default. */
+    clock?: { t: number };
+    /** LEAGUE_START and LEAGUE_SEASON_DAYS (default the server's). */
+    league?: LeagueConfig;
   } = {},
 ): Promise<TestGame> {
   const db = opts.db ?? (await openDb('memory://'));
-  const clock = { t: Date.UTC(2026, 10, 11, 12) };
+  const clock = opts.clock ?? { t: Date.UTC(2026, 10, 11, 12) };
   const logs: string[] = [];
   const log = (line: string) => logs.push(line);
   const providers = opts.providers ?? (opts.client ? [opts.client] : []);
@@ -155,6 +170,7 @@ export async function makeGame(
     cast: opts.cast ?? false,
     season: opts.season ?? null,
     settleEvery: opts.settleEvery,
+    league: opts.league,
     brain: {
       // pacing gaps are not waited for in tests
       chain: new ProviderChain(providers, { sleep: async () => undefined }),

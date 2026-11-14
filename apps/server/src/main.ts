@@ -81,6 +81,7 @@ const game = new Game({
   season: config.season,
   dayLengthMs: config.dayLengthMs,
   settleEvery: config.settleEvery,
+  league: config.league,
   provenance,
   brain: {
     chain: providerChain,
@@ -92,6 +93,7 @@ const game = new Game({
 });
 await game.init();
 log(`[season] ${game.season}${config.season ? '' : ' (GAME_SEASON unset: kept from the database, or made for a fresh one)'}`);
+log(`[league] LEAGUE_START ${new Date(config.league.start).toISOString()}, seasons of ${config.league.seasonDays} days`);
 
 const server = createGameServer({
   game,

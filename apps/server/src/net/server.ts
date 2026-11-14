@@ -261,6 +261,16 @@ export function createGameServer(opts: GameServerOptions): Server {
         if (req.method === 'GET' && url.pathname === '/api/market') {
           return json(res, 200, { market: await game.getMarketState(), clock: game.getClock() });
         }
+        // the league's boards (game/league.ts): public, no player ids, wallets or coins
+        if (req.method === 'GET' && url.pathname === '/api/leaderboard') {
+          const board = url.searchParams.get('board') ?? 'week';
+          const id = url.searchParams.get('id');
+          if (board !== 'week' && board !== 'season') return json(res, 400, { error: 'bad_request' });
+          // window ids are w-YYYY-MM-DD or s-<n>: anything else is simply not found
+          if (id !== null && !/^(w-\d{4}-\d{2}-\d{2}|s-\d{1,6})$/.test(id)) return json(res, 404, { error: 'not_found' });
+          const view = await game.getLeaderboard(board, id);
+          return view ? json(res, 200, view) : json(res, 404, { error: 'not_found' });
+        }
         // a farm's public profile: a whitelist of public fields (game/profile.ts), for anyone
         if (req.method === 'GET' && url.pathname.startsWith('/api/profile/')) {
           // farm ids are letters, digits and dashes: anything else is simply not found
