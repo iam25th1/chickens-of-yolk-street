@@ -43,11 +43,26 @@ export const OPEN_MINT_KEY = 'coys.openMint';
 export type UiEvent = { kind: 'opened'; modal: ModalState } | { kind: 'tab'; modal: 'shop' | 'market' | 'profile'; tab: string } | { kind: 'tapped'; what: string };
 export const uiEvents = new Emitter<UiEvent>();
 
+/**
+ * Going into or out of the Market changes the whole picture (the farm's canvas becomes the town
+ * square): the farm screen registers how that change goes through the curtain (app/curtain.ts).
+ */
+let pageSwap: ((apply: () => void) => void) | null = null;
+export function setPageSwap(fn: ((apply: () => void) => void) | null): void {
+  pageSwap = fn;
+}
+const isMarket = (m: ModalState | null) => m?.kind === 'market';
+
 export function openModal(modal: ModalState): void {
-  ui.set({ modal });
-  uiEvents.emit({ kind: 'opened', modal });
+  const apply = () => {
+    ui.set({ modal });
+    uiEvents.emit({ kind: 'opened', modal });
+  };
+  if (pageSwap && isMarket(modal) !== isMarket(ui.get().modal)) pageSwap(apply);
+  else apply();
 }
 
 export function closeModal(): void {
-  ui.set({ modal: null });
+  if (pageSwap && isMarket(ui.get().modal)) pageSwap(() => ui.set({ modal: null }));
+  else ui.set({ modal: null });
 }

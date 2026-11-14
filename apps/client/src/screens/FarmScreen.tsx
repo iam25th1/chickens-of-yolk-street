@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isCrash, type CardView } from '@coys/shared';
 import { useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
+import { farmDrawn, swap } from '../app/curtain';
 import { viewport, worldToUi } from '../app/viewport';
 import { GameSocket, type Action } from '../net/socket';
 import { FarmScene, type WorldTarget } from '../pixi/farm/FarmScene';
@@ -17,7 +18,7 @@ import { TownScene } from '../pixi/TownScene';
 import { events, game } from '../state/game';
 import { useStore } from '../state/store';
 import { startTourFor, tour } from '../state/tour';
-import { OPEN_MINT_KEY, closeModal, openModal, ui, type ModalState, type SaveReason } from '../state/ui';
+import { OPEN_MINT_KEY, closeModal, openModal, setPageSwap, ui, type ModalState, type SaveReason } from '../state/ui';
 import { CardOverlay, type OverlayResult } from '../ui/CardOverlay';
 import { LOOK } from '../ui/cast';
 import { SidePanel } from '../ui/Desk';
@@ -191,6 +192,8 @@ export function FarmScreen({ session, accountId, onSignedOut, onSave }: { sessio
     (window as unknown as { __coysTour?: unknown }).__coysTour = { count: TOUR.length, show: (step: number) => tour.set({ active: true, step }), end: () => tour.set({ active: false, step: 0 }) };
     s.sync(farm);
     pixi.setScene(s);
+    // the farm has drawn: the curtain over the screen change opens (app/curtain.ts)
+    requestAnimationFrame(() => farmDrawn());
     // drag the farm, or the arrow keys and WASD (not while a modal or the tour is up, or a field has the keys)
     unlook.current = attachLook(
       pixi.app.canvas,
@@ -268,6 +271,18 @@ export function FarmScreen({ session, accountId, onSignedOut, onSave }: { sessio
       town.current = null;
     }
   }, [marketOpen, townArt, assets, audio, pixi]);
+
+  // into and out of the Market through the curtain: the town square's art is in, the page and the
+  // town square are up and drawn, then the curtain opens (no half-drawn or previous frame)
+  useEffect(() => {
+    setPageSwap((apply) => {
+      void swap(async () => {
+        if (!viewport.get().portrait) await assets.loadGroups(['market'], viewport.get().p, { quick: true }).catch(() => undefined);
+        apply();
+      });
+    });
+    return () => setPageSwap(null);
+  }, [assets]);
 
   // the farm's music starts once its sharp art is in (the stream would otherwise share the line)
   const crashed = market ? isCrash(market.multiplier) : false;
