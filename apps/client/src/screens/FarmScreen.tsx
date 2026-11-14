@@ -17,7 +17,7 @@ import { TownScene } from '../pixi/TownScene';
 import { events, game } from '../state/game';
 import { useStore } from '../state/store';
 import { startTourFor, tour } from '../state/tour';
-import { OPEN_MINT_KEY, closeModal, openModal, ui, type ModalState } from '../state/ui';
+import { OPEN_MINT_KEY, closeModal, openModal, ui, type ModalState, type SaveReason } from '../state/ui';
 import { CardOverlay, type OverlayResult } from '../ui/CardOverlay';
 import { LOOK } from '../ui/cast';
 import { SidePanel } from '../ui/Desk';
@@ -37,6 +37,7 @@ import { HenPanel, MachinePanel, SellPanel } from '../ui/WorldPanels';
 import { NameFarm } from '../ui/NameFarm';
 import { ProfilePage } from '../ui/Profile';
 import { PublicProfileModal } from '../ui/PublicProfile';
+import { SaveFarm } from '../ui/SaveFarm';
 import { BadgeMoments } from '../ui/BadgeMoment';
 import { LookAround } from '../ui/Land';
 import { LAND_NAME } from '@coys/shared';
@@ -75,9 +76,29 @@ const REFUSALS: Record<string, string> = {
   invalid_action: 'CANNOT DO THAT RIGHT NOW',
   not_found: 'THAT IS GONE ALREADY',
   farm_bust: 'THIS FARM IS BUST',
+  sign_in: 'SIGN IN TO MINT: FEATHERS NEED A NEAR WALLET',
 };
 
-export function FarmScreen({ session, accountId, onSignedOut }: { session: string; accountId: string | null; onSignedOut: () => void }) {
+/** Real play time before a guest is asked (once a session) to save the farm. */
+export const NUDGE_AFTER_MS = 10 * 60 * 1000;
+const PLAYED_KEY = 'coys.guestPlayedMs';
+const NUDGED_KEY = 'coys.guestNudged';
+const sessionNumber = (key: string): number => {
+  try {
+    return Number(sessionStorage.getItem(key) ?? 0) || 0;
+  } catch {
+    return 0;
+  }
+};
+const setSession = (key: string, value: string): void => {
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // storage blocked: the count lasts for this page only
+  }
+};
+
+export function FarmScreen({ session, accountId, onSignedOut, onSave }: { session: string; accountId: string | null; onSignedOut: () => void; onSave: () => void }) {
   const { assets, audio, pixi } = useServices();
   const v = useViewport();
   const farm = useStore(game, (s) => s.farm);
@@ -89,6 +110,11 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
   // the open card's live state: haggle mood and outcome arrive as events
   const [cardState, setCardState] = useState<{ card: CardView; result: OverlayResult | null; mood: 'warm' | 'firm' | 'cross' | null } | null>(null);
   const reveals = useRef<RevealState[]>([]);
+  /** Save prompts for a guest (a ticket won, the ten-minute nudge), shown when no other modal is up. */
+  const savePrompts = useRef<SaveReason[]>([]);
+  const guest = farm?.guest ?? false;
+  const guestRef = useRef(guest);
+  guestRef.current = guest;
   const socket = useRef<GameSocket | null>(null);
   const scene = useRef<FarmScene | null>(null);
   const town = useRef<TownScene | null>(null);
@@ -260,12 +286,40 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
     if (artIn) audio.playMusic(crashed ? '43-market-tension' : '42-farm-day', 1200);
   }, [audio, crashed, artIn]);
 
-  // a Feather's reveal waits until no other modal is open
+  // a Feather's reveal waits until no other modal is open; so does a guest's save prompt
+  const [promptTick, setPromptTick] = useState(0);
   useEffect(() => {
-    if (modal || !reveals.current.length) return;
+    if (modal) return;
     const next = reveals.current.shift();
-    if (next) openModal({ kind: 'reveal', ...next });
-  }, [modal, farm]);
+    if (next) {
+      openModal({ kind: 'reveal', ...next });
+      return;
+    }
+    if (touring) return;
+    const save = savePrompts.current.shift();
+    if (save && guestRef.current) openModal({ kind: 'saveFarm', reason: save });
+  }, [modal, farm, touring, promptTick]);
+
+  // a guest's real play time (this tab, while the page is in view); after about ten minutes, one
+  // offer to save the farm, once a session (LATER is final for the session)
+  useEffect(() => {
+    if (!guest) return;
+    const add = (ms: number) => {
+      const played = sessionNumber(PLAYED_KEY) + ms;
+      setSession(PLAYED_KEY, String(played));
+      if (played >= NUDGE_AFTER_MS && !sessionNumber(NUDGED_KEY)) {
+        setSession(NUDGED_KEY, '1');
+        savePrompts.current.push('nudge');
+        setPromptTick((n) => n + 1);
+      }
+    };
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') add(1000);
+    }, 1000);
+    // for automated checks: play time passes at once (a simulated clock)
+    (window as unknown as { __coysGuest?: unknown }).__coysGuest = { play: add, played: () => sessionNumber(PLAYED_KEY) };
+    return () => clearInterval(t);
+  }, [guest]);
 
   // the profile asks for its data when it opens, and again when a day closes or a badge comes while it is open
   const profileOpen = modal?.kind === 'profile';
@@ -352,6 +406,11 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
             if (e.won) {
               audio.play('19-haggle-win', { volume: 0.7 });
               uiFx.emit({ kind: 'toast', tone: 'good', text: `MILESTONE: ${what}! YOU WON A FEATHER TICKET. MINT IT IN THE FEATHER MINT. ${e.left} OF ${ECONOMY.feathers.maxSupply} FEATHERS LEFT.` });
+              // a guest's ticket is saved on the farm: minting it needs signing in
+              if (guestRef.current) {
+                savePrompts.current.push('ticket');
+                setPromptTick((n) => n + 1);
+              }
             } else {
               uiFx.emit({
                 kind: 'toast',
@@ -450,7 +509,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
         <RevealPanel reveal={modal} market={market} onLedger={() => openModal({ kind: 'ledger' })} onMintPage={() => openModal({ kind: 'feathers' })} onClose={closeModal} />
       )}
       {modal?.kind === 'feathers' && (
-        <FeatherMint farm={farm} market={market} onMint={startMint} onSignIn={null} onClose={closeModal} closeLabel="BACK TO THE FARM" />
+        <FeatherMint farm={farm} market={market} onMint={startMint} onSignIn={farm.guest ? () => openModal({ kind: 'saveFarm', reason: 'mint' }) : null} onClose={closeModal} closeLabel="BACK TO THE FARM" />
       )}
       {modal?.kind === 'profile' && (
         <ProfilePage
@@ -462,6 +521,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
           onPublic={(farmId) => openModal({ kind: 'publicProfile', farmId, back: modal.tab })}
           onMint={() => openModal({ kind: 'feathers' })}
           onClose={closeModal}
+          onSave={() => openModal({ kind: 'saveFarm', reason: 'profile' })}
         />
       )}
       {modal?.kind === 'publicProfile' && (
@@ -498,8 +558,19 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
             farm={farm}
             onRename={() => openModal({ kind: 'name', mode: 'rename' })}
             onProfile={() => openModal({ kind: 'profile', tab: 'overview' })}
+            onSave={() => openModal({ kind: 'saveFarm', reason: 'settings' })}
           />
         </Modal>
+      )}
+      {modal?.kind === 'saveFarm' && (
+        <SaveFarm
+          reason={modal.reason}
+          onSignIn={() => {
+            closeModal();
+            onSave();
+          }}
+          onClose={closeModal}
+        />
       )}
       {modal?.kind === 'guide' && <HowToPlay onClose={closeModal} />}
       {modal?.kind === 'name' && farm && <NameFarm farm={farm} mode={modal.mode} send={send} onClose={closeModal} />}

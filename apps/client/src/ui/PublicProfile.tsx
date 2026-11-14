@@ -7,7 +7,7 @@ import { BADGES, type PublicProfile, type RivalRank } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { openModal } from '../state/ui';
-import { AiBadge, aiFarmLine, useAiMode } from './AiBadge';
+import { AiBadge, GuestTag, aiFarmLine, useAiMode } from './AiBadge';
 import { Badge, BadgeRow, LEVEL_LABEL } from './Badge';
 import { LOOK } from './cast';
 import { Modal } from './Modal';
@@ -39,6 +39,7 @@ export function FarmRankRow({ rank, farm, mine = false, onOpen }: { rank: number
       <span style={{ flex: '1 1 auto', minWidth: 0, lineHeight: '9px' }}>
         {rank}. {farm.name.toUpperCase()}
         {farm.kind !== 'player' && <AiBadge />}
+        {farm.guest && <GuestTag />}
       </span>
       <BadgeRow badges={farm.badges} max={3} />
       <span style={{ flex: 'none' }}>{farm.bust ? 'BUST' : `${farm.hens} HENS`}</span>
@@ -88,8 +89,9 @@ export function PublicProfileModal({ farmId, onClose }: { farmId: string; onClos
             <span className="panel-title small" style={{ fontSize: 8, lineHeight: '9px', margin: 0 }} data-ui="public-name">
               {p.name.toUpperCase()}
               {p.kind !== 'player' && <AiBadge />}
+              {p.guest && <GuestTag />}
             </span>
-            <span style={{ lineHeight: '9px' }}>{p.kind === 'player' ? 'A PLAYER FARM' : aiFarmLine(aiMode)}</span>
+            <span style={{ lineHeight: '9px' }}>{p.kind === 'player' ? (p.guest ? 'A PLAYER FARM, PLAYED AS A GUEST' : 'A PLAYER FARM') : aiFarmLine(aiMode)}</span>
           </span>
         </div>,
         <div key="stats" className="col" style={{ gap: 2 }} data-ui="public-stats">

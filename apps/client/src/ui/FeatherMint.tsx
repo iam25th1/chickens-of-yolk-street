@@ -5,7 +5,7 @@
 // minted, not minted, mine); the provenance hash and the contract at the foot. Every part fits the
 // window at every size (paged, never scrolled). Pressing MINT plays the minting moment (MintMoment).
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ECONOMY, FEATHER_GRADES, RARITIES, type FarmState, type FeatherGrade, type MarketState, type MintPageData, type Rarity } from '@coys/shared';
+import { ECONOMY, FEATHER_GRADES, GUEST_MINT_TEXT, RARITIES, type FarmState, type FeatherGrade, type MarketState, type MintPageData, type Rarity } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { motion } from '../motion/ui';
@@ -130,18 +130,30 @@ export function FeatherMint({
           <span style={{ lineHeight: '10px' }} data-ui="mint-held">
             {held.length ? `${held.length} TICKET${held.length === 1 ? '' : 'S'} TO MINT.` : 'NO TICKET TO MINT.'} YOUR GRADE NOW: {GRADE_LABEL[farm.score.grade]} (SCORE {Math.round(farm.score.score * 100)}).
           </span>
-          <button
-            className="btn red"
-            data-ui="mint-button"
-            style={{ alignSelf: 'flex-start' }}
-            disabled={!held.length || farm.cashMilli < fee * 1000 || !onMint}
-            onClick={click(() => {
-              const t = held[0];
-              if (t && onMint) onMint(t.id);
-            })}
-          >
-            MINT A FEATHER ({fee} COINS)
-          </button>
+          {farm.guest ? (
+            <>
+              {/* a guest's tickets are saved on the farm; the mint itself needs signing in (a wallet) */}
+              <span style={{ lineHeight: '10px' }} data-ui="mint-guest">
+                {GUEST_MINT_TEXT.toUpperCase()}
+              </span>
+              <button className="btn red" data-ui="mint-button" style={{ alignSelf: 'flex-start' }} disabled={!onSignIn} onClick={click(() => onSignIn?.())}>
+                SIGN IN TO MINT
+              </button>
+            </>
+          ) : (
+            <button
+              className="btn red"
+              data-ui="mint-button"
+              style={{ alignSelf: 'flex-start' }}
+              disabled={!held.length || farm.cashMilli < fee * 1000 || !onMint}
+              onClick={click(() => {
+                const t = held[0];
+                if (t && onMint) onMint(t.id);
+              })}
+            >
+              MINT A FEATHER ({fee} COINS)
+            </button>
+          )}
           {going.map((t) => (
             <span key={t.id} style={{ lineHeight: '10px', color: '#2f6f9e' }} data-ui="mint-going">
               {t.number ? `FEATHER ${featherNo(t.number)}` : 'A FEATHER'}

@@ -129,6 +129,7 @@ export function ProfilePage({
   onPublic,
   onMint,
   onClose,
+  onSave,
 }: {
   farm: FarmState;
   market: MarketState;
@@ -140,6 +141,8 @@ export function ProfilePage({
   onPublic: (farmId: string) => void;
   onMint: () => void;
   onClose: () => void;
+  /** A guest farm: sign in to save it. */
+  onSave?: () => void;
 }) {
   const { audio } = useServices();
   const v = useViewport();
@@ -173,6 +176,11 @@ export function ProfilePage({
         <h2 className="panel-title" style={{ margin: 0, flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere' }} data-ui="profile-name">
           {farm.name.toUpperCase()}
         </h2>
+        {farm.guest && onSave && (
+          <button className="btn red" data-ui="profile-save" onClick={click(onSave)}>
+            SAVE THIS FARM
+          </button>
+        )}
         <button className="btn" data-ui="profile-public" onClick={click(() => onPublic(farm.farmId))}>
           PUBLIC VIEW
         </button>
