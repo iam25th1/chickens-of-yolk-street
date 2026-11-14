@@ -155,6 +155,12 @@ export function LookAround({ rect, farmId, onHome, onLook }: { rect: Rect; farmI
     return () => {
       window.removeEventListener('pointerdown', press, true);
       window.removeEventListener('pointerup', release, true);
+      // a press elsewhere that took these controls away before it was let go (a tap on the farm that
+      // opened a card, which on a phone takes this corner) was a tap elsewhere too
+      if (down) {
+        setOpen(false);
+        keepMapOpen(farmId, false);
+      }
     };
   }, [open, cam.on, farmId]);
   if (!cam.on) return null;
