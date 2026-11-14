@@ -111,7 +111,7 @@ describe('the provider chain', () => {
     expect(u.serv).toMatchObject({ calls: 1, failures: 0, promptTokens: 3000, completionTokens: 140 });
     expect(u.serv.spendUsd).toBeCloseTo((3000 * 0.13 + 140 * 0.65) / 1e6, 9);
     // one line per call, and one for the breaker that opened; never a key
-    expect(s.logs.some((l) => /^\[ai\] nearai z-ai\/glm-5\.3-flash Yolk Street Bakery decision \(first look\): 0\+0 tokens, 0\.000000 USD, failed \(NEAR AI Cloud 402/.test(l))).toBe(true);
+    expect(s.logs.some((l) => /^\[ai\] nearai Qwen\/Qwen3\.6-35B-A3B-FP8 Yolk Street Bakery decision \(first look\): 0\+0 tokens, 0\.000000 USD, failed \(NEAR AI Cloud 402/.test(l))).toBe(true);
     expect(s.logs.some((l) => /^\[ai\] serv gpt-6-luna Yolk Street Bakery decision \(first look\): 3000\+140 tokens, 0\.000481 USD, answered$/.test(l))).toBe(true);
     expect(s.logs.filter((l) => /NEAR AI Cloud refused \(a bad key or no credits\) \(HTTP 402\): skipped for 30 min/.test(l))).toHaveLength(1);
     expect(s.logs.join('\n')).not.toMatch(/test-key/);

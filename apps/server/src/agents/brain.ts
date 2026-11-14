@@ -15,7 +15,7 @@ import type { AiMode } from '@coys/shared';
 import type { Db } from '../db/db';
 import { num } from '../db/db';
 import { CALL_TIMEOUT_MS, MIN_CALL_MS, type ProviderChain } from '../ai/chain';
-import { NEARAI_DEFAULT_CHEAP_MODEL, NEARAI_DEFAULT_MODEL } from '../ai/nearai';
+import { NEARAI_DEFAULT_MODEL } from '../ai/nearai';
 import { asProviderError, type ChatMessage, type InferenceProvider, type Pricing, type ProviderName } from '../ai/provider';
 import { SERV_PRICES } from '../ai/serv';
 import { brokeLine, personaFor, personalityFor } from './cast';
@@ -58,7 +58,6 @@ export interface Tokens {
  */
 export const ASSUMED_PRICING: Readonly<Record<string, Pricing>> = {
   [NEARAI_DEFAULT_MODEL]: { input: 0.2, output: 0.8 },
-  [NEARAI_DEFAULT_CHEAP_MODEL]: { input: 0.1, output: 0.4 },
   ...SERV_PRICES,
 };
 

@@ -16,8 +16,16 @@ export interface NearAiConfig {
 export const NEARAI_DEFAULT_BASE_URL = 'https://cloud-api.near.ai/v1';
 /** Open-weight, TEE-hosted, supports structured outputs (checked against /v1/models). */
 export const NEARAI_DEFAULT_MODEL = 'Qwen/Qwen3.6-35B-A3B-FP8';
-/** The cheaper model, for every decision that is not on a hard day. */
-export const NEARAI_DEFAULT_CHEAP_MODEL = 'z-ai/glm-5.3-flash';
+/**
+ * The model for every other decision: the same one. NEAR AI's models think before they answer
+ * (reasoning_content); on a decision prompt (about 5,000 tokens) the thinking used up the whole reply
+ * cap and the answer came back empty. Qwen3.6 turns its thinking off per request (below) and answers
+ * in about a second; z-ai/glm-5.3-flash, the cheaper one, kept thinking whatever the request said, so
+ * it is not used. NEARAI_CHEAP_MODEL still overrides it.
+ */
+export const NEARAI_DEFAULT_CHEAP_MODEL = NEARAI_DEFAULT_MODEL;
+/** The reply cap: room for a decision's JSON and its reason, with thinking off. */
+export const NEARAI_MAX_TOKENS = 1500;
 
 export class NearAiClient implements InferenceProvider {
   readonly name = 'nearai' as const;
@@ -48,8 +56,10 @@ export class NearAiClient implements InferenceProvider {
       body: {
         model: opts.model ?? this.model,
         messages,
-        max_tokens: opts.maxTokens ?? 1024,
+        max_tokens: opts.maxTokens ?? NEARAI_MAX_TOKENS,
         temperature: 0.4,
+        // no thinking: the answer itself, at once (an empty answer still falls back to the next provider)
+        chat_template_kwargs: { enable_thinking: false },
         ...(opts.responseFormat ? { response_format: opts.responseFormat } : {}),
       },
       timeoutMs: opts.timeoutMs ?? 20_000,

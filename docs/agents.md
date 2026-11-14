@@ -104,7 +104,7 @@ makes no call. A model is asked for:
 
 | Provider | Cheap model (decisions) | Main model (reflections) | USD per million tokens, in / out |
 |---|---|---|---|
-| NEAR AI Cloud | `NEARAI_CHEAP_MODEL`, `z-ai/glm-5.3-flash` | `NEARAI_MODEL`, `Qwen/Qwen3.6-35B-A3B-FP8` | assumed 0.10 / 0.40 and 0.20 / 0.80 (`NEARAI_*_PRICE`, else `/v1/models`) |
+| NEAR AI Cloud | `NEARAI_CHEAP_MODEL`, `Qwen/Qwen3.6-35B-A3B-FP8` (thinking off) | `NEARAI_MODEL`, `Qwen/Qwen3.6-35B-A3B-FP8` | assumed 0.10 / 0.40 and 0.20 / 0.80 (`NEARAI_*_PRICE`, else `/v1/models`) |
 | SERV Reasoning | `SERV_CHEAP_MODEL`, `gpt-6-luna` | `SERV_MODEL`, `gpt-5.4-mini` | published 0.13 / 0.65 and 1.00 / 6.00 (`SERV_*_PRICE`; confirm in the OpenServ console, Usage) |
 
 SERV's hard days stay on `gpt-6-luna`: `gpt-5.4-mini` costs about eight times as much, and hard days are
@@ -275,7 +275,7 @@ tokens a decision, as SERV's `gpt-6-luna` answered live, and 100 a reflection):
 
 | Provider (default models) | A decision | A reflection | Days that matter: a day, a week | Full use: a day, a week | At the default cap (1.50 USD a day) |
 |---|---|---|---|---|---|
-| NEAR AI Cloud, assumed prices (`z-ai/glm-5.3-flash` 0.10 / 0.40, `Qwen/Qwen3.6-35B-A3B-FP8` 0.20 / 0.80; hard days on the main model) | 0.00055 USD | 0.00013 USD | 0.61 USD, 4.24 USD | 1.95 USD, 13.65 USD | 0.61 a day (4.24 a week) as is; full use held at 1.50 a day (10.50 a week) |
+| NEAR AI Cloud, assumed prices (`Qwen/Qwen3.6-35B-A3B-FP8` 0.20 / 0.80 for every decision, its thinking turned off per request; hard days on the main model) | 0.00055 USD | 0.00013 USD | 0.61 USD, 4.24 USD | 1.95 USD, 13.65 USD | 0.61 a day (4.24 a week) as is; full use held at 1.50 a day (10.50 a week) |
 | SERV Reasoning, published prices (`gpt-6-luna` 0.13 / 0.65 for decisions, `gpt-5.4-mini` 1.00 / 6.00 for reflections) | 0.00054 USD | 0.00107 USD | 1.03 USD, 7.24 USD | 2.38 USD, 16.64 USD | 1.03 a day (7.24 a week) as is; full use held at 1.50 a day (10.50 a week) |
 
 The live check (one SERV decision and one reflection, a real observation from a memory game with
