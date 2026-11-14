@@ -982,12 +982,11 @@ input[type='range'].slider::-moz-range-thumb {
   color: var(--ink);
 }
 
-/* The look-round controls over the farm's top-left corner: the small map and HOME. */
+/* The look-round controls in the farm's top-left corner, in a row: the map button, HOME, the small map. */
 .look {
   display: flex;
-  flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 2px;
 }
 
 .land-mini {

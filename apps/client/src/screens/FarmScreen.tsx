@@ -430,7 +430,7 @@ export function FarmScreen({ session, accountId, onSignedOut }: { session: strin
       {!(v.portrait && modal) && <SidePanel farm={farm} market={market} rect={z.side} send={send} onOpen={openCard} />}
       <ToastArea farm={farm} rect={z.toasts} offline={status === 'offline'} />
       <Tracker farm={farm} rect={z.tracker} send={send} />
-      {!touring && !(v.portrait && modal) && <LookAround rect={z.world} onHome={() => scene.current?.goHome()} onLook={(p) => scene.current?.lookAt(p)} />}
+      {!touring && !(v.portrait && modal) && <LookAround rect={z.world} farmId={farm.farmId} onHome={() => scene.current?.goHome()} onLook={(p) => scene.current?.lookAt(p)} />}
       {touring && <TourBox ctx={ctx} send={send} />}
       {modal?.kind === 'shop' && (
         <ShopPanel
