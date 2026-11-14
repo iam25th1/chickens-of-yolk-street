@@ -34,7 +34,7 @@ One contract, **`play.coys-game.testnet`** (version 6, Rust `near-sdk` 5.30.1, w
 ## Architecture
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph Browser
     C["Client<br/>React, PixiJS, anime.js"]
     PV["Privy<br/>email sign-in, silent NEAR wallet"]
