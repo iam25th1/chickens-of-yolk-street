@@ -23,7 +23,7 @@ afterAll(async () => {
   await server?.close();
 });
 
-const OVERLAYS = ['[data-ui="modal"]', '[data-ui="market-page"]', '[data-ui="profile-page"]', '[data-ui="tour-place"]', '[data-ui="announce"]', '[data-ui="update-prompt"]'];
+const OVERLAYS = ['[data-ui="modal"]', '[data-ui="market-page"]', '[data-ui="profile-page"]', '[data-ui="tour-place"]', '[data-ui="announce"]', '[data-ui="update-prompt"]', '[data-ui="warn-bubble"]'];
 
 /** Run in the page: pairs of overlays that overlap, and buttons on a card or in the bubble that something else covers. */
 function overlayProblems(selectors: string[]): string[] {

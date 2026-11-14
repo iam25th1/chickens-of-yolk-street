@@ -39,6 +39,7 @@ import { NameFarm } from '../ui/NameFarm';
 import { ProfilePage } from '../ui/Profile';
 import { PublicProfileModal } from '../ui/PublicProfile';
 import { SaveFarm } from '../ui/SaveFarm';
+import { WarnBubbles } from '../ui/WarnBubbles';
 import { listenForAnnouncements } from '../ui/Announce';
 import { LookAround } from '../ui/Land';
 import { LAND_NAME } from '@coys/shared';
@@ -122,6 +123,9 @@ export function FarmScreen({ session, accountId, onSignedOut, onSave }: { sessio
   const linked = useRef(false);
   /** Removes the look-round input (drag, keys) when the farm screen goes. */
   const unlook = useRef<(() => void) | null>(null);
+
+  /** Where the farm's clickable things are drawn now (CSS pixels), for the warning bubbles. */
+  const farmBoxes = useCallback(() => scene.current?.targets() ?? [], []);
 
   const send = useCallback(async (a: Action): Promise<boolean> => {
     const ack = await socket.current?.send(a);
@@ -497,6 +501,12 @@ export function FarmScreen({ session, accountId, onSignedOut, onSave }: { sessio
         onProfile={() => openModal({ kind: 'profile', tab: 'overview' })}
       />
       {!(v.portrait && modal) && <SidePanel farm={farm} market={market} rect={z.side} send={send} onOpen={openCard} />}
+      <WarnBubbles
+        farm={farm}
+        boxes={farmBoxes}
+        hidden={modal !== null || touring}
+        onOpen={(t) => openModal(modalFor(t.kind === 'machine' ? { kind: 'machine', unlock: t.unlock } : t.kind === 'coop' ? { kind: 'coop', coopId: t.coopId } : t))}
+      />
       <ToastArea farm={farm} rect={z.toasts} offline={status === 'offline'} covered={modal?.kind === 'market' || modal?.kind === 'profile'} />
       <Tracker farm={farm} rect={z.tracker} send={send} />
       {!touring && !(v.portrait && modal) && <LookAround rect={z.world} farmId={farm.farmId} onHome={() => scene.current?.goHome()} onLook={(p) => scene.current?.lookAt(p)} />}
