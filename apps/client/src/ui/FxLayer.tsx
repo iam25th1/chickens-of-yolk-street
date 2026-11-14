@@ -18,15 +18,35 @@ export interface Toast {
   id: number;
   text: string;
   tone: 'good' | 'bad';
+  /** When it came (ms): news never waits more than TOAST_MAX_AGE_MS to be seen. */
+  born: number;
 }
 /** The news shown in the toast zone, newest last. */
 export const toasts = createStore<{ list: Toast[] }>({ list: [] });
 let nextToast = 0;
 
+/** How long news stays on screen (counted only while it is drawn), and the longest it may wait. */
+export const TOAST_MS = 4200;
+const TOAST_MAX_AGE_MS = 30_000;
+/** Which toasts the toast area draws now (it says so as it draws), and how long each has been seen. */
+export const drawnToasts = new Set<number>();
+const seenMs = new Map<number, number>();
+let lastSweep = Date.now();
+setInterval(() => {
+  const now = Date.now();
+  const dt = now - lastSweep;
+  lastSweep = now;
+  for (const id of drawnToasts) seenMs.set(id, (seenMs.get(id) ?? 0) + dt);
+  const keep = (t: Toast) => (seenMs.get(t.id) ?? 0) < TOAST_MS && now - t.born < TOAST_MAX_AGE_MS;
+  if (toasts.get().list.some((t) => !keep(t))) {
+    toasts.set((s) => ({ list: s.list.filter(keep) }));
+    for (const id of [...seenMs.keys()]) if (!toasts.get().list.some((t) => t.id === id)) seenMs.delete(id);
+  }
+}, 200);
+
 function pushToast(text: string, tone: 'good' | 'bad'): void {
   const id = nextToast++;
-  toasts.set((s) => ({ list: [...s.list.slice(-3), { id, text, tone }] }));
-  setTimeout(() => toasts.set((s) => ({ list: s.list.filter((t) => t.id !== id) })), 4200);
+  toasts.set((s) => ({ list: [...s.list.slice(-3), { id, text, tone, born: Date.now() }] }));
 }
 
 uiFx.on((fx) => {

@@ -4,6 +4,7 @@
 // outside the world zone). A step without a target centres the box. Pure, tested at many window
 // sizes in test/tourPlace.test.ts.
 import type { Rect } from '../app/viewport';
+import { TOUR_BAND } from '../state/overlays';
 
 export type Side = 'right' | 'left' | 'below' | 'above' | 'center';
 
@@ -126,4 +127,45 @@ export function placeForTour(
     if (there) return there;
   }
   return placeTourBox(null, sizes.map((s) => fit(s, area)), area, avoid);
+}
+
+/**
+ * The tour's placement while a card (a modal or a full page) is open: the card always wins, so the
+ * bubble is never over it. It goes beside the card (on whichever side has room; the whole window
+ * below the top bar may be used, as the card's backdrop covers it), with its pointer aimed at the
+ * target inside the card; a target outside the card is kept clear too. The goal tracker and the toast
+ * corner stay clear. Null when there is no room: the card then gives up room at its foot (dock).
+ */
+export function placeBesideCard(
+  target: Rect | null,
+  sizes: { w: number; h: number }[],
+  zones: { top: Rect; tracker: Rect; toasts: Rect },
+  ui: { w: number; h: number },
+  card: Rect,
+): Placement | null {
+  const area = { x: 4, y: zones.top.h + 2, w: ui.w - 8, h: ui.h - zones.top.h - 6 };
+  const pad = (r: Rect, n: number): Rect => ({ x: r.x - n, y: r.y - n, w: r.w + 2 * n, h: r.h + 2 * n });
+  const avoid = [pad(zones.tracker, 2), pad(zones.toasts, 2), pad(card, 2)];
+  const inCard = target !== null && overlaps(target, card);
+  const toward = inCard || !target ? card : target;
+  const fit = sizes.map((s) => ({ w: Math.min(s.w, area.w), h: s.h }));
+  const p = placeTourBox(toward, fit, area, avoid);
+  if (!p) return null;
+  // the pointer: at the target itself when it is inside the card, along the edge that faces it
+  if (inCard && target && p.side !== 'center') {
+    const at = p.side === 'left' || p.side === 'right' ? target.y + target.h / 2 - p.y : target.x + target.w / 2 - p.x;
+    return { ...p, pointer: clampPointer(at, p.side === 'left' || p.side === 'right' ? p.h : p.w) };
+  }
+  return p;
+}
+
+/**
+ * The band under a full page where the tour's strip sits (the page keeps TOUR_BAND free at its foot
+ * while the tour is on): the page's width, clear of the goal tracker and the toast corner (in
+ * landscape they sit at the bottom left, so the strip starts right of them).
+ */
+export function pageBand(page: Rect, zones: { tracker: Rect; toasts: Rect }, uiW: number, portrait: boolean): Rect {
+  const y = page.y + page.h + 3;
+  const left = portrait ? page.x : Math.max(page.x, zones.tracker.x + zones.tracker.w + 6, zones.toasts.x + zones.toasts.w + 6);
+  return { x: left, y, w: Math.min(uiW - 4, page.x + page.w) - left, h: TOUR_BAND - 6 };
 }

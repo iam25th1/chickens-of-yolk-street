@@ -6,7 +6,7 @@
 // events with juice. A farm with land is bigger than the window: drag it, use the arrow keys or WASD,
 // or the small map to look round, and HOME to come back (pixi/farm/camera.ts).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ECONOMY, isCrash, type CardView } from '@coys/shared';
+import { isCrash, type CardView } from '@coys/shared';
 import { useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { viewport, worldToUi } from '../app/viewport';
@@ -26,7 +26,7 @@ import { ToastArea, Tracker } from '../ui/Guide';
 import { TopBar } from '../ui/Hud';
 import { LedgerPanel } from '../ui/Ledger';
 import { MarketPage } from '../ui/Market';
-import { HowToPlay, MILESTONE_TEXT } from '../ui/HowToPlay';
+import { HowToPlay } from '../ui/HowToPlay';
 import { Modal } from '../ui/Modal';
 import { SettingsBody, ShopPanel } from '../ui/Panels';
 import { Spotlight, TOUR, TourBox } from '../ui/Tour';
@@ -38,7 +38,7 @@ import { NameFarm } from '../ui/NameFarm';
 import { ProfilePage } from '../ui/Profile';
 import { PublicProfileModal } from '../ui/PublicProfile';
 import { SaveFarm } from '../ui/SaveFarm';
-import { BadgeMoments } from '../ui/BadgeMoment';
+import { listenForAnnouncements } from '../ui/Announce';
 import { LookAround } from '../ui/Land';
 import { LAND_NAME } from '@coys/shared';
 import { MACHINE_NAME } from '../pixi/farm/FarmScene';
@@ -288,14 +288,16 @@ export function FarmScreen({ session, accountId, onSignedOut, onSave }: { sessio
 
   // a Feather's reveal waits until no other modal is open; so does a guest's save prompt
   const [promptTick, setPromptTick] = useState(0);
+  // badges earned and milestone rolls are small toasts in the toast corner (ui/Announce.tsx)
+  useEffect(() => listenForAnnouncements(), []);
+  // cards that need a decision (a Feather's reveal, a guest's save offer) wait for no other card and no tour step
   useEffect(() => {
-    if (modal) return;
+    if (modal || touring) return;
     const next = reveals.current.shift();
     if (next) {
       openModal({ kind: 'reveal', ...next });
       return;
     }
-    if (touring) return;
     const save = savePrompts.current.shift();
     if (save && guestRef.current) openModal({ kind: 'saveFarm', reason: save });
   }, [modal, farm, touring, promptTick]);
@@ -401,21 +403,14 @@ export function FarmScreen({ session, accountId, onSignedOut, onSave }: { sessio
             if (!mintingNow(e.ticketId)) uiFx.emit({ kind: 'toast', text: `A FEATHER MINT WAITS: ${e.note.toUpperCase()}` });
             break;
           case 'milestoneRoll': {
-            const what = MILESTONE_TEXT[e.milestone];
-            const next = e.next ? ` NEXT: ${MILESTONE_TEXT[e.next]}.` : '';
+            // the roll itself is announced as a small toast (ui/Announce.tsx); a win plays the sting
             if (e.won) {
-              audio.play('19-haggle-win', { volume: 0.7 });
-              uiFx.emit({ kind: 'toast', tone: 'good', text: `MILESTONE: ${what}! YOU WON A FEATHER TICKET. MINT IT IN THE FEATHER MINT. ${e.left} OF ${ECONOMY.feathers.maxSupply} FEATHERS LEFT.` });
+              audio.play('19-haggle-win', { volume: 0.5 });
               // a guest's ticket is saved on the farm: minting it needs signing in
               if (guestRef.current) {
                 savePrompts.current.push('ticket');
                 setPromptTick((n) => n + 1);
               }
-            } else {
-              uiFx.emit({
-                kind: 'toast',
-                text: `MILESTONE: ${what}. NO TICKET THIS TIME (A ${Math.round(e.odds * 100)}% CHANCE), BUT WELL FARMED.${next}`,
-              });
             }
             break;
           }
@@ -487,7 +482,7 @@ export function FarmScreen({ session, accountId, onSignedOut, onSave }: { sessio
         onProfile={() => openModal({ kind: 'profile', tab: 'overview' })}
       />
       {!(v.portrait && modal) && <SidePanel farm={farm} market={market} rect={z.side} send={send} onOpen={openCard} />}
-      <ToastArea farm={farm} rect={z.toasts} offline={status === 'offline'} />
+      <ToastArea farm={farm} rect={z.toasts} offline={status === 'offline'} covered={modal?.kind === 'market' || modal?.kind === 'profile'} />
       <Tracker farm={farm} rect={z.tracker} send={send} />
       {!touring && !(v.portrait && modal) && <LookAround rect={z.world} farmId={farm.farmId} onHome={() => scene.current?.goHome()} onLook={(p) => scene.current?.lookAt(p)} />}
       {touring && <TourBox ctx={ctx} send={send} />}
@@ -575,7 +570,6 @@ export function FarmScreen({ session, accountId, onSignedOut, onSave }: { sessio
       {modal?.kind === 'guide' && <HowToPlay onClose={closeModal} />}
       {modal?.kind === 'name' && farm && <NameFarm farm={farm} mode={modal.mode} send={send} onClose={closeModal} />}
       {touring && <Spotlight ctx={ctx} />}
-      <BadgeMoments />
       <FxLayer />
     </div>
   );

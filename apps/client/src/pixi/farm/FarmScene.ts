@@ -507,8 +507,8 @@ export class FarmScene implements Scene, Lookable {
     g.rect(l.yard.left, l.yard.top, l.yard.right - l.yard.left, l.yard.bottom - l.yard.top).stroke({ color: 0xffe066, width: 0.5, alpha: 0.8 });
     if (l.guide.right > 0) g.rect(l.guide.left, l.guide.top, l.guide.right - l.guide.left, l.guide.bottom - l.guide.top).fill({ color: 0x000000, alpha: 0.12 });
     for (const o of Object.values(l.spec.objects)) {
-      g.rect(o.box.left, o.box.top, o.box.right - o.box.left, o.box.bottom - o.box.top).stroke({ color: 0xff7ad9, width: 0.5, alpha: 0.9 });
-      g.rect(o.footprint.left, o.footprint.top, o.footprint.right - o.footprint.left, o.footprint.bottom - o.footprint.top).fill({ color: 0xff7ad9, alpha: 0.45 });
+      g.rect(o.box.left, o.box.top, o.box.right - o.box.left, o.box.bottom - o.box.top).stroke({ color: 0xffa300, width: 0.5, alpha: 0.9 });
+      g.rect(o.footprint.left, o.footprint.top, o.footprint.right - o.footprint.left, o.footprint.bottom - o.footprint.top).fill({ color: 0xffa300, alpha: 0.45 });
       g.moveTo(o.at.x - 2, o.at.y).lineTo(o.at.x + 2, o.at.y).moveTo(o.at.x, o.at.y - 2).lineTo(o.at.x, o.at.y + 2).stroke({ color: 0xffffff, width: 1 });
       for (const p of Object.values(o.points)) g.rect(p.x - 1, p.y - 1, 2, 2).fill({ color: 0x3ff0ff });
     }

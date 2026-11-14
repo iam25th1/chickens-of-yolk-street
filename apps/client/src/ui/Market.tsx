@@ -6,7 +6,9 @@
 // your open orders, with cancel. TRADE: other farms' offers to buy, and your own offers as everyone
 // sees them. HEN AUCTION: hens from bust farms. FARMS: the street's farms ranked, with their signs and best badges; a farm opens its public profile.
 // Every tab opens with one plain line; every list is paged to fit the window (never a scrollbar).
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { TOUR_BAND, useCardRect } from '../state/overlays';
+import { tour } from '../state/tour';
 import { ECONOMY, EGG_GRADES, MARKET_CHART_DAYS, coopCapacity, eggPrice, saleValue, type EggGrade, type FarmState, type MarketChartDay, type MarketState, type OrderView } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
@@ -116,6 +118,11 @@ export function MarketPage({ farm, market, send, tab, onTab, onClose }: { farm: 
   }, [onClose]);
 
   const top = v.zones.top.h + 4;
+  // a full page to the overlay manager: while the tour is on it keeps a band free at its foot, where
+  // the tour's strip sits (it is laid out that way from the start, so nothing has to shrink)
+  const page = useRef<HTMLDivElement>(null);
+  useCardRect(page, 'page');
+  const dock = useStore(tour, (s) => (s.active ? TOUR_BAND : 0));
   const width = Math.min(v.uiW - 8, MAX_W);
   const left = Math.round((v.uiW - width) / 2);
   const wide = !v.portrait;
@@ -129,7 +136,8 @@ export function MarketPage({ farm, market, send, tab, onTab, onClose }: { farm: 
       aria-label="Market"
       data-ui="market-page"
       data-tab={tab}
-      style={{ left, top, width, height: v.uiH - top - 4, zIndex: 30, display: 'flex', flexDirection: 'column', gap: 4, boxSizing: 'border-box', padding: 7 }}
+      ref={page}
+      style={{ left, top, width, height: v.uiH - top - 4 - dock, zIndex: 30, display: 'flex', flexDirection: 'column', gap: 4, boxSizing: 'border-box', padding: 7 }}
     >
       <div className="row" style={{ gap: 8, alignItems: 'center' }}>
         <h2 className="panel-title" style={{ margin: 0 }}>

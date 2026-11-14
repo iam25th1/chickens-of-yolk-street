@@ -51,15 +51,16 @@ async function enter(page: Page, name: string): Promise<void> {
   await page.locator('[data-ui="topbar"]').waitFor({ timeout: 60_000 });
 }
 
-/** Waits out every badge moment still queued (badges the day closes earned): they show one at a time, never more. */
+/** Waits out every badge toast still queued (badges the day closes earned): they show one at a time, never more. */
 async function drainMoments(page: Page): Promise<void> {
   for (let i = 0; i < 240; i++) {
     await page.waitForTimeout(250);
-    const n = await page.locator('[data-ui="badge-moment"]').count();
+    const n = await page.locator('[data-ui="announce"]').count();
     expect(n).toBeLessThanOrEqual(1);
     if (n === 0) {
-      await page.waitForTimeout(600);
-      if (!(await page.locator('[data-ui="badge-moment"]').count())) return;
+      // (a toast waits while news is in the corner, which lasts about 4 s)
+      await page.waitForTimeout(4800);
+      if (!(await page.locator('[data-ui="announce"]').count())) return;
     }
   }
 }
@@ -174,20 +175,24 @@ describe('the profile', () => {
         await page.locator('[data-ui="profile-close"]').click();
         await page.locator('[data-ui="profile-page"]').waitFor({ state: 'detached' });
 
-        // two badges at once: the moments come one after the other, never together
+        // two badges at once: the toasts come one after the other, never together
         await server.badge(name, 'first-haggle', 'plain');
         await server.badge(name, 'number-one', 'gold');
-        // moments play one at a time, a few seconds each; a slow machine draws them slower still
-        await page.locator('[data-ui="badge-moment"][data-badge="first-haggle"]').waitFor({ timeout: 45_000 });
-        expect(await page.locator('[data-ui="badge-moment"]').count()).toBe(1);
-        expect(await page.locator('[data-ui="badge-moment-name"]').innerText()).toBe('FIRST HAGGLE: EARNED');
+        // toasts show one at a time, about 3.5 s each; a slow machine draws them slower still
+        await page.locator('[data-ui="announce"][data-badge="first-haggle"]').waitFor({ timeout: 45_000 });
+        expect(await page.locator('[data-ui="announce"]').count()).toBe(1);
+        expect(await page.locator('[data-ui="announce-title"]').innerText()).toBe('BADGE: FIRST HAGGLE');
         await page.waitForTimeout(500);
-        await check('badge moment');
-        await shot(page, 'badge-moment', size);
-        await page.locator('[data-ui="badge-moment"][data-badge="number-one"]').waitFor({ timeout: 45_000 });
-        expect(await page.locator('[data-ui="badge-moment"]').count()).toBe(1);
-        expect(await page.locator('[data-ui="badge-moment-name"]').innerText()).toBe('NUMBER ONE: GOLD');
-        await page.locator('[data-ui="badge-moment"]').waitFor({ state: 'detached', timeout: 45_000 });
+        await check('badge toast');
+        await shot(page, 'badge-toast', size);
+        await page.locator('[data-ui="announce"][data-badge="number-one"]').waitFor({ timeout: 45_000 });
+        expect(await page.locator('[data-ui="announce"]').count()).toBe(1);
+        expect(await page.locator('[data-ui="announce-title"]').innerText()).toBe('BADGE: NUMBER ONE');
+        // a tap opens the profile on the badges tab
+        await page.locator('[data-ui="announce"]').click();
+        await page.locator('[data-ui="profile-page"][data-tab="badges"]').waitFor({ timeout: 10_000 });
+        await page.locator('[data-ui="profile-close"]').click();
+        await page.locator('[data-ui="profile-page"]').waitFor({ state: 'detached' });
       } finally {
         await ctx.close();
       }
