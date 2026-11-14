@@ -143,10 +143,17 @@ describe('new hens hatch', () => {
         await page.waitForTimeout(800);
         await buyAndHatch(page, 'list', 1, size);
         await buyAndHatch(page, 'random', 3, size);
-        await server.auction(3);
-        await server.cash(name, 400);
-        await page.waitForTimeout(500);
-        await buyAndHatch(page, 'auction', 1, size);
+        // no day closes while hens are up for auction (at a close the AI rivals can buy them up first;
+        // the shop's own list restocks only at a close, so the clock runs again after)
+        server.hold(true);
+        try {
+          await server.auction(3);
+          await server.cash(name, 400);
+          await page.waitForTimeout(500);
+          await buyAndHatch(page, 'auction', 1, size);
+        } finally {
+          server.hold(false);
+        }
         // a big flock (more hens than the screen shows): a new hen still hatches and is shown
         // (they are new to the farm too, so they hatch first: forty eggs, a beat apart)
         await server.flock(name, 45);
