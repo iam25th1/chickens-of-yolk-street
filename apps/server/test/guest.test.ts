@@ -189,7 +189,10 @@ describe('guest farms in the game', () => {
     const counted = (await featherCount(t.db, 0)).tickets;
     const [{ bust_day: bustDay } = { bust_day: null }] = await t.db.query('SELECT bust_day FROM farms WHERE id = $1', [idle.farmId]);
     await t.db.query('UPDATE farms SET bust_day = NULL WHERE id = $1', [idle.farmId]);
-    expect((await featherCount(t.db, 0)).tickets).toBe(counted + 1);
+    // (the farm may have won a ticket of its own at a day close before it went bust: every held one counts again)
+    const held = Number((await t.db.query(`SELECT count(*) AS n FROM feather_tickets WHERE farm_id = $1 AND status = 'held'`, [idle.farmId]))[0]?.n);
+    expect(held).toBeGreaterThanOrEqual(1);
+    expect((await featherCount(t.db, 0)).tickets).toBe(counted + held);
     await t.db.query('UPDATE farms SET bust_day = $2 WHERE id = $1', [idle.farmId, bustDay]);
     expect((await farmOf(t, active.playerId))?.bust_day).toBeNull();
     expect((await farmOf(t, signed.playerId))?.bust_day).toBeNull();
