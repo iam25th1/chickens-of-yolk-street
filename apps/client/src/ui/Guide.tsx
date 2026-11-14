@@ -9,6 +9,7 @@ import type { Rect } from '../app/viewport';
 import type { Action } from '../net/socket';
 import { dayElapsed, events } from '../state/game';
 import { useStore } from '../state/store';
+import { AnnounceToast, announcements } from './Announce';
 import { toasts, uiFx } from './FxLayer';
 import { groundEggs } from './Hud';
 
@@ -42,8 +43,11 @@ export function hint(farm: FarmState): string | null {
 }
 
 /** Hints and news, newest nearest the tracker: whole messages (wrapped, never cut), as many as fit. */
-export function ToastArea({ farm, rect, offline = false }: { farm: FarmState; rect: Rect; offline?: boolean }) {
+export function ToastArea({ farm, rect, offline = false, covered = false }: { farm: FarmState; rect: Rect; offline?: boolean; covered?: boolean }) {
   const list = useStore(toasts, (s) => s.list);
+  // a badge or milestone announcement takes the corner first (it waits while a full page covers it)
+  const showing = useStore(announcements, (s) => s.queue[0] ?? null);
+  const now = covered ? null : showing;
   const [, tick] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   // hints change with the clock, not only with server updates
@@ -51,8 +55,9 @@ export function ToastArea({ farm, rect, offline = false }: { farm: FarmState; re
     const id = setInterval(() => tick((n) => n + 1), 1000);
     return () => clearInterval(id);
   }, []);
-  const h = offline ? 'RECONNECTING TO THE MARKET' : hint(farm);
-  const lines = Math.max(1, Math.floor((rect.h + 2) / 16));
+  const h = now ? null : offline ? 'RECONNECTING TO THE MARKET' : hint(farm);
+  // the announcement's two lines take the corner while it shows
+  const lines = now ? 0 : Math.max(1, Math.floor((rect.h + 2) / 16));
   const [fit, setFit] = useState(lines);
   const room = Math.max(0, Math.min(fit, lines) - (h ? 1 : 0));
   const shown = room ? list.slice(-room) : [];
@@ -66,6 +71,7 @@ export function ToastArea({ farm, rect, offline = false }: { farm: FarmState; re
   }, [fit, newest, lines, rect.w, h]);
   return (
     <div ref={box} className="toasts zone" data-ui="toasts" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
+      {now && <AnnounceToast key={now.key} a={now} />}
       {[...shown].reverse().map((t) => (
         <div key={t.id} className={`toast ${t.tone === 'bad' ? 'bad' : ''}`} role="status" data-ui="toast" title={t.text}>
           {t.text}

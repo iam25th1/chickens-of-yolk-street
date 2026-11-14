@@ -683,6 +683,49 @@ input[type='range'].slider::-moz-range-thumb {
   pointer-events: auto;
 }
 
+/* a badge or milestone announcement: one small toast in the toast corner, above the text toasts
+   (z 42: over a card's backdrop and the tour's shade, so it stays readable and takes a tap; it never
+   overlaps a card or the tour bubble, which keep clear of the corner) */
+.announce {
+  position: relative;
+  z-index: 42;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 3px 6px 3px 4px;
+  border: 0;
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow:
+    0 0 0 1px var(--ink),
+    1px 1px 0 1px var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.announce-icon {
+  flex: none;
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin: 2px;
+  background: var(--cream-deep);
+}
+
+.announce-title {
+  color: var(--barn);
+  font-weight: 700;
+  line-height: 8px;
+  white-space: nowrap;
+}
+
+.announce-line {
+  line-height: 8px;
+  white-space: nowrap;
+}
+
 .hint {
   padding: 3px 6px;
   background: var(--barn-deep);
@@ -717,6 +760,20 @@ input[type='range'].slider::-moz-range-thumb {
 /* The tour's step box: placed beside its target (ui/tourPlace.ts), a pointer at it. */
 .tour-place {
   pointer-events: auto;
+}
+
+/* the tour's strip under a full page: one line of step, title and what to do, then the buttons */
+.tour-strip .tour-box {
+  padding: 4px 6px;
+}
+
+.tour-title-small {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--barn);
+  font-weight: 700;
+  line-height: 8px;
+  overflow-wrap: anywhere;
 }
 
 .tour-box {
