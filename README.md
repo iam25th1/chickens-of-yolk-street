@@ -68,7 +68,7 @@ flowchart LR
 One multiplier sets every grade's price for the next day, from everything sold that day:
 
 $$
-\text{price multiplier} = \operatorname{clamp}\left(\left(\frac{\text{demand}}{\text{supply}}\right)^{0.8},\ 0.4,\ 2.5\right),
+\text{price multiplier} = \mathrm{clamp}\left(\left(\frac{\text{demand}}{\text{supply}}\right)^{0.8},\ 0.4,\ 2.5\right),
 \qquad
 \text{demand} = 15 \cdot \max(1, F)
 $$
@@ -134,7 +134,7 @@ Every number lives in one object, `ECONOMY` in [`packages/shared/src/economy.ts`
 **Market price.** One multiplier for every grade's base price (white 1.00, cream 1.20, brown 1.50, golden 6.00), set by the total eggs sold that day by all players and agents (street sales, order fills, card deals, contract deliveries and the wholesaler's resales) against demand $D_d$, which grows with the number of active farms $F_d$ (player farms plus open agents):
 
 $$
-m_{d+1} = \operatorname{clamp}\left(\left(\frac{D_d}{S_d}\right)^{0.8},\ 0.40,\ 2.50\right)
+m_{d+1} = \mathrm{clamp}\left(\left(\frac{D_d}{S_d}\right)^{0.8},\ 0.40,\ 2.50\right)
 \qquad
 D_d = 15 \cdot F_d
 $$
