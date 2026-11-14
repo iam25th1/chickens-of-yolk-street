@@ -1,7 +1,7 @@
 // The How to play guide: short sections in plain words, each with a picture from the game's own
 // art. Opens from Settings and from the ? in the top bar. One section at a time, with previous and
 // next; a section longer than the window allows is split into pages (never a scrollbar).
-import { Children, Fragment, isValidElement, useState, type ReactNode } from 'react';
+import { Children, Fragment, isValidElement, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { BADGES, ECONOMY, LAND_IDS, LAND_NAME, MARKET_CHART_DAYS, UNLOCK_IDS, type MilestoneId } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
@@ -310,6 +310,9 @@ const SECTIONS: Section[] = [
   },
 ];
 
+/** A section's button in the list is 13 UI pixels tall, with 1 between them. */
+const NAV_ROW = 14;
+
 /** A section's body as blocks to page: each paragraph, and each list item as a list of one. */
 function blocksOf(body: ReactNode): ReactNode[] {
   const out: ReactNode[] = [];
@@ -329,31 +332,46 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
   const { audio } = useServices();
   const v = useViewport();
   const [at, setAt] = useState(0);
+  // the room the modal's body has (its data-room, set once the modal has measured itself)
+  const guide = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState(Infinity);
+  useLayoutEffect(() => {
+    const host = guide.current?.closest<HTMLElement>('[data-room]');
+    if (!host) return;
+    const read = () => setRoom(Number(host.dataset.room) || Infinity);
+    read();
+    const watch = new MutationObserver(read);
+    watch.observe(host, { attributes: true, attributeFilter: ['data-room'] });
+    return () => watch.disconnect();
+  }, []);
   const s = SECTIONS[at] ?? SECTIONS[0];
   if (!s) return null;
   // the list of sections beside the text when the window is wide enough; else previous and next only
   const wide = Math.min(520, Math.floor(v.zones.modal.w)) >= 440;
+  // a list taller than the body's room (a tablet held upright) goes in pages, and follows the open section
+  const pagedNav = SECTIONS.length * NAV_ROW - 1 > room;
   const go = (i: number) => {
     uiSound(audio, 'click');
     setAt(i);
   };
+  const buttons = SECTIONS.map((x, i) => (
+    <button
+      key={x.id}
+      className={`btn ${i === at ? 'red' : ''}`}
+      style={{ justifyContent: 'flex-start', width: '100%', whiteSpace: 'nowrap', height: 13 }}
+      title={x.title}
+      data-tour={`guide-${x.id}`}
+      onClick={() => go(i)}
+    >
+      {x.short}
+    </button>
+  ));
   return (
     <Modal title="HOW TO PLAY" onClose={onClose} w={520} h={320} className="guide-page">
-      <div className="row" style={{ alignItems: 'flex-start', gap: 8 }} data-ui="guide">
+      <div ref={guide} className="row" style={{ alignItems: 'flex-start', gap: 8 }} data-ui="guide">
         {wide && (
-          <nav className="col" style={{ width: 150, flex: 'none', gap: 1 }} aria-label="Sections">
-            {SECTIONS.map((x, i) => (
-              <button
-                key={x.id}
-                className={`btn ${i === at ? 'red' : ''}`}
-                style={{ justifyContent: 'flex-start', width: '100%', whiteSpace: 'nowrap', height: 13 }}
-                title={x.title}
-                data-tour={`guide-${x.id}`}
-                onClick={() => go(i)}
-              >
-                {x.short}
-              </button>
-            ))}
+          <nav className="col" style={{ width: 150, flex: 'none', gap: 1, ...(pagedNav ? { height: room } : {}) }} aria-label="Sections" data-ui="guide-nav">
+            {pagedNav ? <Paged items={buttons} gap={1} fill show={at} ui="guide-nav-pages" /> : buttons}
           </nav>
         )}
         <article className="col" style={{ flex: 1, minWidth: 0, gap: 6 }} data-ui="guide-section" data-section={s.id}>

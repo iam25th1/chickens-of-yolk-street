@@ -48,6 +48,8 @@ export interface TestServer {
   flock(name: string, n: number): Promise<void>;
   /** Sets the named farm's coins (a rich farm's long numbers) and sends the farm its fresh state. */
   cash(name: string, coins: number): Promise<void>;
+  /** Shows every player this day number on the clock (a long season's day: four or five digits). Only the clock: nothing closes. */
+  day(n: number): void;
   /** Puts these eggs in the named farm's crate and sends the farm its fresh state. */
   crate(name: string, eggs: Partial<Record<EggGrade, number>>): Promise<void>;
   /** An AI buyer's order for eggs at this share of today's price, open for three days; the browsers see it with the next market. Returns its id. */
@@ -165,6 +167,11 @@ export async function startTestServer(): Promise<TestServer> {
     },
     hold(on) {
       held = on;
+    },
+    day(n) {
+      const g = game as unknown as { clock: { day: number }; emit(to: string | null, msg: { t: 'clock'; clock: ReturnType<Game['getClock']> }): void };
+      g.clock.day = n;
+      g.emit(null, { t: 'clock', clock: game.getClock() });
     },
     async flock(name, n) {
       const farm = await farmNamed(name);

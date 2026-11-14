@@ -55,6 +55,7 @@ export function Paged({
   onNextEdge,
   resetKey,
   fill = false,
+  show,
   style,
   ui,
 }: {
@@ -71,6 +72,8 @@ export function Paged({
   resetKey?: unknown;
   /** Take the height a flex parent gives (flex: 1) and fit the pages to it, instead of growing the panel. */
   fill?: boolean;
+  /** Turns to the page that holds this item whenever it (or the paging) changes: a list follows its open entry. */
+  show?: number;
   style?: CSSProperties;
   ui?: string;
 }) {
@@ -155,6 +158,12 @@ export function Paged({
     }
     return undefined;
   }, [cell, pages, gap, items, onPrevEdge, onNextEdge, fill, v.uiW, v.uiH, tick]);
+
+  useLayoutEffect(() => {
+    if (show === undefined) return;
+    const holds = pages.findIndex((p) => p.includes(show));
+    if (holds >= 0) setAt(holds);
+  }, [show, pages]);
 
   const n = pages.length;
   const page = Math.min(at, n - 1);

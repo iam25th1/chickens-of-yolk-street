@@ -97,7 +97,10 @@ body {
   line-height: 8px;
   image-rendering: pixelated;
   pointer-events: none;
+  /* clipped, never scrolled: the 640x360 stages reach past a phone's edges, and a scrollable layer
+     would slide the whole UI sideways when a tap or a focus brings something into view */
   overflow: hidden;
+  overflow: clip;
 }
 
 .ui > * {
@@ -459,9 +462,7 @@ input[type='range'].slider::-moz-range-thumb {
   position: relative;
 }
 
-[data-tip]:hover::after,
-[data-tip]:focus-visible::after {
-  content: attr(data-tip);
+[data-tip]::after {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
@@ -480,8 +481,22 @@ input[type='range'].slider::-moz-range-thumb {
   pointer-events: none;
 }
 
-.topbar > :nth-last-child(-n + 5)[data-tip]:hover::after,
-.topbar > :nth-last-child(-n + 5)[data-tip]:focus-visible::after {
+/* (drawn only when it has content: on hover or keyboard focus; on a touch screen, where nothing
+   hovers, a tap on a top bar number or on BETA shows its label too) */
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+}
+
+@media (hover: none) {
+  .topbar .stat[data-tip]:focus::after,
+  .topbar .beta[data-tip]:focus::after {
+    content: attr(data-tip);
+  }
+}
+
+.topbar > :nth-last-child(-n + 5)[data-tip]::after,
+.topbar > .tip-right[data-tip]::after {
   left: auto;
   right: 0;
 }
@@ -923,9 +938,10 @@ input[type='range'].slider::-moz-range-thumb {
   box-shadow: 0 0 0 1px var(--ink);
 }
 
-/* the full one-row top bar: no DAY word; with long numbers the COLLECT and SELL words step aside too */
+/* the full one-row top bar: no DAY word; with long numbers the COLLECT and SELL words step aside too
+   (on two rows the DAY word stays) */
 .topbar.one-row .day-label,
-.topbar.compact .stat-label {
+.topbar.compact .stat-label:not(.day-label) {
   display: none;
 }
 

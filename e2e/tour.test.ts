@@ -1,7 +1,7 @@
 // The naming screen and the tour in a real browser (the built client and the real server, a fresh
 // headless browser each time, nothing kept). Naming: a new player is asked to name the farm (a
 // suggestion filled in, SHUFFLE, a refused email-like name, CONFIRM), or keeps the generated name;
-// Settings renames. Tour, at 1280x720, 1920x1080, 390x844 and 360x640: it shows on first entry with
+// Settings renames. Tour, at 1280x720, 1920x1080, 390x844, 360x640 and 768x1024: it shows on first entry with
 // no click; on every step its box sits beside the spotlight, never over it, inside the window and
 // clear of the top bar, the side panel (on a phone it may sit below the farm when the farm has no
 // room), the goal tracker and the toasts; BACK, NEXT (after a few
@@ -130,6 +130,7 @@ describe('the tour', () => {
     [1920, 1080, 1],
     [390, 844, 3],
     [360, 640, 2],
+    [768, 1024, 2],
   ] as const)) {
     it(`at ${w}x${h}: beside its target on every step, clear of the UI, every control working`, async () => {
       const size = `${w}x${h}`;

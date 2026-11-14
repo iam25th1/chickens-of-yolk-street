@@ -82,9 +82,9 @@ export function SplitFlap({ text }: { text: string }) {
   );
 }
 
-function Stat({ icon, sheet = '32-icons', children, title }: { icon: string; sheet?: string; children: ReactNode; title: string }) {
+function Stat({ icon, sheet = '32-icons', children, title, tipRight = false }: { icon: string; sheet?: string; children: ReactNode; title: string; tipRight?: boolean }) {
   return (
-    <div className="stat" title={title} data-tip={title.toUpperCase()} tabIndex={0}>
+    <div className={`stat${tipRight ? ' tip-right' : ''}`} title={title} data-tip={title.toUpperCase()} tabIndex={0}>
       <SheetSprite id={sheet} row={icon} />
       {children}
     </div>
@@ -164,6 +164,30 @@ export function barNumbersWidth(parts: { coins: string; ground: number; crate: n
   return counter(parts.coins) + counter(String(parts.ground)) + counter(String(parts.crate)) + 6 * parts.hens.length + 6 * parts.feed.length + 9 * Math.max(3, String(parts.day).length);
 }
 
+/** Widths (UI pixels) of the bar's number characters in its font (Silkscreen at 8 pixels): a digit 6, a 1 5. */
+const GLYPH: Record<string, number> = { '1': 5, '.': 3, '/': 5, '-': 5, M: 7 };
+export const textWidth = (t: string): number => [...t].reduce((sum, c) => sum + (GLYPH[c] ?? 6), 0);
+
+/**
+ * The two-row top bar (a window under 640 UI pixels wide: a phone, a tablet held upright) keeps the
+ * farm's numbers and BETA on its first row, and the day, the clock and the buttons on its second, which
+ * has room for them at 360 pixels even with a five-digit day. The first row is TWO_ROW_FIXED pixels of
+ * icons, words, gaps, padding and BETA, plus the numbers in the bar's font; when that passes the bar's
+ * width, the words COLLECT and SELL step aside (TWO_ROW_WORDS pixels) and the icons carry on, each
+ * with its label on a tap. Coins from 100 up count as wide as 999.99 (they pass through it as they
+ * count up), and the eggs on the ground as wide as one a hen (they are laid through the day).
+ * e2e/topbar.test.ts checks the bar never needs a third row.
+ */
+export const TWO_ROW_FIXED = 247;
+export const TWO_ROW_WORDS = 67;
+export function rowOneWidth(parts: { cashMilli: number; ground: number; hens: number; crate: number; hensText: string; feed: string }): number {
+  const counter = (t: string) => Math.max(16, textWidth(t));
+  const coins = barCoins(parts.cashMilli);
+  const v = Math.abs(parts.cashMilli) / 1000;
+  const coinsW = v >= 1_000_000 ? 36 : v >= 100 ? Math.max(33, textWidth(coins)) : textWidth(coins);
+  return TWO_ROW_FIXED + coinsW + counter(String(Math.max(parts.ground, parts.hens))) + counter(String(parts.crate)) + textWidth(parts.hensText) + textWidth(parts.feed);
+}
+
 export function TopBar({
   farm,
   rect,
@@ -209,32 +233,36 @@ export function TopBar({
   );
   const oneRow = rect.h <= 24;
   const crate = farm.crate.white + farm.crate.cream + farm.crate.brown + farm.crate.golden;
-  const numbers = barNumbersWidth({ coins: barCoins(farm.cashMilli), ground: groundEggs(farm), crate, hens: `${farm.hens.length}/${capacity}`, feed: `${days.toFixed(1)}D`, day: clock?.day ?? 1 });
-  const compact = oneRow && numbers > ROW_BUDGET;
+  const ground = groundEggs(farm);
+  const numbers = barNumbersWidth({ coins: barCoins(farm.cashMilli), ground, crate, hens: `${farm.hens.length}/${capacity}`, feed: `${days.toFixed(1)}D`, day: clock?.day ?? 1 });
+  const rowOne = rowOneWidth({ cashMilli: farm.cashMilli, ground, hens: farm.hens.length, crate, hensText: `${farm.hens.length}/${capacity}`, feed: `${days.toFixed(1)}D` });
+  const compact = oneRow ? numbers > ROW_BUDGET : rowOne > rect.w;
   return (
     // on one row (a window 640 UI pixels wide) the bar is full: tighter gaps, no DAY word, and the
-    // COLLECT and SELL words step aside when the numbers grow long
+    // COLLECT and SELL words step aside when the numbers grow long; on two rows those words step
+    // aside when the first row would not hold the numbers and BETA (rowOneWidth)
     <div
       className={`topbar zone${oneRow ? ' one-row' : ''}${compact ? ' compact' : ''}`}
       data-ui="topbar"
       data-compact={compact ? '1' : '0'}
       data-numbers={numbers}
+      data-row-one={oneRow ? undefined : rowOne}
       style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, flexWrap: rect.h > 24 ? 'wrap' : 'nowrap', alignContent: 'center', columnGap: rect.h > 24 ? undefined : 2 }}
     >
       <Stat icon="cash" title="Coins to spend">
         <Counter id="cash-counter" value={farm.cashMilli} format={(v) => barCoins(Math.round(v))} />
       </Stat>
       <EggStats farm={farm} />
-      <Stat icon="hen" title="Hens, and room in your coops">
+      <Stat icon="hen" title="Hens, and room in your coops" tipRight={!oneRow}>
         <span className={farm.hens.length > capacity ? 'down' : ''}>
           {farm.hens.length}/{capacity}
         </span>
       </Stat>
-      <Stat icon="feed" title="Days of feed left for your hens">
+      <Stat icon="feed" title="Days of feed left for your hens" tipRight={!oneRow}>
         <span className={days < 2 ? 'down' : ''}>{days.toFixed(1)}D</span>
       </Stat>
       <div className="spacer" style={{ flex: 1 }} />
-      <span className="beta" data-ui="beta" title="Beta: still being built, on NEAR's test network" data-tip="BETA: STILL BEING BUILT. EVERYTHING ON NEAR IS ON THE TEST NETWORK." tabIndex={0}>
+      <span className={`beta${oneRow ? '' : ' tip-right'}`} data-ui="beta" title="Beta: still being built, on NEAR's test network" data-tip="BETA: STILL BEING BUILT. EVERYTHING ON NEAR IS ON THE TEST NETWORK." tabIndex={0}>
         BETA
       </span>
       <DayClock />

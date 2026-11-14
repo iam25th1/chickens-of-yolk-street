@@ -100,6 +100,8 @@ describe('modals hold still', () => {
     [1280, 720, 1],
     [1920, 1080, 1],
     [390, 844, 3],
+    [360, 640, 2],
+    [768, 1024, 2],
   ] as const)) {
     it(`at ${w}x${h}, the naming box does not replay its open animation while a 20-character name is typed`, async () => {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: w < 600, hasTouch: w < 600 });

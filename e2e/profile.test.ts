@@ -70,6 +70,7 @@ describe('the profile', () => {
     [390, 844, 3],
     [1280, 720, 1],
     [360, 640, 2],
+    [768, 1024, 2],
   ] as const)) {
     it(`at ${w}x${h}: every tab and page fits, the public profiles open, and badge moments queue`, async () => {
       const size = `${w}x${h}`;
