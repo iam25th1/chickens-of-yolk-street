@@ -3,7 +3,7 @@ name = "coys-game"
 description = "Chickens of Yolk Street game contract: hen NFTs (NEP-171), egg tokens (NEP-245) and the daily settlement"
 version = "0.1.0"
 edition = "2021"
-license = "UNLICENSED"
+license = "MIT"
 publish = false
 repository = "https://github.com/iam25th1/chickens-of-yolk-street"
 

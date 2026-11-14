@@ -3,7 +3,7 @@ name = "founding-hens"
 description = "Chickens of Yolk Street: the planned mainnet Founding Hens contract (snapshot, reveal, claim). Sandbox-tested only; not deployed."
 version = "0.1.0"
 edition = "2021"
-license = "UNLICENSED"
+license = "MIT"
 publish = false
 repository = "https://github.com/iam25th1/chickens-of-yolk-street"
 

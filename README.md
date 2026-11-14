@@ -2,32 +2,340 @@
 
 # Chickens of Yolk Street
 
-Run an egg farm in **one shared live market** with other players and AI. Some farms on Yolk Street are other players, some are AI (marked AI); the feed suppliers and egg buyers are AI agents, each with its own cash, memory and wallet. Egg prices, gluts and bankruptcies come only from what everyone trades, never from a script. Built at NEAR HACKATHON (tracks: games, agents, NFTs), 1 to 14 November 2026.
+An egg farm game in one shared live market, where players and AI agents with their own NEAR wallets trade the same eggs.
 
-**Play:** https://yolkstreet.25th.dev (live on NEAR testnet, season `s1`; how it is hosted: [deploy/pier](deploy/pier/README.md))
-
-| | |
-|---|---|
-| **Play loop** | Hens lay on a schedule; you collect, sell, buy hens, feed, coops and machines. One in-game day is 3 real minutes, and each day brings 2 to 4 decision cards from the agents. Everything on the farm is clickable; a first-run tour walks the loop by doing it, then a chain of goals pays coins for learning the rest. Every farm keeps a **profile** (eight tabs, a public version) and earns **73 cosmetic badges**; new hens hatch from an egg in the yard. |
-| **Market** | One price multiplier for everyone, set by the whole market's daily supply against demand that grows with the number of farms. Instant street sales, a real order book with limit orders, and player-to-player trades, all on one **Market** page with seven tabs. |
-| **Agents** | Seven: two rival farms, two feed suppliers, three egg buyers. Each has its own wallet, memory and personality, decides once a day, pays a fee for each decision, remembers every deal, haggles in character, borrows, and can go bust. Agent decisions run on a provider chain: NEAR AI Cloud is the primary model, SERV Reasoning is the fallback, and rule-based strategies are the last resort, all under a hard daily spend cap. |
-| **Chain** | Hens are never minted. The beta mints **Feathers** (NEP-171 on NEAR testnet, **777 ever**, capped on chain): claim tickets for the 777 Founding Hens, planned to be revealed at the mainnet launch. Milestones win tickets; a player redeems one for coins and the game pays the testnet gas. Eggs are NEP-245 tokens, and each day settles in one call that stores nothing new: a SHA-256 of the day's full record, kept in the game's database. Agents hold sub-account wallets. Players sign in with email; their wallet is made silently. |
-| **Feel** | Squash and stretch, hitstop, screen shake, particles and layered sound on every action, portraits that talk with voice babble, and a reduce-motion switch. |
+**Play:** https://yolkstreet.25th.dev (NEAR testnet, season `s1`) · **Demo post:** [DEMO POST] · **License:** [MIT](LICENSE)
 
 ## The problem
 
-Farm games fake their economies: prices follow a curve someone wrote, rivals are scripts, and nothing a player does moves the market. On-chain games often go the other way and lead with wallets and tokens, so the game is buried under the plumbing.
+Farm games fake their economies: prices follow a curve someone wrote and the rivals are scripts, so nothing a player does moves the market. On-chain games often go the other way and put wallets and tokens in front of the game. Here every egg any farm sells, player or AI, is supply in one market, so prices, gluts and bankruptcies come only from what everyone trades. The chain keeps a checkable record of that market, and the player only ever signs in with an email.
 
-Chickens of Yolk Street puts a **real, shared economy** in a toy you can play with one hand. Every egg anyone sells (players and AI agents alike) is supply in the same market. Sell too many and everyone's price falls. NPCs are businesses with wallets: the Squeezer prices your hunger into your feed, the Bakery holds you to your contract, and a rival that overbuilds goes bust and its hens go to auction. The economy evolves without a dev patch, and the chain keeps an honest record of each day while staying out of sight.
+## Try it in 3 minutes
+
+1. **Sign in.** Open https://yolkstreet.25th.dev, press **PLAY** and sign in with your email. You get a farm with ten hens; a NEAR testnet wallet was made for you silently (no extension, no seed phrase).
+2. **Name the farm.** In **NAME YOUR FARM**, type a name and press **CONFIRM**. The tour starts; **SKIP** ends it.
+3. **Collect and sell.** Click an egg a hen laid: it pops into the crate, **COLLECT** in the top bar drops by one and **SELL** rises. Click the crate: a **SOLD** stamp slams and the coins arc to your counter.
+4. **Read the AI traders.** Press **MARKET** in the top bar. The **PRICES** tab shows today's price, yesterday's sales against what the street needs, and **WHAT THE AI TRADERS SAY**: each agent's own line on what it just did.
+5. **Answer an agent.** When a card slides in (the Bakery's contract, the Wholesaler's bulk order, the Squeezer's feed deal), press **ACCEPT**, or set **YOUR PRICE** with **-** and **+** and press **COUNTER**: the agent takes it, counters, or walks away.
+6. **Hatch a hen.** Open the shop (top bar) and buy a hen: an egg drops at the coop door, wobbles, cracks and hatches her.
+7. **Follow a receipt.** Open the ledger (top bar). A settled day shows **DAYS a-b**, the range its batch settled: press it to open the `settle_day` transaction on the testnet explorer. A day still waiting says **IN A BATCH** (ranges settle every 10 in-game days, 30 real minutes).
+8. **See the Feather odds.** Open https://yolkstreet.25th.dev/mint (no sign-in needed): the Feathers left of 777, each grade's odds of a hen at the reveal, the recent mints and all 777 numbers.
+
+## How NEAR fits, per track
+
+One contract, **`play.coys-game.testnet`** (version 6, Rust `near-sdk` 5.30.1, wasm built in CI, sha256 `d6c85dd9...`). Every check below is a free view call on it.
+
+**Games With Real Economies.** Eggs are NEP-245 tokens (`egg-white`, `egg-cream`, `egg-brown`, `egg-golden`) held by player and agent wallets. An in-game day is 3 real minutes; every 10 closed days settle in one owner-only `settle_day` call that mints, moves and burns the eggs and carries the SHA-256 of those days' full records (supply, price multiplier, every farm's net). The contract keeps only a fixed-size head per season. Check: `season_head({"season": "s1"})`, `mt_batch_supply`, `late_days({"season": "s1"})`. Receipt: [`5Js9kNyp...`](https://testnet.nearblocks.io/txns/5Js9kNyp7T18UMtp9jm5Ke3rDChWXccKqvgeFBYTZrvY), `s1` days 1033 to 1042 in one call.
+
+**Agent Economy.** Seven AI agents (two rival farms, two feed suppliers, three egg buyers) run businesses with their own cash, memory and a sub-account wallet of the game account; the eggs they buy settle to their wallets, and a Bakery contract delivery moves egg tokens from the player's wallet to the Bakery's. Agent decisions run on a provider chain: NEAR AI Cloud is the primary model, SERV Reasoning is the fallback, and rule-based strategies are the last resort, all under a hard daily spend cap. Check: `mt_batch_balance_of({"account_id": "oldmoney1.play.coys-game.testnet", "token_ids": ["egg-white", "egg-cream", "egg-brown", "egg-golden"]})` shows the eggs a wallet held at the last settled range (any of `bakery1`, `loyalist1`, `oldmoney1`, `squeezer1`, `trader1`, `upstart1`, `wholesaler1`; the Bakery's empties when it bakes). Wallet: [`bakery1.play.coys-game.testnet`](https://testnet.nearblocks.io/address/bakery1.play.coys-game.testnet).
+
+**NFTs That Do Something.** Hens are never minted. Feathers are NEP-171 tokens, 777 at most, enforced on chain: each is a claim ticket for one of the 777 Founding Hens planned for the mainnet launch. Farm milestones win tickets; minting one costs 25 in-game coins, draws a random free number from a seed anyone can replay, and the game pays the gas: the owner-only `mint_feather` mints it at once to the player's wallet with its card image and hash in the token. Its grade (Fluff, Plume, Quill or Golden Quill) comes from the farm's record and sets its odds at the reveal, whose provenance was fixed in advance with `commit_provenance`. Check: `feather_supply()`, `nft_token({"token_id": "001"})`. Receipt: [`3nL5mUUQ...`](https://testnet.nearblocks.io/txns/3nL5mUUQkbVPuCtLVbUabD8sFD5GFNg62BASB3wzLzoD) mints Feather #001 of 777, a Quill, to a player's wallet (in the `s1` settlement of day 577, before version 6 moved mints to `mint_feather`).
+
+## Architecture
+
+```mermaid
+flowchart TB
+  subgraph Browser
+    C["Client<br/>React, PixiJS, anime.js"]
+    PV["Privy<br/>email sign-in, silent NEAR wallet"]
+  end
+  subgraph Server["Game server (Node, authoritative)"]
+    G["Game<br/>day clock, market, cards,<br/>haggling, ledger"]
+    A["Seven agents and AI farms<br/>cash, memory, wallets"]
+    S["Settlement<br/>10 closed days per batch"]
+  end
+  DB[("Postgres<br/>one season")]
+  subgraph Chain["Agent provider chain, hard daily spend cap"]
+    N["NEAR AI Cloud<br/>primary"] --> SV["SERV Reasoning<br/>fallback"] --> R["rule strategies<br/>last resort"]
+  end
+  subgraph NEAR["NEAR testnet: play.coys-game.testnet"]
+    K["game contract v6<br/>NEP-245 eggs, NEP-171 Feathers"]
+    W["agent sub-account wallets<br/>and player wallets"]
+  end
+  C <-->|WebSocket| G
+  PV -->|access token| G
+  G <--> DB
+  A -->|decide| N
+  A -->|validated actions| G
+  G -->|day close| S
+  S -->|"settle_day, one call per range"| K
+  G -->|"mint_feather, at once"| K
+  K -.->|tokens held by| W
+```
+
+## The price rule
+
+One multiplier sets every grade's price for the next day, from everything sold that day:
+
+$$
+\text{price multiplier} = \mathrm{clamp}\left(\left(\frac{\text{demand}}{\text{supply}}\right)^{0.8},\ 0.4,\ 2.5\right),
+\qquad
+\text{demand} = 15 \cdot \max(1, F)
+$$
+
+Supply is every egg sold that day by players and agents (street sales, order fills, card deals, contract deliveries, the Wholesaler's resales); $F$ is the open agents plus the player farms not bust, so demand grows with the street. No supply gives 2.5. An egg sells at its grade's base price times the multiplier.
+
+<p align="center"><img src="docs/readme/hatch.svg" alt="A pixel egg wobbles three times, cracks and hatches, drawn by code from the game's own hatch sprite sheet" width="160"></p>
+
+<p align="center"><sub>A bought hen hatching at the coop: <code>docs/readme/hatch.svg</code>, made by <code>scripts/derive-art/readme-hatch.ts</code> from the game's hatch sprite sheet.</sub></p>
+
+## Run it locally
+
+Node 22.22.2 or newer (CI uses 24.22.3). From a clean clone:
+
+```sh
+git clone https://github.com/iam25th1/chickens-of-yolk-street.git && cd chickens-of-yolk-street
+npm ci --ignore-scripts
+npm run dev        # server on port 8787, client on http://localhost:5173
+```
+
+Every variable is optional for local play (`.env.example` names them all). Without `PRIVY_APP_ID` a labelled local dev login asks for a name; without `NEAR_TESTNET_ACCOUNT_ID` and `NEAR_TESTNET_PRIVATE_KEY` each settlement is a recorded no-op; without `NEARAI_API_KEY` and `SERV_API_KEY` the agents run on their rule strategies. Production also needs `NODE_ENV=production`, `GAME_SEASON`, `SESSION_SECRET` and a Postgres `DATABASE_URL`; then `npm run build` and `npm start`.
+
+```sh
+npm run typecheck && npm run lint && npm test   # 481 tests; the Postgres ones need TEST_DATABASE_URL
+npm run build && npm run test:e2e               # headless browser checks; CHROME_PATH points at a Chromium
+cd contracts/coys-game && cargo test            # contract unit tests
+```
+
+## Hackathon disclosure
+
+Built in the NEAR HACKATHON window, 1 to 14 November 2026 (first commit 11 November). Libraries: React 19, PixiJS 8, anime.js 4, Privy, near-api-js 7, zod 4, ws, pg, PGlite, `near-sdk`, `near-contract-standards` and `near-sdk-contract-tools`, with Vite, Vitest and Playwright (exact versions pinned in the lockfiles). AI tooling: the code and docs were written with Claude Code at 25TH's direction (most commits carry its co-author line); the art and sounds were made in Spawn and are kept byte for byte in `iam25th1/coys-assets`, and newer art is derived from them by code (`scripts/derive-art/`); in play, the agents call NEAR AI Cloud and SERV Reasoning; the demo video's voice is kokoro-onnx. The dated build history is in [docs/build-log.md](docs/build-log.md).
+
+## License
+
+[MIT](LICENSE), copyright 2026 25TH (iam25th1).
+
+## More detail
+
+Everything below opens on a click; none of it is needed to try the game.
+
+<details>
+<summary><b>At a glance</b>: the play loop, the market, the agents, the chain, the feel</summary>
+
+## At a glance
+
+| | |
+|---|---|
+| **Play loop** | Hens lay on a schedule; you collect, sell, buy hens, feed, coops and machines. One in-game day is 3 real minutes, and each day brings 2 to 4 decision cards from the agents. Everything on the farm is clickable; a first-run tour walks the loop by doing it, then a chain of goals pays coins for learning the rest. Every farm keeps a **profile** (eight tabs, a public version) and earns **76 cosmetic badges**; a bought hen hatches from an egg at the coop door, and a farm can buy more land. |
+| **Market** | One price multiplier for everyone, set by the whole market's daily supply against demand that grows with the number of farms. Instant street sales, a real order book with limit orders, and player-to-player trades, all on one **Market** page with seven tabs. |
+| **Agents** | Seven: two rival farms, two feed suppliers, three egg buyers. Each has its own wallet, memory and personality, decides once a day, pays a fee for each decision, remembers every deal, haggles in character, borrows, and can go bust. Agent decisions run on a provider chain: NEAR AI Cloud is the primary model, SERV Reasoning is the fallback, and rule-based strategies are the last resort, all under a hard daily spend cap. |
+| **Chain** | Hens are never minted. The beta mints **Feathers** (NEP-171 on NEAR testnet, **777 ever**, capped on chain): claim tickets for the 777 Founding Hens, planned to be revealed at the mainnet launch. Milestones win tickets; a player mints one into a Feather at once for 25 coins, and the game pays the testnet gas. Eggs are NEP-245 tokens, and every ten in-game days settle in one call that stores nothing new: a SHA-256 of those days' full records, kept in the game's database. Agents hold sub-account wallets. Players sign in with email; their wallet is made silently. |
+| **Feel** | Squash and stretch, hitstop, screen shake, particles and layered sound on every action, portraits that talk with voice babble, and a reduce-motion switch. |
+
+</details>
+
+<details>
+<summary><b>The economy</b>: base prices, the multiplier, hen payback, feed prices</summary>
+
+## The economy
+
+Every number lives in one object, `ECONOMY` in [`packages/shared/src/economy.ts`](packages/shared/src/economy.ts), including every agent's costs, markups, penalties and thresholds.
+
+**Market price.** One multiplier for every grade's base price (white 1.00, cream 1.20, brown 1.50, golden 6.00), set by the total eggs sold that day by all players and agents (street sales, order fills, card deals, contract deliveries and the wholesaler's resales) against demand $D_d$, which grows with the number of active farms $F_d$ (player farms plus open agents):
+
+$$
+m_{d+1} = \mathrm{clamp}\left(\left(\frac{D_d}{S_d}\right)^{0.8},\ 0.40,\ 2.50\right)
+\qquad
+D_d = 15 \cdot F_d
+$$
+
+With two players and the seven agents, $D = 135$: a typical day sits near $1.00$ whether Yolk Street has two farms or twenty. The economy sheet keeps the fixed reference $D = 600$ (at $S = 1300$, $m = 0.54$). The market has crashed when $m \le 0.80$.
+
+**Hen payback.** With base laying $0.80$, feed laying multiplier $f$, breakage $b$, the tier's expected egg price $\bar p$ at multiplier $m$, and feed at $0.12$ kg a day from a 25 kg bag of price $P$:
+
+$$
+\text{margin} = 0.80\, f\,(1-b)\,\bar p\, m - \frac{P}{25}\cdot 0.12
+\qquad
+\text{payback} = \frac{8}{\text{margin}}
+$$
+
+On standard feed at $m = 1$: margin $= 0.4624$, payback $= 17.3$ days.
+
+**Feed from the Squeezer.** Its bag price rises with how desperate a farm looks, $\delta \in [0, 1]$ (feed days left weigh most, low cash adds): $P_{sq} = P \cdot (1.05 + 0.5\,\delta)$. The Loyalist takes 2% off per past deal, up to 15%, and offers credit due in 5 days at 8%.
+
+</details>
+
+<details>
+<summary><b>The agent cast</b>: seven agents and the AI farms that enter</summary>
+
+## The agent cast
+
+| Agent | Role | Character (rule policy and haggling) |
+|---|---|---|
+| **Upstart Eggs** | rival farm | Lives on the Loyalist's feed credit. On a good week (recent closes averaging 1.08x or more) it borrows, puts every coin into hens and packs its coops past capacity; in a glut it dumps its fresh eggs below the Wholesaler's bid. Agents repay credit in full even into the red, so a boom that turns into a glut busts it. Undercuts players to the trader. Haggles loosely. |
+| **Old Money Farms** | rival farm | Never panics: below 0.90x it holds half its crate back and sells the lot once the price recovers (a glut of its own), keeps cash, premium feed, buys bust farms' hens at auction. Makes buyout offers to struggling players. Proud: walks away from insulting asks. |
+| **The Squeezer** | feed supplier | Reads desperation (low feed, low cash) and prices it in. Barely bends in a haggle. |
+| **The Loyalist** | feed supplier | Rewards repeat buyers with discounts and offers credit terms; never extends credit after a default. Bends the most. |
+| **Yolk Street Bakery** | egg buyer | Wants steady volume: offers standing contracts and posts daily buy orders. A missed delivery costs a penalty; two cancel the contract and start a sulk. |
+| **The Market Trader** | egg buyer | Pays a premium for brown and golden, up to what it resells for in town; walks away from farms whose quality slips; warns of gluts. |
+| **The Wholesaler** | egg buyer | Buys anything in bulk at a low price (bulk-order cards sized from a farm's daily lay, standing bids under the market, deeper in a glut), resells it into the street the next day: the same eggs count as supply twice, which drags a glut out. |
+
+Each agent has its own cash, stock and **memory of every farm** (deals, value, refusals, haggles won and lost, missed deliveries, sulks) in Postgres, a persona, its last few **public reasons** (one line each, on the market board) and a **weekly reflection** it reads back. It decides once per in-game day and pays 0.50 coins per decision from its own cash. Below 40 coins it sits out every other day to save the fee, so a struggling business visibly gets worse. Below zero it closes: its orders and contracts end, a rival's hens go to auction at half price, and a new agent of the same role opens three days later under a fresh name.
+
+**New AI farms** enter too: Early Bird Eggs, the Cluck Collective, Gilded Roost Estates and Pennywise Poultry (from a registry; they look like the Upstart or Old Money, start smaller and have their own personas). At each day close one may enter (a 25% chance) after three days of supply under demand or a rival's bust, always when fewer than two AI farms are open, never past `max(4, 1.5 x player farms)`. Every AI farm and agent wears an **AI** tag on the Market page and the ticker. Details, the 30-day model-against-rules comparison and the costs: [docs/agents.md](docs/agents.md).
+
+</details>
+
+<details>
+<summary><b>Systems</b>: agent decisions, cards, the order book, the chain, the server, the client, the simulation, assets, security</summary>
+
+## Systems
+
+<details>
+<summary><b>Agent decisions</b>: one shape for rules and the model, always validated</summary>
+
+- Each agent sees a context: its cash and stock, its last reflection and reasons, the live market and recent history, the last three days' supply against demand, recent busts, how many AI and player farms are open, auction hens, its own farm (rivals), and a brief of every farm with its memory of it (`apps/server/src/agents/decision.ts`).
+- On the days that matter, a model gets a persona prompt and must answer with the decision JSON schema (`response_format: json_schema, strict`), which includes a public `reason` under 80 characters; routine days run on the rule strategy. Every decision, model or rules, goes through `validateDecision`: text cleaned and cut safely, then the schema, then only the agent's own role's parts, offers only to player farms it sees, fills only to orders it sees. Anything unusable falls back to the rule policy and the fallback is logged and counted.
+- The provider chain is NEAR AI Cloud, then SERV Reasoning, then the rules, each provider behind a breaker. Decisions go to the provider's cheap model (NEAR AI's main one on hard days); weekly reflections to its main one.
+- The game bounds every number: prices are shares of the live price within bands, quantities are capped by stock and cash, offers only reach real player farms, and every farm action goes through the same validated actions players use.
+- Spend caps: `LLM_DAILY_CAP_USD` (1.50) per UTC day for every provider and agent together, and per agent `LLM_AGENT_DAILY_CAP_USD` (a quarter of it) and `LLM_AGENT_DAILY_CALLS` (240, failed calls counted), tracked from token usage and each model's per-token price (`*_MAIN_PRICE`, `*_CHEAP_PRICE`, else the provider's own list, else the assumed prices). Each call reserves its prompt with a margin and a full reply first, so a cap is never crossed; past it, the agent uses rules until the next day. The old `NEARAI_` cap names are still read.
+- Decisions apply in two phases: farm actions and restock before the market closes (their sales count today), then orders, fills and offers once tomorrow's price is set.
+
+</details>
+
+<details>
+<summary><b>Cards and haggling</b>: 2 to 4 a day, never scripted</summary>
+
+- Agents' offers become cards (bulk order, premium order, standing contract, feed deal, credit terms, undercut, buyout offer, glut warning), plus player trade cards from other players' sell orders. At most one per agent and four per player per day, arriving at 12%, 30%, 48% and 64% of the day.
+- Choices: accept, decline, counter, and the card's own options (switch supplier, match price, sell now or hold, sell hens).
+- A counter is a proposal. The agent accepts any ask inside its hidden walk-away price; otherwise it concedes part of the gap (its personality's concession), and walks away after three rounds, or at once from an insulting ask if it is proud. The walk-away price comes from personality and memory: regulars get more room, farms that won haggles get less, missed deliveries cost room.
+- The sales clerk auto-accepts bulk and premium orders at or above the player's floor; the delivery cart delivers standing contracts at dusk.
+
+</details>
+
+<details>
+<summary><b>Order book</b></summary>
+
+- Buyer agents post buy orders each day; farms post limit sells (the eggs leave the crate into the order and come back if it expires after 3 days). Orders cross at the resting price, best price first.
+- Players sell into buy orders, buy each other's eggs (also offered as player trade cards), and cancel their own orders. Every fill is a trade on the market board and counts as supply.
+
+</details>
+
+<details>
+<summary><b>Chain</b>: one contract, one call per ten days</summary>
+
+- `contracts/coys-game` (Rust, `near-sdk` 5.30.1): NEP-171 Feathers from `near-contract-standards`, NEP-245 eggs from `near-sdk-contract-tools` (`Nep245` derive without per-account storage fees, so holders need no deposit; the contract pays storage), `Owner` access control, and `settle_day`.
+- `settle_day(batch)`: owner only; within a season, days strictly in order and each once. One call settles a range of closed days (`first_day` to `day`, ten by default: `SETTLE_EVERY_DAYS`): it mints, transfers and burns egg tokens, updates the season's fixed-size head (last day, the SHA-256 of the range's full settlement, a running hash chain), and emits a `day_settled` event. A settled range stores nothing new (version 4); version 2's per-day records are released with `prune_days` into an archive hash. Since version 6 it carries no Feathers: `mint_feather` mints each one at once.
+- **Seasons**: a season is one game world from day 1, and one database holds one season (`GAME_SEASON`). A new season starts again at day 1 on the same contract while repeats within a season are refused; a server pointed at another season's database refuses to start. Version 1 settled days without seasons; `migrate` upgrades it in place and files those days under `legacy` (done on `coys-game.testnet`).
+- The batch (`apps/server/src/chain/batch.ts`): the trades of the range's days between holders become egg transfers; then every account is reconciled to what it really holds (crate plus open sell orders, or a buyer's stock) with mints and burns, starting from the balances last confirmed on chain. A failed call is caught up by the next, and no burn exceeds a balance. Each day's full settlement (every farm's net and the egg moves) is kept as exact text in `market_days.settlement_json`; the digest on chain is the SHA-256 over the range's day records, and the call carries only the moving farms' nets.
+- **Feathers only** (version 4): hens are never minted; `settle_day` refuses them. Feathers are capped at 777 on chain and numbered, with the founders provenance committed once ([docs/founding-hens.md](docs/founding-hens.md)); since version 6 `mint_feather` mints each one at once with the number the server drew.
+- **Feather images**: the grade's Spawn card frame and feather, with the number, are composed once at mint into a 96x136 PNG and stored in the token metadata with its `media_hash`. Why: it is the simplest correct storage. The token is self-contained and verifiable from the chain alone, with no image host, pinning service or URL to keep alive. A Feather costs 1,913 to 2,075 bytes of state, measured on the live contract (0.019 to 0.021 NEAR), plus 0.0004 to 0.0005 NEAR of gas. Mints go out only while the game account's free balance stays above its margin (`CHAIN_MINT_NEAR`, default 0.027 each; `CHAIN_MIN_BALANCE_NEAR`, default 0.1); the rest wait, and go out once it does.
+- **Agent wallets**: sub-accounts of the game account, funded from it (`AGENT_ACCOUNT_FUNDING_NEAR`, default 0.01), with keys derived from the game key by HMAC so no extra secret is stored. They are a pool: a wallet whose agents are all bust (any kind) is free, and a new agent takes a free one before a new one is created and funded; every wallet and its funding is recorded (`agent_wallets`), and each creation logs the pool's size and the NEAR spent.
+- **Players**: the Privy wallet holds their Feathers and eggs. Egg mints and transfers happen only in the range batch, never per click; a Feather mints when its owner mints it.
+- Testnet only, enforced in code before any key is used: accounts must be `.testnet` (or implicit), RPC hosts must be testnet, and the RPC's `chain_id` must say `testnet` before anything is signed. Without credentials, every day's batch is built the same way and logged as a NO-OP.
+- **Deliveries on chain**: a contract delivery is a trade from the player's wallet to the Bakery's sub-account, so the day's batch moves the eggs as NEP-245 tokens between them (then burns them when the Bakery bakes). Proven on testnet (receipt above), in a dedicated test, and in every seed of the simulation.
+- Tests: 33 contract unit tests, 10 for the planned reveal (`contracts/founding-hens`), and 10 **sandbox tests** (`contracts/sandbox-tests`, near-workspaces 0.24): a full day settlement, a settled day storing nothing, holder transfers, only the game can settle or mint, a new season settling day 1 after an old season ended at day 3, 777 Feathers minted then the 778th refused, the provenance committed once, the version 2 wasm that ran on `play.coys-game.testnet` (kept in `contracts/sandbox-tests/res`) upgrading in place with its records released into the archive hash, and the reveal giving exactly 7/70/200/500 and the same hens from the same seed. They run in CI (Linux); the wasm CI builds is what gets deployed (`npm run deploy-contract` checks its sha256, testnet only, see [deploy/testnet.md](deploy/testnet.md)).
+
+</details>
+
+<details>
+<summary><b>Server</b>: authoritative, transactional, reconnect safe</summary>
+
+- `apps/server`: Node, `ws`, `pg` and PGlite behind one `Db` interface. `DATABASE_URL=postgres://...` uses Postgres; `pglite://<dir>` (default `.data/coys`) or `memory://` uses embedded PGlite for local play and tests. Production (`NODE_ENV=production`) refuses PGlite and requires `GAME_SEASON` and `SESSION_SECRET`.
+- Migrations run on every boot and are safe to repeat; on Postgres they run in one transaction under an advisory lock, so two instances booting together cannot race (tested on real Postgres in CI). v1 (clock, market days, players, farms, coops, hens, unlocks, lay events, orders, ledger), v2 (agents, memory, cards, contracts, debts, order book fields, trades, inference usage, confirmed chain balances), v3 (each day's demand), v4 (seasons on the clock, market days and every ledger row; market days keyed by season and day), and v5 to v17 one change each, up to v15 (provider usage), v16 (farm land) and v17 (settlement ranges); all are in `apps/server/src/db/migrations.ts`.
+- `/healthz` (and `/api/health`) reports the version and commit baked in at build time, the season, the day and a timed database round trip; it answers 503 when the database does not.
+- `DEMO_DAY_SECONDS` (20 to 3600) shortens the in-game day for recording; production ignores it unless `DEMO_MODE=1`. The client takes the day length from the server clock.
+- Backups: `scripts/db-backup.ts` (pg_dump to `backups/coys-<UTC time>.dump`) and `scripts/db-restore.ts` (pg_restore in one transaction, stops at the first error); the password reaches the tools as an environment variable, never on a command line. CI round-trips a backup between two Postgres databases.
+- Every farm cash change writes the balance and a ledger row in the same transaction; tests check the ledger total equals cash, for players and rival farms, across a 30-day simulation.
+- Mutations run one at a time; messages go out only after commit. Strict zod schemas reject any extra field. Per-player rate limits, reconnect-safe request ids.
+
+</details>
+
+<details>
+<summary><b>Client</b>: screens, juice and sound</summary>
+
+- Whole device pixels everywhere: the UI is laid out in UI pixels drawn at $p$ device pixels each (CSS zoom), the world at $k$ device pixels per world pixel, painted art from the atlas cut for that density (see [Visual quality](#visual-quality-and-the-tour-12-november-2026)). PixiJS draws the farm and the town square; anime.js drives every UI motion, in whole-pixel steps, never rotating text.
+- **Card overlay**: one composed modal (portrait and line, the card art upright beside them, answers in one row); the card slides in with an overshoot and a paper swoosh; the portrait talks with its voice babble while the line types out; outcomes play the agent's expression and slam a stamp; a haggle win flips the card to gold with a hitstop, shake, confetti and the win chime; a fail sends the agent walking with the fail sound.
+- **Market page**: seven tabs (prices, sell, buy orders, your orders, trade, the hen auction, farms) over the town square plate with animated bunting and a milling crowd (market murmur loop), the split-flap ticker by grade, the farms ranked with their signs, what the AI traders say, big trades and the order book.
+- **Ledger**: day-by-day profit, contracts, debts, and each settled day's on-chain receipt (the range call that settled it).
+- **Shop**: listed hens drawn from their trait layers with laying trait and price (auction hens marked), feed with supplier switching, coops, machines.
+- **Rival bust**: the sign tips over, a price wave crosses the ticker, medium shake, falling feathers, the collapse crash and the bust sting. **Glut**: the ticker drops red and the market tension music plays until prices recover.
+- **Tour**: thirteen spotlight steps covering the whole game, each moving on only when the player does it; Back, Skip, progress dots, replayable from Settings. Waiting cards queue in the side panel with a count; an unanswered card closes with its day.
+- **Page**: descriptive title and meta description, a favicon and a 1200x630 share image cut from the sprites by `scripts/make-share-images.ts`.
+- Everything from brief 1 stays: lays, hand collect, big haul, deal stamp, coop builds, unlocks, crash, new day.
+
+</details>
+
+<details>
+<summary><b>Simulation</b>: 30 in-game days, five seeds, seven agents and two headless players</summary>
+
+`apps/server/test/sim.test.ts` runs the whole market for 30 days on five fixed seeds, with AI farms entering by the entry rule (it also checks their count stays within its bounds every day). The stub model answers each agent's own in-character decision as JSON on most calls and garbage on every fourth, under a 0.25 USD cap; both headless players have wallets, and every day settles through a recording chain writer that builds the real batch. The test checks, per seed: the median day's multiplier is between 0.80 and 1.30, at least one day falls to 0.80 or below, contract eggs move on chain to the Bakery's wallet, the spend cap holds, and ledgers equal cash; and a rival busts naturally in at least three of the five seeds.
+
+| Seed | Median day | Lowest day | Days at 0.80x or below | Rival bust | Contracts (signed, delivered, missed) | Bakery contract eggs moved on chain | Wholesaler resold | Model calls, fallbacks, spend (cap 0.25 USD) |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 1.10x | 0.67x | 11 | Upstart Eggs, day 25 | 8, 50, 8 | 103 | 168 | 66, 154, 0.2424 USD |
+| 2 | 1.08x | 0.66x | 10 | Upstart Eggs, day 15 | 9, 36, 13 | 78 | 231 | 64, 157, 0.2416 USD |
+| 3 | 1.07x | 0.65x | 10 | Upstart Eggs, day 17 | 8, 37, 9 | 89 | 205 | 65, 156, 0.2420 USD |
+| 4 | 1.10x | 0.66x | 11 | Upstart Eggs, day 15 | 9, 35, 13 | 94 | 239 | 64, 157, 0.2416 USD |
+| 5 | 1.16x | 0.64x | 10 | Upstart Eggs, day 15 | 8, 39, 9 | 101 | 189 | 63, 158, 0.2412 USD |
+
+Demand is 135 a day (two players and seven agents) and drops to 120 while a bust rival's successor is waiting to open. Seed 1, day by day (supply of demand, then the multiplier it set): days 6 to 18 swing between about 220 and 90 eggs as Old Money holds half its crate below 0.90x and releases it on the recovery, so the price alternates between roughly 1.3x and 0.7x; the Upstart's cash runs 12, 80, 104, 36, 121 and it busts on day 25 when its feed credit falls due in a glut. The only 2.50x day is day 2, after a first day with no sales. Hen and order ids are random, so the exact numbers move a little between runs; the acceptance holds on every run.
+
+The companion test forces a glut on Upstart Eggs (no cash, empty trough, crashed market): it goes bust on day 2, its hens go to auction, and Hatch and Dash opens as the new rival on day 5.
+
+</details>
+
+<details>
+<summary><b>Asset pipeline</b>: verified, byte for byte</summary>
+
+- `npm run pack-assets` checks every manifest file of `iam25th1/coys-assets` against its SHA-256 and packs 86 sprite sheets (PixiJS JSON with rows, per-frame durations and anchors) and 59 sounds (124 MP3 takes, 12 gapless loop OGGs). PNG, MP3 and OGG files are copied byte for byte.
+- Hen trait layers match `01-hen-anims` frame for frame; brown and black bodies are palette swaps in code. The server composes each Feather's card image at mint (`apps/server/src/chain/feather-image.ts`).
+
+</details>
+
+<details>
+<summary><b>Security</b></summary>
+
+- No secrets in the repo or the client bundle: `.env` is ignored; `.env.example` names and describes every variable with no values; the client reads only the public Privy app id from `/api/config`; the built bundle is grepped for key-like strings.
+- The model key, the testnet key and agent keys live only on the server. Testnet only, enforced in code.
+- Every dependency pinned exactly; installed with `npm ci --ignore-scripts` locally and in CI; Rust crates pinned with `Cargo.lock` and built `--locked`; cargo-near checksum-verified in CI.
+
+</details>
+
+</details>
+
+<details>
+<summary><b>Where it runs</b>: Pier on a Mac, Render as the fallback, what the server trusts</summary>
+
+## Where it runs, and what the server trusts
+
+**Where it runs.** One Node process per season serves the built client, the API and the WebSocket on one port; Pier runs it on a Mac behind a Cloudflare tunnel, and Render is the fallback with a restore path between them ([deploy/pier](deploy/pier/README.md), [deploy/render](deploy/render/README.md)).
+
+```mermaid
+flowchart LR
+  P["Players' browsers"] -- "https and wss" --> CF["Cloudflare tunnel<br/>yolkstreet.25th.dev"]
+  subgraph Mac["Pier on the Mac (main)"]
+    N["node apps/server/dist/main.js<br/>port 8787, /healthz"]
+    PG[("Postgres<br/>season s1")]
+    N <--> PG
+  end
+  CF --> N
+  subgraph Render["Render (fallback)"]
+    RN["web service<br/>same build and start"]
+    RPG[("Postgres 18<br/>private network")]
+    RN <--> RPG
+  end
+  PG -. "scripts/db-backup.ts<br/>daily and before deploys" .-> BK[["pg_dump<br/>backups/coys-time.dump"]]
+  BK -. "scripts/db-restore.ts<br/>in an outage" .-> RPG
+  N -- "settle_day" --> T["play.coys-game.testnet"]
+  RN -. "same season, same contract" .-> T
+```
+
+The client never sends a balance or an outcome. It asks for actions; the only prices it sends are proposals (a haggle ask, a limit order) that the server bounds and that an agent or counterparty must accept. The server applies every action in a database transaction and answers with state and events that drive the juice.
+
+</details>
+
+<details>
+<summary><b>NEAR pieces and testnet receipts</b>: every component, and every transaction since 11 November</summary>
 
 ## How NEAR fits in
 
-NEAR tools used: **Privy social login** (email, with a silent NEAR wallet), **NEAR AI Cloud** (the primary model for agent decisions, with SERV Reasoning as the fallback), **NEP-171** Feathers, **NEP-245** egg tokens, **sub-account agent wallets**, and **compact batched testnet settlement** (one call per in-game day, no storage per day).
+NEAR tools used: **Privy social login** (email, with a silent NEAR wallet), **NEAR AI Cloud** (the primary model for agent decisions, with SERV Reasoning as the fallback), **NEP-171** Feathers, **NEP-245** egg tokens, **sub-account agent wallets**, and **compact batched testnet settlement** (one call per ten in-game days, no storage per day).
 
 | NEAR piece | What it does here | Status in this build |
 |---|---|---|
-| **Game contract on testnet** (`near-sdk` 5.30.1) | One contract on the game account: the Feathers (NEP-171, `near-contract-standards` 5.30.1, 777 ever, capped on chain), egg tokens (NEP-245, `near-sdk-contract-tools` 4.0.0 from the near org), and `settle_day`, owner only, once per in-game day of a season, storing only a fixed-size head per season. | **Live**, version 5, on `play.coys-game.testnet` (upgraded in place on 12 November 2026 to version 4, tx [`9jsFd4EA...`](https://testnet.nearblocks.io/txns/9jsFd4EAZc3nkE4v11x4poVTMhLyYzPpuZKrsCud9J4s), and to version 5, tx [`4h7ZEQkP...`](https://testnet.nearblocks.io/txns/4h7ZEQkPG66zVmNrNvLr8W3b9dyBYmQoFibEBFCWuN92); wasm built in CI with `cargo near`, sha256 `7fa2c060...`), live season `s1`, with the founders provenance committed ([`JBoKNVa6...`](https://testnet.nearblocks.io/txns/JBoKNVa6Pi5jAb2BA4chAh8K43GGpWgw8AtHJy26b5AB)). The demo account `coys-game.testnet` stays on version 2 ([deploy/testnet.md](deploy/testnet.md)). |
-| **Agent wallets** (near-api-js 7.5.3) | Each agent gets a testnet sub-account of the game account (`bakery1.coys-game.testnet` and so on), funded from it; its eggs settle to it. A contract delivery moves egg tokens from the player's wallet to the Bakery's. | **Live**: seven wallets, and a delivery proven on chain (below). |
+| **Game contract on testnet** (`near-sdk` 5.30.1) | One contract on the game account: the Feathers (NEP-171, `near-contract-standards` 5.30.1, 777 ever, capped on chain), egg tokens (NEP-245, `near-sdk-contract-tools` 4.0.0 from the near org), `settle_day`, owner only, once per range of closed days of a season (ten by default), storing only a fixed-size head per season, and `mint_feather`, owner only, which mints one Feather at once. | **Live**, version 6, on `play.coys-game.testnet` (upgraded in place on 12 November 2026 to version 4, tx [`9jsFd4EA...`](https://testnet.nearblocks.io/txns/9jsFd4EAZc3nkE4v11x4poVTMhLyYzPpuZKrsCud9J4s), to version 5, tx [`4h7ZEQkP...`](https://testnet.nearblocks.io/txns/4h7ZEQkPG66zVmNrNvLr8W3b9dyBYmQoFibEBFCWuN92), and on 13 November to version 6, tx [`8aADyAiD...`](https://testnet.nearblocks.io/txns/8aADyAiDPopPb67ZnY9WATvLM6jz7XjyWAgocF9o174r); wasm built in CI with `cargo near`, sha256 `d6c85dd9...`), live season `s1`, with the founders provenance committed ([`JBoKNVa6...`](https://testnet.nearblocks.io/txns/JBoKNVa6Pi5jAb2BA4chAh8K43GGpWgw8AtHJy26b5AB)). The demo account `coys-game.testnet` stays on version 2 ([deploy/testnet.md](deploy/testnet.md)). |
+| **Agent wallets** (near-api-js 7.5.3) | Each agent gets a testnet sub-account of the game account (`bakery1.play.coys-game.testnet` and so on, on the live game), funded from it; its eggs settle to it. A contract delivery moves egg tokens from the player's wallet to the Bakery's. | **Live**: seven wallets, and a delivery proven on chain (below). |
 | **Privy social login** (docs.near.org social login) | Email sign-in; a NEAR testnet wallet is created silently with Privy's extended-chains API; the server verifies the ES256 access token with `jose`. That wallet holds the player's Feathers and eggs. | Wired. Needs `PRIVY_APP_ID` and the live domain in Privy's allowed domains. |
 | **NEAR AI Cloud** (OpenAI-compatible) | First in the agents' provider chain: decisions on the days that matter, as structured JSON output (`json_schema`, strict) checked against a zod schema, and a weekly reflection; anything unusable falls back to rules and is logged. One shared daily spend cap, and caps per agent. | Integrated as the primary model; SERV Reasoning is the fallback and the rule strategies the last resort. Needs `NEARAI_API_KEY` and account credits; `z-ai/glm-5.3-flash` for decisions, `Qwen/Qwen3.6-35B-A3B-FP8` for weekly reflections and hard days. Costs: [docs/agents.md](docs/agents.md). |
 
@@ -45,11 +353,11 @@ NEAR tools used: **Privy social login** (email, with a silent NEAR wallet), **NE
 | 11 Nov | Season `delivery-proof` day 2: the player delivers 3 eggs on a Bakery standing contract; two NEP-245 `mt_transfer` events move 1 white and 2 cream from the player's wallet `f9ad7ca1...` to `bakery1.coys-game.testnet`, which then bakes them (burned) | [2Erp19yX...](https://testnet.nearblocks.io/txns/2Erp19yXaNGekgt6a8EgK2q66gSnDRpAAmQmb3cH2ifF) |
 | 11 Nov | Season `tour5-20261111`: the headless tour behind the screenshots, one settlement per 30-second day for 12 days (the ledger links in the ledger screenshot are these) | day 1 [8WeCaoGp...](https://testnet.nearblocks.io/txns/8WeCaoGpJJ72nHqpVcnunnrN8FAEgzJWvAm44VbfT1ER), day 12 [2jebGi4R...](https://testnet.nearblocks.io/txns/2jebGi4RLcinhyvL6WC7pizakx5WAmpvepMqGYJEdNk6) |
 
-Check it yourself with view calls on `coys-game.testnet`: `day_record({"season": "delivery-proof", "day": 2})` (shows `egg_transfers: 2`), `last_settled_day({"season": "legacy"})` (3), `nft_total_supply()`; the `mt_transfer` events are in the day 2 transaction's receipts. In these runs every agent used its rule policy and each fallback was logged: the path the tests also cover.
+Check it yourself with view calls on `coys-game.testnet`: `day_record({"season": "delivery-proof", "day": 2})` (shows `egg_transfers: 2`), `last_settled_day({"season": "legacy"})` (3), `nft_total_supply()` (this demo account stays on version 2, so its early test hens still count there); the `mt_transfer` events are in the day 2 transaction's receipts. In these runs every agent used its rule policy and each fallback was logged: the path the tests also cover.
 
 **Live deploy.** https://yolkstreet.25th.dev runs season `s1` on Pier, settling to its own production contract
 account `play.coys-game.testnet` ([deploy/pier](deploy/pier/README.md), [deploy/testnet.md](deploy/testnet.md)).
-Checked on 11 November 2026 at about 20:06 UTC:
+Checked on 11 November 2026 at about 20:06 UTC (a snapshot of that day; `/healthz` now answers the current commit and day):
 
 ```json
 {"ok":true,"version":"0.1.0","commit":"a2d54b574f2f","season":"s1","day":2,"db":{"kind":"postgres","ok":true,"ms":0},"settlement":"near-testnet","uptimeS":108}
@@ -66,20 +374,154 @@ Checked on 11 November 2026 at about 20:06 UTC:
 | 11 Nov | Agent wallet `bakery1.play.coys-game.testnet`, 0.05 NEAR | [6XoSGUAn...](https://testnet.nearblocks.io/txns/6XoSGUAnp98xLnTB7vg1LyS6vmS5bk99h274iTg4Jf4A) |
 | 11 Nov | Agent wallet `trader1.play.coys-game.testnet`, 0.05 NEAR | [FfCVpyMj...](https://testnet.nearblocks.io/txns/FfCVpyMjNcZScYkGu75JYy6oVBSn3LWVtSWqxTgaaM4a) |
 | 11 Nov | Agent wallet `wholesaler1.play.coys-game.testnet`, 0.05 NEAR | [4xqGJnhA...](https://testnet.nearblocks.io/txns/4xqGJnhAcTpRHM2wEZU2H9PZLvKd5k2LDcnzGMpt3jRf) |
-| 11 Nov | Season `s1` day 1 settled on the production contract (`last_settled_day({"season": "s1"})` is 1) | [Fz56pALi...](https://testnet.nearblocks.io/txns/Fz56pALiRXbLvt9ZK6R6ZwRg1uhzdeJ2XRyxcipHdaS6) |
+| 11 Nov | Season `s1` day 1 settled on the production contract (`last_settled_day({"season": "s1"})` was 1 then; it now follows the latest settled range) | [Fz56pALi...](https://testnet.nearblocks.io/txns/Fz56pALiRXbLvt9ZK6R6ZwRg1uhzdeJ2XRyxcipHdaS6) |
 
 Also checked live: the title page, `/build/index-BL-i4f2Y.js` and `/assets/sprites/12-crate.png` answer 200, a
 WebSocket on `wss://yolkstreet.25th.dev/ws` upgrades (101) and answers a ping, and `/api/market` serves the market
 state. On 12 November contract version 4 replaced the per-day record with a fixed-size head, so `s1`'s settlements stopped
 growing the account's storage (they had cost about 1.06 NEAR a real day; now about 0.19 NEAR of gas), and version 2's
 day records can be released back to the account ([The Feathers beta](#the-feathers-beta-compact-settlement-and-the-layout-spec-12-november-2026)).
+Since 13 November ten closed days settle in one call: about 0.002 NEAR of gas a call (0.0020 and 0.0023 measured on two
+range calls on 14 November), about 0.1 NEAR a real day.
 
-## Try it
+</details>
+
+<details>
+<summary><b>Environment variables</b></summary>
+
+## Environment variables
+
+All optional for local play. Copy `.env.example` to `.env` at the repo root. Production needs `NODE_ENV=production`, `GAME_SEASON`, `SESSION_SECRET` and a Postgres `DATABASE_URL` ([deploy/pier](deploy/pier/README.md) lists every variable).
+
+| Variable | Used by | Without it |
+|---|---|---|
+| `NODE_ENV` | server | local play rules (PGlite allowed, demo days allowed) |
+| `PORT`, `DATABASE_URL`, `SESSION_SECRET` | server | 8787; PGlite at `.data/coys`; a random secret per boot |
+| `HOST` | server | listens on every interface |
+| `GAME_SEASON` | server | a fresh database makes its own `dev-...` season; an existing one keeps its own |
+| `DEMO_DAY_SECONDS`, `DEMO_MODE` | server | 180-second days; `DEMO_MODE=1` lets a production server use demo days; outside production, with `HOST` on loopback, it also turns on the demo session (`/?demo=new`) that records the demo video |
+| `ALLOW_PGLITE_IN_PRODUCTION` | server | production refuses PGlite (set only to check a build) |
+| `ALLOW_DEV_LOGIN` | server | dev login only when Privy is not set up |
+| `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY` | server, client (via `/api/config`) | labelled local dev login |
+| `NEAR_TESTNET_ACCOUNT_ID`, `NEAR_TESTNET_PRIVATE_KEY` | server, deploy script | daily settlement is a recorded NO-OP |
+| `NEAR_TESTNET_RPC_URL`, `NEAR_GAME_CONTRACT_ID` | server | `https://test.rpc.fastnear.com`; the signing account |
+| `SETTLE_EVERY_DAYS` | server | 10: days settle in ranges of ten, one call each (1 settles every day on its own) |
+| `CHAIN_MINT_NEAR`, `CHAIN_MIN_BALANCE_NEAR`, `AGENT_ACCOUNT_FUNDING_NEAR` | server | 0.027 kept free per Feather mint (measured 0.0213, plus 25%); 0.1 margin, kept for settlement gas (about 50 ten-day range calls), under which mints and agent wallet links wait; 0.01 per new agent wallet |
+| `NEARAI_API_KEY`, `NEARAI_BASE_URL`, `NEARAI_MODEL`, `NEARAI_CHEAP_MODEL` | server | NEAR AI Cloud left out of the provider chain |
+| `NEARAI_MAIN_PRICE`, `NEARAI_CHEAP_PRICE` | server | `/v1/models`, else the assumed prices in `apps/server/src/agents/brain.ts` (USD per million tokens, "input,output") |
+| `SERV_API_KEY`, `SERV_BASE_URL`, `SERV_MODEL`, `SERV_CHEAP_MODEL` | server | SERV Reasoning left out of the chain; `https://inference-api.openserv.ai/v1`, `gpt-5.4-mini` (reflections), `gpt-6-luna` (decisions) |
+| `SERV_REASONING_EFFORT` | server | `none` (or `low`, `medium`, `high`) |
+| `SERV_MAIN_PRICE`, `SERV_CHEAP_PRICE` | server | SERV's published prices in `apps/server/src/ai/serv.ts` (confirm them in the OpenServ console) |
+| `LLM_DAILY_CAP_USD` (old name `NEARAI_DAILY_SPEND_CAP_USD`, still read) | server | 1.50, every provider together |
+| `LLM_AGENT_DAILY_CAP_USD`, `LLM_AGENT_DAILY_CALLS` (old `NEARAI_AGENT_DAILY_` names still read) | server | a quarter of the shared cap; 240 calls, failed ones included |
+| `LLM_PRICE_MOVE`, `LLM_DECISION_GAP_DAYS`, `LLM_CLOSE_BUDGET_SECONDS` | server | 0.15 (a 15% move asks a model); 3 in-game days between model decisions; 60 s of model calls per day close |
+| `ASSETS_DIR` | `npm run pack-assets` | required to re-pack |
+
+</details>
+
+<details>
+<summary><b>Commands</b></summary>
+
+## Commands
+
+| Command | Does |
+|---|---|
+| `npm ci --ignore-scripts` | install from the lockfile, no install scripts |
+| `npm run dev` | server (port 8787) and client (Vite, port 5173) |
+| `npm test` | Vitest: economy, agents, haggling, market, chain batch, simulation, WebSocket, packer, pixel passes, hen movement |
+| `npm run test:e2e` | after a build: the naming screen and the tour at four sizes, and every screen, tab, page and tour step in a headless browser at 11 window sizes (`E2E_SIZES` keeps a few: CI runs 1280x720, 1920x1080 and 390x844); fails on anything that scrolls or is cut off (`SCREENSHOTS=1` saves them to `docs/screenshots`) |
+| `npm run typecheck` / `npm run lint` | strict TypeScript; ESLint plus a check that no file holds an em dash |
+| `npm run build` / `npm start` | bundle the server and client; serve both on one port |
+| `npm run deploy-contract -- --wasm <file> --account <id.testnet> [--create] [--migrate]` | deploy a CI-built contract to a testnet account (sha256 checked, mainnet refused; see [deploy/testnet.md](deploy/testnet.md)) |
+| `npm run settle-late-days -- --season <id> [--dry-run]` | record closed days whose settlement failed, late, by their digests (the server also does it at each day close) |
+| `npx tsx scripts/db-backup.ts` / `scripts/db-restore.ts` | back up the Postgres database to `backups/`, or restore a dump into another (see [deploy/pier](deploy/pier/README.md)) |
+| `npx tsx scripts/make-share-images.ts` | cut the favicon and the share image from the sprites |
+| `cd contracts/coys-game && cargo test` | contract unit tests (CI also runs `cargo near build` and the sandbox tests) |
+
+</details>
+
+<details>
+<summary><b>Repository layout</b></summary>
+
+## Repository layout
+
+```
+apps/client          Vite + React shell + PixiJS world + anime.js motion + Web Audio
+apps/server          game server: HTTP, WebSocket, game, agents, cards, market, chain, db
+packages/shared      economy config and formulas, agent pricing, protocol, pixel passes
+contracts/coys-game  the game contract (Rust); res/ holds the CI-built wasm and its sha256
+contracts/sandbox-tests  near-workspaces sandbox tests for the contract (res/ holds the version 2, 4 and 5 wasm for the upgrade tests)
+scripts              asset packer, dev runner, text check, testnet deploy, backups, share images, late days
+e2e                  the browser check: no scrollbars, nothing cut off, at every window size
+deploy               Pier and Render settings, testnet contract accounts and seasons
+render.yaml          Render Blueprint (fallback host)
+docs/screenshots     headless captures of this build
+docs/submission      drafts: demo shot list, post drafts, form fields
+docs/readme          the README's animated hatch (made by scripts/derive-art/readme-hatch.ts)
+docs/build-log.md    the dated build history
+```
+
+</details>
+
+<details>
+<summary><b>What is stubbed, and why</b></summary>
+
+## What is stubbed, and why
+
+- **Contract builds run in CI**: the first development machine (Windows, with Application Control) blocked the unsigned build scripts cargo compiles, so the contract is built and sandbox-tested on Linux in CI, and the deployed wasm is the CI artifact (its sha256 is committed and checked by the deploy script).
+- **Privy end to end** needs a real browser and inbox; the server and client sides are wired and tested headlessly up to the token check.
+- **Model decisions** depend on a provider answering: agent decisions run on a provider chain: NEAR AI Cloud is the primary model, SERV Reasoning is the fallback, and rule-based strategies are the last resort, all under a hard daily spend cap. A model is held to the same rules a rule strategy follows.
+- **Player credit default** is remembered and blocks further credit, but a player is never pushed below zero; agents always repay in full.
+- **Feather mints go one at a time** through `mint_feather`, each RPC call paced and retried with backoff; a mint that cannot go out yet (no wallet linked, the game account under its margin) waits and goes again when the wallet is linked or at the next day close.
+- **The live deploy** (Pier on the Mac, the tunnel, Render) is set up from [deploy/](deploy/); it is not run from this repository.
+
+</details>
+
+<details>
+<summary><b>Verification</b>: CI, and what was checked live</summary>
+
+## Verification
+
+This README was checked on 14 November 2026: every transaction and account it links under
+[How NEAR fits, per track](#how-near-fits-per-track) answered on testnet, and every view method it names there answered
+on `play.coys-game.testnet` (read-only calls).
+
+On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass. CI is green: the TypeScript job on every push and pull request (with PostgreSQL 16: the Postgres tests, the production build booting against Postgres with `/healthz` checked, and a backup restored into a second database), the browser checks (`layout`: every browser check at 1280x720, 1920x1080 and 390x844; the full sweep at 11 window sizes runs locally before a merge) on pull requests that change more than docs, and the contracts workflow whenever `contracts/` changes (unit tests, `cargo near build`, sandbox tests). The economy sheet tests hit their values exactly; the five-seed simulation meets the economy acceptance; a malformed model answer falls back to rules; a new season settles day 1 after an old season ended at day 3; non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
+
+The live Pier deploy and its tunnel were checked end to end on 11 November 2026 (receipts under [How NEAR fits in](#how-near-fits-in)).
+
+Brief 8 was checked on 12 November 2026: the hen size and movement tests (41 window sizes and a resize sequence), the
+belt test (no egg colour on any frame), the browser check at 11 window sizes with every screen, tab, page and tour step
+open (nothing scrolls, nothing is cut off), the contract's unit and sandbox tests (version 4 upgraded to 5 with the test
+Feathers burnt and two missed days recorded), and on `play.coys-game.testnet` the upgrade, the burn (0 minted, 777
+remaining) and days 509 and 510 recorded late, with no unsettled closed day left in `s1` (under
+[Scaling, no scrollbars, a clean conveyor and the 777 restored](#scaling-no-scrollbars-a-clean-conveyor-and-the-777-restored-12-november-2026)).
+
+Brief 7 was checked live on 12 November 2026 on `4471029`: the version 4 upgrade and the release of version 2's records on
+`play.coys-game.testnet`, three Feathers minted in a test season, the mint page and the board, and the farm and its layout
+overlay at five sizes with no overlap (under [the Feathers beta](#the-feathers-beta-compact-settlement-and-the-layout-spec-12-november-2026)).
+The contracts job builds both contracts; the sandbox mints 777 Feathers and refuses the 778th, settles 30 days with no new
+storage, upgrades version 2 and releases its records, and reveals exactly 7/70/200/500.
+
+Brief 6 was checked live on 12 November 2026 on `c48d2f2`: the farm at four sizes with no overlap, the first-run tour for brand-new players at three sizes, a 30-second capture of the belt and the coop doors, and live milestone rolls (under [Founding Hens](#founding-hens-machines-at-work-sound-and-a-guide-12-november-2026)). The contracts job builds the version 3 wasm and the sandbox mints 777 Founding Hens and refuses the 778th.
+
+The visual-quality pass was checked live on 12 November 2026: cold load at five sizes, the whole tour completed by an automated browser at five sizes, the no-overlap check with every modal and tour step open, and device-pixel crops (numbers under [Visual quality](#visual-quality-and-the-tour-12-november-2026)).
+
+The playability rescue was checked live on 12 November 2026: cold load, the four window sizes, every world object's card, an egg collected, and a 20-second flicker capture (numbers under [Playability rescue](#playability-rescue-12-november-2026)).
+
+**Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, the quality of real model decisions, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
+
+</details>
+
+<details>
+<summary><b>A longer walkthrough on a local copy</b>: sixteen steps, from install to a production build</summary>
+
+## A longer walkthrough on a local copy
 
 Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what to do and what you should see. Commands are the same in PowerShell and a POSIX shell unless shown otherwise.
 
 1. **Install.** Run `npm ci --ignore-scripts`. You see the lockfile install with no package install scripts (`.npmrc` also sets `ignore-scripts=true`).
-2. **Test.** Run `npm test`. You see **334 tests pass and 2 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it); on a fresh clone without a coys-assets checkout beside the repo, the asset re-pack check skips too (333 and 3). After `npm run build`, `npm run test:e2e` opens every screen in a headless browser at 11 window sizes and checks that nothing scrolls or is cut off (it needs a Chromium: `CHROME_PATH` points at one). Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
+2. **Test.** Run `npm test`. You see **481 tests: 479 pass and 2 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it); on a fresh clone without a coys-assets checkout beside the repo, the asset re-pack check skips too (478 and 3). After `npm run build`, `npm run test:e2e` opens every screen in a headless browser at 11 window sizes and checks that nothing scrolls or is cut off (it needs a Chromium: `CHROME_PATH` points at one). Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
 3. **Play.** Run `npm run dev` and open http://localhost:5173. You see an egg fill up over the loading plate, then the title: the logo stamps in and the price ticker scrolls.
 4. **Sign in.** Press **PLAY**. With `PRIVY_APP_ID` set you sign in with email; without it a red **LOCAL DEV LOGIN** label asks for a name. You see your farm: 10 hens, a starter coop, **50.00** coins, **DAY001**.
 5. **Take the tour.** The first time you enter your farm the tour starts on its own: your hen walks you through the loop by doing it (collect an egg, sell, the market, feed, an offer, a hen, machines, rivals, the ledger). Each step ends when you do the thing; **SKIP** ends it, and it never comes back unless you press **REPLAY THE TOUR** in **SETTINGS**. After it, the goal in the corner shows what to aim for next, with a **CLAIM** button and coins when you reach it. The **?** in the top bar opens **HOW TO PLAY**, the guide to everything.
@@ -89,18 +531,24 @@ Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what 
 9. **Lose one.** On another card, press **+** many times and **COUNTER**. You see the agent counter, get cross, and after three rounds (or at once, if it is proud) walk off with the fail sound.
 10. **Sell into a glut.** Speed days up: `DEMO_DAY_SECONDS=30` before `npm run dev` (PowerShell: `$env:DEMO_DAY_SECONDS = "30"; npm run dev`). Open the **Market** (top bar): its PRICES tab shows today's sales against what the street needs. When a day's supply runs well past demand (Old Money releasing its hoard, the Wholesaler reselling), you see the next multiplier fall, the ticker turn red at 0.80 or lower, the **GLUT WARNING** card in the tray, and the tension music take over.
 11. **Watch a rival bust.** The Upstart borrows feed from the Loyalist to grow on good weeks. When a glut meets its debt, it goes below zero: you see its sign tip over, a price wave cross the ticker, feathers fall, and its hens appear in the shop as **AUCTION** hens at half price; a new rival opens three days later. At 30-second days this usually happens 8 to 14 minutes into a season.
-12. **Deliver a contract.** Accept the Bakery's contract, then press **DELIVER** on the desk each day (or buy the delivery cart: it delivers at dusk). You see coins arrive; with testnet credentials the day's batch moves those egg tokens to the Bakery's wallet. Miss one and you pay a penalty and the Bakery remembers.
-13. **Read the ledger.** Open the **ledger** (top bar): you see the season and tabs: **DAYS** (income, costs and net a day, with an **ON-CHAIN RECEIPT** link per settled day that opens the testnet explorer, in pages that fit the window), **CONTRACTS**, **FEATHERS** and **MILESTONES**. Nothing in the game scrolls: longer lists have **PREV** and **NEXT**.
+12. **Deliver a contract.** Accept the Bakery's contract, then press **DELIVER** on the desk each day (or buy the delivery cart: it delivers at dusk). You see coins arrive; with testnet credentials the settlement batch moves those egg tokens to the Bakery's wallet. Miss one and you pay a penalty and the Bakery remembers.
+13. **Read the ledger.** Open the **ledger** (top bar): you see the season and tabs: **DAYS** (income, costs and net a day, in pages that fit the window; a settled day links its receipt, **DAYS a-b**, the range of days one call settled, which opens the testnet explorer, and a day still waiting says **IN A BATCH**), **CONTRACTS**, **FEATHERS** and **MILESTONES**. Nothing in the game scrolls: longer lists have **PREV** and **NEXT**.
 14. **Comfort.** **SETTINGS**: a volume and a mute for each of twelve sound groups (master, music, ambience, hens, eggs and money, cards and stamps, haggling, machines, market and rivals, agent voices, buttons, new day and stings), a reset button, and **REDUCE MOTION**, kept per browser. Each change applies at once and plays a sample. With reduce motion, stamps still slam and chime, but nothing shakes or freezes.
-15. **Win a Feather.** Reach a milestone in good standing (fill your coops, sell 500 eggs, win 10 haggles...). At the day close you get one roll at 30%: a win is a **Feather Ticket**, a miss says so kindly and names the next milestone. Press **FEATHERS** in the top bar: the mint page's tabs show your tickets and the grade a redemption would get now, all 777 numbers (in pages that fit the window), each grade's odds, and the provenance and contract. Press **REDEEM FOR 25 COINS**; at the next day close the reveal flips your card to a Feather (Fluff, Plume, Quill or Golden Quill) with its number of 777 and the receipt. Add `?debug=layout` to the address to see the farm's layout spec drawn over it.
+15. **Win a Feather.** Reach a milestone in good standing (fill your coops, sell 500 eggs, win 10 haggles...). At the day close you get one roll at 30%: a win is a **Feather Ticket**, a miss says so kindly and names the next milestone. Press **MINT** in the top bar: the Feather Mint (also at `/mint`) shows your tickets and the grade a mint would get now, the Feathers left of 777, each grade's odds, the recent mints, all 777 numbers (in pages that fit the window), and the provenance and contract. Press **MINT A FEATHER (25 COINS)**: the press stamps your Feather (Fluff, Plume, Quill or Golden Quill) with a random number of 777, minted at once to your wallet, with its receipt. Add `?debug=layout` to the address to see the farm's layout spec drawn over it.
 16. **Production build.** `npm run build`, then start it as production would (PowerShell):
     `$env:NODE_ENV = "production"; $env:GAME_SEASON = "local"; $env:SESSION_SECRET = "a-long-random-string"; $env:DATABASE_URL = "postgres://..."; node apps/server/dist/main.js`.
     Open http://localhost:8787/healthz: you see `{"ok":true,"version":"0.1.0","commit":"...","season":"local",...,"db":{"kind":"postgres","ok":true,...}}`. Without a Postgres at hand, `ALLOW_PGLITE_IN_PRODUCTION=1` with `DATABASE_URL=memory://` checks the build on PGlite (never for players).
 
+</details>
+
+<details>
+<summary><b>Screenshots and video</b></summary>
+
 ## Screenshots and video
 
 The live site on 12 November 2026 after the visual-quality pass (season `s1`), from fresh headless browsers through the
-tunnel. The farm at every listed size, UI drawn at whole device pixels:
+tunnel (since then hens are no longer minted, so the hen certificate and the ledger's hen certificates shown here are gone,
+and the market board became the Market page). The farm at every listed size, UI drawn at whole device pixels:
 
 | 1280x720 | 1920x1080 |
 |---|---|
@@ -143,7 +591,7 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 
 </details>
 
-**Video:** _slot for a direct upload (drag the gameplay video into this section on GitHub)._
+**Video:** in the demo post ([DEMO POST]); it is recorded from the game itself, as [docs/submission/demo-video.md](docs/submission/demo-video.md) explains.
 
 **Live resize** (13 November 2026, the live farm in a fresh headless browser: wide 1600x760, narrow 900x760, tall
 560x1000, wide again; ten hens, all inside the yard at every size, the same size at the same zoom):
@@ -151,6 +599,16 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 ([wide](docs/screenshots/live-resize-1-wide-1600x760.png), [narrow](docs/screenshots/live-resize-2-narrow-900x760.png),
 [tall](docs/screenshots/live-resize-3-tall-560x1000.png), [wide again](docs/screenshots/live-resize-4-wide-1600x760.png))
 and the [belt](docs/screenshots/live-belt-clean.png), which carries only real eggs.
+
+</details>
+
+### Notes by date
+
+What each stage of the build changed, newest first, as written at the time (later changes are noted where a
+statement no longer holds).
+
+<details>
+<summary><b>Hatching, the Market page, profiles and badges (13 November 2026)</b></summary>
 
 ## Hatching, the Market page, profiles and badges (13 November 2026)
 
@@ -404,7 +862,8 @@ $$
 \text{free balance} \ \ge\ \underbrace{1.25 \times 0.0213}_{\text{per mint, }0.027} \ +\ \underbrace{120 \times 0.00084}_{\text{margin, }0.1}
 $$
 
-that is, six real hours of day closes stay covered after it.
+that is, six real hours of day closes stay covered after it. (Measured before batching: since ten closed days settle in
+one call of about 0.002 NEAR, the same 0.1 margin covers about 50 calls, 500 day closes, about 25 real hours.)
 
 | Setting | Old | New | Why |
 |---|---|---|---|
@@ -448,6 +907,11 @@ HOUSE unlocked at the same time):
 11 and 12 November that showed farm names made from players' emails were removed from every commit (the later, clean
 versions of those screenshots are kept). Every commit message, author and date is unchanged; the old history is
 archived privately.
+
+</details>
+
+<details>
+<summary><b>Agents that reflect, and AI farms that enter (13 November 2026)</b></summary>
 
 ## Agents that reflect, and AI farms that enter (13 November 2026)
 
@@ -523,6 +987,11 @@ same five seeds. It is a stand-in, not a measurement of a real model. What a rea
 in [Honest AI](#honest-ai-a-provider-chain-under-one-spend-cap-13-november-2026) below. The full write-up, the per-day
 entrant counts and the cost table: [docs/agents.md](docs/agents.md).
 
+</details>
+
+<details>
+<summary><b>Honest AI: a provider chain under one spend cap (13 November 2026)</b></summary>
+
 ## Honest AI: a provider chain under one spend cap (13 November 2026)
 
 **What decides.** Agent decisions run on a provider chain: NEAR AI Cloud is the primary model, SERV Reasoning is the fallback, and rule-based strategies are the last resort, all under a hard daily spend cap. Every agent has its own wallet, memory and
@@ -559,6 +1028,11 @@ and `/healthz` has an `ai` object (mode, each provider's state, today's USD, the
 One live SERV decision on `gpt-6-luna` (a real observation from a memory game) took 2,381 tokens in and 258 out, about
 0.0005 USD, and passed the server's validation. Details: [docs/agents.md](docs/agents.md#provider-chain-and-cost-control).
 
+</details>
+
+<details>
+<summary><b>The Feather Mint: random numbers, instant mints and the press (13 November 2026)</b></summary>
+
 ## The Feather Mint: random numbers, instant mints and the press (13 November 2026)
 
 **Its own page.** The Feather Mint lives at [`/mint`](https://yolkstreet.25th.dev/mint) and opens without entering the
@@ -589,7 +1063,7 @@ and kept with the ticket, so a draw can be replayed. Feather #001 (the Quill min
 seconds) when NEAR refuses it. A mint that cannot go out yet (no wallet linked, the game account under its margin)
 waits and goes again when the wallet is linked or at the next day close. A mint refused after its retries holds the
 ticket again and refunds its 25 coins; minting it again draws the same number. A number the contract already holds is
-replaced by the next one in the same stream. The daily settlement is unchanged; it no longer carries Feathers.
+replaced by the next one in the same stream. The settlement is otherwise unchanged (it has since moved to one call per ten days); it no longer carries Feathers.
 
 ```mermaid
 sequenceDiagram
@@ -639,6 +1113,11 @@ live season `s1`.
   ticket `test-verify-mint-1-091`
   ([`85tSsXN1...`](https://testnet.nearblocks.io/txns/85tSsXN1rJKF735xc2827LNCJ3meCxzb9oK8RY8AWLBn)); afterwards the
   contract still reads 1 of 777 minted.
+
+</details>
+
+<details>
+<summary><b>Farm zones and machine wear (13 November 2026)</b></summary>
 
 ## Farm zones and machine wear (13 November 2026)
 
@@ -697,6 +1176,11 @@ Owning all five without ever repairing earns 40 over 150 days against 245 when t
 a test holds every machine to paying back before its repair and never-repairing to under half). The five-seed market
 simulation still meets its targets.
 
+</details>
+
+<details>
+<summary><b>Farm names, privacy and the new tour (13 November 2026)</b></summary>
+
 ## Farm names, privacy and the new tour (13 November 2026)
 
 **Farm names.** A farm used to be named after its player at sign-in, and an email sign-in with no name typed sent the
@@ -720,13 +1204,13 @@ trade with each other and the street, closes a day, and checks every WebSocket m
 and the player rows: no email and no four-letter piece of either email name anywhere. Three committed screenshots showed
 a player's email-derived farm name; they are replaced with the same screens from the test server
 ([board](docs/screenshots/live-board.png), [tour over the board](docs/screenshots/live-tour-glut.png),
-[board at 2560x1440](docs/screenshots/founders-board-founding.png)). History is not rewritten: those files are still in
-commits `2b412e9` and `e725006`.
+[board at 2560x1440](docs/screenshots/founders-board-founding.png)). History was not rewritten at first; later
+that day it was (brief 10), so no commit in this repository holds those files now.
 
 **The tour.** Its box used to sit in the bottom-left corner with only BACK and SKIP (which ended it). Now the box sits
 beside what it highlights, with a pointer, never over it; inside the farm's area and clear of the top bar, the side
 panel, the goal tracker and the toasts; centred when a step has no target ([ui/tourPlace.ts](apps/client/src/ui/tourPlace.ts)
-tries each side and four widths, so it fits a phone's farm band too). It is larger, says **STEP 3 OF 11** with dots, says
+tries each side and four widths, so it fits a phone's farm band too). It is larger, says **STEP 3 OF 11** (13 steps since) with dots, says
 what to do on a highlighted line, and drops in with anime.js over a dimmed window with a spotlight. Every step has
 **BACK**, **SKIP STEP** and **END TOUR** (which asks once more; **REPLAY THE TOUR** in Settings brings it back), and
 **NEXT** appears after five seconds so nobody is stuck on a step that waits for an action. A new player sees it on first
@@ -751,6 +1235,10 @@ whose farm is too short for the tour box beside its target, the box now sits bel
 
 ![Name your farm, live: the farm's sign with the suggestion, SHUFFLE, CONFIRM and KEEP](docs/screenshots/name-your-farm-live-1920x1080.png)
 
+</details>
+
+<details>
+<summary><b>Scaling, no scrollbars, a clean conveyor and the 777 restored (12 November 2026)</b></summary>
 
 ## Scaling, no scrollbars, a clean conveyor and the 777 restored (12 November 2026)
 
@@ -794,7 +1282,7 @@ are hidden only as the last safeguard, after the content fits.
 | Toasts | long messages cut with an ellipsis | messages wrap; only the newest that fit are shown |
 
 `e2e/no-scroll.test.ts` opens the built game in a fresh headless browser at 11 window sizes (1280x720, 1440x900, 1920x1080, 2560x1440, 390x844 and 360x640, and in between 1024x640, 1180x820 on a 2x screen, 1680x1050, 768x1024 and 412x915) and, at each, checks the title and
-its settings, all 11 tour steps, the farm, every modal, tab and page (shop, market, ledger, settings, guide, mint page),
+its settings, all 11 tour steps (13 now), the farm, every modal, tab and page (shop, market, ledger, settings, guide, mint page),
 every card the farm's things open and an offer: no element scrolls or clips its content, and the page never scrolls. It
 runs in CI (job `layout`, on the runner's own Chrome). Screenshots of every screen: [docs/screenshots/](docs/screenshots).
 
@@ -887,6 +1375,11 @@ digests above. No closed day of `s1` is unsettled. From now on, each day close t
 missed day of the season the same way (one paced call, up to ten days), unless the contract's count of settled days
 disagrees with the database, when a day marked failed may have landed after all and a person should look.
 `npm run settle-late-days -- --season s1 --dry-run` lists missed days and their digests.
+
+</details>
+
+<details>
+<summary><b>The Feathers beta, compact settlement and the layout spec (12 November 2026)</b></summary>
 
 ## The Feathers beta, compact settlement and the layout spec (12 November 2026)
 
@@ -1054,6 +1547,11 @@ days), since a live reveal would mint one of the 777 in `s1`:
 |---|---|---|
 | ![The unminted card with its silhouette and number 041](docs/screenshots/feathers-reveal-closed.png) | ![The Quill card in the epic frame with confetti and the stamp: Feather 041 of 777, won at sell 500 eggs, planned to hatch into a Founding Hen at mainnet launch](docs/screenshots/feathers-reveal-open.png) | ![The same reveal on a phone](docs/screenshots/feathers-reveal-phone.png) |
 
+</details>
+
+<details>
+<summary><b>Founding Hens, machines at work, sound and a guide (12 November 2026)</b></summary>
+
 ## Founding Hens, machines at work, sound and a guide (12 November 2026)
 
 *Superseded the same day by [the Feathers beta](#the-feathers-beta-compact-settlement-and-the-layout-spec-12-november-2026): hens are never minted now, and the Founding Hen won live below became a Feather Ticket.*
@@ -1086,7 +1584,7 @@ waiting). A missed roll gets a kind message naming the next milestone. The marke
 left; the ledger lists certificates, milestones and good standing.
 
 **Contract version 3** (`contracts/coys-game`): `settle_day` takes `founding_mints` and refuses ordinary `hen_mints`;
-`FOUNDING_MAX = 777` is a `require!` on chain; `founding_supply()` reports minted, max and remaining; `migrate()`
+`FOUNDING_MAX = 777` is a `require!` on chain; `founding_supply()` (version 3; `feather_supply()` since version 4) reports minted, max and remaining; `migrate()`
 upgrades version 2 in place. 11 unit tests and 6 sandbox tests on the CI-built wasm, among them **mint 777 then refuse
 the 778th**, and an upgrade of the exact code running on `play.coys-game.testnet` (read with `view_code`). The testnet
 upgrade waits for funds: see the Build log, brief 6.
@@ -1161,6 +1659,11 @@ service stopped; no trades with anyone). One check farm owned all five machines.
   height it can, PR #13); phones whose world zoom is 1 (360x640, 375x667 at 2x) threw `sprite 16-farmhouse not loaded`
   (they now load the smallest painted level, PR #13); the guide's list ran over its text (short names, PR #14).
 
+</details>
+
+<details>
+<summary><b>Visual quality and the tour (12 November 2026)</b></summary>
+
 ## Visual quality and the tour (12 November 2026)
 
 A recording of the live game at 2560x1284 on a 2x Mac showed assets that looked like 240p, soft top bar and card text,
@@ -1215,7 +1718,7 @@ one at a time in the world zone over a backdrop that dims the whole window; Esca
 
 The goal tracker continues from there.
 
-**Hen certificates.** When a day close mints a player's hen, the server stores the settlement transaction and day on her
+**Hen certificates** (gone since version 4: hens are never minted now). When a day close mints a player's hen, the server stores the settlement transaction and day on her
 and tells her owner (`henMinted`). The game then shows a certificate: her portrait and traits, a stamp, and one line, "SHE
 IS NOW PERMANENTLY YOURS ON NEAR", with the receipt in the ledger. Her card shows her token and receipt link. While
 `play.coys-game.testnet` is below its 2.05 NEAR threshold (1.301 available, 0.749 short), mints wait and the game says
@@ -1266,6 +1769,11 @@ pixels a texel), then the sharp one; sounds wait until the sharp farm is in. The
 The Verify Bot farm from the rescue's checks is gone from season `s1` entirely (`scripts/remove-player.ts`: its hens,
 coop, machine, cards and ledger, out of the market, the rankings, demand and the ticker), and so are the five check farms
 this pass used.
+
+</details>
+
+<details>
+<summary><b>Playability rescue (12 November 2026)</b></summary>
 
 ## Playability rescue (12 November 2026)
 
@@ -1319,529 +1827,8 @@ pixel-art outline is one art pixel wide) and every block takes its majority colo
 
 </details>
 
-## Architecture
-
-```mermaid
-flowchart LR
-  subgraph Browser
-    UI["React shell<br/>cards, haggling, market board,<br/>ledger, anime.js timelines"]
-    PX["PixiJS canvas<br/>farm and town square"]
-    PV["Privy<br/>email login, silent NEAR wallet"]
-  end
-  subgraph Server["Game server (Node, authoritative)"]
-    WS["WebSocket protocol v2<br/>strict zod schemas, rate limits"]
-    GM["Game: day clock, market,<br/>order book, cards, contracts, ledger"]
-    AG["Seven agents<br/>rules or model, memory, cash"]
-    CW["Chain writer<br/>day batch"]
-  end
-  DB[("Postgres in production<br/>PGlite locally<br/>one season per database")]
-  AI["NEAR AI Cloud (primary),<br/>then SERV Reasoning (fallback)<br/>structured JSON, days that matter"]
-  subgraph Testnet["NEAR testnet"]
-    GC["game contract<br/>NEP-171 hens, NEP-245 eggs,<br/>settle_day(season, day)"]
-    SA["agent sub-accounts<br/>bakery1, upstart1, ..."]
-    PW["player wallets<br/>(Privy)"]
-  end
-  UI <--> WS
-  PX --- UI
-  PV -- "access token" --> WS
-  WS --> GM
-  GM <--> DB
-  AG -- "orders, offers,<br/>farm actions" --> GM
-  AG -- "decide, when a provider answers" --> AI
-  GM -- "day close" --> CW
-  CW -- "settle_day" --> GC
-  CW -- "create and fund" --> SA
-  GC -. "eggs and hens held by" .-> SA
-  GC -. "eggs and hens held by" .-> PW
-```
-
-**Where it runs.** One Node process per season serves the built client, the API and the WebSocket on one port; Pier runs it on a Mac behind a Cloudflare tunnel, and Render is the fallback with a restore path between them ([deploy/pier](deploy/pier/README.md), [deploy/render](deploy/render/README.md)).
-
-```mermaid
-flowchart LR
-  P["Players' browsers"] -- "https and wss" --> CF["Cloudflare tunnel<br/>yolkstreet.25th.dev"]
-  subgraph Mac["Pier on the Mac (main)"]
-    N["node apps/server/dist/main.js<br/>port 8787, /healthz"]
-    PG[("Postgres<br/>season s1")]
-    N <--> PG
-  end
-  CF --> N
-  subgraph Render["Render (fallback)"]
-    RN["web service<br/>same build and start"]
-    RPG[("Postgres 18<br/>private network")]
-    RN <--> RPG
-  end
-  PG -. "scripts/db-backup.ts<br/>daily and before deploys" .-> BK[["pg_dump<br/>backups/coys-time.dump"]]
-  BK -. "scripts/db-restore.ts<br/>in an outage" .-> RPG
-  N -- "settle_day" --> T["play.coys-game.testnet"]
-  RN -. "same season, same contract" .-> T
-```
-
-The client never sends a balance or an outcome. It asks for actions; the only prices it sends are proposals (a haggle ask, a limit order) that the server bounds and that an agent or counterparty must accept. The server applies every action in a database transaction and answers with state and events that drive the juice.
-
-## The economy
-
-Every number lives in one object, `ECONOMY` in [`packages/shared/src/economy.ts`](packages/shared/src/economy.ts), including every agent's costs, markups, penalties and thresholds.
-
-**Market price.** One multiplier for every grade's base price (white 1.00, cream 1.20, brown 1.50, golden 6.00), set by the total eggs sold that day by all players and agents (street sales, order fills, card deals, contract deliveries and the wholesaler's resales) against demand $D_d$, which grows with the number of active farms $F_d$ (player farms plus open agents):
-
-$$
-m_{d+1} = \operatorname{clamp}\left(\left(\frac{D_d}{S_d}\right)^{0.8},\ 0.40,\ 2.50\right)
-\qquad
-D_d = 15 \cdot F_d
-$$
-
-With two players and the seven agents, $D = 135$: a typical day sits near $1.00$ whether Yolk Street has two farms or twenty. The economy sheet keeps the fixed reference $D = 600$ (at $S = 1300$, $m = 0.54$). The market has crashed when $m \le 0.80$.
-
-**Hen payback.** With base laying $0.80$, feed laying multiplier $f$, breakage $b$, the tier's expected egg price $\bar p$ at multiplier $m$, and feed at $0.12$ kg a day from a 25 kg bag of price $P$:
-
-$$
-\text{margin} = 0.80\, f\,(1-b)\,\bar p\, m - \frac{P}{25}\cdot 0.12
-\qquad
-\text{payback} = \frac{8}{\text{margin}}
-$$
-
-On standard feed at $m = 1$: margin $= 0.4624$, payback $= 17.3$ days.
-
-**Feed from the Squeezer.** Its bag price rises with how desperate a farm looks, $\delta \in [0, 1]$ (feed days left weigh most, low cash adds): $P_{sq} = P \cdot (1.05 + 0.5\,\delta)$. The Loyalist takes 2% off per past deal, up to 15%, and offers credit due in 5 days at 8%.
-
-## The agent cast
-
-| Agent | Role | Character (rule policy and haggling) |
-|---|---|---|
-| **Upstart Eggs** | rival farm | Lives on the Loyalist's feed credit. On a good week (recent closes averaging 1.08x or more) it borrows, puts every coin into hens and packs its coops past capacity; in a glut it dumps its fresh eggs below the Wholesaler's bid. Agents repay credit in full even into the red, so a boom that turns into a glut busts it. Undercuts players to the trader. Haggles loosely. |
-| **Old Money Farms** | rival farm | Never panics: below 0.90x it holds half its crate back and sells the lot once the price recovers (a glut of its own), keeps cash, premium feed, buys bust farms' hens at auction. Makes buyout offers to struggling players. Proud: walks away from insulting asks. |
-| **The Squeezer** | feed supplier | Reads desperation (low feed, low cash) and prices it in. Barely bends in a haggle. |
-| **The Loyalist** | feed supplier | Rewards repeat buyers with discounts and offers credit terms; never extends credit after a default. Bends the most. |
-| **Yolk Street Bakery** | egg buyer | Wants steady volume: offers standing contracts and posts daily buy orders. A missed delivery costs a penalty; two cancel the contract and start a sulk. |
-| **The Market Trader** | egg buyer | Pays a premium for brown and golden, up to what it resells for in town; walks away from farms whose quality slips; warns of gluts. |
-| **The Wholesaler** | egg buyer | Buys anything in bulk at a low price (bulk-order cards sized from a farm's daily lay, standing bids under the market, deeper in a glut), resells it into the street the next day: the same eggs count as supply twice, which drags a glut out. |
-
-Each agent has its own cash, stock and **memory of every farm** (deals, value, refusals, haggles won and lost, missed deliveries, sulks) in Postgres, a persona, its last few **public reasons** (one line each, on the market board) and a **weekly reflection** it reads back. It decides once per in-game day and pays 0.50 coins per decision from its own cash. Below 40 coins it sits out every other day to save the fee, so a struggling business visibly gets worse. Below zero it closes: its orders and contracts end, a rival's hens go to auction at half price, and a new agent of the same role opens three days later under a fresh name.
-
-**New AI farms** enter too: Early Bird Eggs, the Cluck Collective, Gilded Roost Estates and Pennywise Poultry (from a registry; they look like the Upstart or Old Money, start smaller and have their own personas). At each day close one may enter (a 25% chance) after three days of supply under demand or a rival's bust, always when fewer than two AI farms are open, never past `max(4, 1.5 x player farms)`. Every AI farm and agent wears an **AI** tag on the Market page and the ticker. Details, the 30-day model-against-rules comparison and the costs: [docs/agents.md](docs/agents.md).
-
-## Systems
-
-<details>
-<summary><b>Agent decisions</b>: one shape for rules and the model, always validated</summary>
-
-- Each agent sees a context: its cash and stock, its last reflection and reasons, the live market and recent history, the last three days' supply against demand, recent busts, how many AI and player farms are open, auction hens, its own farm (rivals), and a brief of every farm with its memory of it (`apps/server/src/agents/decision.ts`).
-- On the days that matter, a model gets a persona prompt and must answer with the decision JSON schema (`response_format: json_schema, strict`), which includes a public `reason` under 80 characters; routine days run on the rule strategy. Every decision, model or rules, goes through `validateDecision`: text cleaned and cut safely, then the schema, then only the agent's own role's parts, offers only to player farms it sees, fills only to orders it sees. Anything unusable falls back to the rule policy and the fallback is logged and counted.
-- The provider chain is NEAR AI Cloud, then SERV Reasoning, then the rules, each provider behind a breaker. Decisions go to the provider's cheap model (NEAR AI's main one on hard days); weekly reflections to its main one.
-- The game bounds every number: prices are shares of the live price within bands, quantities are capped by stock and cash, offers only reach real player farms, and every farm action goes through the same validated actions players use.
-- Spend caps: `LLM_DAILY_CAP_USD` (1.50) per UTC day for every provider and agent together, and per agent `LLM_AGENT_DAILY_CAP_USD` (a quarter of it) and `LLM_AGENT_DAILY_CALLS` (240, failed calls counted), tracked from token usage and each model's per-token price (`*_MAIN_PRICE`, `*_CHEAP_PRICE`, else the provider's own list, else the assumed prices). Each call reserves its prompt with a margin and a full reply first, so a cap is never crossed; past it, the agent uses rules until the next day. The old `NEARAI_` cap names are still read.
-- Decisions apply in two phases: farm actions and restock before the market closes (their sales count today), then orders, fills and offers once tomorrow's price is set.
-
 </details>
-
-<details>
-<summary><b>Cards and haggling</b>: 2 to 4 a day, never scripted</summary>
-
-- Agents' offers become cards (bulk order, premium order, standing contract, feed deal, credit terms, undercut, buyout offer, glut warning), plus player trade cards from other players' sell orders. At most one per agent and four per player per day, arriving at 12%, 30%, 48% and 64% of the day.
-- Choices: accept, decline, counter, and the card's own options (switch supplier, match price, sell now or hold, sell hens).
-- A counter is a proposal. The agent accepts any ask inside its hidden walk-away price; otherwise it concedes part of the gap (its personality's concession), and walks away after three rounds, or at once from an insulting ask if it is proud. The walk-away price comes from personality and memory: regulars get more room, farms that won haggles get less, missed deliveries cost room.
-- The sales clerk auto-accepts bulk and premium orders at or above the player's floor; the delivery cart delivers standing contracts at dusk.
-
-</details>
-
-<details>
-<summary><b>Order book</b></summary>
-
-- Buyer agents post buy orders each day; farms post limit sells (the eggs leave the crate into the order and come back if it expires after 3 days). Orders cross at the resting price, best price first.
-- Players sell into buy orders, buy each other's eggs (also offered as player trade cards), and cancel their own orders. Every fill is a trade on the market board and counts as supply.
-
-</details>
-
-<details>
-<summary><b>Chain</b>: one contract, one call a day</summary>
-
-- `contracts/coys-game` (Rust, `near-sdk` 5.30.1): NEP-171 Feathers from `near-contract-standards`, NEP-245 eggs from `near-sdk-contract-tools` (`Nep245` derive without per-account storage fees, so holders need no deposit; the contract pays storage), `Owner` access control, and `settle_day`.
-- `settle_day(batch)`: owner only; within a season, days strictly in order and each once. It mints, transfers and burns egg tokens, mints the day's Feathers, updates the season's fixed-size head (last day, the SHA-256 of the day's full settlement, a running hash chain), and emits a `day_settled` event. A settled day stores nothing new (version 4); version 2's per-day records are released with `prune_days` into an archive hash.
-- **Seasons**: a season is one game world from day 1, and one database holds one season (`GAME_SEASON`). A new season starts again at day 1 on the same contract while repeats within a season are refused; a server pointed at another season's database refuses to start. Version 1 settled days without seasons; `migrate` upgrades it in place and files those days under `legacy` (done on `coys-game.testnet`).
-- The batch (`apps/server/src/chain/batch.ts`): the day's trades between holders become egg transfers; then every account is reconciled to what it really holds (crate plus open sell orders, or a buyer's stock) with mints and burns, starting from the balances last confirmed on chain. A failed day is caught up by the next, and no burn exceeds a balance. The day's full settlement (every farm's net, the egg moves, the Feathers) is kept as exact text in `market_days.settlement_json`; its SHA-256 is the digest on chain, and the call carries only the moving farms' nets.
-- **Feathers only** (version 4): hens are never minted; `settle_day` refuses them and mints Feathers up to a hard cap of 777, numbering each, with the founders provenance committed once ([docs/founding-hens.md](docs/founding-hens.md)).
-- **Feather images**: the grade's Spawn card frame and feather, with the number, are composed once at mint into a 96x136 PNG and stored in the token metadata with its `media_hash`. Why: it is the simplest correct storage. The token is self-contained and verifiable from the chain alone, with no image host, pinning service or URL to keep alive. A Feather costs 1,913 to 2,075 bytes of state, measured on the live contract (0.019 to 0.021 NEAR), plus 0.0004 to 0.0005 NEAR of gas. Mints go out only while the game account's free balance stays above its margin (`CHAIN_MINT_NEAR`, default 0.027 each; `CHAIN_MIN_BALANCE_NEAR`, default 0.1); the rest wait, and go out once it does.
-- **Agent wallets**: sub-accounts of the game account, funded from it (`AGENT_ACCOUNT_FUNDING_NEAR`, default 0.01), with keys derived from the game key by HMAC so no extra secret is stored. They are a pool: a wallet whose agents are all bust (any kind) is free, and a new agent takes a free one before a new one is created and funded; every wallet and its funding is recorded (`agent_wallets`), and each creation logs the pool's size and the NEAR spent.
-- **Players**: the Privy wallet holds their Feathers and eggs. Minting and transfers happen only in the day batch, never per click.
-- Testnet only, enforced in code before any key is used: accounts must be `.testnet` (or implicit), RPC hosts must be testnet, and the RPC's `chain_id` must say `testnet` before anything is signed. Without credentials, every day's batch is built the same way and logged as a NO-OP.
-- **Deliveries on chain**: a contract delivery is a trade from the player's wallet to the Bakery's sub-account, so the day's batch moves the eggs as NEP-245 tokens between them (then burns them when the Bakery bakes). Proven on testnet (receipt above), in a dedicated test, and in every seed of the simulation.
-- Tests: 18 contract unit tests, 10 for the planned reveal (`contracts/founding-hens`), and 9 **sandbox tests** (`contracts/sandbox-tests`, near-workspaces 0.24): a full day settlement, a settled day storing nothing, holder transfers, only the game can settle or mint, a new season settling day 1 after an old season ended at day 3, 777 Feathers minted then the 778th refused, the provenance committed once, the version 2 wasm that ran on `play.coys-game.testnet` (kept in `contracts/sandbox-tests/res`) upgrading in place with its records released into the archive hash, and the reveal giving exactly 7/70/200/500 and the same hens from the same seed. They run in CI (Linux); the wasm CI builds is what gets deployed (`npm run deploy-contract` checks its sha256, testnet only, see [deploy/testnet.md](deploy/testnet.md)).
-
-</details>
-
-<details>
-<summary><b>Server</b>: authoritative, transactional, reconnect safe</summary>
-
-- `apps/server`: Node, `ws`, `pg` and PGlite behind one `Db` interface. `DATABASE_URL=postgres://...` uses Postgres; `pglite://<dir>` (default `.data/coys`) or `memory://` uses embedded PGlite for local play and tests. Production (`NODE_ENV=production`) refuses PGlite and requires `GAME_SEASON` and `SESSION_SECRET`.
-- Migrations run on every boot and are safe to repeat; on Postgres they run in one transaction under an advisory lock, so two instances booting together cannot race (tested on real Postgres in CI). v1 (clock, market days, players, farms, coops, hens, unlocks, lay events, orders, ledger), v2 (agents, memory, cards, contracts, debts, order book fields, trades, inference usage, confirmed chain balances), v3 (each day's demand), v4 (seasons on the clock, market days and every ledger row; market days keyed by season and day).
-- `/healthz` (and `/api/health`) reports the version and commit baked in at build time, the season, the day and a timed database round trip; it answers 503 when the database does not.
-- `DEMO_DAY_SECONDS` (20 to 3600) shortens the in-game day for recording; production ignores it unless `DEMO_MODE=1`. The client takes the day length from the server clock.
-- Backups: `scripts/db-backup.ts` (pg_dump to `backups/coys-<UTC time>.dump`) and `scripts/db-restore.ts` (pg_restore in one transaction, stops at the first error); the password reaches the tools as an environment variable, never on a command line. CI round-trips a backup between two Postgres databases.
-- Every farm cash change writes the balance and a ledger row in the same transaction; tests check the ledger total equals cash, for players and rival farms, across a 30-day simulation.
-- Mutations run one at a time; messages go out only after commit. Strict zod schemas reject any extra field. Per-player rate limits, reconnect-safe request ids.
-
-</details>
-
-<details>
-<summary><b>Client</b>: screens, juice and sound</summary>
-
-- Whole device pixels everywhere: the UI is laid out in UI pixels drawn at $p$ device pixels each (CSS zoom), the world at $k$ device pixels per world pixel, painted art from the atlas cut for that density (see [Visual quality](#visual-quality-and-the-tour-12-november-2026)). PixiJS draws the farm and the town square; anime.js drives every UI motion, in whole-pixel steps, never rotating text.
-- **Card overlay**: one composed modal (portrait and line, the card art upright beside them, answers in one row); the card slides in with an overshoot and a paper swoosh; the portrait talks with its voice babble while the line types out; outcomes play the agent's expression and slam a stamp; a haggle win flips the card to gold with a hitstop, shake, confetti and the win chime; a fail sends the agent walking with the fail sound.
-- **Market board**: town square plate with animated bunting and a milling crowd (market murmur loop), split-flap ticker board by grade, farms ranked with their signs, the cast, big trades, the order book.
-- **Ledger**: day-by-day profit, contracts, debts, and the on-chain receipt link per day.
-- **Shop**: listed hens drawn from their trait layers with laying trait and price (auction hens marked), feed with supplier switching, coops, machines.
-- **Rival bust**: the sign tips over, a price wave crosses the ticker, medium shake, falling feathers, the collapse crash and the bust sting. **Glut**: the ticker drops red and the market tension music plays until prices recover.
-- **Tour**: ten spotlight steps covering the whole game, each moving on only when the player does it; Back, Skip, progress dots, replayable from Settings. Waiting cards queue in the side panel with a count; an unanswered card closes with its day.
-- **Page**: descriptive title and meta description, a favicon and a 1200x630 share image cut from the sprites by `scripts/make-share-images.ts`.
-- Everything from brief 1 stays: lays, hand collect, big haul, deal stamp, coop builds, unlocks, crash, new day.
-
-</details>
-
-<details>
-<summary><b>Simulation</b>: 30 in-game days, five seeds, seven agents and two headless players</summary>
-
-`apps/server/test/sim.test.ts` runs the whole market for 30 days on five fixed seeds, with AI farms entering by the entry rule (it also checks their count stays within its bounds every day). The stub model answers each agent's own in-character decision as JSON on most calls and garbage on every fourth, under a 0.25 USD cap; both headless players have wallets, and every day settles through a recording chain writer that builds the real batch. The test checks, per seed: the median day's multiplier is between 0.80 and 1.30, at least one day falls to 0.80 or below, contract eggs move on chain to the Bakery's wallet, the spend cap holds, and ledgers equal cash; and a rival busts naturally in at least three of the five seeds.
-
-| Seed | Median day | Lowest day | Days at 0.80x or below | Rival bust | Contracts (signed, delivered, missed) | Bakery contract eggs moved on chain | Wholesaler resold | Model calls, fallbacks, spend (cap 0.25 USD) |
-|---|---|---|---|---|---|---|---|---|
-| 1 | 1.10x | 0.67x | 11 | Upstart Eggs, day 25 | 8, 50, 8 | 103 | 168 | 66, 154, 0.2424 USD |
-| 2 | 1.08x | 0.66x | 10 | Upstart Eggs, day 15 | 9, 36, 13 | 78 | 231 | 64, 157, 0.2416 USD |
-| 3 | 1.07x | 0.65x | 10 | Upstart Eggs, day 17 | 8, 37, 9 | 89 | 205 | 65, 156, 0.2420 USD |
-| 4 | 1.10x | 0.66x | 11 | Upstart Eggs, day 15 | 9, 35, 13 | 94 | 239 | 64, 157, 0.2416 USD |
-| 5 | 1.16x | 0.64x | 10 | Upstart Eggs, day 15 | 8, 39, 9 | 101 | 189 | 63, 158, 0.2412 USD |
-
-Demand is 135 a day (two players and seven agents) and drops to 120 while a bust rival's successor is waiting to open. Seed 1, day by day (supply of demand, then the multiplier it set): days 6 to 18 swing between about 220 and 90 eggs as Old Money holds half its crate below 0.90x and releases it on the recovery, so the price alternates between roughly 1.3x and 0.7x; the Upstart's cash runs 12, 80, 104, 36, 121 and it busts on day 25 when its feed credit falls due in a glut. The only 2.50x day is day 2, after a first day with no sales. Hen and order ids are random, so the exact numbers move a little between runs; the acceptance holds on every run.
-
-The companion test forces a glut on Upstart Eggs (no cash, empty trough, crashed market): it goes bust on day 2, its hens go to auction, and Hatch and Dash opens as the new rival on day 5.
-
-</details>
-
-<details>
-<summary><b>Asset pipeline</b>: verified, byte for byte</summary>
-
-- `npm run pack-assets` checks all 375 manifest files of `iam25th1/coys-assets` against their SHA-256 and packs 67 sprite sheets (PixiJS JSON with rows, per-frame durations and anchors) and 59 sounds (124 MP3 takes, 12 gapless loop OGGs). PNG, MP3 and OGG files are copied byte for byte.
-- Hen trait layers match `01-hen-anims` frame for frame; brown and black bodies are palette swaps in code. The server renders hen NFT portraits with the same passes.
-
-</details>
-
-<details>
-<summary><b>Security</b></summary>
-
-- No secrets in the repo or the client bundle: `.env` is ignored; `.env.example` names and describes every variable with no values; the client reads only the public Privy app id from `/api/config`; the built bundle is grepped for key-like strings.
-- The model key, the testnet key and agent keys live only on the server. Testnet only, enforced in code.
-- Every dependency pinned exactly; installed with `npm ci --ignore-scripts` locally and in CI; Rust crates pinned with `Cargo.lock` and built `--locked`; cargo-near checksum-verified in CI.
-
-</details>
-
-## Environment variables
-
-All optional for local play. Copy `.env.example` to `.env` at the repo root. Production needs `NODE_ENV=production`, `GAME_SEASON`, `SESSION_SECRET` and a Postgres `DATABASE_URL` ([deploy/pier](deploy/pier/README.md) lists every variable).
-
-| Variable | Used by | Without it |
-|---|---|---|
-| `NODE_ENV` | server | local play rules (PGlite allowed, demo days allowed) |
-| `PORT`, `DATABASE_URL`, `SESSION_SECRET` | server | 8787; PGlite at `.data/coys`; a random secret per boot |
-| `HOST` | server | listens on every interface |
-| `GAME_SEASON` | server | a fresh database makes its own `dev-...` season; an existing one keeps its own |
-| `DEMO_DAY_SECONDS`, `DEMO_MODE` | server | 180-second days; `DEMO_MODE=1` lets a production server use demo days |
-| `ALLOW_PGLITE_IN_PRODUCTION` | server | production refuses PGlite (set only to check a build) |
-| `ALLOW_DEV_LOGIN` | server | dev login only when Privy is not set up |
-| `PRIVY_APP_ID`, `PRIVY_VERIFICATION_KEY` | server, client (via `/api/config`) | labelled local dev login |
-| `NEAR_TESTNET_ACCOUNT_ID`, `NEAR_TESTNET_PRIVATE_KEY` | server, deploy script | daily settlement is a recorded NO-OP |
-| `NEAR_TESTNET_RPC_URL`, `NEAR_GAME_CONTRACT_ID` | server | `https://test.rpc.fastnear.com`; the signing account |
-| `SETTLE_EVERY_DAYS` | server | 10: days settle in ranges of ten, one call each (1 settles every day on its own) |
-| `CHAIN_MINT_NEAR`, `CHAIN_MIN_BALANCE_NEAR`, `AGENT_ACCOUNT_FUNDING_NEAR` | server | 0.027 kept free per Feather mint (measured 0.0213, plus 25%); 0.1 margin (120 day closes of settlement gas, six real hours) under which mints and agent wallet links wait; 0.01 per new agent wallet |
-| `NEARAI_API_KEY`, `NEARAI_BASE_URL`, `NEARAI_MODEL`, `NEARAI_CHEAP_MODEL` | server | NEAR AI Cloud left out of the provider chain |
-| `NEARAI_MAIN_PRICE`, `NEARAI_CHEAP_PRICE` | server | `/v1/models`, else the assumed prices in `apps/server/src/agents/brain.ts` (USD per million tokens, "input,output") |
-| `SERV_API_KEY`, `SERV_BASE_URL`, `SERV_MODEL`, `SERV_CHEAP_MODEL` | server | SERV Reasoning left out of the chain; `https://inference-api.openserv.ai/v1`, `gpt-5.4-mini` (reflections), `gpt-6-luna` (decisions) |
-| `SERV_REASONING_EFFORT` | server | `none` (or `low`, `medium`, `high`) |
-| `SERV_MAIN_PRICE`, `SERV_CHEAP_PRICE` | server | SERV's published prices in `apps/server/src/ai/serv.ts` (confirm them in the OpenServ console) |
-| `LLM_DAILY_CAP_USD` (old name `NEARAI_DAILY_SPEND_CAP_USD`, still read) | server | 1.50, every provider together |
-| `LLM_AGENT_DAILY_CAP_USD`, `LLM_AGENT_DAILY_CALLS` (old `NEARAI_AGENT_DAILY_` names still read) | server | a quarter of the shared cap; 240 calls, failed ones included |
-| `LLM_PRICE_MOVE`, `LLM_DECISION_GAP_DAYS`, `LLM_CLOSE_BUDGET_SECONDS` | server | 0.15 (a 15% move asks a model); 3 in-game days between model decisions; 60 s of model calls per day close |
-| `ASSETS_DIR` | `npm run pack-assets` | required to re-pack |
-
-## Commands
-
-| Command | Does |
-|---|---|
-| `npm ci --ignore-scripts` | install from the lockfile, no install scripts |
-| `npm run dev` | server (port 8787) and client (Vite, port 5173) |
-| `npm test` | Vitest: economy, agents, haggling, market, chain batch, simulation, WebSocket, packer, pixel passes, hen movement |
-| `npm run test:e2e` | after a build: the naming screen and the tour at four sizes, and every screen, tab, page and tour step in a headless browser at 11 window sizes; fails on anything that scrolls or is cut off (`SCREENSHOTS=1` saves them to `docs/screenshots`) |
-| `npm run typecheck` / `npm run lint` | strict TypeScript; ESLint plus a check that no file holds an em dash |
-| `npm run build` / `npm start` | bundle the server and client; serve both on one port |
-| `npm run deploy-contract -- --wasm <file> --account <id.testnet> [--create] [--migrate]` | deploy a CI-built contract to a testnet account (sha256 checked, mainnet refused; see [deploy/testnet.md](deploy/testnet.md)) |
-| `npm run settle-late-days -- --season <id> [--dry-run]` | record closed days whose settlement failed, late, by their digests (the server also does it at each day close) |
-| `npx tsx scripts/db-backup.ts` / `scripts/db-restore.ts` | back up the Postgres database to `backups/`, or restore a dump into another (see [deploy/pier](deploy/pier/README.md)) |
-| `npx tsx scripts/make-share-images.ts` | cut the favicon and the share image from the sprites |
-| `cd contracts/coys-game && cargo test` | contract unit tests (CI also runs `cargo near build` and the sandbox tests) |
-
-## Repository layout
-
-```
-apps/client          Vite + React shell + PixiJS world + anime.js motion + Web Audio
-apps/server          game server: HTTP, WebSocket, game, agents, cards, market, chain, db
-packages/shared      economy config and formulas, agent pricing, protocol, pixel passes
-contracts/coys-game  the game contract (Rust); res/ holds the CI-built wasm and its sha256
-contracts/sandbox-tests  near-workspaces sandbox tests for the contract (res/ holds the version 1 wasm)
-scripts              asset packer, dev runner, text check, testnet deploy, backups, share images, late days
-e2e                  the browser check: no scrollbars, nothing cut off, at every window size
-deploy               Pier and Render settings, testnet contract accounts and seasons
-render.yaml          Render Blueprint (fallback host)
-docs/screenshots     headless captures of this build
-docs/submission      drafts: demo shot list, post drafts, form fields
-```
-
-## What is stubbed, and why
-
-- **Contract builds run in CI, not on this Windows machine**: Windows Application Control blocks the unsigned build scripts cargo compiles, so the contract is built and sandbox-tested on Linux in CI, and the deployed wasm is the CI artifact (its sha256 is committed and checked by the deploy script).
-- **Privy end to end** needs a real browser and inbox; the server and client sides are wired and tested headlessly up to the token check.
-- **Model decisions** depend on a provider answering: agent decisions run on a provider chain: NEAR AI Cloud is the primary model, SERV Reasoning is the fallback, and rule-based strategies are the last resort, all under a hard daily spend cap. A model is held to the same rules a rule strategy follows.
-- **Player credit default** is remembered and blocks further credit, but a player is never pushed below zero; agents always repay in full.
-- **Feather mints are capped per day** (20) to keep a day's call well inside its gas; redeemed tickets that do not fit wait for the next day close.
-- **The live deploy** (Pier on the Mac, the tunnel, Render) is set up from [deploy/](deploy/); it is not run from this repository.
-
-## Verification
-
-On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass. CI is green: the TypeScript job on every push and pull request (with PostgreSQL 16: the Postgres tests, the production build booting against Postgres with `/healthz` checked, and a backup restored into a second database), the browser checks (`layout`: the naming screen, the tour at four sizes, and all 11 window sizes) on pull requests that change more than docs, and the contracts workflow whenever `contracts/` changes (unit tests, `cargo near build`, sandbox tests). The economy sheet tests hit their values exactly; the five-seed simulation meets the economy acceptance; a malformed model answer falls back to rules; a new season settles day 1 after an old season ended at day 3; non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
-
-The live Pier deploy and its tunnel were checked end to end on 11 November 2026 (receipts under [How NEAR fits in](#how-near-fits-in)).
-
-Brief 8 was checked on 12 November 2026: the hen size and movement tests (41 window sizes and a resize sequence), the
-belt test (no egg colour on any frame), the browser check at 11 window sizes with every screen, tab, page and tour step
-open (nothing scrolls, nothing is cut off), the contract's unit and sandbox tests (version 4 upgraded to 5 with the test
-Feathers burnt and two missed days recorded), and on `play.coys-game.testnet` the upgrade, the burn (0 minted, 777
-remaining) and days 509 and 510 recorded late, with no unsettled closed day left in `s1` (under
-[Scaling, no scrollbars, a clean conveyor and the 777 restored](#scaling-no-scrollbars-a-clean-conveyor-and-the-777-restored-12-november-2026)).
-
-Brief 7 was checked live on 12 November 2026 on `4471029`: the version 4 upgrade and the release of version 2's records on
-`play.coys-game.testnet`, three Feathers minted in a test season, the mint page and the board, and the farm and its layout
-overlay at five sizes with no overlap (under [the Feathers beta](#the-feathers-beta-compact-settlement-and-the-layout-spec-12-november-2026)).
-The contracts job builds both contracts; the sandbox mints 777 Feathers and refuses the 778th, settles 30 days with no new
-storage, upgrades version 2 and releases its records, and reveals exactly 7/70/200/500.
-
-Brief 6 was checked live on 12 November 2026 on `c48d2f2`: the farm at four sizes with no overlap, the first-run tour for brand-new players at three sizes, a 30-second capture of the belt and the coop doors, and live milestone rolls (under [Founding Hens](#founding-hens-machines-at-work-sound-and-a-guide-12-november-2026)). The contracts job builds the version 3 wasm and the sandbox mints 777 Founding Hens and refuses the 778th.
-
-The visual-quality pass was checked live on 12 November 2026: cold load at five sizes, the whole tour completed by an automated browser at five sizes, the no-overlap check with every modal and tour step open, and device-pixel crops (numbers under [Visual quality](#visual-quality-and-the-tour-12-november-2026)).
-
-The playability rescue was checked live on 12 November 2026: cold load, the four window sizes, every world object's card, an egg collected, and a 20-second flicker capture (numbers under [Playability rescue](#playability-rescue-12-november-2026)).
-
-**Not verifiable headlessly:** whether it now looks and feels good to a person, a Render deploy, Privy login on the live domain, the quality of real model decisions, how haggling and cards feel, whether portraits and voices read right, and how the market evolves over weeks of real play.
 
 ## Build log
 
-### Brief 10: a clean history, the Market page, profiles, badges and hatching (13 November 2026)
-
-- **History.** Three screenshot files that showed email-derived farm names were removed from every commit; the
-  repository moved to a fresh public history with every commit message, author and date unchanged, and the old one is
-  archived privately. Pier deploys from the new repository.
-- **Fixes.** The stray egg below the crate (a loose piece of the crate sheet cut as a frame of its own), the wording
-  about who runs the farms (players and AI; suppliers and buyers are AI), the shop's hen button (`BUY 4`, with a small
-  `AUCTION` tag and one line on auction hens), and the mint reserve from measured costs (0.127 NEAR free for a mint,
-  was 0.535).
-- **Market page.** Seven tabs in place of the market board, a 10-day price chart from the server, one-tap fills,
-  ranking with badges and public profiles.
-- **Profile and badges.** Eight private tabs and a public profile with a whitelisted set of fields; 73 cosmetic
-  badges (153 levels to earn, 7 secret), day records and counters (migration 14), a one-off back-fill, the unlock
-  moment.
-- **Hatching.** New hens hatch from an egg in a free yard spot, a beat apart, with sound and reduce-motion respected.
-- **Art.** Badge frames, badge icons and the hatching egg, made in Spawn by `@gama` and backed up in coys-assets.
-
-### Brief 9, stage 4: agents that reflect, AI farms that enter (13 November 2026)
-
-- **Agents.** Richer observations, personas, one validated schema with a public reason, weekly reflections, model tiers,
-  per-agent caps, trend-aware rules (migration 13). A 30-day comparison on a recorded stand-in model and
-  the cost of real model use.
-- **AI farms.** A registry of entrants, the entry rule and its bounds, the AI tag, a reusable wallet pool.
-
-### Brief 9, stage 3: the Feather Mint (13 November 2026)
-
-- **Numbers.** Random free numbers from a logged SHA-256 seed anchored on the season's last settlement transaction.
-- **Mints.** At once on redemption through contract version 6's `mint_feather`, paced, retried with backoff, refunded on
-  failure, caught up at day closes (migration 12). Test seasons mint into their own collection.
-- **Page and moment.** `/mint` with its seven parts in order; MINT in the title, top bar and board; the press sheet
-  (Spawn, coys-assets #5); SENT TO NEAR and CONFIRMED; RETRY. Checked live on testnet with a forced failure.
-
-### Brief 9, stage 2: farm zones and machine wear (13 November 2026)
-
-- **Layout.** Zones in the layout spec; a hen's width between every two things standing on the ground (except designed
-  connections), zones apart, labels on hover, tap and arrival only. Tests at 41 window sizes; before and after pictures.
-- **Wear.** Condition, effect by condition, breakdowns, repairs (migration 11), worn and broken looks made from the
-  machines' own art (Spawn, coys-assets #4), the breakdown and repair moments, card, hints, guide and tour.
-- **Tuning.** Config only: cart, hopper and clerk prices, so each machine pays back before its first repair.
-
-### Brief 9, stage 1: farm names, privacy, the new tour (13 November 2026)
-
-- **Recon.** The game never saw a full email, but an email sign-in with no name typed sent the email's local part as the
-  player's name; the farm was named after it and that name reached the public board, order book, trades, trade cards,
-  the public market and mint page, and the agents' prompts on NEAR AI. Three committed screenshots showed such a name.
-  Logs, on-chain data and every committed text file were clean.
-- **Fixed.** Generated farm names and NAME YOUR FARM, the email-name hash guard, renames in Settings, the boot-time rename
-  of the three `s1` player farms (old names gone from player rows and trades), log redaction, the three screenshots
-  replaced. Migration 10.
-- **Tour.** A larger box beside its target with a pointer, four controls on every step, NEXT after five seconds.
-- **CI.** The browser checks moved to a pull-request workflow that skips docs-only changes.
-
-### Brief 8: scaling, no scrollbars, a clean conveyor and the 777 restored (12 November 2026)
-
-- **Recon first.** No PR was open. Four causes found: a frame cache keyed by atlas downloads, not by the density each
-  sprite is drawn at (hens changed size after a resize); straight random walks in a yard box that holds the trough,
-  props and machines, with arrivals crossing the belt row and resizes leaving stale targets; eggs painted on all 20
-  frames of the belt; scroll boxes in the modal body, the side desk, the ledger and settings (the mint page ran up to
-  821 pixels past the window). On chain, the three test Feathers (#001 to #003, held by the game account) counted
-  against 777, and `s1` days 509 and 510 had failed with 429s and never settled.
-- **Scaling and movement.** The cache key carries the density; movement areas and keep-outs come from the layout spec,
-  walks are routed round standing objects, and every hen and egg is carried relative to the yard on a resize. Tests for
-  both.
-- **Clean conveyor.** Created as a new asset in Spawn `@25th/game-11` with the Spawn agent account (the in-world builder
-  is not open to agent accounts, so the sheet was made from the existing belt, pixel for pixel, and uploaded through the
-  world's asset door; easel 28 and every other asset are untouched), pulled byte for byte, backed up in coys-assets
-  (PR #3), drawn on the farm and in the shop, with a test.
-- **No scrollbars.** A pager that measures what it draws and fits each panel; tabs for the ledger, the board (a new FARMS
-  tab) and the mint page; the guide one section at a time; the top bar on two rows under 640 UI pixels; toasts that wrap.
-  The browser check runs in CI.
-- **Contract version 5** (sandbox-tested against the exact version 4 code, then upgraded in place): `burn_test_feathers`,
-  `set_live_season`, mints only for the live season and only of its own season, and `settle_late_days`. The burn and
-  the late days are recorded above; the server now records missed days at each day close and never sends mints for a
-  season that is not the live one.
-
-### Brief 7: the Feathers beta, compact settlement and the layout spec (12 November 2026)
-
-- **Recon first.** No PRs were open; main CI was red on a docs-only merge because the five-seed simulation is not fully
-  deterministic (a Founding Hen win added a hen; farm ids are random). A win is now a ticket, not a hen; the simulation
-  passed three local runs in a row. Of the items the last report left out, sound settings, rival signs and the tour's hen
-  portrait were present and working; the Spawn pull, the layout spec, the debug overlay and the mint page were missing,
-  and the guide still spoke of Founding Hens.
-- **Settlement cost.** Each day close stored a 179-byte record (85,920 bytes and about 0.86 NEAR a real day), and 478
-  records already held about 85.6 KB of `play.coys-game.testnet`'s 429 KB (the rest is the contract code). Version 4
-  stores a fixed-size head per season instead: 0 bytes a day (sandbox: 30 days, 355,102 to 355,102 bytes), so storage
-  growth per real day went from 85,920 bytes to 0, and the projected cost from about 1.06 to about 0.19 NEAR a real day
-  (gas only). `prune_days` and `scripts/release-chain-days.ts` release version 2's records into an archive hash after
-  copying them to `chain_archive`.
-- **The upgrade.** Measured at 20:29 UTC: 0.470 NEAR available, against the upgrade's +11,490 bytes (about 0.115
-  NEAR) plus a buffer, so it went ahead: version 4 deployed with `migrate` in one transaction,
-  [9jsFd4EA...](https://testnet.nearblocks.io/txns/9jsFd4EAZc3nkE4v11x4poVTMhLyYzPpuZKrsCud9J4s). The running server
-  (still on the previous build) settled the next day against it at once, compactly. Then the founders provenance,
-  [JBoKNVa6...](https://testnet.nearblocks.io/txns/JBoKNVa6Pi5jAb2BA4chAh8K43GGpWgw8AtHJy26b5AB).
-- **Feathers.** Tickets at milestones (30%, logged, auditable), a coin fee to redeem, grades from the management score,
-  mints at the day close to the player's wallet, 777 on chain, the reveal moment and the mint page. Migration 9 adds the
-  tickets, the archive and the exact settlement text, and turned the one Founding Hen won live (but never minted) into a
-  Feather Ticket for her farm; she stays on it as an ordinary hen. The board shows Feathers left of 777.
-- **Founding Hens committed now.** `scripts/generate-founders.ts` writes the 777 (7/70/200/500), unique looks from
-  recolours of existing layers, Legendary and Epic palettes theirs alone, a sparkle on every Legendary; the hash is
-  public, the file stays on the server.
-- **Reveal, sandbox only.** `contracts/founding-hens` (snapshot, seal, reveal once, claim) and the draw in Rust and
-  TypeScript with one pinned vector; 111 Tgas for 777, exactly 7/70/200/500, the same hens from the same seed.
-- **Assets.** The four feathers and five card frames were pulled from Spawn and backed up in coys-assets (PR #2, merged);
-  nothing else needed new art, so nothing was created or changed in Spawn.
-- **Layout spec and sizes.** One size table relative to the hen drives the art ratios; the layout places every object
-  with its anchor, bounds, footprint and connection points; `?debug=layout` draws them; tests check connections within a
-  world pixel, sizes within 3.5% and no overlapping footprints. Two sizes differ from the brief because their art is
-  exact pixel art (belt 0.59, hay bale 0.96).
-- **Docs**: [docs/founding-hens.md](docs/founding-hens.md) rewritten for the Feathers, [docs/mainnet-plan.md](docs/mainnet-plan.md)
-  (snapshot, claim, reveal seed, the mainnet contract, sybil checks) and the checklist updated. No mainnet action.
-- **Live** (checked under [the Feathers beta](#the-feathers-beta-compact-settlement-and-the-layout-spec-12-november-2026)):
-  the release of 489 records (three transactions, archive `cfe525e7...`, checked against the live database), three test
-  Feathers minted in a test season, six agent wallets linked, and the layout at five sizes with no overlap. Running it
-  found three more things, fixed in PRs #17 and #18: the mint page drew only this season's Feathers (it reads the contract
-  now), the release script needed paced reads (the public RPC answered 429, and two `s1` days failed to settle for those
-  six minutes; the next day caught their eggs up), and each bust rival's successor got a newly funded wallet (it now takes
-  over its predecessor's). Merged as PRs #16 and #17 (live on `4471029`), docs and fixes in #18.
-
-### Brief 6: Founding Hens, machines at work, sound, a guide and BETA (12 November 2026)
-
-- **Coops and layering.** The doors looped because the coop played its idle row, which is the door swinging; it now
-  holds the first frame and swings once when a hen passes (and creaks every 25 to 75 s). Animated ground tiles were
-  inserted above the sorted layer (`addChildAt(1)`), so a straw tile cut the belt; the world now draws in a fixed order
-  (ground, animated ground, floor, things sorted by their feet, labels, effects) with a test.
-- **Composition.** `farmLayout(w, h)` places everything for the whole free area: the yard at least half the width,
-  hens spread out, one belt along the bottom, one fence the full width with a gate on the path. Tested at four sizes.
-- **Machines** at fixed, labelled spots (grader, cart and clerk 48x48, hopper 48x72 world px, the belt in 16 px tiles),
-  each arriving with a ring and doing its job on screen and on the server: the belt carries eggs to the crate in 5 s
-  and saves breakage (2% for 5%), the grader sorts (+10%, in the sell panel), the cart drives the delivery, the hopper
-  refills under a price cap (-10%, in the ledger), the clerk stamps offers (+5%). A daily tally per machine
-  (`machine_days`, migration 7) feeds each machine's card and the ledger; a three-day test runs all five.
-- **Rival signs** on the board and at the farm's edge (sway, tip over on a bust); the tour's hen talks again.
-- **Sound settings**: twelve groups with volume and mute, every sound in exactly one (tested), instant, per browser,
-  with a reset.
-- **How to play**: eleven sections with pictures, from Settings and the **?** in the top bar.
-- **BETA** on the title, the top bar and the page title. The first-run tour starts for every new player on first farm
-  entry, once per player (server flag plus browser flag).
-- **Founding Hens.** Ordinary hens are no longer minted; 777 Founding Hens, capped on chain by contract version 3, are
-  won at seven milestones by farms in good standing, 30% per roll, one roll each, seeded from the previous day's
-  settlement tx and logged ([docs/founding-hens.md](docs/founding-hens.md)). Migration 8 adds the founding fields, the
-  roll log and the counters. Mints are gated on the real reserve (0.03 NEAR each above a 1.25 NEAR margin) instead of a
-  flat 2 NEAR, and agent wallets that exist are linked without the old 2.05 NEAR gate once the margin is there.
-- **The testnet upgrade waits for funds.** Measured on 12 November at 15:59 UTC, `play.coys-game.testnet` held 4.8103
-  NEAR with 415,245 bytes of state (4.1524 NEAR locked), so **0.6579 NEAR available**. Its own settlements cost 179 bytes
-  and 0.0004 NEAR of gas per 3-minute day (measured on chain over 69 minutes), about **1.06 NEAR a real day**. The
-  reserve for this brief's chain steps:
-
-  | Step | NEAR |
-  |---|---|
-  | Upgrade to version 3 in place: +9,384 bytes (sandbox, exact v2 code) and about 27 Tgas | 0.097 |
-  | Link the 7 agent wallets: their egg balances, 28 entries of about 106 bytes | 0.030 |
-  | Mint 3 Founding Hens in a test season: 3 x 2,647 bytes, two day records, gas | 0.085 |
-  | Keep one real day of `s1` settlements free | 1.060 |
-  | **Needed** | **1.272** |
-  | Available | 0.658 |
-  | **Short** | **0.614** |
-
-  So nothing was signed: the contract is built (wasm sha256 `9bc8bfba...`, committed in `contracts/coys-game/res`) and
-  tested (11 unit, 6 sandbox), and the server already speaks version 3. The shortfall grows by about 0.044 NEAR an hour
-  while `s1` settles, and at that rate the account's free balance runs out around 07:00 UTC on 13 November, after which
-  day settlements fail (and catch up once topped up). Topping up about 10 NEAR covers the steps above and a week of
-  settlements; then the owner runs the upgrade in [deploy/testnet.md](deploy/testnet.md), and the server links the
-  wallets and mints waiting Founding Hens at the next day close on its own.
-- [Mainnet checklist](docs/mainnet-checklist.md) written; nothing touched mainnet.
-- Live checks found three more things, fixed the same day: a half-empty phone screen and a crash on phones whose world
-  zoom is 1 (PR #13), and the guide's section list running over its text (PR #14). Merged as PRs #12, #13 and #14;
-  live on `c48d2f2`.
-
-### Brief 5: visual quality, layout and the tour (12 November 2026)
-
-- Every asset at the detail its round trip allows ([asset report](docs/asset-report.md)): exact sheets at their grid, painted art at full resolution, cut per screen density as WebP pages.
-- UI at the screen's own resolution (whole device pixels per UI pixel), the world at whole device pixels per world pixel, no rotated text, whole-pixel motion; plates cover the window or mirror their edges.
-- Fixed zones that never overlap, one modal at a time over a backdrop, a composed card panel, waiting cards queued with a count; a layout test at eight sizes.
-- A ten-step spotlight tour of the whole game, done by doing; a practice offer to haggle on; feed on credit for players.
-- Hen certificates: mint receipts on each hen, a `henMinted` event and a certificate moment; honest wording while minting is paused.
-- The smallest density first, then sharp, then sound: a playable farm in 5 to 9 seconds cold through the tunnel.
-- The Verify Bot farm removed from season `s1` (`scripts/remove-player.ts`).
-
-### Brief 4: playability rescue (12 November 2026)
-
-- True-pixel atlases built offline from the packed sheets (coys-assets stays read only); staged loading by screen; streamed music; immutable caching and brotli.
-- Full-window rendering: a 360-pixel-tall world as wide as the window, crisp on Retina, with a usable portrait layout; HUD pinned to the window edges.
-- No flicker: frames cut by body ownership, resting rows, persistent hens; a frame test over every animation.
-- Everything clickable: hens (with their on-chain status in words), eggs, crate, trough and sack, coops, farmhouse, sign and machines.
-- Clarity: plain labels and tooltips, a tour by doing, a goal chain that pays coins, hints when the farm needs something, one plain line on every card.
-- Submission field list matched to the form's own contract.
-
-### Brief 3: deploy, polish and submission prep (11 November 2026)
-
-- Economy tension: demand scales with active farms (15 per farm), so a typical day sits near 1.00x; the Upstart lives on feed credit and booms into busts, Old Money hoards and releases, the Wholesaler resells into gluts. Accepted on five seeds of the 30-day simulation.
-- Season-safe settlement: the contract keys days by (season, day), upgraded in place on testnet with version 1 days kept as `legacy`; one season per database, on every ledger row.
-- A Bakery contract delivery proven on testnet: egg tokens from the player's wallet to `bakery1.coys-game.testnet`.
-- Deploy readiness: `/healthz`, production checks, Postgres migrations under an advisory lock, demo days, backups and restore, Pier and Render settings, a testnet-only deploy script; CI runs Postgres, the production boot and a backup round trip.
-- Polish: first-run tour, favicon and share image, page meta, stale cards closed at the day's end; screenshots from a headless tour of the built game with live testnet receipts.
-- Submission drafts in `docs/submission`.
-
-### Brief 2: agents, cards and chain (11 November 2026)
-
-- Seven agents with personalities, memory, cash and wallets on rule strategies; model decisions wired for NEAR AI Cloud (structured JSON) with rule fallbacks, a hard daily spend cap, struggling agents sitting out every other day, busts and replacements.
-- Decision cards with three-round haggling, standing contracts and deliveries, feed credit, the sales clerk, a real order book and player-to-player trades.
-- Screens: card overlay with talking portraits and voices, market board over the town square, ledger with on-chain receipts, a shop of hens with visible traits.
-- Juice: card arrivals, haggle win and fail, rival bust (sign, price wave, feathers), glut music.
-- Chain: one game contract on NEAR testnet (NEP-171 hens, NEP-245 eggs, daily `settle_day`), sandbox-tested in CI and deployed; agent sub-account wallets; hen portraits rendered at mint.
-- A 30-day simulation and a rival-bust scenario in the test suite.
-
-### Brief 1: foundation and farm loop (11 November 2026)
-
-- Merged the asset backup (coys-assets PR #1) and packed 67 sheets and 59 sounds from it, byte for byte.
-- Monorepo: client, server and shared packages; strict TypeScript, ESLint, Vitest; pinned dependencies; CI on `npm ci --ignore-scripts`.
-- Economy in one config object, tested against the sheet (0.46 margin, 17.3-day payback, 0.54 multiplier at 1300, day 16 coop fill).
-- Authoritative server on Postgres or PGlite: day clock, shared market, order book, ledger, strict protocol, rate limits, reconnect-safe request ids.
-- Privy email login with a silent NEAR testnet wallet, and a labelled dev login fallback.
-- Designed screens with real art: loading, title, login, farm, settings; the full farm loop with juice and sound on every action.
+The dated build history (briefs 1 to 10, 11 to 13 November 2026) is in [docs/build-log.md](docs/build-log.md).
