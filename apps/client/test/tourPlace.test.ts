@@ -3,7 +3,8 @@
 // never covers the target, stays in the world zone and clear of the tracker and toasts.
 import { describe, expect, it } from 'vitest';
 import { measure, type Rect } from '../src/app/viewport';
-import { insideRect, overlaps, placeForTour, placeTourBox } from '../src/ui/tourPlace';
+import { TOUR_BAND } from '../src/state/overlays';
+import { insideRect, overlaps, pageBand, placeBesideCard, placeForTour, placeTourBox } from '../src/ui/tourPlace';
 
 const SIZES = [
   { w: 264, h: 96 },
@@ -88,6 +89,55 @@ describe('the tour box', () => {
         expect(insideRect(box, { x: 0, y: z.world.y, w: v.uiW, h: v.uiH - z.world.y }), 'box off the screen or over the top bar').toBe(true);
         for (const a of avoid) expect(overlaps(box, a), 'box over the tracker or toasts').toBe(false);
       }
+    });
+  }
+});
+
+describe('the tour box beside an open card', () => {
+  for (const [w, h, dpr] of [
+    [1280, 720, 1],
+    [1920, 1080, 1],
+    [390, 844, 3],
+    [360, 640, 2],
+    [768, 1024, 2],
+  ] as const) {
+    it(`always finds a place beside a modal card, never over it, the tracker or the toast corner, at ${w}x${h}`, () => {
+      const v = measure(w, h, dpr);
+      const z = v.zones;
+      const ui = { w: v.uiW, h: v.uiH };
+      // the step box's widths as the tour measures them, with the narrow one for the column beside a card
+      const sizes = [...SIZES, { w: 128, h: 200 }];
+      for (const cw of [300, 340, 420, 444, 520]) {
+        for (const ch of [120, 200, 268, 400]) {
+          // a modal centred in its zone, as Modal.tsx places it
+          const width = Math.min(cw, Math.floor(z.modal.w));
+          const height = Math.min(ch, Math.floor(z.modal.h));
+          const card: Rect = { x: Math.round(z.modal.x + (z.modal.w - width) / 2), y: Math.round(z.modal.y + (z.modal.h - height) / 2), w: width, h: height };
+          const target: Rect = { x: card.x + card.w - 40, y: card.y + 4, w: 30, h: 14 };
+          const p = placeBesideCard(target, sizes, z, ui, card);
+          expect(p, `${cw}x${ch}: no place`).not.toBeNull();
+          if (!p) continue;
+          const box = { x: p.x, y: p.y, w: p.w, h: p.h };
+          expect(overlaps(box, card), `${cw}x${ch}: over the card`).toBe(false);
+          expect(overlaps(box, z.toasts), `${cw}x${ch}: over the toasts`).toBe(false);
+          expect(overlaps(box, z.tracker), `${cw}x${ch}: over the tracker`).toBe(false);
+          expect(insideRect(box, { x: 0, y: z.top.h, w: v.uiW, h: v.uiH - z.top.h }), `${cw}x${ch}: off the window`).toBe(true);
+        }
+      }
+    });
+
+    it(`puts the strip under a full page clear of the tracker and the toast corner at ${w}x${h}`, () => {
+      const v = measure(w, h, dpr);
+      const z = v.zones;
+      const page: Rect = { x: 4, y: z.top.h + 4, w: v.uiW - 8, h: v.uiH - z.top.h - 8 - TOUR_BAND };
+      const b = pageBand(page, z, v.uiW, v.portrait);
+      expect(b.w).toBeGreaterThanOrEqual(200);
+      expect(overlaps(b, page)).toBe(false);
+      if (!v.portrait) {
+        expect(overlaps(b, z.toasts)).toBe(false);
+        expect(overlaps(b, z.tracker)).toBe(false);
+      }
+      expect(b.y + b.h).toBeLessThanOrEqual(v.uiH);
     });
   }
 });

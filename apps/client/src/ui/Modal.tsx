@@ -6,6 +6,7 @@ import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { useLatest } from '../app/useLatest';
 import { motion } from '../motion/ui';
+import { useCardRect } from '../state/overlays';
 
 export function Modal({
   title,
@@ -43,6 +44,8 @@ export function Modal({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [close]);
+  // the open card registers its box with the overlay manager (the tour bubble goes beside it)
+  useCardRect(el);
   const z = v.zones.modal;
   const width = Math.min(w, Math.floor(z.w));
   const maxH = Math.min(h, Math.floor(z.h));

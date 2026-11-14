@@ -13,7 +13,8 @@ import type { Action } from '../net/socket';
 import { events } from '../state/game';
 import { createStore, useStore } from '../state/store';
 import { motion } from '../motion/ui';
-import { placeForTour, type Placement } from './tourPlace';
+import { pageBand, placeBesideCard, placeForTour, type Placement } from './tourPlace';
+import { overlays } from '../state/overlays';
 import { finishTour, tour, tourStep } from '../state/tour';
 import { closeModal, openModal, ui, uiEvents, type ModalState, type UiEvent } from '../state/ui';
 import { uiFx } from './FxLayer';
@@ -211,6 +212,7 @@ function measure(t: TourTarget, v: ReturnType<typeof useViewport>, ui: HTMLEleme
 export function Spotlight({ ctx }: { ctx: TourCtx }) {
   const v = useViewport();
   const t = useStore(tour, (s) => s);
+  const card = useStore(overlays, (s) => s.card);
   const [rect, setRect] = useState<Rect | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const step = TOUR[t.step];
@@ -239,20 +241,22 @@ export function Spotlight({ ctx }: { ctx: TourCtx }) {
   if (!t.active || !step) return null;
   const W = v.uiW;
   const H = v.uiH;
+  // an open card always wins: the shades leave the whole card clear (readable, every button on it
+  // takes a tap) and the ring still marks the target on it
+  const hole = card ? { x: card.x - 1, y: card.y - 1, w: card.w + 2, h: card.h + 2 } : rect;
   return (
     <div ref={host} className="layer" style={{ zIndex: 40 }} data-ui="spotlight">
       {/* no target on screen: the whole window dims, and still takes clicks through */}
-      {!rect && <div className="spot-shade" style={{ left: 0, top: 0, width: W, height: H, pointerEvents: 'none' }} />}
-      {rect && (
+      {!hole && <div className="spot-shade" style={{ left: 0, top: 0, width: W, height: H, pointerEvents: 'none' }} />}
+      {hole && (
         <>
-          <div className="spot-shade" style={{ left: 0, top: 0, width: W, height: Math.max(0, rect.y) }} />
-          <div className="spot-shade" style={{ left: 0, top: rect.y + rect.h, width: W, height: Math.max(0, H - rect.y - rect.h) }} />
-          <div className="spot-shade" style={{ left: 0, top: rect.y, width: Math.max(0, rect.x), height: rect.h }} />
-          <div className="spot-shade" style={{ left: rect.x + rect.w, top: rect.y, width: Math.max(0, W - rect.x - rect.w), height: rect.h }} />
-          <div className="spot-ring" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }} />
-
+          <div className="spot-shade" style={{ left: 0, top: 0, width: W, height: Math.max(0, hole.y) }} />
+          <div className="spot-shade" style={{ left: 0, top: hole.y + hole.h, width: W, height: Math.max(0, H - hole.y - hole.h) }} />
+          <div className="spot-shade" style={{ left: 0, top: hole.y, width: Math.max(0, hole.x), height: hole.h }} />
+          <div className="spot-shade" style={{ left: hole.x + hole.w, top: hole.y, width: Math.max(0, W - hole.x - hole.w), height: hole.h }} />
         </>
       )}
+      {rect && <div className="spot-ring" style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }} />}
     </div>
   );
 }
@@ -260,8 +264,8 @@ export function Spotlight({ ctx }: { ctx: TourCtx }) {
 /** Where the spotlight is (UI pixels), for the step box to sit beside it. */
 export const tourTarget = createStore<{ rect: Rect | null; tag: string }>({ rect: null, tag: '' });
 
-/** The widths the step box tries, widest first (the narrow ones are for phones). */
-const BOX_WIDTHS = [264, 220, 180, 150];
+/** The widths the step box tries, widest first (the narrow ones are for phones; 128 fits the column beside a card). */
+const BOX_WIDTHS = [264, 220, 180, 150, 128];
 /** Seconds an action step waits before NEXT appears. */
 export const NEXT_AFTER_S = 5;
 
@@ -341,7 +345,12 @@ export function TourBox({ ctx, send }: { ctx: TourCtx; send: (a: Action) => Prom
     if (hs.join() !== heights.join()) setHeights(hs);
   }, [heights, t.step, ending, waited, refusedAt, v.uiW, v.uiH]);
   const sizes = BOX_WIDTHS.map((w, i) => ({ w, h: heights[i] ?? 0 })).filter((s) => s.h > 0);
-  const place: Placement | null = sizes.length ? placeForTour(target, sizes, v.zones, v.portrait) : null;
+  // an open card always wins (overlay manager, state/overlays.ts): the bubble goes beside a modal card
+  // (pointing at the target on it), and under a full page it sits in the band the page keeps free
+  const card = useStore(overlays, (s) => s.card);
+  const band = card?.kind === 'page' ? pageBand(card, v.zones, v.uiW, v.portrait) : null;
+  const beside = sizes.length && card?.kind === 'card' ? placeBesideCard(target, sizes, v.zones, { w: v.uiW, h: v.uiH }, card) : null;
+  const place: Placement | null = !sizes.length || band ? null : (beside ?? placeForTour(target, sizes, v.zones, v.portrait));
   // a new step drops in
   useEffect(() => {
     if (boxRef.current && t.active) motion.enter(boxRef.current);
@@ -440,6 +449,56 @@ export function TourBox({ ctx, send }: { ctx: TourCtx; send: (a: Action) => Prom
             ? { left: place.pointer - 6, top: -6, borderWidth: '0 6px 6px 6px', borderColor: 'transparent transparent var(--ink) transparent' }
             : { left: place.pointer - 6, top: place.h, borderWidth: '6px 6px 0 6px', borderColor: 'var(--ink) transparent transparent transparent' }
       : null;
+  if (band) {
+    // the strip under a full page: the step, its title and what to do, and the buttons
+    return (
+      <>
+        <div ref={measureRef} className="paged-measure" aria-hidden="true">
+          {BOX_WIDTHS.map((w) => (
+            <div key={w}>{content(Math.min(w, v.zones.world.w - 8), false)}</div>
+          ))}
+        </div>
+        <div ref={boxRef} className="zone tour-place tour-strip" data-ui="tour-place" data-side="band" style={{ left: band.x, top: band.y, width: band.w, height: band.h, zIndex: 41 }}>
+          <div className="tour-box" data-ui="tour" role="dialog" aria-label="How to play" style={{ width: '100%', height: '100%', boxSizing: 'border-box', gap: 3 }}>
+            <span className="row" style={{ gap: 6, alignItems: 'baseline', minWidth: 0 }}>
+              <span className="tour-step" data-ui="tour-progress" style={{ flex: 'none' }}>
+                STEP {t.step + 1} OF {TOUR.length}
+              </span>
+              <span className="tour-title-small">{step.title}</span>
+              {action && (
+                <span className="tour-action" data-ui="tour-action" style={{ flex: 'none' }}>
+                  ^ {action}
+                </span>
+              )}
+            </span>
+            <span className="row" style={{ gap: 4 }}>
+              <button className="btn" data-ui="tour-back" disabled={t.step === 0} onClick={() => go(t.step - 1)}>
+                BACK
+              </button>
+              {showNext && (
+                <button className="btn red" data-ui="tour-next" onClick={() => go(t.step + 1)}>
+                  {t.step + 1 >= TOUR.length ? 'DONE' : 'NEXT'}
+                </button>
+              )}
+              <button className="btn" data-ui="tour-skip-step" onClick={() => go(t.step + 1)}>
+                SKIP STEP
+              </button>
+              <button
+                className="btn"
+                data-ui="tour-end"
+                onClick={() => {
+                  uiSound(audio, 'click');
+                  finishTour();
+                }}
+              >
+                END TOUR
+              </button>
+            </span>
+          </div>
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <div ref={measureRef} className="paged-measure" aria-hidden="true">

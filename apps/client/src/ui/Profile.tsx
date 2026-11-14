@@ -6,7 +6,10 @@
 // repairs and breakdowns), MARKET (contracts, haggles, orders, share, rivals outlasted), MINT (tickets,
 // Feathers and milestones) and BADGES (earned and locked; secret ones hidden until earned). Every tab
 // fits the window at every size: its blocks are paged, never scrolled.
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { TOUR_BAND, useCardRect } from '../state/overlays';
+import { tour } from '../state/tour';
+import { useStore } from '../state/store';
 import {
   BADGES,
   BADGE_BY_ID,
@@ -147,6 +150,11 @@ export function ProfilePage({
   const { audio } = useServices();
   const v = useViewport();
   const wide = !v.portrait;
+  // a full page to the overlay manager: while the tour is on it keeps a band free at its foot, where
+  // the tour's strip sits (it is laid out that way from the start, so nothing has to shrink)
+  const page = useRef<HTMLDivElement>(null);
+  useCardRect(page, 'page');
+  const dock = useStore(tour, (s) => (s.active ? TOUR_BAND : 0));
   useEffect(() => {
     const el = document.querySelector<HTMLElement>('[data-ui="profile-page"]');
     if (el) motion.enter(el);
@@ -170,7 +178,8 @@ export function ProfilePage({
       className="panel"
       data-ui="profile-page"
       data-tab={tab}
-      style={{ left: 4, top: 4, width: v.uiW - 8, height: v.uiH - 8, display: 'flex', flexDirection: 'column', gap: 4, boxSizing: 'border-box', padding: 7, zIndex: 30 }}
+      ref={page}
+      style={{ left: 4, top: 4, width: v.uiW - 8, height: v.uiH - 8 - dock, display: 'flex', flexDirection: 'column', gap: 4, boxSizing: 'border-box', padding: 7, zIndex: 30 }}
     >
       <div className="row" style={{ gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <h2 className="panel-title" style={{ margin: 0, flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere' }} data-ui="profile-name">
