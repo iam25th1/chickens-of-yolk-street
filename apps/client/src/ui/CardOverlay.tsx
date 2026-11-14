@@ -7,6 +7,7 @@ import { animate, createTimeline } from 'animejs';
 import { useEffect, useRef, useState } from 'react';
 import { ECONOMY, type CardChoice, type CardOutcome, type CardView } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
+import { useLatest } from '../app/useLatest';
 import { useViewport } from '../app/Stage';
 import { juice } from '../motion/juice';
 import type { Action } from '../net/socket';
@@ -111,6 +112,7 @@ export function CardOverlay({
   }, [haggleMood, card, audio]);
 
   // the outcome
+  const close = useLatest(onClose);
   useEffect(() => {
     if (!result) return;
     const good = result.outcome === 'accepted' || result.outcome === 'won';
@@ -134,9 +136,10 @@ export function CardOverlay({
       audio.play('18-stamp', { volume: 0.8 });
       if (result.totalMilli > 0) audio.play('15-kaching', { delayMs: 120, volume: 0.7 });
     } else audio.play('35-back', { volume: 0.6 });
-    const t = setTimeout(onClose, 1700);
+    // (read through a ref: a new onClose from the parent never replays the outcome, its stamp or its sound)
+    const t = setTimeout(() => close.current(), 1700);
     return () => clearTimeout(t);
-  }, [result, look, audio, onClose]);
+  }, [result, look, audio, close]);
 
   const choose = (choice: CardChoice) => {
     if (busy || result) return;

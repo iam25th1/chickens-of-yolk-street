@@ -4,6 +4,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
+import { useLatest } from '../app/useLatest';
 import { motion } from '../motion/ui';
 
 export function Modal({
@@ -28,14 +29,20 @@ export function Modal({
   const { audio } = useServices();
   const v = useViewport();
   const el = useRef<HTMLDivElement>(null);
+  // callers often pass a new onClose on every render (an inline arrow): it is read through a ref, so a
+  // re-render (typing, a server tick) never replays the open animation
+  const close = useLatest(onClose);
+  // the open animation: once, when the modal opens
   useEffect(() => {
     if (el.current) motion.enter(el.current);
+  }, []);
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') close.current();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [close]);
   const z = v.zones.modal;
   const width = Math.min(w, Math.floor(z.w));
   const maxH = Math.min(h, Math.floor(z.h));
