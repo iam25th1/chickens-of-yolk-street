@@ -3,8 +3,11 @@
 // its moment (the camera goes to the new plot, fence posts pop up, then stand in the ground); a
 // second plot, the south orchard, follows. Then the player looks round: dragging the farm moves the
 // world and not the page (and does not open what the drag started on), the arrow keys move it, the
-// small map shows the view, and HOME brings the home plot back. Nothing scrolls or overflows at any
-// step. SCREENSHOTS=1 saves frames to SHOTS_DIR (default: a folder in the system's temp folder).
+// map button opens the small map (half its old size) that shows the view, a tap on the button again
+// or anywhere else closes it, a drag leaves it open, and the open or closed map is kept over a reload.
+// HOME shows only while the view is off the home plot, and brings it back. Nothing scrolls or
+// overflows at any step. SCREENSHOTS=1 saves frames to SHOTS_DIR (default: a folder in the system's
+// temp folder).
 import { mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -81,8 +84,10 @@ describe('land', () => {
         await page.locator('[data-ui="topbar"]').waitFor({ timeout: 60_000 });
         await page.evaluate(() => (window as unknown as { __coysTour?: { end(): void } }).__coysTour?.end());
         await page.waitForFunction(() => (window as unknown as { __coysFarm?: FarmHook }).__coysFarm?.targets().some((t) => t.kind === 'hen'), undefined, { timeout: 30_000 });
-        // a farm on its home plot alone: no map, no HOME, and the camera never moves
+        // a farm on its home plot alone: no map button, no map, no HOME, and the camera never moves
+        expect(await page.locator('[data-ui="farm-map-button"]').count()).toBe(0);
         expect(await page.locator('[data-ui="farm-map"]').count()).toBe(0);
+        expect(await page.locator('[data-ui="farm-home"]').count()).toBe(0);
         expect(await camera(page)).toEqual({ x: 0, y: 0 });
         await check('home plot');
 
@@ -104,7 +109,11 @@ describe('land', () => {
         await page.waitForTimeout(700);
         expect((await camera(page)).x, `${size}: the camera went east`).toBeGreaterThan(0);
         await page.getByText('THE EAST FIELD IS YOURS', { exact: false }).first().waitFor({ timeout: 5000 });
-        await page.locator('[data-ui="farm-map"]').waitFor();
+        // the farm is bigger than the window now: the map button (the map itself closed) and, the
+        // camera being on the east field, HOME
+        await page.locator('[data-ui="farm-map-button"]').waitFor();
+        expect(await page.locator('[data-ui="farm-map"]').count(), `${size}: the map starts closed`).toBe(0);
+        await page.locator('[data-ui="farm-home"]').waitFor();
         await check('east field');
 
         // the south orchard next, at the second price
@@ -121,13 +130,28 @@ describe('land', () => {
         expect((await camera(page)).y, `${size}: the camera went south`).toBeGreaterThan(0);
         await check('south orchard');
 
-        // HOME brings the home plot back
+        // HOME brings the home plot back, and goes once the view is home
         await page.locator('[data-ui="farm-home"]').click();
         await page.waitForFunction(() => {
           const c = (window as unknown as { __coysFarm: FarmHook }).__coysFarm.camera();
           return c.x === 0 && c.y === 0;
         });
+        await page.locator('[data-ui="farm-home"]').waitFor({ state: 'detached' });
         await check('home again');
+        // the map button and the open map: as tall as the top bar's buttons, the map half its old 64 x 40
+        await page.locator('[data-ui="farm-map-button"]').click();
+        await page.locator('[data-ui="farm-map"]').waitFor();
+        const ui = await page.evaluate(() => {
+          const zoom = Number(document.querySelector<HTMLElement>('.ui')?.dataset.p ?? 1) / devicePixelRatio;
+          const sz = (sel: string) => {
+            const r = document.querySelector(sel)?.getBoundingClientRect();
+            return r ? { w: Math.round(r.width / zoom), h: Math.round(r.height / zoom) } : null;
+          };
+          return { button: sz('[data-ui="farm-map-button"]'), map: sz('[data-ui="farm-map"]') };
+        });
+        expect(ui.button?.h, `${size}: the map button's height`).toBe(16);
+        expect((ui.map?.w ?? 99) <= 32 && (ui.map?.h ?? 99) <= 20, `${size}: the map at most 32 x 20 (${JSON.stringify(ui.map)})`).toBe(true);
+        await check('map open at home');
 
         // drag the farm from the farmhouse: the world moves with the pointer, the page does not, and
         // letting go does not open the farmhouse
@@ -143,6 +167,9 @@ describe('land', () => {
         expect(cam.x, `${size}: dragged east`).toBeGreaterThan(0);
         expect(cam.y, `${size}: dragged south`).toBeGreaterThan(0);
         expect(await page.locator('[data-ui="modal"]').count(), `${size}: the drag opened something`).toBe(0);
+        // off the home plot: HOME is back; a drag left the map open
+        await page.locator('[data-ui="farm-home"]').waitFor();
+        expect(await page.locator('[data-ui="farm-map"]').count(), `${size}: the drag closed the map`).toBe(1);
         // the farmhouse moved on screen by the camera's move (in CSS pixels)
         const after = await farmhouse(page);
         expect(after && after.x < before.x && after.y < before.y, `${size}: the farmhouse moved with the farm`).toBe(true);
@@ -171,6 +198,8 @@ describe('land', () => {
           await page.keyboard.press('Escape');
           await page.waitForTimeout(300);
           expect(await camera(page), `${size}: a click does not move the camera`).toEqual(cam);
+          // (a tap anywhere else closed the map)
+          expect(await page.locator('[data-ui="farm-map"]').count(), `${size}: a tap elsewhere left the map open`).toBe(0);
         }
 
         // the arrow keys move the camera back
@@ -184,11 +213,34 @@ describe('land', () => {
         expect(keyed.y).toBeLessThan(cam.y);
         await check('keys');
 
-        // a tap on the small map looks there; HOME comes back
-        if (map) await page.mouse.click(map.x + map.width - 2, map.y + map.height - 2);
+        // a tap on the small map looks there and leaves it open; HOME comes back
+        if (!(await page.locator('[data-ui="farm-map"]').count())) await page.locator('[data-ui="farm-map-button"]').click();
+        const reopened = await page.locator('[data-ui="farm-map"]').boundingBox();
+        if (reopened) await page.mouse.click(reopened.x + reopened.width - 2, reopened.y + reopened.height - 2);
         await page.waitForTimeout(800);
         const looked = await camera(page);
         expect(looked.x > 0 || looked.y > 0, `${size}: the map moved the view`).toBe(true);
+        expect(await page.locator('[data-ui="farm-map"]').count(), `${size}: a tap on the map closed it`).toBe(1);
+        // the map is kept open over a reload, and the button closes it (kept closed too)
+        const back = async () => {
+          await page.reload();
+          await page.getByText('PLAY', { exact: true }).waitFor({ timeout: 60_000 });
+          await page.waitForTimeout(800);
+          await page.getByText('PLAY', { exact: true }).click({ force: true });
+          await page.locator('[data-ui="farm-map-button"]').waitFor({ timeout: 60_000 });
+          await page.waitForTimeout(500);
+        };
+        await back();
+        await page.locator('[data-ui="farm-map"]').waitFor({ timeout: 10_000 });
+        await page.locator('[data-ui="farm-map-button"]').click();
+        await page.locator('[data-ui="farm-map"]').waitFor({ state: 'detached' });
+        await back();
+        expect(await page.locator('[data-ui="farm-map"]').count(), `${size}: the closed map came back open`).toBe(0);
+        await check('reloaded, map closed');
+        // (after a reload the view starts on the home plot: look away, then HOME)
+        await page.keyboard.down('ArrowRight');
+        await page.waitForTimeout(400);
+        await page.keyboard.up('ArrowRight');
         await page.locator('[data-ui="farm-home"]').click();
         await page.waitForFunction(() => {
           const c = (window as unknown as { __coysFarm: FarmHook }).__coysFarm.camera();
