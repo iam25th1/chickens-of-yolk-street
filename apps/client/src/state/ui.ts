@@ -4,8 +4,8 @@ import type { FeatherGrade, TicketMilestone, UnlockId } from '@coys/shared';
 import { Emitter, createStore } from './store';
 
 export type ShopTab = 'hens' | 'feed' | 'coops' | 'machines' | 'land';
-/** The Market page's tabs: prices, sell, buy orders, your orders, trade, hen auction, farms. */
-export type MarketTab = 'prices' | 'sell' | 'buyers' | 'mine' | 'trade' | 'auction' | 'farms';
+/** The Market page's tabs: prices, sell, buy orders, your orders, trade, hen auction, farms, leaderboard. */
+export type MarketTab = 'prices' | 'sell' | 'buyers' | 'mine' | 'trade' | 'auction' | 'farms' | 'leaderboard';
 export const PROFILE_TABS = ['overview', 'eggs', 'money', 'flock', 'machines', 'market', 'mint', 'badges'] as const;
 export type ProfileTab = (typeof PROFILE_TABS)[number];
 

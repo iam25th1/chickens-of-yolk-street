@@ -5,15 +5,17 @@
 // price. BUY ORDERS: what the AI buyers want, each filled from the crate in one tap. YOUR ORDERS:
 // your open orders, with cancel. TRADE: other farms' offers to buy, and your own offers as everyone
 // sees them. HEN AUCTION: hens from bust farms. FARMS: the street's farms ranked, with their signs and best badges; a farm opens its public profile.
+// LEADERBOARD: the league's weekly and season boards (GET /api/leaderboard), profit at book value.
 // Every tab opens with one plain line; every list is paged to fit the window (never a scrollbar).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { TOUR_BAND, useCardRect } from '../state/overlays';
 import { tour } from '../state/tour';
-import { ECONOMY, EGG_GRADES, MARKET_CHART_DAYS, coopCapacity, eggPrice, saleValue, type EggGrade, type FarmState, type MarketChartDay, type MarketState, type OrderView } from '@coys/shared';
+import { ECONOMY, EGG_GRADES, MARKET_CHART_DAYS, coopCapacity, eggPrice, saleValue, type EggGrade, type FarmState, type LeaderboardEntry, type LeaderboardView, type LeagueBoard, type MarketChartDay, type MarketState, type OrderView } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { motion } from '../motion/ui';
 import type { Action } from '../net/socket';
+import { serverNow } from '../state/game';
 import { useStore } from '../state/store';
 import { openModal, uiEvents, type MarketTab } from '../state/ui';
 import { AiBadge, GuestTag } from './AiBadge';
@@ -43,6 +45,7 @@ export const MARKET_TABS: { id: MarketTab; label: string; line: string }[] = [
   { id: 'trade', label: 'TRADE', line: 'EGGS OTHER FARMS OFFER AT THEIR OWN PRICE, AND THE OFFERS YOU HAVE OUT FOR EVERYONE TO SEE.' },
   { id: 'auction', label: 'HEN AUCTION', line: "HENS FROM FARMS THAT WENT BUST, AT HALF THE BREEDER'S PRICE. EACH ONE IS ONE OF A KIND." },
   { id: 'farms', label: 'FARMS', line: 'EVERY FARM ON THE STREET, RICHEST FIRST. TAP A FARM FOR ITS PUBLIC PROFILE AND BADGES.' },
+  { id: 'leaderboard', label: 'LEADERBOARD', line: 'EVERY FARM BY PROFIT THIS WEEK AND THIS SEASON: WHAT YOUR FARM IS WORTH NOW AGAINST WHEN THE BOARD OPENED.' },
 ];
 
 /** A price against today's street price for its grade, in words. */
@@ -190,6 +193,7 @@ export function MarketPage({ farm, market, send, tab, onTab, onClose }: { farm: 
         {tab === 'trade' && <TradeTab {...props} />}
         {tab === 'auction' && <AuctionTab {...props} />}
         {tab === 'farms' && <FarmsTab {...props} />}
+        {tab === 'leaderboard' && <LeaderboardTab {...props} />}
       </div>
     </div>
   );
@@ -726,5 +730,217 @@ function FarmsTab({ farm, market, wide, side }: TabProps) {
         <Paged fill gap={3} ui="ranking" items={rows} />
       </Column>
     </>
+  );
+}
+
+// ---- LEADERBOARD ----------------------------------------------------------------------------------
+
+/** Time left in days and hours (hours and minutes under a day): 2D 4H. */
+function timeLeft(ms: number): string {
+  const m = Math.max(0, Math.floor(ms / 60_000));
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  if (d > 0) return `${d}D ${h}H`;
+  return h > 0 ? `${h}H ${m % 60}M` : `${m % 60}M`;
+}
+
+/** A score in coins with its sign: +12.50, -3.00, 0.00. */
+const signedCoins = (milli: number): string => `${milli > 0 ? '+' : milli < 0 ? '-' : ''}${coins(Math.abs(milli))}`;
+
+/** The up or down arrow against yesterday's rank: up when the rank number went down (better). */
+function RankArrow({ e }: { e: LeaderboardEntry }) {
+  const d = e.prevRank === null ? 0 : e.prevRank - e.rank;
+  const style = { flex: 'none', width: 7, textAlign: 'center' } as const;
+  if (d > 0)
+    return (
+      <span style={{ ...style, color: '#3d7a22' }} title={`UP FROM ${e.prevRank}`}>
+        ^
+      </span>
+    );
+  if (d < 0)
+    return (
+      <span style={{ ...style, color: '#b8321f' }} title={`DOWN FROM ${e.prevRank}`}>
+        v
+      </span>
+    );
+  return <span style={style} />;
+}
+
+/** One farm on the board: rank, arrow, name and tags, busts, score. Your own farm is highlighted. */
+function BoardRow({ e, you, ui }: { e: LeaderboardEntry; you: boolean; ui: string }) {
+  return (
+    <div
+      className="row"
+      data-ui={ui}
+      data-farm={e.farmId}
+      data-kind={e.kind}
+      style={{ gap: 4, alignItems: 'flex-start', width: '100%', opacity: e.bust ? 0.6 : 1, background: you ? '#e3cc96' : undefined, color: you ? '#2f6f9e' : undefined }}
+    >
+      <span style={{ flex: 'none', width: 22, textAlign: 'right' }}>{e.rank}.</span>
+      <RankArrow e={e} />
+      <span style={{ flex: 1, minWidth: 0, lineHeight: '9px', overflowWrap: 'anywhere' }}>
+        {e.name.toUpperCase()}
+        {e.kind !== 'player' && <AiBadge />}
+        {e.guest && <GuestTag />}
+        {e.bust && (
+          <span className="ai-badge" style={{ background: '#b8321f' }}>
+            BUST
+          </span>
+        )}
+        {you ? ' (YOU)' : ''}
+      </span>
+      <span style={{ flex: 'none', width: 30, textAlign: 'right' }}>{e.busts > 0 ? e.busts : ''}</span>
+      <span style={{ flex: 'none', minWidth: 52, textAlign: 'right' }}>{signedCoins(e.scoreMilli)}</span>
+    </div>
+  );
+}
+
+function LeaderboardTab({ farm, market, wide, side }: TabProps) {
+  const click = useClick();
+  const [board, setBoard] = useState<LeagueBoard>('week');
+  const [players, setPlayers] = useState(false);
+  const [view, setView] = useState<LeaderboardView | null>(null);
+  const [failed, setFailed] = useState(false);
+  // the board again when it changes, and with each new market state (a day close moves the ranks)
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/leaderboard?board=${board}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(String(res.status));
+        const body = (await res.json()) as LeaderboardView;
+        if (!live) return;
+        setView(body);
+        setFailed(false);
+      })
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [board, market]);
+  // the countdown, on the server's clock, a minute at a time
+  const [now, setNow] = useState(serverNow);
+  useEffect(() => {
+    const t = setInterval(() => setNow(serverNow()), 20_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const shown = view && view.board === board ? view : null;
+  const all = shown?.entries ?? [];
+  const entries = players ? all.filter((e) => e.kind === 'player') : all;
+  const controls = (
+    <div className="row" style={{ gap: 4, flexWrap: 'wrap', rowGap: 4 }}>
+      <button className={`btn ${board === 'week' ? 'red' : ''}`} data-ui="leaderboard-board-week" aria-pressed={board === 'week'} onClick={click(() => setBoard('week'))}>
+        WEEKLY
+      </button>
+      <button className={`btn ${board === 'season' ? 'red' : ''}`} data-ui="leaderboard-board-season" aria-pressed={board === 'season'} onClick={click(() => setBoard('season'))}>
+        SEASON
+      </button>
+      <span style={{ width: 6 }} />
+      <button className={`btn ${!players ? 'red' : ''}`} data-ui="leaderboard-filter-all" aria-pressed={!players} onClick={click(() => setPlayers(false))}>
+        ALL
+      </button>
+      <button className={`btn ${players ? 'red' : ''}`} data-ui="leaderboard-filter-players" aria-pressed={players} onClick={click(() => setPlayers(true))}>
+        PLAYERS ONLY
+      </button>
+    </div>
+  );
+
+  // the week's end, and the season's (or the first season's start, before the league begins)
+  let countdown = failed ? 'THE BOARD IS NOT ANSWERING. IT TRIES AGAIN WITH THE NEXT MARKET NEWS.' : 'READING THE BOARD';
+  if (shown) {
+    const n = shown.next;
+    const warmup = board === 'week' && shown.window ? shown.window.warmup : now < n.seasonStartsAt;
+    const seasonName = board === 'season' && shown.window ? `SEASON ${shown.window.seq}` : 'SEASON';
+    const season = now < n.seasonStartsAt ? `SEASON 1 STARTS IN ${timeLeft(n.seasonStartsAt - now)}` : `${seasonName} ENDS IN ${timeLeft(n.seasonEndsAt - now)}`;
+    countdown = `${warmup ? 'WARM-UP WEEK (NO REWARDS). ' : ''}WEEK ENDS IN ${timeLeft(n.weekEndsAt - now)}. ${season}.`;
+  }
+  const clock = (
+    <span style={{ lineHeight: '9px', color: '#8b5a2b' }} data-ui="leaderboard-countdown">
+      {countdown}
+    </span>
+  );
+
+  const head = (
+    <div className="row" style={{ gap: 4, width: '100%', color: '#8b5a2b' }}>
+      <span style={{ flex: 'none', width: 33, textAlign: 'right' }}>RANK</span>
+      <span style={{ flex: 1, minWidth: 0 }}>FARM</span>
+      <span style={{ flex: 'none', width: 30, textAlign: 'right' }}>BUSTS</span>
+      <span style={{ flex: 'none', minWidth: 52, textAlign: 'right' }}>SCORE</span>
+    </div>
+  );
+  const rows = entries.map((e) => <BoardRow key={e.farmId} e={e} you={e.farmId === farm.farmId} ui="leaderboard-row" />);
+  const list = rows.length ? (
+    <Paged fill gap={3} ui="leaderboard" items={rows} resetKey={`${board}-${players}`} />
+  ) : (
+    <div style={{ flex: 1, minHeight: 0 }}>
+      <Empty>{!shown ? '' : shown.window ? 'NO FARM ON THIS BOARD YET.' : 'SEASON 1 HAS NOT STARTED. EVERY FARM JOINS IT WHEN IT OPENS.'}</Empty>
+    </div>
+  );
+
+  // your own row, pinned under the list, and what it takes to pass the farm just above you
+  const at = all.findIndex((e) => e.farmId === farm.farmId);
+  const mine = all[at];
+  const above = at > 0 ? all[at - 1] : undefined;
+  let nudge = shown && !shown.window ? 'YOUR FARM JOINS THE BOARD WHEN SEASON 1 OPENS' : 'YOUR FARM JOINS THE BOARD AT ITS FIRST DAY CLOSE';
+  if (mine && !above) nudge = 'YOU LEAD THE BOARD';
+  else if (mine && above) {
+    const egg = Math.max(1, market.pricesMilli.white);
+    const eggs = Math.max(1, Math.ceil((above.scoreMilli - mine.scoreMilli) / egg));
+    nudge = `SELL ABOUT ${eggs} MORE EGG${eggs === 1 ? '' : 'S'} TO PASS ${above.name.toUpperCase()}`;
+  }
+  const you = shown ? (
+    <div className="col" style={{ gap: 3, flex: 'none', borderTop: '1px solid #8b5a2b', paddingTop: 4 }} data-ui="leaderboard-you">
+      {mine && <BoardRow e={mine} you ui="leaderboard-you-row" />}
+      <span style={{ lineHeight: '9px', color: '#2f6f9e' }}>{nudge}</span>
+    </div>
+  ) : null;
+
+  // the closed seasons, newest first: the winner, and the standings' hash on chain when it went out
+  const past =
+    board === 'season' && shown && shown.past.length > 0 ? (
+      <div className="col" style={{ gap: 3, flex: 'none' }} data-ui="leaderboard-past">
+        <H3>PAST SEASONS</H3>
+        {shown.past.slice(0, 3).map((p) => (
+          <span key={p.id} style={{ lineHeight: '9px' }} data-ui="leaderboard-past-row">
+            SEASON {p.seq}: {p.winner ? `WINNER ${p.winner.name.toUpperCase()}` : 'NO WINNER'}
+            {p.winner && p.winner.kind !== 'player' && <AiBadge />}
+            {p.explorerUrl && (
+              <>
+                {' '}
+                <a href={p.explorerUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#2f6f9e' }}>
+                  ON CHAIN
+                </a>
+              </>
+            )}
+          </span>
+        ))}
+      </div>
+    ) : null;
+
+  if (wide) {
+    return (
+      <>
+        <Column width={side}>
+          {controls}
+          {clock}
+          {past}
+        </Column>
+        <Column>
+          {head}
+          {list}
+          {you}
+        </Column>
+      </>
+    );
+  }
+  return (
+    <Column>
+      {controls}
+      {clock}
+      {head}
+      {list}
+      {you}
+      {past}
+    </Column>
   );
 }
