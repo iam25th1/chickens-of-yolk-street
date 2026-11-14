@@ -42,6 +42,15 @@ export function AiBadge({ brain }: { brain?: AiMode }) {
   );
 }
 
+/** The GUEST tag: a player farm started with PLAY and not signed in yet (the AI tag's size, in straw). */
+export function GuestTag() {
+  return (
+    <span className="ai-badge guest-tag" aria-label="Guest" title="A guest farm: started with PLAY, not signed in yet">
+      GUEST
+    </span>
+  );
+}
+
 /** The How to play guide's line on how the AI decides, following the mode. */
 export function AiHowLine() {
   return <>{aiHowLine(useAiMode())}</>;

@@ -9,6 +9,9 @@ export type MarketTab = 'prices' | 'sell' | 'buyers' | 'mine' | 'trade' | 'aucti
 export const PROFILE_TABS = ['overview', 'eggs', 'money', 'flock', 'machines', 'market', 'mint', 'badges'] as const;
 export type ProfileTab = (typeof PROFILE_TABS)[number];
 
+/** Why a guest is offered to save the farm (sign in). */
+export type SaveReason = 'ticket' | 'mint' | 'nudge' | 'settings' | 'profile';
+
 export type ModalState =
   | { kind: 'shop'; tab: ShopTab }
   | { kind: 'ledger' }
@@ -23,6 +26,8 @@ export type ModalState =
   | { kind: 'settings' }
   | { kind: 'guide' }
   | { kind: 'name'; mode: 'first' | 'rename' }
+  /** A guest farm: sign in to save it (and to mint). */
+  | { kind: 'saveFarm'; reason: SaveReason }
   /** The player's own profile page (private), on a tab. */
   | { kind: 'profile'; tab: ProfileTab }
   /** A farm's public profile, opened from the farms ranking or the profile's own link. */

@@ -827,6 +827,31 @@ input[type='range'].slider::-moz-range-thumb {
   pointer-events: none;
 }
 
+/* the save card's mark: a straw ticket stub with a punched notch, beside its lines */
+.save-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 22px;
+  background: var(--straw);
+  color: var(--ink);
+  box-shadow:
+    0 0 0 1px var(--ink),
+    inset 0 -2px 0 var(--straw-deep),
+    1px 1px 0 1px var(--ink);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+
+.ai-badge.guest-tag {
+  background: var(--straw);
+  color: var(--ink);
+}
+
 .ai-badge {
   display: inline-block;
   /* aligned to the line's top, so it never makes a line taller than its text */

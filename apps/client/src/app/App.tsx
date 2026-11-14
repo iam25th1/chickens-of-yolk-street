@@ -1,17 +1,19 @@
-// Screen flow: boot loading, title, login, farm loading, farm. Settings opens over any screen. The
-// Feather Mint has its own address (/mint): it opens straight from the boot, or from the title,
-// without entering the farm; signing in from it goes to the farm with the mint open.
+// Screen flow: boot loading, title, login, farm loading, farm. PLAY opens a guest farm at once (no
+// sign-in); SIGN IN is for returning players, and a guest's SAVE THIS FARM signs in with the farm
+// carried along. Settings opens over any screen. The Feather Mint has its own address (/mint): it
+// opens straight from the boot, or from the title, without entering the farm; signing in from it goes
+// to the farm with the mint open.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AssetStore } from '../assets/store';
 import { BOOT_GROUPS, BOOT_SOUNDS, FARM_GROUPS, FARM_SOUNDS, LATER_GROUPS, TITLE_GROUPS } from '../assets/catalog';
 import { AudioEngine } from '../audio/audio';
 import { motion } from '../motion/ui';
-import { api, sessionStore, type ServerConfigView } from '../net/api';
+import { GUEST_SESSION, GuestLimitError, api, sessionStore, type ServerConfigView } from '../net/api';
 import { BackdropScene } from '../pixi/BackdropScene';
 import { PixiHost } from '../pixi/host';
 import { FarmScreen } from '../screens/FarmScreen';
 import { LoadingScreen } from '../screens/LoadingScreen';
-import { LoginScreen, type SignedIn } from '../screens/LoginScreen';
+import { GuestLimitScreen, LoginScreen, type SignedIn } from '../screens/LoginScreen';
 import { TitleScreen } from '../screens/TitleScreen';
 import { FeatherMint } from '../ui/FeatherMint';
 import { OPEN_MINT_KEY } from '../state/ui';
@@ -24,7 +26,7 @@ import { ServicesContext, type Services } from './services';
 import { Stage, useViewport } from './Stage';
 import { viewport } from './viewport';
 
-type Screen = 'boot' | 'title' | 'mint' | 'login' | 'loadingFarm' | 'farm';
+type Screen = 'boot' | 'title' | 'mint' | 'login' | 'guestLimit' | 'loadingFarm' | 'farm';
 
 /** The Feather Mint's own address. */
 const MINT_PATH = '/mint';
@@ -42,6 +44,9 @@ export function App() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
   const [signedIn, setSignedIn] = useState<{ session: string; accountId: string | null } | null>(null);
+  /** The login screen was opened from a guest farm (SAVE THIS FARM): BACK returns to it. */
+  const [fromGuest, setFromGuest] = useState(false);
+  const [guestLimit, setGuestLimit] = useState<'ip' | 'hour'>('ip');
   const [cursor, setCursor] = useState<string | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const screenEl = useRef<HTMLDivElement>(null);
@@ -154,12 +159,51 @@ export function App() {
         .catch((e: unknown) => setFatal(e instanceof Error ? e.message : String(e)));
       return;
     }
+    // a returning player's session opens their farm; anyone else plays at once as a guest
     const session = sessionStore.get();
     if (session) {
       setSignedIn({ session, accountId: null });
       setScreen('loadingFarm');
-    } else setScreen('login');
+      return;
+    }
+    if (!config?.guestPlay) {
+      setFromGuest(false);
+      setScreen('login');
+      return;
+    }
+    void api
+      .loginGuest()
+      .then(() => {
+        setSignedIn({ session: GUEST_SESSION, accountId: null });
+        setScreen('loadingFarm');
+      })
+      .catch((e: unknown) => {
+        if (e instanceof GuestLimitError) {
+          setGuestLimit(e.limit);
+          setScreen('guestLimit');
+        } else setFatal(e instanceof Error ? e.message : String(e));
+      });
   };
+
+  /** SIGN IN (returning players): their farm if this browser still has their session, else the sign-in. */
+  const signIn = () => {
+    unlockAudio();
+    if (location.pathname === MINT_PATH) history.pushState(null, '', '/');
+    const session = sessionStore.get();
+    if (session) {
+      setSignedIn({ session, accountId: null });
+      setScreen('loadingFarm');
+      return;
+    }
+    setFromGuest(false);
+    setScreen('login');
+  };
+
+  /** A guest saves the farm: the sign-in, with the farm carried into the account. */
+  const saveFarm = useCallback(() => {
+    setFromGuest(true);
+    setScreen('login');
+  }, []);
 
   // farm loading: the jingle plays while the farm's art and sound arrive
   useEffect(() => {
@@ -194,10 +238,16 @@ export function App() {
   };
 
   const signOut = useCallback(() => {
+    // a guest whose farm is gone (moved to an account, or bust) goes back to the title
+    if (signedIn?.session === GUEST_SESSION) {
+      setSignedIn(null);
+      setScreen('title');
+      return;
+    }
     sessionStore.set(null);
     setSignedIn(null);
     setScreen('login');
-  }, []);
+  }, [signedIn]);
 
   return (
     <Stage onMount={onMount} cursor={cursor} onPointerDown={unlockAudio}>
@@ -207,10 +257,17 @@ export function App() {
             {screen !== 'farm' && screen !== 'mint' && (
               <div className="stage640">
                 {screen === 'boot' && <LoadingScreen progress={progress} label="WAKING THE HENS" />}
-                {screen === 'title' && <TitleScreen audioReady={audioReady} onPlay={play} onMint={openMint} onSettings={() => setSettingsOpen(true)} />}
+                {screen === 'title' && <TitleScreen audioReady={audioReady} onPlay={play} onSignIn={signIn} onMint={openMint} onSettings={() => setSettingsOpen(true)} />}
                 {screen === 'login' && config && (
-                  <LoginScreen privyAppId={config.privyAppId} devLogin={config.devLogin} onSignedIn={onSignedIn} onBack={() => setScreen('title')} />
+                  <LoginScreen
+                    privyAppId={config.privyAppId}
+                    devLogin={config.devLogin}
+                    fromGuest={fromGuest && signedIn?.session === GUEST_SESSION}
+                    onSignedIn={onSignedIn}
+                    onBack={() => setScreen(fromGuest && signedIn?.session === GUEST_SESSION ? 'loadingFarm' : 'title')}
+                  />
                 )}
+                {screen === 'guestLimit' && <GuestLimitScreen limit={guestLimit} onSignIn={signIn} onBack={() => setScreen('title')} />}
                 {screen === 'loadingFarm' && <LoadingScreen progress={progress} label="LOADING THE FARM" />}
               </div>
             )}
@@ -222,7 +279,7 @@ export function App() {
                   onMint={null}
                   onSignIn={() => {
                     sessionStorage.setItem(OPEN_MINT_KEY, '1');
-                    play();
+                    signIn();
                   }}
                   onClose={leaveMint}
                   closeLabel="TITLE"
@@ -232,7 +289,7 @@ export function App() {
             {/* the title's live prices run along the whole window's foot */}
             {screen === 'title' && <Ticker />}
             {screen === 'farm' && signedIn && (
-              <FarmScreen session={signedIn.session} accountId={signedIn.accountId} onSignedOut={signOut} />
+              <FarmScreen session={signedIn.session} accountId={signedIn.accountId} onSignedOut={signOut} onSave={saveFarm} />
             )}
           </div>
           {guideOpen && screen !== 'farm' && (

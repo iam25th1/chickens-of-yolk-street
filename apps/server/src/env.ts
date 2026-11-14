@@ -5,6 +5,7 @@ import { ECONOMY } from '@coys/shared';
 import { AGENT_DAILY_CALLS, DECISION_GAP_DAYS, PRICE_MOVE } from './agents/brain';
 import { CLOSE_BUDGET_MS } from './ai/chain';
 import { SERV_REASONING_EFFORTS, type ServReasoningEffort } from './ai/serv';
+import { DEFAULT_GUEST_LIMITS, type GuestLimits } from './game/guests';
 
 export interface ServerConfig {
   production: boolean;
@@ -32,6 +33,8 @@ export interface ServerConfig {
   demoDayIgnored: boolean;
   /** SETTLE_EVERY_DAYS: days settle on the chain in ranges of this many, one call each (default 10). */
   settleEvery: number;
+  /** Guest play's limits (GUEST_FARMS_PER_IP_PER_DAY, GUEST_FARMS_PER_HOUR), or null when either is 0 (guest play off). */
+  guestLimits: GuestLimits | null;
 }
 
 /** Season ids as the game contract accepts them. */
@@ -81,7 +84,21 @@ export function readConfig(env: NodeJS.ProcessEnv, repoRoot: string): ServerConf
     dayLengthMs: demoSeconds !== null && demoAllowed ? demoSeconds * 1000 : ECONOMY.day.lengthMs,
     demoDayIgnored: demoSeconds !== null && !demoAllowed,
     settleEvery: settleEveryDays(env.SETTLE_EVERY_DAYS),
+    guestLimits: guestLimits(env),
   };
+}
+
+/** The guest limits: whole numbers from 0 (guest play off) to 100000; the defaults when unset. */
+export function guestLimits(env: NodeJS.ProcessEnv): GuestLimits | null {
+  const read = (name: string, fallback: number): number => {
+    const raw = env[name];
+    if (raw === undefined || raw === '') return fallback;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 0 || n > 100_000) throw new Error(`${name} must be a whole number from 0 to 100000`);
+    return n;
+  };
+  const limits = { perIpPerDay: read('GUEST_FARMS_PER_IP_PER_DAY', DEFAULT_GUEST_LIMITS.perIpPerDay), perHour: read('GUEST_FARMS_PER_HOUR', DEFAULT_GUEST_LIMITS.perHour) };
+  return limits.perIpPerDay === 0 || limits.perHour === 0 ? null : limits;
 }
 
 /** Whether the demo session may run: DEMO_MODE=1, not production, and HOST a loopback address (never all interfaces). */

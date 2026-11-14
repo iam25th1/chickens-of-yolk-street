@@ -1,5 +1,5 @@
 // Title: the title plate (canvas), the logo stamping in then shining, the live price ticker,
-// and Play, the Feather Mint and Settings.
+// and Play (a guest farm at once, no sign-in), Sign in (returning players), the Feather Mint and Settings.
 import { animate } from 'animejs';
 import { useEffect, useRef, useState } from 'react';
 import { uiSound, useServices } from '../app/services';
@@ -9,7 +9,19 @@ import { api } from '../net/api';
 import { BackdropScene } from '../pixi/BackdropScene';
 import { game } from '../state/game';
 
-export function TitleScreen({ onPlay, onMint, onSettings, audioReady }: { onPlay: () => void; onMint: () => void; onSettings: () => void; audioReady: boolean }) {
+export function TitleScreen({
+  onPlay,
+  onSignIn,
+  onMint,
+  onSettings,
+  audioReady,
+}: {
+  onPlay: () => void;
+  onSignIn: () => void;
+  onMint: () => void;
+  onSettings: () => void;
+  audioReady: boolean;
+}) {
   const { assets, audio, pixi } = useServices();
   const buttons = useRef<HTMLDivElement>(null);
   const prompt = useRef<HTMLDivElement>(null);
@@ -73,8 +85,11 @@ export function TitleScreen({ onPlay, onMint, onSettings, audioReady }: { onPlay
         BETA
       </span>
       <div ref={buttons} style={{ position: 'absolute', left: 0, top: 266, width: 640, display: 'flex', justifyContent: 'center', gap: 12 }}>
-        <button className="btn red big" style={{ height: 22, padding: '0 18px', opacity: 0 }} onMouseEnter={() => uiSound(audio, 'hover')} onClick={press(onPlay)}>
+        <button className="btn red big" style={{ height: 22, padding: '0 18px', opacity: 0 }} data-ui="title-play" onMouseEnter={() => uiSound(audio, 'hover')} onClick={press(onPlay)}>
           PLAY
+        </button>
+        <button className="btn" style={{ height: 22, padding: '0 10px', opacity: 0 }} data-ui="title-sign-in" onMouseEnter={() => uiSound(audio, 'hover')} onClick={press(onSignIn)}>
+          SIGN IN
         </button>
         <button className="btn" style={{ height: 22, padding: '0 10px', opacity: 0 }} data-ui="title-mint" onMouseEnter={() => uiSound(audio, 'hover')} onClick={press(onMint)}>
           MINT

@@ -8,6 +8,7 @@ import { NearAiClient } from './ai/nearai';
 import type { InferenceProvider } from './ai/provider';
 import { ServClient } from './ai/serv';
 import { InferenceBudget, priceOf, type Pricing } from './agents/brain';
+import { createGuestAuth } from './auth/guest';
 import { createPrivyVerifier } from './auth/privy';
 import { createSessionSigner } from './auth/session';
 import { BUILD } from './build-info';
@@ -99,6 +100,7 @@ const server = createGameServer({
   privyAppId: config.privyAppId,
   devLogin: config.devLogin,
   demoSession: config.demoSession,
+  guest: config.guestLimits ? { auth: createGuestAuth(config.sessionSecret), limits: config.guestLimits } : undefined,
   clientDist: config.clientDist,
   settlementMode: chain.mode,
   dbKind: db.kind,
@@ -110,6 +112,7 @@ const tick = setInterval(() => {
   game.tick().catch((err: unknown) => log(`[day] tick failed: ${err instanceof Error ? err.stack : String(err)}`));
 }, 1000);
 
+log(config.guestLimits ? `[guest] guest play is on: at most ${config.guestLimits.perIpPerDay} new guest farms per address a day and ${config.guestLimits.perHour} an hour; idle guest farms go bust after 7 days` : '[guest] guest play is off (a guest limit is 0)');
 if (config.demoSession) log('[demo] the demo session is ON (DEMO_MODE=1 on a local, non-production server): /?demo=new or /?demo=<farm name> signs straight in');
 const listening = (): void => log(`[http] listening on http://${config.host ?? 'localhost'}:${config.port} (day ${game.getClock().day})`);
 if (config.host) server.listen(config.port, config.host, listening);

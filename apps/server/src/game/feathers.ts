@@ -116,8 +116,12 @@ export interface FeatherCount {
 }
 
 export async function featherCount(q: Queryable, chainMinted: number | null): Promise<FeatherCount> {
+  // a held ticket on a bust farm (an idle guest farm, or the farm a player chose not to keep) can never
+  // be redeemed: it stays in the farm's records but holds no Feather back
   const [r] = await q.query(
-    `SELECT count(*) FILTER (WHERE status IN ('held', 'queued')) AS out, count(*) FILTER (WHERE status = 'minted' AND left(COALESCE(token_id, ''), 5) <> 'test-') AS minted FROM feather_tickets`,
+    `SELECT count(*) FILTER (WHERE t.status = 'queued' OR (t.status = 'held' AND f.bust_day IS NULL)) AS out,
+            count(*) FILTER (WHERE t.status = 'minted' AND left(COALESCE(t.token_id, ''), 5) <> 'test-') AS minted
+     FROM feather_tickets t LEFT JOIN farms f ON f.id = t.farm_id`,
   );
   const minted = Math.max(chainMinted ?? 0, num(r?.minted));
   const tickets = num(r?.out);

@@ -4,12 +4,14 @@
 // short wait (the next ones can be made to fail, as NEAR refusing them would). A named farm can be
 // given every machine, a handful of Feather tickets and a wallet, so every screen has content to page;
 // the Market can be given eggs to sell, a buyer's order, another player's offer and auction hens;
-// and a farm can be given a badge, so its player sees the unlock moment.
+// and a farm can be given a badge, so its player sees the unlock moment. Guest play is on (PLAY starts
+// a guest farm on a cookie), and a farm can win a Feather ticket as a milestone roll would give it.
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
-import type { EggGrade } from '@coys/shared';
+import { ECONOMY, type EggGrade } from '@coys/shared';
 import { InferenceBudget } from '../apps/server/src/agents/brain';
 import { ProviderChain } from '../apps/server/src/ai/chain';
+import { createGuestAuth } from '../apps/server/src/auth/guest';
 import { createSessionSigner } from '../apps/server/src/auth/session';
 import { NoopChain, type ChainWriter, type MintResult } from '../apps/server/src/chain/chain';
 import { openDb } from '../apps/server/src/db/db';
@@ -62,6 +64,10 @@ export interface TestServer {
   trader(name: string, grade: EggGrade, qty: number, share: number): Promise<{ name: string; orderId: string }>;
   /** Gives the named farm a badge at a level now: its player hears it at once (the unlock moment). */
   badge(name: string, badge: string, level: 'bronze' | 'silver' | 'gold' | 'plain'): Promise<void>;
+  /** The named farm wins a Feather ticket at a milestone, as a day close's roll would give it: its player hears the roll at once. */
+  ticketWon(name: string): Promise<void>;
+  /** The named farm's eggs in the crate and its coins (milli), as the server holds them. */
+  farmNow(name: string): Promise<{ crate: number; cashMilli: number; guest: boolean }>;
   close(): Promise<void>;
 }
 
@@ -110,6 +116,7 @@ export async function startTestServer(): Promise<TestServer> {
     privy: null,
     privyAppId: null,
     devLogin: true,
+    guest: { auth: createGuestAuth('browser-checks-only'), limits: { perIpPerDay: 1000, perHour: 1000 } },
     clientDist: fileURLToPath(new URL('../apps/client/dist', import.meta.url)),
     settlementMode: 'noop',
     dbKind: db.kind,
@@ -230,6 +237,26 @@ export async function startTestServer(): Promise<TestServer> {
       const [farm] = await db.query<{ id: string }>('SELECT id FROM farms WHERE name LIKE $1 LIMIT 1', [`${name}%`]);
       if (!farm) throw new Error(`no farm named ${name}`);
       await game.withCtx((ctx) => grantBadge(ctx, farm.id, badge, level));
+    },
+    async farmNow(name) {
+      const [f] = await db.query(
+        `SELECT f.crate_white + f.crate_cream + f.crate_brown + f.crate_golden AS crate, f.cash_milli, p.auth_provider FROM farms f JOIN players p ON p.id = f.player_id WHERE f.name LIKE $1 LIMIT 1`,
+        [`${name}%`],
+      );
+      if (!f) throw new Error(`no farm named ${name}`);
+      return { crate: Number(f.crate), cashMilli: Number(f.cash_milli), guest: f.auth_provider === 'guest' };
+    },
+    async ticketWon(name) {
+      const farm = await farmNamed(name);
+      await game.withCtx(async (ctx) => {
+        const ticketId = `${farm.id}-won-${ctx.day}`;
+        await ctx.q.query("INSERT INTO feather_tickets (id, farm_id, milestone, season, day, created_at) VALUES ($1, $2, 'full-coop', 'checks', $3, 0)", [ticketId, farm.id, ctx.day]);
+        ctx.touched.add(farm.id);
+        ctx.out.push({
+          playerId: farm.player_id,
+          msg: { t: 'event', event: { kind: 'milestoneRoll', milestone: 'full-coop', won: true, ticketId, next: 'eggs-sold', left: ECONOMY.feathers.maxSupply - 1, roll: 0.01, odds: ECONOMY.feathers.odds } },
+        });
+      });
     },
     async close() {
       clearInterval(timer);

@@ -14,7 +14,7 @@ import { motion } from '../motion/ui';
 import type { Action } from '../net/socket';
 import { useStore } from '../state/store';
 import { openModal, uiEvents, type MarketTab } from '../state/ui';
-import { AiBadge } from './AiBadge';
+import { AiBadge, GuestTag } from './AiBadge';
 import { BadgeRow } from './Badge';
 import { LOOK } from './cast';
 import { toasts, uiFx } from './FxLayer';
@@ -704,6 +704,7 @@ function FarmsTab({ farm, market, wide, side }: TabProps) {
       <span style={{ flex: 1, minWidth: 0, lineHeight: '9px', color: r.name === farm.name ? '#2f6f9e' : undefined }}>
         {i + 1}. {r.name.toUpperCase()}
         {r.kind !== 'player' && <AiBadge />}
+        {r.guest && <GuestTag />}
         {r.name === farm.name ? ' (YOU)' : ''}
       </span>
       <BadgeRow badges={r.badges} max={3} />

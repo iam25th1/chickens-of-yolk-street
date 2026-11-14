@@ -8,9 +8,11 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { z } from 'zod';
 import { PROTOCOL_VERSION, parseClientMessage, type ServerMessage } from '@coys/shared';
 import { BUILD } from '../build-info';
+import { GUEST_COOKIE, GUEST_COOKIE_TTL_MS, guestCookie, readCookie, type GuestAuth } from '../auth/guest';
 import type { PrivyVerifier } from '../auth/privy';
 import type { SessionSigner } from '../auth/session';
 import type { ActionResult, AiStatus, Game } from '../game/game';
+import type { GuestLimits } from '../game/guests';
 import { RateLimiter } from './ratelimit';
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -37,6 +39,8 @@ export interface GameServerOptions {
   devLogin: boolean;
   /** POST /api/login/demo: only on a local, non-production server with DEMO_MODE=1 (env.ts demoSessionAllowed). */
   demoSession?: boolean;
+  /** Guest play (POST /api/login/guest): the guest cookie's signer, the address hash, and the limits. Off when unset. */
+  guest?: { auth: GuestAuth; limits: GuestLimits };
   clientDist: string | null;
   settlementMode: string;
   dbKind: string;
@@ -77,14 +81,19 @@ const displayName = z
   .string()
   .max(40)
   .transform((s) => s.replace(/[^\p{L}\p{N} '-]/gu, '').trim().slice(0, 20) || 'Farmer');
-const devLoginBody = z.object({ name: displayName.optional(), deviceId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/) }).strict();
+const devLoginBody = z.object({ name: displayName.optional(), deviceId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/), keep: z.enum(['guest', 'account']).optional() }).strict();
+/** The hello a guest sends: its session is the guest cookie, which the page cannot read. */
+export const GUEST_HELLO = 'guest';
 /** The demo session: a new farm (which gets a generated name and asks for one), or an existing farm by its name. */
 const demoLoginBody = z.object({ farm: z.string().min(1).max(40) }).strict();
 // An email sign-in never names the farm: `name` is accepted from older clients and ignored. The
 // email-name guard is the SHA-256 of the email name's letters and digits, and their count.
+// `keep`: signing in from a guest session when the account already has a farm, the farm to keep
+const keepFarm = z.enum(['guest', 'account']).optional();
 const privyLoginBody = z
   .object({
     accessToken: z.string().min(20).max(4096),
+    keep: keepFarm,
     name: displayName.optional(),
     nameGuard: z.object({ sha256: z.string().regex(/^[0-9a-f]{64}$/), len: z.number().int().min(3).max(64) }).strict().optional(),
   })
@@ -110,9 +119,39 @@ export function createGameServer(opts: GameServerOptions): Server {
     }
   });
 
-  const json = (res: ServerResponse, status: number, body: unknown): void => {
-    res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+  const json = (res: ServerResponse, status: number, body: unknown, cookie?: string): void => {
+    res.writeHead(status, {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff',
+      ...(cookie ? { 'set-cookie': cookie } : {}),
+    });
     res.end(JSON.stringify(body));
+  };
+
+  /** The guest player id in the request's guest cookie, when its signature and expiry check out. */
+  const guestOf = (req: IncomingMessage): string | null => {
+    if (!opts.guest) return null;
+    const token = readCookie(req.headers.cookie, GUEST_COOKIE);
+    return token ? opts.guest.auth.signer.verify(token) : null;
+  };
+
+  /**
+   * Signing in with a guest cookie: the guest farm moves to the account (or the player is asked
+   * which farm to keep). Answers the request itself and returns true, or false for the usual sign-in.
+   * The guest cookie ends either way once a sign-in goes through.
+   */
+  const claimGuest = async (req: IncomingMessage, res: ServerResponse, provider: 'privy' | 'dev', subject: string, guard: { sha256: string; len: number } | null, keep: 'guest' | 'account' | null): Promise<boolean> => {
+    const guestId = guestOf(req);
+    if (!guestId) return false;
+    const claim = await game.claimGuest(guestId, provider, subject, guard, keep);
+    if (!claim) return false;
+    if (claim.status === 'choose') {
+      json(res, 409, { error: 'choose', choose: { guest: claim.guest, account: claim.account } });
+      return true;
+    }
+    json(res, 200, { session: sessions.sign(claim.playerId), playerId: claim.playerId, name: claim.name, carried: claim.kept === 'guest' }, guestCookie(null));
+    return true;
   };
 
   const readBody = (req: IncomingMessage): Promise<unknown> =>
@@ -162,8 +201,9 @@ export function createGameServer(opts: GameServerOptions): Server {
     };
   };
 
-  const issue = (res: ServerResponse, who: { playerId: string; name: string }): void =>
-    json(res, 200, { session: sessions.sign(who.playerId), playerId: who.playerId, name: who.name });
+  /** A signed-in session; a guest cookie still in the request (its farm gone) ends with it. */
+  const issue = (res: ServerResponse, who: { playerId: string; name: string }, req?: IncomingMessage): void =>
+    json(res, 200, { session: sessions.sign(who.playerId), playerId: who.playerId, name: who.name }, req && readCookie(req.headers.cookie, GUEST_COOKIE) ? guestCookie(null) : undefined);
 
   const serveStatic = (req: IncomingMessage, res: ServerResponse, path: string): boolean => {
     // normalised, so the containment check below holds for any spelling of the path
@@ -213,7 +253,7 @@ export function createGameServer(opts: GameServerOptions): Server {
           return json(res, report.ok ? 200 : 503, report);
         }
         if (req.method === 'GET' && url.pathname === '/api/config') {
-          return json(res, 200, { protocol: PROTOCOL_VERSION, privyAppId: opts.privyAppId, devLogin: opts.devLogin, demoSession: opts.demoSession === true });
+          return json(res, 200, { protocol: PROTOCOL_VERSION, privyAppId: opts.privyAppId, devLogin: opts.devLogin, demoSession: opts.demoSession === true, guestPlay: Boolean(opts.guest) });
         }
         if (req.method === 'GET' && url.pathname === '/api/feathers') {
           return json(res, 200, await game.getMintPage());
@@ -232,9 +272,10 @@ export function createGameServer(opts: GameServerOptions): Server {
           if (!loginLimiter.take(ip)) return json(res, 429, { error: 'rate_limited' });
           const body = devLoginBody.safeParse(await readBody(req));
           if (!body.success) return json(res, 400, { error: 'bad_request' });
+          if (await claimGuest(req, res, 'dev', body.data.deviceId, null, body.data.keep ?? null)) return;
           const who = await game.ensurePlayer('dev', body.data.deviceId, body.data.name ?? null);
           if (who.created) log(`[login] dev player ${who.playerId} joined`);
-          return issue(res, who);
+          return issue(res, who, req);
         }
         if (req.method === 'POST' && url.pathname === '/api/login/demo') {
           // a local recording only: off unless the server allows it, and only from this machine
@@ -263,9 +304,21 @@ export function createGameServer(opts: GameServerOptions): Server {
           } catch {
             return json(res, 401, { error: 'unauthenticated' });
           }
+          if (await claimGuest(req, res, 'privy', did, body.data.nameGuard ?? null, body.data.keep ?? null)) return;
           const who = await game.ensurePlayer('privy', did, null, body.data.nameGuard ?? null);
           if (who.created) log(`[login] privy player ${who.playerId} joined`);
-          return issue(res, who);
+          return issue(res, who, req);
+        }
+        if (req.method === 'POST' && url.pathname === '/api/login/guest') {
+          // PLAY with no sign-in: the visitor's guest farm (from its cookie), or a new one within the limits
+          if (!opts.guest) return json(res, 403, { error: 'guest play is off' });
+          if (!loginLimiter.take(ip)) return json(res, 429, { error: 'rate_limited' });
+          const known = guestOf(req);
+          const farm = known ? await game.guestFarm(known) : null;
+          if (farm) return json(res, 200, { guest: true, name: farm.name }, guestCookie(opts.guest.auth.signer.sign(farm.playerId, GUEST_COOKIE_TTL_MS)));
+          const started = await game.startGuest(opts.guest.auth.ipHash(ip), opts.guest.limits);
+          if (!started.ok) return json(res, 429, { error: 'guest_limit', limit: started.limit });
+          return json(res, 200, { guest: true, name: started.name }, guestCookie(opts.guest.auth.signer.sign(started.playerId, GUEST_COOKIE_TTL_MS)));
         }
         if (url.pathname.startsWith('/api/')) return json(res, 404, { error: 'not_found' });
         if (serveStatic(req, res, url.pathname)) return;
@@ -286,8 +339,10 @@ export function createGameServer(opts: GameServerOptions): Server {
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   });
 
-  wss.on('connection', (ws: WebSocket & { alive?: boolean }) => {
+  wss.on('connection', (ws: WebSocket & { alive?: boolean }, req: IncomingMessage) => {
     let playerId: string | null = null;
+    // a guest's session is its cookie, sent with the websocket's upgrade request
+    const guestId = guestOf(req);
     let strikes = 0;
     ws.alive = true;
     ws.on('pong', () => {
@@ -315,7 +370,7 @@ export function createGameServer(opts: GameServerOptions): Server {
         const msg = parsed.msg;
         if (msg.t === 'ping') return send(ws, { t: 'pong', n: msg.n, serverNow: Date.now() });
         if (msg.t === 'hello') {
-          const id = sessions.verify(msg.session);
+          const id = msg.session === GUEST_HELLO ? guestId : sessions.verify(msg.session);
           const info = id ? await game.playerInfo(id) : null;
           if (!id || !info) {
             send(ws, { t: 'error', code: 'unauthenticated', message: 'session expired, log in again' });
@@ -325,6 +380,7 @@ export function createGameServer(opts: GameServerOptions): Server {
           if (previous && previous !== ws) previous.close(4000, 'replaced by a newer connection');
           playerId = id;
           connections.set(id, ws);
+          await game.touch(id);
           return send(ws, {
             t: 'welcome',
             v: PROTOCOL_VERSION,

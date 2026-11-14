@@ -327,6 +327,7 @@ export function SettingsBody({
   farm,
   onRename,
   onProfile,
+  onSave,
 }: {
   onClose: () => void;
   onGuide?: () => void;
@@ -334,6 +335,8 @@ export function SettingsBody({
   onRename?: () => void;
   /** The farm's name opens its profile. */
   onProfile?: () => void;
+  /** A guest farm: sign in to save it. */
+  onSave?: () => void;
 }) {
   const { audio } = useServices();
   const s = useStore(settings, (v) => v);
@@ -373,6 +376,22 @@ export function SettingsBody({
             }}
           >
             {farm.renameFromDay !== null ? `RENAME FROM DAY ${farm.renameFromDay}` : 'RENAME'}
+          </button>
+        </div>
+      )}
+      {farm?.guest && onSave && (
+        <div className="row spread" style={{ gap: 6 }} data-ui="save-farm-setting">
+          <span style={{ minWidth: 0, lineHeight: '9px' }}>A GUEST FARM. SIGN IN TO KEEP IT AND MINT FEATHERS.</span>
+          <button
+            className="btn red"
+            data-ui="save-farm-settings"
+            style={{ flex: 'none' }}
+            onClick={() => {
+              uiSound(audio, 'click');
+              onSave();
+            }}
+          >
+            SAVE THIS FARM
           </button>
         </div>
       )}

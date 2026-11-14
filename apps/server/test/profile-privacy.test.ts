@@ -22,7 +22,7 @@ const PLAYERS = [
 const local = (email: string) => email.split('@')[0] as string;
 
 /** Every field a public profile may hold; anything else is a leak. */
-const PUBLIC_FIELDS = ['badgeCount', 'badges', 'bust', 'daysOnStreet', 'eggsSold', 'farmId', 'farms', 'hagglesWon', 'hens', 'kind', 'name', 'rank', 'rivalsOutlasted'];
+const PUBLIC_FIELDS = ['badgeCount', 'badges', 'bust', 'daysOnStreet', 'eggsSold', 'farmId', 'farms', 'guest', 'hagglesWon', 'hens', 'kind', 'name', 'rank', 'rivalsOutlasted'];
 
 let t: TestGame;
 let server: Server;

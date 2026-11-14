@@ -79,7 +79,7 @@ describe('no scrollbars and nothing cut off', () => {
           await check('title settings');
           await page.keyboard.press('Escape');
         }
-        await page.getByText('PLAY', { exact: true }).click({ force: true });
+        await page.locator('[data-ui="title-sign-in"]').click({ force: true });
         const field = page.getByPlaceholder('FARMER NAME');
         await field.waitFor({ timeout: 15_000 });
         const name = `Ada Check ${size}`;

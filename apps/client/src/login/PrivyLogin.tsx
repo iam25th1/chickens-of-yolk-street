@@ -6,7 +6,7 @@
 import { PrivyProvider, useLogin, usePrivy } from '@privy-io/react-auth';
 import { useCreateWallet } from '@privy-io/react-auth/extended-chains';
 import { useEffect, useRef } from 'react';
-import { api, nameGuardFor } from '../net/api';
+import { api, nameGuardFor, type ChooseFarm, type LoginResult } from '../net/api';
 import { rememberEmailName } from '../state/emailName';
 import type { SignedIn } from '../screens/LoginScreen';
 
@@ -14,9 +14,11 @@ interface Props {
   appId: string;
   onSignedIn: (s: SignedIn) => void;
   onError: (message: string) => void;
+  /** Signing in from a guest session to an account that has a farm: the player picks one, then finish(keep). */
+  onChoose: (choose: ChooseFarm['choose'], finish: (keep: 'guest' | 'account') => Promise<void>) => void;
 }
 
-function Inner({ onSignedIn, onError }: Omit<Props, 'appId'>) {
+function Inner({ onSignedIn, onError, onChoose }: Omit<Props, 'appId'>) {
   const { ready, authenticated, user, getAccessToken } = usePrivy();
   const { login } = useLogin();
   const { createWallet } = useCreateWallet();
@@ -32,24 +34,37 @@ function Inner({ onSignedIn, onError }: Omit<Props, 'appId'>) {
         const emailName = user.email?.address?.split('@')[0] ?? '';
         // kept in memory for this visit only, so the naming screen can warn before the server refuses
         rememberEmailName(emailName);
-        const session = await api.loginPrivy(token, await nameGuardFor(emailName));
-        // A user may have other chains linked; pick the NEAR wallet explicitly, create it if missing.
-        const existing = user.linkedAccounts.find((a) => a.type === 'wallet' && 'chainType' in a && a.chainType === 'near');
-        let accountId = existing && 'address' in existing ? existing.address : null;
-        if (!accountId) {
-          try {
-            accountId = (await createWallet({ chainType: 'near' })).wallet.address;
-          } catch {
-            accountId = null; // the farm works without it; linking retries next sign-in
+        const guard = await nameGuardFor(emailName);
+        const finish = async (session: LoginResult) => {
+          // A user may have other chains linked; pick the NEAR wallet explicitly, create it if missing.
+          const existing = user.linkedAccounts.find((a) => a.type === 'wallet' && 'chainType' in a && a.chainType === 'near');
+          let accountId = existing && 'address' in existing ? existing.address : null;
+          if (!accountId) {
+            try {
+              accountId = (await createWallet({ chainType: 'near' })).wallet.address;
+            } catch {
+              accountId = null; // the farm works without it; linking retries next sign-in
+            }
           }
+          onSignedIn({ login: session, accountId });
+        };
+        const first = await api.loginPrivy(token, guard);
+        if ('choose' in first) {
+          // a guest farm and an account farm: the player keeps one (the guest cookie is still there)
+          onChoose(first.choose, async (keep) => {
+            const again = await api.loginPrivy((await getAccessToken()) ?? token, guard, keep);
+            if ('choose' in again) throw new Error('Could not sign in');
+            await finish(again);
+          });
+          return;
         }
-        onSignedIn({ login: session, accountId });
+        await finish(first);
       } catch (e) {
         started.current = false;
         onError(e instanceof Error ? e.message : 'Could not sign in');
       }
     })();
-  }, [ready, authenticated, user, getAccessToken, createWallet, onSignedIn, onError]);
+  }, [ready, authenticated, user, getAccessToken, createWallet, onSignedIn, onError, onChoose]);
 
   return (
     <button className="btn red" disabled={!ready} onClick={() => login({ loginMethods: ['email'] })}>
