@@ -149,7 +149,7 @@ export const TOUR: TourStep[] = [
     title: 'THE FEATHER MINT (BETA)',
     hen: true,
     text: (c) =>
-      `MILESTONES WIN FEATHER TICKETS. MINT ONE HERE FOR A FEATHER WITH A RANDOM NUMBER, A CLAIM ON ONE OF ${c.market.feathers.max} FOUNDING HENS (PLANNED). OPEN THE MINT.`,
+      `MILESTONES WIN FEATHER TICKETS. MINT ONE HERE FOR A FEATHER WITH A RANDOM NUMBER, A CLAIM ON ONE OF ${c.market.feathers.max} FOUNDING HENS (PLANNED).${c.farm.guest ? ' A GUEST SIGNS IN TO MINT.' : ''} OPEN THE MINT.`,
     target: (c) => (c.modal?.kind === 'feathers' ? { dom: 'mint-tickets', tag: 'YOUR TICKETS' } : c.modal ? close : { dom: 'feathers', tag: 'MINT' }),
     done: (s) => opened(s, 'feathers'),
   },

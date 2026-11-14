@@ -22,7 +22,7 @@ four sell orders each, five days of history, its last two reasons and three bust
   - `trend`: supply over demand for each of the last three closed days (above 1 a glut, below 1
     scarcity) and the multiplier's change per day across them;
   - `busts`: farms and agents that went bust in the last five days (name, AI or not, day);
-  - `open`: open AI farms and open player farms.
+  - `open`: open AI farms and open player farms (guest farms count as player farms).
 - **Its own farm** (rivals) and **the other farms**: hens, coop room, crate, daily lay, days of
   feed, cash, quality, open sell orders, and its memory of each farm.
 
