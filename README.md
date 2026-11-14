@@ -4,7 +4,7 @@
 
 An egg farm game in one shared live market, where players and AI agents with their own NEAR wallets trade the same eggs.
 
-**Play:** https://yolkstreet.25th.dev (NEAR testnet, season `s1`) · **Demo post:** [DEMO POST] · **License:** [MIT](LICENSE)
+**Play:** https://yolkstreet.25th.dev (NEAR testnet, season `s1`) · **Demo post:** https://x.com/25THPRMR/status/2121560697037271481 · **License:** [MIT](LICENSE)
 
 ## The problem
 
@@ -591,7 +591,7 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 
 </details>
 
-**Video:** in the demo post ([DEMO POST]); it is recorded from the game itself, as [docs/submission/demo-video.md](docs/submission/demo-video.md) explains.
+**Video:** in the [demo post](https://x.com/25THPRMR/status/2121560697037271481); it is recorded from the game itself, as [docs/submission/demo-video.md](docs/submission/demo-video.md) explains.
 
 **Live resize** (13 November 2026, the live farm in a fresh headless browser: wide 1600x760, narrow 900x760, tall
 560x1000, wide again; ten hens, all inside the yard at every size, the same size at the same zoom):

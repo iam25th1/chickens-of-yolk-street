@@ -16,7 +16,7 @@ in by 25TH on the form itself; no personal data is written here.
 | `tracks` | `["games", "agents", "nfts"]` | |
 | `nearAddress` | _blank_ | the NEAR **mainnet** payout account, created by 25TH only; the game never touches mainnet |
 | `projectUrl` | https://github.com/iam25th1/chickens-of-yolk-street | the repo must be made public before submitting |
-| `demoUrl` | _blank_ | the X post with the demo video ([x-post.md](x-post.md)) |
+| `demoUrl` | https://x.com/25THPRMR/status/2121560697037271481 | the X post with the demo video ([x-post.md](x-post.md)) |
 | `idea` | see below (1,800 characters; the form takes 20 to 2000) | |
 | `consent` | `false` until 25TH agrees | set to true only after 25TH agrees to: "I agree that the organizers may use these details to review our submission and contact us about this hackathon." |
 | `website` | **leave empty** | a spam trap: any value gets the submission dropped |
