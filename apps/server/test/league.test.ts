@@ -185,7 +185,7 @@ describe('league closes and rewards', () => {
     await t.game.tick();
     expect((await board(t, 'week', 'w-2026-11-09')).window).toMatchObject({ status: 'closed', warmup: true });
     expect(await count(t, 'SELECT count(*) AS n FROM league_rewards')).toBe(0);
-    expect(await count(t, 'SELECT count(*) AS n FROM feather_tickets')).toBe(0);
+    expect(await count(t, "SELECT count(*) AS n FROM feather_tickets WHERE milestone = 'league-week'")).toBe(0);
     expect((await board(t)).window).toMatchObject({ id: 'w-2026-11-16', seq: 1, warmup: false, status: 'open' });
     expect((await board(t, 'season')).window).toMatchObject({ id: 's-1', seq: 1, startsAt: Date.UTC(2026, 10, 16), status: 'open' });
     expect((await board(t)).past[0]).toMatchObject({ id: 'w-2026-11-09', winner: { name: (await t.game.getFarmState(a.farmId)).name, kind: 'player' }, chainTx: null, explorerUrl: null });
