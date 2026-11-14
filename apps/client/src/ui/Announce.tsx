@@ -3,7 +3,9 @@
 // title and one short line, the badge (or the ticket) at its small size. They never block input: only
 // the toast itself takes a tap, which opens the profile on the badges (or the mint) tab. One at a
 // time, each about 3.5 s (the clock stops while the pointer is on it), sliding in and settling with
-// anime.js; while a full page covers the corner they wait.
+// anime.js. News (text toasts) goes first, but an announcement that has waited ANNOUNCE_WAIT_MS takes
+// the corner next; news waits meanwhile, its time on screen kept (ui/FxLayer.tsx counts it only while
+// drawn). While a full page covers the corner, they wait.
 import { useEffect, useRef, useState } from 'react';
 import { BADGE_BY_ID, ECONOMY, type BadgeLevel, type MilestoneId } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
@@ -39,15 +41,18 @@ export const MILESTONE_SHORT: Record<MilestoneId, string> = {
   'top-three': `A TOP ${ECONOMY.feathers.topRank} FARM`,
 };
 
-/** The queue: the one showing first. */
-export const announcements = createStore<{ queue: Announcement[] }>({ queue: [] });
+/** The queue (the one showing first), and since when its head has been first in line (ms). */
+export const announcements = createStore<{ queue: Announcement[]; since: number }>({ queue: [], since: 0 });
 let seq = 0;
 
+/** News goes first, but an announcement first in line this long takes the corner next. */
+export const ANNOUNCE_WAIT_MS = 3000;
+
 export function announce(a: Omit<Announcement, 'key'>): void {
-  announcements.set((s) => ({ queue: [...s.queue, { ...a, key: ++seq }] }));
+  announcements.set((s) => ({ queue: [...s.queue, { ...a, key: ++seq }], since: s.queue.length ? s.since : Date.now() }));
 }
 
-const done = (key: number) => announcements.set((s) => ({ queue: s.queue.filter((a) => a.key !== key) }));
+const done = (key: number) => announcements.set((s) => ({ queue: s.queue.filter((a) => a.key !== key), since: Date.now() }));
 
 /** Badges earned and milestone rolls become announcements (the farm screen listens while it is open). */
 export function listenForAnnouncements(): () => void {
@@ -76,7 +81,7 @@ export function AnnounceToast({ a }: { a: Announcement }) {
 
   // in: a short slide from the left that settles (nothing flashy), and a quiet chime
   useEffect(() => {
-    if (el.current) animate(el.current, { translateX: [-14, 0], opacity: [0, 1], duration: 260, ease: 'outBack(1.2)' });
+    if (el.current) animate(el.current, { translateY: [6, 0], opacity: [0, 1], duration: 260, ease: 'outBack(1.2)' });
     audio.play(a.kind === 'badge' ? '18-stamp' : '17-card', { volume: 0.35 });
   }, [a.key, audio, a.kind]);
 
@@ -87,7 +92,7 @@ export function AnnounceToast({ a }: { a: Announcement }) {
     const t = setTimeout(() => {
       const node = el.current;
       if (!node) return done(a.key);
-      animate(node, { translateX: [0, -10], opacity: [1, 0], duration: 200, ease: 'inQuad', onComplete: () => setTimeout(() => done(a.key), GAP_MS) });
+      animate(node, { translateY: [0, 6], opacity: [1, 0], duration: 200, ease: 'inQuad', onComplete: () => setTimeout(() => done(a.key), GAP_MS) });
     }, left.current);
     return () => {
       clearTimeout(t);

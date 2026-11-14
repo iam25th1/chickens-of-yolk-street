@@ -9,8 +9,8 @@ import type { Rect } from '../app/viewport';
 import type { Action } from '../net/socket';
 import { dayElapsed, events } from '../state/game';
 import { useStore } from '../state/store';
-import { AnnounceToast, announcements } from './Announce';
-import { toasts, uiFx } from './FxLayer';
+import { ANNOUNCE_WAIT_MS, AnnounceToast, announcements } from './Announce';
+import { drawnToasts, toasts, uiFx } from './FxLayer';
 import { groundEggs } from './Hud';
 
 export const GOAL_TEXT: Record<GoalId, string> = {
@@ -45,9 +45,14 @@ export function hint(farm: FarmState): string | null {
 /** Hints and news, newest nearest the tracker: whole messages (wrapped, never cut), as many as fit. */
 export function ToastArea({ farm, rect, offline = false, covered = false }: { farm: FarmState; rect: Rect; offline?: boolean; covered?: boolean }) {
   const list = useStore(toasts, (s) => s.list);
-  // a badge or milestone announcement takes the corner first (it waits while a full page covers it)
+  // a badge or milestone announcement takes the corner when no news waits, or once it has waited
+  // ANNOUNCE_WAIT_MS (news first, but neither starves); it waits while a full page covers the corner
   const showing = useStore(announcements, (s) => s.queue[0] ?? null);
-  const now = covered ? null : showing;
+  const since = useStore(announcements, (s) => s.since);
+  const [shownKey, setShownKey] = useState<number | null>(null);
+  const turn = showing !== null && (shownKey === showing.key || list.length === 0 || Date.now() - since >= ANNOUNCE_WAIT_MS);
+  const now = covered || !turn ? null : showing;
+  useEffect(() => setShownKey(now?.key ?? null), [now?.key]);
   const [, tick] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   // hints change with the clock, not only with server updates
@@ -61,6 +66,12 @@ export function ToastArea({ farm, rect, offline = false, covered = false }: { fa
   const [fit, setFit] = useState(lines);
   const room = Math.max(0, Math.min(fit, lines) - (h ? 1 : 0));
   const shown = room ? list.slice(-room) : [];
+  // news counts its time only while it is drawn
+  useEffect(() => {
+    drawnToasts.clear();
+    for (const t of shown) drawnToasts.add(t.id);
+  });
+  useEffect(() => () => drawnToasts.clear(), []);
   // a long message wraps and takes more room: keep only the newest that fit the zone (and try them
   // all again when a message comes or the zone changes)
   const newest = list[list.length - 1]?.id;

@@ -58,7 +58,8 @@ async function drainMoments(page: Page): Promise<void> {
     const n = await page.locator('[data-ui="announce"]').count();
     expect(n).toBeLessThanOrEqual(1);
     if (n === 0) {
-      await page.waitForTimeout(600);
+      // (a toast waits while news is in the corner, which lasts about 4 s)
+      await page.waitForTimeout(4800);
       if (!(await page.locator('[data-ui="announce"]').count())) return;
     }
   }
