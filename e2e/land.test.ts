@@ -51,6 +51,8 @@ describe('land', () => {
     [1280, 720, 1],
     [1920, 1080, 1],
     [390, 844, 3],
+    [360, 640, 2],
+    [768, 1024, 2],
   ] as const)) {
     it(`at ${w}x${h}: buy plots from the LAND tab, see the moment, look round by drag, keys and the map, and come HOME`, async () => {
       const size = `${w}x${h}`;

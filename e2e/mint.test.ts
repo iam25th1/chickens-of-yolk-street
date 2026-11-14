@@ -1,7 +1,7 @@
 // The Feather Mint in a real browser (the built client and the real server, whose mints are a
 // stand-in that answers like NEAR after a short wait; a fresh headless browser each time, nothing
 // kept). /mint opens straight away without signing in, with its parts in order and nothing cut off
-// or scrolled at four window sizes; the title's MINT opens it too. Signed in, MINT plays the minting
+// or scrolled at five window sizes; the title's MINT opens it too. Signed in, MINT plays the minting
 // moment: the press, the card out face down, SENT TO NEAR, then CONFIRMED and the flip. When the
 // mint fails the ticket and the coins come back, and RETRY mints it.
 // SCREENSHOTS=1 saves the mint and the moment at 1920x1080 and 390x844 to docs/screenshots.
@@ -58,6 +58,7 @@ describe('the Feather Mint', () => {
     [390, 844, 3],
     [1280, 720, 1],
     [360, 640, 2],
+    [768, 1024, 2],
   ] as const)) {
     it(`/mint opens without signing in at ${w}x${h}: every part in order, nothing cut off`, async () => {
       const size = `${w}x${h}`;
@@ -107,6 +108,8 @@ describe('the Feather Mint', () => {
   for (const [w, h, dpr] of sizes([
     [1920, 1080, 1],
     [390, 844, 3],
+    [360, 640, 2],
+    [768, 1024, 2],
   ] as const)) {
     it(`at ${w}x${h}, MINT plays the minting moment to a confirmed Feather; a failed mint gives the ticket and coins back, and RETRY mints it`, async () => {
       const size = `${w}x${h}`;

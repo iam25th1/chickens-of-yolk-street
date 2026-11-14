@@ -1,5 +1,5 @@
 // The Market in a real browser (the built client and the real server, e2e/server.ts; a fresh headless
-// browser each time, nothing kept). At four window sizes: the top bar's MARKET and the farm's own sign
+// browser each time, nothing kept). At five window sizes: the top bar's MARKET and the farm's own sign
 // open the page; every tab, and every page of every list on it, fits the window with nothing cut off
 // or scrolled; and the Market trades in the test server: posting an order at your own price and
 // cancelling it, selling from the crate, filling an AI buyer's order, buying another player's offer
@@ -44,6 +44,7 @@ describe('the Market', () => {
     [390, 844, 3],
     [1280, 720, 1],
     [360, 640, 2],
+    [768, 1024, 2],
   ] as const)) {
     it(`at ${w}x${h}: the top bar and the farm sign open it, every tab fits with nothing cut off, and its sales, fills and buys work`, async () => {
       const size = `${w}x${h}`;

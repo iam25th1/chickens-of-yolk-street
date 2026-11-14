@@ -4,7 +4,7 @@
 
 An egg farm game in one shared live market, where players and AI agents with their own NEAR wallets trade the same eggs.
 
-**Play:** https://yolkstreet.25th.dev (NEAR testnet, season `s1`) · **Demo post:** [DEMO POST] · **License:** [MIT](LICENSE)
+**Play:** https://yolkstreet.25th.dev (NEAR testnet, season `s1`) · **Demo post:** https://x.com/25THPRMR/status/2121560697037271481 · **License:** [MIT](LICENSE)
 
 ## The problem
 
@@ -92,7 +92,7 @@ npm run dev        # server on port 8787, client on http://localhost:5173
 Every variable is optional for local play (`.env.example` names them all). Without `PRIVY_APP_ID` a labelled local dev login asks for a name; without `NEAR_TESTNET_ACCOUNT_ID` and `NEAR_TESTNET_PRIVATE_KEY` each settlement is a recorded no-op; without `NEARAI_API_KEY` and `SERV_API_KEY` the agents run on their rule strategies. Production also needs `NODE_ENV=production`, `GAME_SEASON`, `SESSION_SECRET` and a Postgres `DATABASE_URL`; then `npm run build` and `npm start`.
 
 ```sh
-npm run typecheck && npm run lint && npm test   # 481 tests; the Postgres ones need TEST_DATABASE_URL
+npm run typecheck && npm run lint && npm test   # 485 tests; the Postgres ones need TEST_DATABASE_URL
 npm run build && npm run test:e2e               # headless browser checks; CHROME_PATH points at a Chromium
 cd contracts/coys-game && cargo test            # contract unit tests
 ```
@@ -429,7 +429,7 @@ All optional for local play. Copy `.env.example` to `.env` at the repo root. Pro
 | `npm ci --ignore-scripts` | install from the lockfile, no install scripts |
 | `npm run dev` | server (port 8787) and client (Vite, port 5173) |
 | `npm test` | Vitest: economy, agents, haggling, market, chain batch, simulation, WebSocket, packer, pixel passes, hen movement |
-| `npm run test:e2e` | after a build: the naming screen and the tour at four sizes, and every screen, tab, page and tour step in a headless browser at 11 window sizes (`E2E_SIZES` keeps a few: CI runs 1280x720, 1920x1080 and 390x844); fails on anything that scrolls or is cut off (`SCREENSHOTS=1` saves them to `docs/screenshots`) |
+| `npm run test:e2e` | after a build: the naming screen and the tour at five sizes, and every screen, tab, page and tour step in a headless browser at 12 window sizes (`E2E_SIZES` keeps a few: CI runs 1280x720, 1920x1080 and 390x844); fails on anything that scrolls or is cut off (`SCREENSHOTS=1` saves them to `docs/screenshots`) |
 | `npm run typecheck` / `npm run lint` | strict TypeScript; ESLint plus a check that no file holds an em dash |
 | `npm run build` / `npm start` | bundle the server and client; serve both on one port |
 | `npm run deploy-contract -- --wasm <file> --account <id.testnet> [--create] [--migrate]` | deploy a CI-built contract to a testnet account (sha256 checked, mainnet refused; see [deploy/testnet.md](deploy/testnet.md)) |
@@ -486,7 +486,7 @@ This README was checked on 14 November 2026: every transaction and account it li
 [How NEAR fits, per track](#how-near-fits-per-track) answered on testnet, and every view method it names there answered
 on `play.coys-game.testnet` (read-only calls).
 
-On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass. CI is green: the TypeScript job on every push and pull request (with PostgreSQL 16: the Postgres tests, the production build booting against Postgres with `/healthz` checked, and a backup restored into a second database), the browser checks (`layout`: every browser check at 1280x720, 1920x1080 and 390x844; the full sweep at 11 window sizes runs locally before a merge) on pull requests that change more than docs, and the contracts workflow whenever `contracts/` changes (unit tests, `cargo near build`, sandbox tests). The economy sheet tests hit their values exactly; the five-seed simulation meets the economy acceptance; a malformed model answer falls back to rules; a new season settles day 1 after an old season ended at day 3; non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
+On a fresh clone: `npm ci --ignore-scripts`, then typecheck, lint, test and build all pass. CI is green: the TypeScript job on every push and pull request (with PostgreSQL 16: the Postgres tests, the production build booting against Postgres with `/healthz` checked, and a backup restored into a second database), the browser checks (`layout`: every browser check at 1280x720, 1920x1080 and 390x844; the full sweep at 12 window sizes runs locally before a merge) on pull requests that change more than docs, and the contracts workflow whenever `contracts/` changes (unit tests, `cargo near build`, sandbox tests). The economy sheet tests hit their values exactly; the five-seed simulation meets the economy acceptance; a malformed model answer falls back to rules; a new season settles day 1 after an old season ended at day 3; non-game accounts cannot mint or settle; two real WebSocket clients see the same prices and each other's trades; no secrets in the repo or bundle; no file has an em dash.
 
 The live Pier deploy and its tunnel were checked end to end on 11 November 2026 (receipts under [How NEAR fits in](#how-near-fits-in)).
 
@@ -521,7 +521,7 @@ The playability rescue was checked live on 12 November 2026: cold load, the four
 Node 22.22.2 or newer (CI and the deploy docs use 24.22.3). Each step says what to do and what you should see. Commands are the same in PowerShell and a POSIX shell unless shown otherwise.
 
 1. **Install.** Run `npm ci --ignore-scripts`. You see the lockfile install with no package install scripts (`.npmrc` also sets `ignore-scripts=true`).
-2. **Test.** Run `npm test`. You see **481 tests: 479 pass and 2 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it); on a fresh clone without a coys-assets checkout beside the repo, the asset re-pack check skips too (478 and 3). After `npm run build`, `npm run test:e2e` opens every screen in a headless browser at 11 window sizes and checks that nothing scrolls or is cut off (it needs a Chromium: `CHROME_PATH` points at one). Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
+2. **Test.** Run `npm test`. You see **485 tests: 483 pass and 2 skip**: the 2 Postgres tests need `TEST_DATABASE_URL` (CI sets it); on a fresh clone without a coys-assets checkout beside the repo, the asset re-pack check skips too (482 and 3). After `npm run build`, `npm run test:e2e` opens every screen in a headless browser at 12 window sizes and checks that nothing scrolls or is cut off (it needs a Chromium: `CHROME_PATH` points at one). Among them: the economy sheet (margin **0.46**, payback **17.3** days, multiplier **0.54** at 1300 supply against the fixed 600 reference, a 30-hen coop **full on day 16**), the five-seed 30-day market simulation, haggling, model fallbacks, seasons, the chain batch with a contract delivery moving tokens to the Bakery, `/healthz`, two real WebSocket clients in one market, and every frame of every derived animation (no blank frame, no neighbouring row, atlases up to date).
 3. **Play.** Run `npm run dev` and open http://localhost:5173. You see an egg fill up over the loading plate, then the title: the logo stamps in and the price ticker scrolls.
 4. **Sign in.** Press **PLAY**. With `PRIVY_APP_ID` set you sign in with email; without it a red **LOCAL DEV LOGIN** label asks for a name. You see your farm: 10 hens, a starter coop, **50.00** coins, **DAY001**.
 5. **Take the tour.** The first time you enter your farm the tour starts on its own: your hen walks you through the loop by doing it (collect an egg, sell, the market, feed, an offer, a hen, machines, rivals, the ledger). Each step ends when you do the thing; **SKIP** ends it, and it never comes back unless you press **REPLAY THE TOUR** in **SETTINGS**. After it, the goal in the corner shows what to aim for next, with a **CLAIM** button and coins when you reach it. The **?** in the top bar opens **HOW TO PLAY**, the guide to everything.
@@ -591,7 +591,7 @@ Screenshots come from a headless tour of the built game at 1280x720: the real se
 
 </details>
 
-**Video:** in the demo post ([DEMO POST]); it is recorded from the game itself, as [docs/submission/demo-video.md](docs/submission/demo-video.md) explains.
+**Video:** in the [demo post](https://x.com/25THPRMR/status/2121560697037271481); it is recorded from the game itself, as [docs/submission/demo-video.md](docs/submission/demo-video.md) explains.
 
 **Live resize** (13 November 2026, the live farm in a fresh headless browser: wide 1600x760, narrow 900x760, tall
 560x1000, wide again; ten hens, all inside the yard at every size, the same size at the same zoom):
@@ -1281,7 +1281,7 @@ are hidden only as the last safeguard, after the content fits.
 | Side panel | 2 pixels too narrow for the sell card; the desk scrolled | the card fits exactly; the desk is paged |
 | Toasts | long messages cut with an ellipsis | messages wrap; only the newest that fit are shown |
 
-`e2e/no-scroll.test.ts` opens the built game in a fresh headless browser at 11 window sizes (1280x720, 1440x900, 1920x1080, 2560x1440, 390x844 and 360x640, and in between 1024x640, 1180x820 on a 2x screen, 1680x1050, 768x1024 and 412x915) and, at each, checks the title and
+`e2e/no-scroll.test.ts` opens the built game in a fresh headless browser at 12 window sizes (1280x720, 1440x900, 1920x1080, 2560x1440, 390x844 and 360x640, and in between 1024x640, 1180x820 on a 2x screen, 1680x1050, 768x1024, 1024x768 and 412x915) and, at each, checks the title and
 its settings, all 11 tour steps (13 now), the farm, every modal, tab and page (shop, market, ledger, settings, guide, mint page),
 every card the farm's things open and an offer: no element scrolls or clips its content, and the page never scrolls. It
 runs in CI (job `layout`, on the runner's own Chrome). Screenshots of every screen: [docs/screenshots/](docs/screenshots).

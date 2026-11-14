@@ -1,6 +1,6 @@
 # Post drafts for X
 
-Drafts only. Nothing has been posted. Fill the two slots, attach the demo video, and pick one.
+The demo post is up: https://x.com/25THPRMR/status/2121560697037271481. The drafts it was written from are kept below as they were.
 
 ## Draft 1
 

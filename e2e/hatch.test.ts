@@ -117,6 +117,8 @@ describe('new hens hatch', () => {
   for (const [w, h, dpr] of sizes([
     [1280, 720, 1],
     [390, 844, 3],
+    [360, 640, 2],
+    [768, 1024, 2],
   ] as const)) {
     it(`at ${w}x${h}: from the shop's list, at random and from the hen auction, and on a farm bigger than the screen shows`, async () => {
       const size = `${w}x${h}`;
