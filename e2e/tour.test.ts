@@ -154,10 +154,11 @@ describe('the tour', () => {
           if (box.x < 0 || box.y < 0 || box.x + box.w > w + 0.5 || box.y + box.h > h + 0.5) problems.push(`${size} step ${i + 1}: box off screen ${JSON.stringify(box)}`);
           const ring = await rectOf(page, '.spot-ring');
           if (ring && overlap(box, ring)) problems.push(`${size} step ${i + 1}: box over its target`);
-          // on a phone whose farm has no room clear of the target, the box may sit below the farm, over
-          // the side panel's zone (pointing up at it); everywhere else the side panel stays clear
+          // in portrait (a phone, a tablet held upright) whose farm has no room clear of the target, the
+          // box may sit below the farm, over the side panel's zone (pointing up at it); everywhere else
+          // the side panel stays clear
           const tracker = await rectOf(page, '[data-ui="tracker"]');
-          const belowFarm = w < 600 && tracker !== null && box.y >= tracker.y + tracker.h;
+          const belowFarm = h > w && tracker !== null && box.y >= tracker.y + tracker.h;
           for (const [zone, sel] of [
             ['top bar', '[data-ui="topbar"]'],
             ['side panel', '[data-ui="side"]'],
