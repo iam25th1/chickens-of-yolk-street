@@ -675,6 +675,27 @@ ALTER TABLE market_days ADD COLUMN settlement_first integer;
 ALTER TABLE market_days ADD COLUMN settlement_last integer;
 `,
   },
+  {
+    id: 18,
+    name: 'guest play',
+    sql: `
+-- Guests: PLAY starts a farm with no sign-in. A guest player has a random subject and no wallet,
+-- ever; signing in moves its farm to the account. 'retired' holds a farm the player chose not to
+-- keep when both their guest farm and their account had one (a farm always has its own player).
+ALTER TABLE players DROP CONSTRAINT IF EXISTS players_auth_provider_check;
+ALTER TABLE players ADD CONSTRAINT players_auth_provider_check CHECK (auth_provider IN ('privy', 'dev', 'guest', 'retired'));
+-- when the player last connected or acted (real time); an idle guest farm goes bust after 7 days
+ALTER TABLE players ADD COLUMN last_seen_at bigint;
+-- each guest farm started: a keyed hash of the address it came from (never the address) and when,
+-- for the per-address and per-hour limits; rows older than two days are dropped
+CREATE TABLE guest_starts (
+  ip_hash text NOT NULL,
+  started_at bigint NOT NULL
+);
+CREATE INDEX guest_starts_ip ON guest_starts (ip_hash, started_at);
+CREATE INDEX guest_starts_at ON guest_starts (started_at);
+`,
+  },
 ];
 
 /** Key for the Postgres advisory lock that serialises migrations across server instances. */

@@ -13,6 +13,7 @@ export class ActionError extends Error {
       | 'invalid_action'
       | 'not_found'
       | 'farm_bust'
+      | 'sign_in'
       | 'name_length'
       | 'name_characters'
       | 'name_letters'

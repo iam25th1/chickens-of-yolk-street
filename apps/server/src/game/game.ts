@@ -8,6 +8,7 @@ import {
   power,
   type Unlocks,
   FARM_NAME_PROBLEM_TEXT,
+  GUEST_MINT_TEXT,
   RENAME_EVERY_DAYS,
   checkFarmName,
   EGG_GRADES,
@@ -109,6 +110,7 @@ import {
 import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
 import { featherCount, featherSlots, managementScore, milestoneViews, nextMilestone, rarityEstimates, redeemTicket, rollMilestones, standing, ticketViews } from './feathers';
 import { claimGoal, goalViews, markGoal, markToured, toured } from './goals';
+import { afterMove, bustIdleGuests, farmChoice, guestLimitHit, guestSubject, retireFarm, type FarmChoice, type GuestLimits } from './guests';
 import { checkChosenName, nameTaken, renameLegacyFarms, setFarmName, uniqueFarmName } from './names';
 import { conveyorCarry, hopperRefill, loadMachines, logMachine, logSale, machineDay, machineViews, repairMachine, wearMachines, type Machines } from './machines';
 import { pick, randomSeed, seededRng, weighted, type Rng } from './rng';
@@ -386,33 +388,154 @@ export class Game {
         );
         if (found) {
           if (guard && !found.guard) await ctx.q.query('UPDATE players SET name_guard_sha256 = $2, name_guard_len = $3 WHERE id = $1', [found.id, guard.sha256, guard.len]);
+          await this.seen(ctx.q, found.id, true);
           return { playerId: found.id, farmId: found.farm_id, name: String(found.farm_name), created: false };
         }
         const typed = provider === 'dev' && typedName ? checkFarmName(typedName) : null;
         const keep = typed?.ok && !(await nameTaken(ctx.q, typed.name, null)) ? typed.name : null;
         const name = keep ?? (await uniqueFarmName(ctx.q, this.rng));
-        const playerId = newId();
-        await ctx.q.query(
-          'INSERT INTO players (id, auth_provider, auth_subject, display_name, created_at, name_guard_sha256, name_guard_len) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-          [playerId, provider, subject, name, this.now(), guard?.sha256 ?? null, guard?.len ?? null],
-        );
-        const s = ECONOMY.start;
-        const farmId = await this.createFarm(ctx, {
-          ownerKind: 'player',
-          playerId,
-          agentKey: null,
-          name,
-          nameSource: keep ? 'chosen' : 'generated',
-          needsName: !keep,
-          cash: s.cash,
-          hens: s.hens,
-          coops: [s.coop],
-          feed: s.feed,
-        });
-        ctx.marketChanged = true;
+        const playerId = await this.insertPlayer(ctx, provider, subject, name, guard);
+        const farmId = await this.startFarm(ctx, playerId, name, keep ? 'chosen' : 'generated', !keep);
         return { playerId, farmId, name, created: true };
       }),
     );
+  }
+
+  private async insertPlayer(ctx: Ctx, provider: 'privy' | 'dev' | 'guest' | 'retired', subject: string, name: string, guard: { sha256: string; len: number } | null): Promise<string> {
+    const playerId = newId();
+    await ctx.q.query(
+      'INSERT INTO players (id, auth_provider, auth_subject, display_name, created_at, name_guard_sha256, name_guard_len, last_seen_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $5)',
+      [playerId, provider, subject, name, ctx.now, guard?.sha256 ?? null, guard?.len ?? null],
+    );
+    return playerId;
+  }
+
+  /** A new player's farm, with the starting coins, hens, coop and feed. */
+  private async startFarm(ctx: Ctx, playerId: string, name: string, nameSource: 'generated' | 'chosen', needsName: boolean): Promise<string> {
+    const s = ECONOMY.start;
+    const farmId = await this.createFarm(ctx, { ownerKind: 'player', playerId, agentKey: null, name, nameSource, needsName, cash: s.cash, hens: s.hens, coops: [s.coop], feed: s.feed });
+    ctx.marketChanged = true;
+    return farmId;
+  }
+
+  // ---- guests ---------------------------------------------------------------------------------
+
+  /** When each player was last written as seen (real time), so a busy player costs one write a minute. */
+  private readonly seenAt = new Map<string, number>();
+
+  /** Notes that the player is here (connected or acting): an idle guest farm goes bust after GUEST_IDLE_MS. */
+  private async seen(q: Queryable, playerId: string, force = false): Promise<void> {
+    const now = this.now();
+    if (!force && now - (this.seenAt.get(playerId) ?? -Infinity) < 60_000) return;
+    this.seenAt.set(playerId, now);
+    await q.query('UPDATE players SET last_seen_at = $2 WHERE id = $1', [playerId, now]);
+  }
+
+  /** Notes the player is here (the server calls it when a player connects). */
+  async touch(playerId: string): Promise<void> {
+    await this.seen(this.db, playerId, true);
+  }
+
+  /** The guest player's farm, when this id is a guest's and its farm is still open. */
+  async guestFarm(playerId: string): Promise<{ playerId: string; farmId: string; name: string } | null> {
+    const [r] = await this.db.query<{ farm_id: string; name: string }>(
+      `SELECT f.id AS farm_id, f.name FROM players p JOIN farms f ON f.player_id = p.id WHERE p.id = $1 AND p.auth_provider = 'guest' AND f.bust_day IS NULL`,
+      [playerId],
+    );
+    return r ? { playerId, farmId: r.farm_id, name: String(r.name) } : null;
+  }
+
+  /**
+   * Starts a guest farm with a generated name (no naming card: it plays at once), unless a limit is
+   * reached: `ipHash` (a keyed hash of the visitor's address, never the address) may start
+   * limits.perIpPerDay in 24 hours, and the street limits.perHour in an hour.
+   */
+  async startGuest(ipHash: string, limits: GuestLimits): Promise<{ ok: true; playerId: string; farmId: string; name: string } | { ok: false; limit: 'ip' | 'hour' }> {
+    return this.serial(() =>
+      this.inTx(async (ctx) => {
+        const limit = await guestLimitHit(ctx.q, ipHash, ctx.now, limits);
+        if (limit) return { ok: false as const, limit };
+        const name = await uniqueFarmName(ctx.q, this.rng);
+        const playerId = await this.insertPlayer(ctx, 'guest', guestSubject(), name, null);
+        const farmId = await this.startFarm(ctx, playerId, name, 'generated', false);
+        await ctx.q.query('INSERT INTO guest_starts (ip_hash, started_at) VALUES ($1, $2)', [ipHash, ctx.now]);
+        this.log(`[guest] a guest farm started (${farmId})`);
+        return { ok: true as const, playerId, farmId, name };
+      }),
+    );
+  }
+
+  /**
+   * Signing in from a guest session. With no open guest farm: null (the usual sign-in). Otherwise,
+   * in one transaction: an account with no open farm takes the guest farm (every row the farm owns
+   * moves with it, as its rows hang off the farm); an account with an open farm asks the player to
+   * choose (`keep` unset: both farms' summaries come back), then keeps one and retires the other
+   * through the bust flow. The kept farm is offered a free rename, under the email check.
+   */
+  async claimGuest(
+    guestId: string,
+    provider: 'privy' | 'dev',
+    subject: string,
+    guard: { sha256: string; len: number } | null,
+    keep: 'guest' | 'account' | null,
+  ): Promise<
+    | null
+    | { status: 'choose'; guest: FarmChoice; account: FarmChoice }
+    | { status: 'done'; kept: 'guest' | 'account'; playerId: string; farmId: string; name: string; created: boolean }
+  > {
+    return this.serial(() =>
+      this.inTx(async (ctx) => {
+        const [g] = await ctx.q.query<{ farm_id: string }>(
+          `SELECT f.id AS farm_id FROM players p JOIN farms f ON f.player_id = p.id WHERE p.id = $1 AND p.auth_provider = 'guest' AND f.bust_day IS NULL FOR UPDATE OF f`,
+          [guestId],
+        );
+        if (!g) return null;
+        const guestFarm = g.farm_id;
+        const [acct] = await ctx.q.query<{ id: string; farm_id: string | null; bust_day: number | null; guard: string | null }>(
+          `SELECT p.id, f.id AS farm_id, f.bust_day, p.name_guard_sha256 AS guard FROM players p LEFT JOIN farms f ON f.player_id = p.id
+           WHERE p.auth_provider = $1 AND p.auth_subject = $2`,
+          [provider, subject],
+        );
+        const accountFarm = acct?.farm_id && (acct.bust_day === null || acct.bust_day === undefined) ? acct.farm_id : null;
+        if (accountFarm && keep === null) {
+          return { status: 'choose' as const, guest: await farmChoice(ctx.q, guestFarm, ctx.day), account: await farmChoice(ctx.q, accountFarm, ctx.day) };
+        }
+        const [{ name: guestName } = { name: '' }] = await ctx.q.query<{ name: string }>('SELECT name FROM farms WHERE id = $1', [guestFarm]);
+        let playerId = acct?.id ?? null;
+        const created = playerId === null;
+        if (playerId === null) playerId = await this.insertPlayer(ctx, provider, subject, String(guestName), guard);
+        else if (guard && !acct?.guard) await ctx.q.query('UPDATE players SET name_guard_sha256 = $2, name_guard_len = $3 WHERE id = $1', [playerId, guard.sha256, guard.len]);
+        const accountGuard = guard ?? (await this.guardOf(ctx.q, playerId));
+        if (accountFarm && keep === 'account') {
+          // the guest farm is retired where it is (its guest player keeps it); the account's farm plays on
+          await retireFarm(ctx, guestFarm);
+          await this.seen(ctx.q, playerId, true);
+          const [a] = await ctx.q.query<{ name: string }>('SELECT name FROM farms WHERE id = $1', [accountFarm]);
+          this.log(`[guest] a guest signed in and kept their account's farm; the guest farm is retired (${guestFarm})`);
+          return { status: 'done' as const, kept: 'account' as const, playerId, farmId: accountFarm, name: String(a?.name ?? ''), created };
+        }
+        if (acct?.farm_id) {
+          // the account's own farm (open and not chosen, or already bust) moves to a holder of its own
+          // first: a farm always has its player, and one player has one farm
+          const holder = await this.insertPlayer(ctx, 'retired', `retired-${acct.farm_id}`, 'retired', null);
+          await ctx.q.query('UPDATE farms SET player_id = $2 WHERE id = $1', [acct.farm_id, holder]);
+          if (accountFarm) await retireFarm(ctx, accountFarm);
+        }
+        await ctx.q.query('UPDATE farms SET player_id = $2 WHERE id = $1', [guestFarm, playerId]);
+        await afterMove(ctx.q, guestFarm, accountGuard, this.rng);
+        await this.seen(ctx.q, playerId, true);
+        ctx.touched.add(guestFarm);
+        ctx.marketChanged = true;
+        const [moved] = await ctx.q.query<{ name: string }>('SELECT name FROM farms WHERE id = $1', [guestFarm]);
+        this.log(`[guest] a guest farm moved to a signed-in account (${guestFarm})${accountFarm ? `; the account's other farm is retired (${accountFarm})` : ''}`);
+        return { status: 'done' as const, kept: 'guest' as const, playerId, farmId: guestFarm, name: String(moved?.name ?? guestName), created };
+      }),
+    );
+  }
+
+  private async guardOf(q: Queryable, playerId: string): Promise<{ sha256: string; len: number } | null> {
+    const [p] = await q.query('SELECT name_guard_sha256, name_guard_len FROM players WHERE id = $1', [playerId]);
+    return p?.name_guard_sha256 ? { sha256: String(p.name_guard_sha256), len: num(p.name_guard_len) } : null;
   }
 
   async playerInfo(playerId: string): Promise<{ name: string; farmId: string } | null> {
@@ -554,10 +677,10 @@ export class Game {
       goals: await goalViews(q, farmId),
       tourDone: await toured(q, farmId),
       ...(await (async () => {
-        const [n] = await q.query('SELECT needs_name, renamed_day FROM farms WHERE id = $1', [farmId]);
+        const [n] = await q.query('SELECT f.needs_name, f.renamed_day, p.auth_provider FROM farms f LEFT JOIN players p ON p.id = f.player_id WHERE f.id = $1', [farmId]);
         const renamed = n?.renamed_day === null || n?.renamed_day === undefined ? null : num(n.renamed_day);
         const from = renamed === null ? null : renamed + RENAME_EVERY_DAYS;
-        return { needsName: Boolean(n?.needs_name), renameFromDay: from !== null && from > day ? from : null };
+        return { needsName: Boolean(n?.needs_name), renameFromDay: from !== null && from > day ? from : null, guest: n?.auth_provider === 'guest' };
       })()),
       milestones: await milestoneViews(q, farmId),
       standing: await standing(q, farmId, Math.max(1, day - 1)),
@@ -632,9 +755,9 @@ export class Game {
     const brainOf = (a: Record<string, unknown>): AiMode =>
       aiMode !== 'rules' && (a.model_provider === 'nearai' || a.model_provider === 'serv') && num(a.model_day ?? -1e9) >= day - MODE_WINDOW_DAYS && this.brain.chain.usable(a.model_provider) ? a.model_provider : 'rules';
     const ranking = await this.db.query(
-      `SELECT f.id, f.name, f.owner_kind, f.cash_milli, f.bust_day, a.kind AS agent_kind,
+      `SELECT f.id, f.name, f.owner_kind, f.cash_milli, f.bust_day, a.kind AS agent_kind, p.auth_provider,
               (SELECT count(*) FROM hens h WHERE h.farm_id = f.id AND h.status = 'alive') AS hens
-       FROM farms f LEFT JOIN agents a ON a.farm_id = f.id ORDER BY (f.bust_day IS NULL) DESC, f.cash_milli DESC LIMIT 12`,
+       FROM farms f LEFT JOIN agents a ON a.farm_id = f.id LEFT JOIN players p ON p.id = f.player_id ORDER BY (f.bust_day IS NULL) DESC, f.cash_milli DESC LIMIT 12`,
     );
     // each ranked farm's best few badges, for a small row beside its name
     const marks = await earnedBadges(this.db, ranking.map((r) => String(r.id)));
@@ -696,6 +819,7 @@ export class Game {
         farmId: String(r.id),
         name: String(r.name),
         kind: r.owner_kind === 'agent' ? ((r.agent_kind as AgentKind) ?? 'upstart') : 'player',
+        guest: r.auth_provider === 'guest',
         hens: num(r.hens),
         cashMilli: num(r.cash_milli),
         bust: r.bust_day !== null,
@@ -816,6 +940,8 @@ export class Game {
 
   /** Validates and applies one player action. */
   async act(playerId: string, action: ActionMessage): Promise<ActionResult> {
+    // the player is here (at most one write a minute): an idle guest farm goes bust only after seven days away
+    await this.seen(this.db, playerId);
     if (action.t === 'getLedger') {
       const info = await this.playerInfo(playerId);
       if (info) this.emit(playerId, { t: 'ledger', days: await this.getLedger(info.farmId) });
@@ -837,6 +963,11 @@ export class Game {
     const result = await this.serial(async (): Promise<ActionResult> => {
       try {
         await this.inTx(async (ctx) => {
+          // a guest has no wallet: a Feather mint (and linking a wallet) needs signing in first
+          if (action.t === 'linkWallet' || action.t === 'redeemTicket') {
+            const [who] = await ctx.q.query<{ auth_provider: string }>('SELECT auth_provider FROM players WHERE id = $1', [playerId]);
+            if (who?.auth_provider === 'guest') throw new ActionError('sign_in', GUEST_MINT_TEXT);
+          }
           if (action.t === 'linkWallet') {
             const [p] = await ctx.q.query<{ near_account_id: string | null }>('SELECT near_account_id FROM players WHERE id = $1', [playerId]);
             if (!p) throw new ActionError('not_found', 'player not found');
@@ -1294,6 +1425,8 @@ export class Game {
           await q.query('UPDATE agents SET last_decided_day = $2, last_brain = $3 WHERE id = $1', [agent.id, day, result.brain]);
           await bustIfBroke(ctx, agent);
         }
+        // 3b. guest farms idle for seven real days go bust, as a broke farm does
+        await bustIdleGuests(ctx);
         // 4. the market closes on the day's total supply, against demand from every active farm
         const [md] = await q.query('SELECT multiplier, supply FROM market_days WHERE day = $1', [day]);
         const supply = num(md?.supply ?? 0);

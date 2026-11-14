@@ -361,6 +361,8 @@ export interface FarmState {
   tourDone: boolean;
   /** Ask the player to name their farm (a new farm, or one named before farm naming). */
   needsName: boolean;
+  /** A guest farm (PLAY with no sign-in): it plays the whole game, but a Feather mint needs signing in. */
+  guest: boolean;
   /** The first in-game day a rename in Settings is allowed again (null: now). */
   renameFromDay: number | null;
   /** Milestones, in order: each rolls once for a Feather Ticket. */
@@ -423,6 +425,8 @@ export interface RivalRank {
   farmId: string;
   name: string;
   kind: 'player' | AgentKind;
+  /** A player farm started as a guest (no sign-in yet): shown with a small GUEST tag. */
+  guest: boolean;
   hens: number;
   cashMilli: number;
   bust: boolean;
@@ -598,6 +602,8 @@ export interface PublicProfile {
   farmId: string;
   name: string;
   kind: 'player' | AgentKind;
+  /** A guest farm (no sign-in yet). */
+  guest: boolean;
   bust: boolean;
   rank: number | null;
   farms: number;
@@ -681,7 +687,11 @@ export type ErrorCode =
   | 'invalid_action'
   | 'not_found'
   | 'farm_bust'
+  | 'sign_in'
   | 'server_error';
+
+/** What a guest is told when a Feather mint (or anything that needs a wallet) asks them to sign in. */
+export const GUEST_MINT_TEXT = 'Sign in to mint it. Feathers need a NEAR wallet, made for you with no seed phrase.';
 
 export const emptyEggStock = (): EggStock => ({ white: 0, cream: 0, brown: 0, golden: 0 });
 export const emptyFeedStock = (): FeedStock => ({ cheap: 0, standard: 0, premium: 0 });

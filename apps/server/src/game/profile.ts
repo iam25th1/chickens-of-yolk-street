@@ -640,7 +640,8 @@ export async function publicProfileFor(q: Queryable, farmId: string, day: number
   if (!PUBLIC_ID.test(farmId)) return null;
   const [f] = await q.query(
     `SELECT f.id, f.name, f.owner_kind, f.bust_day, f.created_day, f.eggs_sold, f.haggles_won, a.kind AS agent_kind,
-       (SELECT count(*) FROM hens h WHERE h.farm_id = f.id AND h.status = 'alive') AS hens
+       (SELECT count(*) FROM hens h WHERE h.farm_id = f.id AND h.status = 'alive') AS hens,
+       (SELECT p.auth_provider = 'guest' FROM players p WHERE p.id = f.player_id) AS guest
      FROM farms f LEFT JOIN agents a ON a.farm_id = f.id WHERE f.id = $1 LIMIT 1`,
     [farmId],
   );
@@ -652,6 +653,7 @@ export async function publicProfileFor(q: Queryable, farmId: string, day: number
     farmId: String(f.id),
     name: String(f.name),
     kind: isAgent ? ((f.agent_kind as AgentKind | null) ?? 'upstart') : 'player',
+    guest: f.guest === true,
     bust: f.bust_day !== null && f.bust_day !== undefined,
     rank: ranks.get(farmId) ?? null,
     farms: ranks.size,
