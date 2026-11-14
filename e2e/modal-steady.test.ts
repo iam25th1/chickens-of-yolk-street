@@ -83,7 +83,7 @@ async function signIn(page: Page, name: string): Promise<void> {
   await page.goto(`${server.url}/`);
   await page.getByText('PLAY', { exact: true }).waitFor({ timeout: 60_000 });
   await page.waitForTimeout(800);
-  await page.getByText('PLAY', { exact: true }).click({ force: true });
+  await page.locator('[data-ui="title-sign-in"]').click({ force: true });
   const field = page.getByPlaceholder('FARMER NAME');
   await field.waitFor({ timeout: 15_000 });
   await field.fill(name);
