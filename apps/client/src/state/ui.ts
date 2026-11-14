@@ -1,11 +1,11 @@
 // What the farm screen shows over the world: one modal at a time. The tour reads this to know where
 // the player is, and listens to uiEvents for the things it asks the player to do.
-import type { FeatherGrade, MilestoneId, UnlockId } from '@coys/shared';
+import type { FeatherGrade, TicketMilestone, UnlockId } from '@coys/shared';
 import { Emitter, createStore } from './store';
 
 export type ShopTab = 'hens' | 'feed' | 'coops' | 'machines' | 'land';
-/** The Market page's tabs: prices, sell, buy orders, your orders, trade, hen auction, farms. */
-export type MarketTab = 'prices' | 'sell' | 'buyers' | 'mine' | 'trade' | 'auction' | 'farms';
+/** The Market page's tabs: prices, sell, buy orders, your orders, trade, hen auction, farms, leaderboard. */
+export type MarketTab = 'prices' | 'sell' | 'buyers' | 'mine' | 'trade' | 'auction' | 'farms' | 'leaderboard';
 export const PROFILE_TABS = ['overview', 'eggs', 'money', 'flock', 'machines', 'market', 'mint', 'badges'] as const;
 export type ProfileTab = (typeof PROFILE_TABS)[number];
 
@@ -20,7 +20,7 @@ export type ModalState =
   | { kind: 'machine'; unlock: UnlockId }
   | { kind: 'market'; tab: MarketTab }
   | { kind: 'card'; cardId: string }
-  | { kind: 'reveal'; ticketId: string; number: number; grade: FeatherGrade; milestone: MilestoneId; txHash: string | null; day: number }
+  | { kind: 'reveal'; ticketId: string; number: number; grade: FeatherGrade; milestone: TicketMilestone; txHash: string | null; day: number }
   | { kind: 'feathers' }
   | { kind: 'minting'; ticketId: string; attempt: number }
   | { kind: 'settings' }

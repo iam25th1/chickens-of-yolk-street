@@ -999,6 +999,56 @@
         "y": 0.5
       },
       "duration": 1000
+    },
+    "season/0": {
+      "frame": {
+        "x": 0,
+        "y": 5120,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 1000
+    },
+    "comeback/0": {
+      "frame": {
+        "x": 0,
+        "y": 5248,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      },
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "duration": 1000
     }
   },
   "animations": {
@@ -1121,6 +1171,12 @@
     ],
     "sparkle": [
       "sparkle/0"
+    ],
+    "season": [
+      "season/0"
+    ],
+    "comeback": [
+      "comeback/0"
     ]
   },
   "meta": {
@@ -1130,12 +1186,12 @@
     "format": "RGBA8888",
     "size": {
       "w": 128,
-      "h": 5120
+      "h": 5376
     },
     "scale": "1",
     "source": {
       "path": "art/x-badge-icons/x-badge-icons.png",
-      "sha256": "dd64889535e8d9ad546ab24fb62657da45ca0ace30eaf7b5ce8afb55c83b2d0a"
+      "sha256": "ddf48b65fba420b680f431f13c115a1ece8d448d37e909771628026dadb350ae"
     },
     "grid": 8
   }

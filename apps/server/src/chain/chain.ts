@@ -20,12 +20,15 @@
 // A day whose close failed to settle (a refused RPC call, say) is caught up later: the next day's
 // moves already bring every egg balance up to date, so the missed day is recorded by its digest
 // alone with settle_late_days (version 5), paced, once the season has moved past it.
+//
+// A league season's close stores the SHA-256 of its canonical standings the same way: a settle_day
+// call in the season 'league', its day the league season's number (storeStandings).
 import { createHmac } from 'node:crypto';
 import { ed25519 } from '@noble/curves/ed25519.js';
 import { Account, JsonRpcProvider, KeyPairSigner, baseEncode, nearToYocto, teraToGas } from 'near-api-js';
 import type { KeyPairString } from 'near-api-js';
 import { num, type Db, type Queryable } from '../db/db';
-import { ECONOMY, type FeatherGrade, type MilestoneId } from '@coys/shared';
+import { ECONOMY, type FeatherGrade, type TicketMilestone } from '@coys/shared';
 import { buildDayBatch, buildLateSettlement, buildRangeBatch, commitBatch, commitBalances, digestOf, featherToken, type FullSettlement, type MintedFeather, type RangeSettlement } from './batch';
 import type { FeatherRenderer } from './feather-image';
 import { testFeatherToken, type Collection } from './mint';
@@ -76,13 +79,28 @@ export interface ChainWriter {
   collectionFor?(season: string): Promise<Collection>;
   /** Mints one Feather now, with the number drawn for it (version 6); absent without a chain. */
   mintFeather?(req: MintRequest): Promise<MintResult>;
+  /**
+   * Stores a closed league season's standings hash: settle_day with { season: 'league', day: seq,
+   * digest } and nothing else. Absent: nothing to store.
+   */
+  storeStandings?(seq: number, digest: string): Promise<StandingsResult>;
 }
+
+/** How storing a league season's standings hash went. */
+export interface StandingsResult {
+  status: 'sent' | 'noop' | 'failed';
+  txHash: string | null;
+  error?: string;
+}
+
+/** The season name a league season's standings settle under on the game contract. */
+export const LEAGUE_CHAIN_SEASON = 'league';
 
 /** One Feather to mint now: its ticket's details and the number drawn for it. */
 export interface MintRequest {
   owner: string;
   grade: FeatherGrade;
-  milestone: MilestoneId;
+  milestone: TicketMilestone;
   season: string;
   day: number;
   number: number;
@@ -164,7 +182,7 @@ export function settledCountsAgree(head: SeasonHead, sent: { day: number; tx: st
 export interface ChainFeather {
   number: number;
   grade: FeatherGrade;
-  milestone: MilestoneId;
+  milestone: TicketMilestone;
   season: string;
   day: number;
   owner: string;
@@ -307,6 +325,11 @@ export class NoopChain implements ChainWriter {
     this.log(`[chain] !!! NO-OP for season ${season} days ${first} to ${last}: ${this.reason}. Range built (digest ${built.batch.digest.slice(0, 12)}) and recorded in market_days only.`);
     return { status: 'noop', txHash: null, first, last, settlement: built.settlement, digest: built.batch.digest };
   }
+
+  async storeStandings(seq: number, digest: string): Promise<StandingsResult> {
+    this.log(`[chain] !!! NO-OP for league season ${seq}: ${this.reason}. Standings hash ${digest.slice(0, 12)} recorded in league_windows only, not on NEAR testnet.`);
+    return { status: 'noop', txHash: null };
+  }
 }
 
 export class TestnetChain implements ChainWriter {
@@ -359,7 +382,7 @@ export class TestnetChain implements ChainWriter {
         // a test collection's Feather is never one of the 777
         if (t.token_id.startsWith('test-')) continue;
         try {
-          const x = JSON.parse(t.metadata?.extra ?? '{}') as { number?: number; grade?: FeatherGrade; milestone?: MilestoneId; season?: string; day?: number };
+          const x = JSON.parse(t.metadata?.extra ?? '{}') as { number?: number; grade?: FeatherGrade; milestone?: TicketMilestone; season?: string; day?: number };
           if (typeof x.number === 'number' && x.grade) list.push({ number: x.number, grade: x.grade, milestone: x.milestone ?? 'full-coop', season: x.season ?? '', day: x.day ?? 0, owner: t.owner_id });
         } catch {
           // not a Feather (no token of another kind exists on version 4, but stay safe)
@@ -521,6 +544,56 @@ export class TestnetChain implements ChainWriter {
       const error = err instanceof Error ? err.message : String(err);
       this.log(`[chain] season ${season} days ${first} to ${last} FAILED on NEAR testnet: ${error.slice(0, 300)}`);
       return { status: 'failed', txHash: null, first, last, error: error.slice(0, 500) };
+    }
+  }
+
+  /**
+   * A closed league season's standings hash, on chain: one settle_day call in the season 'league' with
+   * the league season's number as its day and the hash as its digest (no egg moves, no Feathers),
+   * paced and retried with backoff while the RPC refuses it. A call refused as already settled is
+   * checked against the contract's head for 'league': the same day and digest there means an earlier
+   * send landed unseen, and it counts as sent.
+   */
+  async storeStandings(seq: number, digest: string): Promise<StandingsResult> {
+    const retry = (attempt: number, err: unknown, wait: number) =>
+      this.log(`[chain] league season ${seq} standings refused (try ${attempt}): ${(err instanceof Error ? err.message : String(err)).slice(0, 120)}; again in ${wait} ms`);
+    try {
+      await pause(PACE_MS);
+      const blocked = await withBackoff(() => this.preflight(), { onRetry: retry });
+      if (blocked) {
+        this.log(`[chain] !!! NO-OP for league season ${seq}: ${blocked}`);
+        return { status: 'noop', txHash: null, error: blocked };
+      }
+      await pause(PACE_MS);
+      try {
+        const outcome = await withBackoff(
+          () =>
+            this.account.callFunctionRaw({
+              contractId: this.cfg.contractId,
+              methodName: 'settle_day',
+              args: { batch: { season: LEAGUE_CHAIN_SEASON, day: seq, digest } },
+              gas: teraToGas('60'),
+              deposit: 0n,
+            }),
+          { onRetry: retry },
+        );
+        const txHash = outcome.transaction_outcome.id;
+        this.log(`[chain] league season ${seq} standings stored on NEAR testnet: ${txHash} (sha256 ${digest.slice(0, 12)})`);
+        return { status: 'sent', txHash };
+      } catch (err) {
+        if (!/day already settled/i.test(err instanceof Error ? err.message : String(err))) throw err;
+        await pause(PACE_MS);
+        const head = await this.view<{ last_day: number; last_digest: string } | null>('season_head', { season: LEAGUE_CHAIN_SEASON });
+        if (head && head.last_day === seq && head.last_digest === digest) {
+          this.log(`[chain] league season ${seq} standings were already on chain: an earlier send had landed`);
+          return { status: 'sent', txHash: null };
+        }
+        throw err;
+      }
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      this.log(`[chain] league season ${seq} standings FAILED on NEAR testnet: ${error.slice(0, 300)}`);
+      return { status: 'failed', txHash: null, error: error.slice(0, 500) };
     }
   }
 

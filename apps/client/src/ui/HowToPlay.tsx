@@ -2,7 +2,7 @@
 // art. Opens from Settings and from the ? in the top bar. One section at a time, with previous and
 // next; a section longer than the window allows is split into pages (never a scrollbar).
 import { Children, Fragment, isValidElement, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { BADGES, ECONOMY, LAND_IDS, LAND_NAME, MARKET_CHART_DAYS, UNLOCK_IDS, type MilestoneId } from '@coys/shared';
+import { BADGES, ECONOMY, LAND_IDS, LAND_NAME, MARKET_CHART_DAYS, MILESTONE_IDS, UNLOCK_IDS, type TicketMilestone } from '@coys/shared';
 import { uiSound, useServices } from '../app/services';
 import { useViewport } from '../app/Stage';
 import { AiHowLine } from './AiBadge';
@@ -12,7 +12,8 @@ import { Badge } from './Badge';
 import { MachineArt, UNLOCK_TEXT } from './Panels';
 import { SheetSprite } from './SheetSprite';
 
-export const MILESTONE_TEXT: Record<MilestoneId, string> = {
+/** What a Feather Ticket was won at: each milestone, and a league week's top three. */
+export const MILESTONE_TEXT: Record<TicketMilestone, string> = {
   'full-coop': 'FILL YOUR COOPS FOR THE FIRST TIME',
   'good-week': `STAY IN GOOD STANDING FOR ${ECONOMY.feathers.goodDays} DAYS`,
   'eggs-sold': `SELL ${ECONOMY.feathers.eggsSold} EGGS`,
@@ -20,6 +21,7 @@ export const MILESTONE_TEXT: Record<MilestoneId, string> = {
   'all-machines': 'OWN ALL FIVE MACHINES',
   'outlast-rival': 'OUTLAST A RIVAL FARM THAT GOES BUST',
   'top-three': `FINISH A DAY IN THE TOP ${ECONOMY.feathers.topRank} OF THE MARKET'S FARMS`,
+  'league-week': 'FINISH A LEAGUE WEEK IN THE TOP 3 PLAYERS',
 };
 
 const minutes = Math.round(ECONOMY.day.lengthMs / 60_000);
@@ -202,7 +204,10 @@ const SECTIONS: Section[] = [
     body: (
       <>
         <p>RIVAL FARMS TRADE IN THE SAME MARKET. A FARM THAT RUNS OUT OF COINS GOES BUST: ITS SIGN FALLS AND ITS HENS GO TO THE MARKET&apos;S HEN AUCTION.</p>
-        <p>YOUR FARM CAN GO BUST TOO. WATCH YOUR COINS AND YOUR CREDIT.</p>
+        <p>
+          YOUR COINS CAN&apos;T GO BELOW ZERO. UNPAID CREDIT COSTS YOU THE LOYALIST&apos;S GOODWILL AND YOUR GOOD STANDING FOR MILESTONE ROLLS. IF YOUR FARM HITS A DEAD END (NO WAY TO EARN AND NOTHING
+          AFFORDABLE TO FIX IT), YOU CAN TAKE A FRESH START: IT COUNTS AS A BUST ON THE LEADERBOARD FOR EVERYONE TO SEE. AI RIVALS AND IDLE GUEST FARMS GO BUST FOR REAL.
+        </p>
       </>
     ),
   },
@@ -276,7 +281,7 @@ const SECTIONS: Section[] = [
           ITS DUE DAY, NO CONTRACT MISSED IN THE LAST {ECONOMY.feathers.missWindowDays} DAYS.
         </p>
         <ul>
-          {(Object.keys(MILESTONE_TEXT) as MilestoneId[]).map((m) => (
+          {MILESTONE_IDS.map((m) => (
             <li key={m}>{MILESTONE_TEXT[m]}</li>
           ))}
         </ul>

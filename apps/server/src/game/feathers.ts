@@ -27,6 +27,7 @@ import {
   type ManagementScore,
   type MilestoneId,
   type Rarity,
+  type TicketMilestone,
 } from '@coys/shared';
 import { num, type Queryable } from '../db/db';
 import { drawForTicket, type Collection } from '../chain/mint';
@@ -167,15 +168,7 @@ export async function rollMilestones(ctx: Ctx, chainMinted: number | null, odds:
       const won = roll < odds;
       let ticketId: string | null = null;
       if (won) {
-        ticketId = newId();
-        await q.query(`INSERT INTO feather_tickets (id, farm_id, milestone, season, day, status, created_at) VALUES ($1, $2, $3, $4, $5, 'held', $6)`, [
-          ticketId,
-          f.id,
-          m,
-          ctx.season,
-          day,
-          ctx.now,
-        ]);
+        ticketId = await insertTicket(ctx, f.id, m);
         issuable--;
       }
       await q.query(
@@ -191,6 +184,27 @@ export async function rollMilestones(ctx: Ctx, chainMinted: number | null, odds:
   return out;
 }
 
+/** A new held Feather Ticket for a farm, won at a milestone (or a league week's top three). The caller checks featherCount's issuable first. */
+export async function insertTicket(ctx: Ctx, farmId: string, milestone: TicketMilestone): Promise<string> {
+  const ticketId = newId();
+  await ctx.q.query(`INSERT INTO feather_tickets (id, farm_id, milestone, season, day, status, created_at) VALUES ($1, $2, $3, $4, $5, 'held', $6)`, [
+    ticketId,
+    farmId,
+    milestone,
+    ctx.season,
+    ctx.day,
+    ctx.now,
+  ]);
+  ctx.touched.add(farmId);
+  return ticketId;
+}
+
+/** A grade stepped up `steps` grades, at most to golden-quill. */
+export function stepGrade(grade: FeatherGrade, steps: number): FeatherGrade {
+  const i = FEATHER_GRADES.indexOf(grade) + Math.max(0, Math.floor(steps));
+  return FEATHER_GRADES[Math.min(FEATHER_GRADES.length - 1, i)] ?? grade;
+}
+
 /** The grade a management score earns: the highest band it reaches. */
 export function gradeFor(score: number): FeatherGrade {
   let grade: FeatherGrade = 'fluff';
@@ -200,13 +214,8 @@ export function gradeFor(score: number): FeatherGrade {
 
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
 
-/** The farm's management score now: days in good standing, delivery record, haggles won and profit, weighted. */
-export async function managementScore(q: Queryable, farmId: string): Promise<ManagementScore> {
-  const [f] = await q.query('SELECT good_days, haggles_won, cash_milli FROM farms WHERE id = $1', [farmId]);
-  const [delivered] = await q.query(`SELECT count(*) AS n FROM trades WHERE seller_farm = $1 AND via = 'contract'`, [farmId]);
-  const [missed] = await q.query('SELECT COALESCE(SUM(misses), 0) AS n FROM contracts WHERE farm_id = $1', [farmId]);
-  const d = num(delivered?.n);
-  const m = num(missed?.n);
+/** The management score from its inputs: days in good standing, haggles won and coins, contract days delivered and missed. */
+function scoreFrom(f: Record<string, unknown> | undefined, d: number, m: number): ManagementScore {
   const parts = {
     goodDays: clamp01(num(f?.good_days) / F.score.full.goodDays),
     delivery: d + m === 0 ? F.score.noContracts : clamp01(d / (d + m)),
@@ -218,9 +227,34 @@ export async function managementScore(q: Queryable, farmId: string): Promise<Man
   return { score, grade: gradeFor(score), parts };
 }
 
+/** The farm's management score now: days in good standing, delivery record, haggles won and profit, weighted. */
+export async function managementScore(q: Queryable, farmId: string): Promise<ManagementScore> {
+  const [f] = await q.query('SELECT good_days, haggles_won, cash_milli FROM farms WHERE id = $1', [farmId]);
+  const [delivered] = await q.query(`SELECT count(*) AS n FROM trades WHERE seller_farm = $1 AND via = 'contract'`, [farmId]);
+  const [missed] = await q.query('SELECT COALESCE(SUM(misses), 0) AS n FROM contracts WHERE farm_id = $1', [farmId]);
+  return scoreFrom(f, num(delivered?.n), num(missed?.n));
+}
+
+/** Many farms' management scores at once (the league's tie-break), with grouped queries. */
+export async function managementScores(q: Queryable, farmIds: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (!farmIds.length) return out;
+  const delivered = new Map(
+    (await q.query(`SELECT seller_farm AS id, count(*) AS n FROM trades WHERE seller_farm = ANY($1::text[]) AND via = 'contract' GROUP BY seller_farm`, [farmIds])).map((r) => [String(r.id), num(r.n)]),
+  );
+  const missed = new Map((await q.query('SELECT farm_id AS id, SUM(misses) AS n FROM contracts WHERE farm_id = ANY($1::text[]) GROUP BY farm_id', [farmIds])).map((r) => [String(r.id), num(r.n)]));
+  for (const f of await q.query('SELECT id, good_days, haggles_won, cash_milli FROM farms WHERE id = ANY($1::text[])', [farmIds])) {
+    const id = String(f.id);
+    out.set(id, scoreFrom(f, delivered.get(id) ?? 0, missed.get(id) ?? 0).score);
+  }
+  return out;
+}
+
 /**
- * Redeems a held ticket: the coin fee is paid, the grade set from the score now, and its Feather's
- * number drawn (a random free one, from a seed kept with the ticket). The game sends its mint at once.
+ * Redeems a held ticket: the coin fee is paid, the grade set from the score now (stepped up by the
+ * farm's grade boost from a league season's top 10, at most to golden-quill; the boost is then used
+ * up), and its Feather's number drawn (a random free one, from a seed kept with the ticket). The game
+ * sends its mint at once.
  */
 export async function redeemTicket(
   ctx: Ctx,
@@ -234,13 +268,18 @@ export async function redeemTicket(
   const farm = await loadFarm(ctx.q, farmId);
   const feeMilli = toMilli(F.redeemFee);
   await spend(ctx, farm, 'feather-fee', feeMilli, ticketId);
-  const { score, grade } = await managementScore(ctx.q, farmId);
+  const scored = await managementScore(ctx.q, farmId);
+  const score = scored.score;
+  const [b] = await ctx.q.query('SELECT grade_boost FROM farms WHERE id = $1', [farmId]);
+  const boost = num(b?.grade_boost);
+  const grade = boost > 0 ? stepGrade(scored.grade, boost) : scored.grade;
+  if (boost > 0) await ctx.q.query('UPDATE farms SET grade_boost = 0 WHERE id = $1', [farmId]);
   await ctx.q.query(
     `UPDATE feather_tickets SET status = 'queued', grade = $2, score = $3, fee_milli = $4, redeemed_day = $5,
      redeemed_seq = (SELECT COALESCE(MAX(redeemed_seq), 0) + 1 FROM feather_tickets) WHERE id = $1`,
     [ticketId, grade, score, feeMilli, ctx.day],
   );
-  ctx.log(`[feathers] farm ${farmId} redeemed ticket ${ticketId}: score ${score.toFixed(3)} grade ${grade}`);
+  ctx.log(`[feathers] farm ${farmId} redeemed ticket ${ticketId}: score ${score.toFixed(3)} grade ${grade}${boost > 0 ? ` (${scored.grade} stepped up by the league boost)` : ''}`);
   const { number } = await drawForTicket(ctx.q, ticketId, ctx.season, collection, ctx.log);
   return { grade, score, feeMilli, number };
 }
@@ -249,7 +288,7 @@ export async function ticketViews(q: Queryable, farmId: string): Promise<Feather
   const rows = await q.query('SELECT * FROM feather_tickets WHERE farm_id = $1 ORDER BY day, created_at, id', [farmId]);
   return rows.map((r) => ({
     id: String(r.id),
-    milestone: r.milestone as MilestoneId,
+    milestone: r.milestone as TicketMilestone,
     day: num(r.day),
     status: r.status as FeatherTicketView['status'],
     grade: (r.grade as FeatherGrade | null) ?? null,
@@ -306,7 +345,7 @@ export async function featherSlots(q: Queryable, order: 'number' | 'recent' = 'n
   return rows.map((r) => ({
     number: num(r.number),
     grade: r.grade as FeatherGrade,
-    milestone: r.milestone as MilestoneId,
+    milestone: r.milestone as TicketMilestone,
     day: num(r.day),
     owner: String(r.owner_account ?? ''),
     farm: String(r.name),

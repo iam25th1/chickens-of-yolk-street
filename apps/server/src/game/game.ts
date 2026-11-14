@@ -29,6 +29,7 @@ import {
   gradeForRoll,
   henLayingRate,
   isCrash,
+  LEAGUE_DEFAULTS,
   MARKET_CHART_DAYS,
   marketMultiplier,
   marketReference,
@@ -48,16 +49,19 @@ import {
   type GameEvent,
   type HenView,
   type LandId,
+  type LeaderboardView,
+  type LeagueBoard,
+  type LeagueConfig,
   type LedgerDay,
   type MarketChartDay,
   type MarketDay,
   type MarketState,
   type MintPageData,
-  type MilestoneId,
   type OrderView,
   type Rarity,
   type ServerMessage,
   type ShopHenView,
+  type TicketMilestone,
   type ProfileData,
   type PublicProfile,
   topBadges,
@@ -109,6 +113,8 @@ import {
 } from './ctx';
 import { activeFarms, cancelOrder, emit, expireOrders, fillOrderAction, placeSellOrder, streetSell } from './market';
 import { featherCount, featherSlots, managementScore, milestoneViews, nextMilestone, rarityEstimates, redeemTicket, rollMilestones, standing, ticketViews } from './feathers';
+import { deadEnd, freshStart } from './fresh';
+import { bestRanks, closeWindow, dueWindows, ensureWindows, enterFarm, leaderboardView, leagueDayClose, nextWindowEnd } from './league';
 import { claimGoal, goalViews, markGoal, markToured, toured } from './goals';
 import { afterMove, bustIdleGuests, farmChoice, guestLimitHit, guestSubject, retireFarm, type FarmChoice, type GuestLimits } from './guests';
 import { checkChosenName, nameTaken, renameLegacyFarms, setFarmName, uniqueFarmName } from './names';
@@ -154,6 +160,8 @@ export interface GameOptions {
   provenance?: string;
   /** SETTLE_EVERY_DAYS: days settle on the chain in ranges of this many, one call each (default 1: every day, its own call). */
   settleEvery?: number;
+  /** The league's windows: LEAGUE_START and LEAGUE_SEASON_DAYS (default LEAGUE_DEFAULTS). */
+  league?: LeagueConfig;
 }
 
 /** The newest public reason in an agent's stored reasons, or null. */
@@ -201,6 +209,13 @@ export class Game {
   private readonly provenance: string;
   private readonly wantSeason: string | null;
   private readonly dayMs: number;
+  private readonly league: LeagueConfig;
+  /** The soonest end of an open league window (null: none open), so the tick's check costs nothing. */
+  private leagueDueAt: number | null = null;
+  private leagueClosing = false;
+  /** The run storing closed seasons' standings on chain, and whether it should go round once more. */
+  private standingsRun: Promise<void> | null = null;
+  private standingsAgain = false;
   /** The database's season, known after init(). */
   season = '';
   private readonly listeners = new Set<(out: Outbound) => void>();
@@ -230,6 +245,7 @@ export class Game {
     this.provenance = opts.provenance ?? '';
     this.wantSeason = opts.season ?? null;
     this.dayMs = opts.dayLengthMs ?? ECONOMY.day.lengthMs;
+    this.league = opts.league ?? LEAGUE_DEFAULTS;
   }
 
   // ---- plumbing -------------------------------------------------------------------------------
@@ -312,6 +328,8 @@ export class Game {
     }
     this.season = stored;
     this.clock = { day: num(clock?.day), dayStartedAt: num(clock?.day_started_at) };
+    // league windows that ended while the server was down close first, at what every farm held then
+    await this.leagueCatchUp();
     await this.serial(() =>
       this.inTx(async (ctx) => {
         // farms named at sign-in before farm naming: a generated name now, the owner asked to choose
@@ -333,8 +351,15 @@ export class Game {
     );
   }
 
-  /** Called every second: cards arrive through the day; the day closes when its time is up. */
+  /** Called every second: cards arrive through the day; a league window closes when it ends; the day closes when its time is up. */
   async tick(): Promise<void> {
+    if (this.leagueDueAt !== null && this.now() >= this.leagueDueAt) {
+      await this.leagueCatchUp().catch((err: unknown) => {
+        // it rolled back whole: it goes again in a minute
+        this.leagueDueAt = this.now() + 60_000;
+        this.log(`[league] a window's close failed (it goes again in a minute): ${err instanceof Error ? err.message : String(err)}`);
+      });
+    }
     if (this.now() >= this.clock.dayStartedAt + this.dayMs) {
       await this.tickIfDue();
       return;
@@ -518,6 +543,8 @@ export class Game {
           // the account's own farm (open and not chosen, or already bust) moves to a holder of its own
           // first: a farm always has its player, and one player has one farm
           const holder = await this.insertPlayer(ctx, 'retired', `retired-${acct.farm_id}`, 'retired', null);
+          // the holder remembers its account: a ticket queued on the old farm still mints to the account's wallet
+          await ctx.q.query('UPDATE players SET retired_from = $2 WHERE id = $1', [holder, playerId]);
           await ctx.q.query('UPDATE farms SET player_id = $2 WHERE id = $1', [acct.farm_id, holder]);
           if (accountFarm) await retireFarm(ctx, accountFarm);
         }
@@ -576,6 +603,8 @@ export class Game {
     }
     await this.insertHens(ctx, farmId, spec.hens);
     await this.planFarmDay(ctx.q, farmId, ctx.day);
+    // the league's open windows: the new farm starts at its starting worth, now
+    await enterFarm(ctx, farmId);
     return farmId;
   }
 
@@ -686,6 +715,7 @@ export class Game {
       standing: await standing(q, farmId, Math.max(1, day - 1)),
       tickets: await ticketViews(q, farmId),
       score: await managementScore(q, farmId),
+      freshStart: await deadEnd(ctx, farm),
       machines: await machineDay(q, farmId, day),
       hopperCapMilli: farm.hopperCapMilli,
       shop: shopRows.map(
@@ -755,7 +785,7 @@ export class Game {
     const brainOf = (a: Record<string, unknown>): AiMode =>
       aiMode !== 'rules' && (a.model_provider === 'nearai' || a.model_provider === 'serv') && num(a.model_day ?? -1e9) >= day - MODE_WINDOW_DAYS && this.brain.chain.usable(a.model_provider) ? a.model_provider : 'rules';
     const ranking = await this.db.query(
-      `SELECT f.id, f.name, f.owner_kind, f.cash_milli, f.bust_day, a.kind AS agent_kind, p.auth_provider,
+      `SELECT f.id, f.name, f.owner_kind, f.cash_milli, f.bust_day, f.busts, a.kind AS agent_kind, p.auth_provider,
               (SELECT count(*) FROM hens h WHERE h.farm_id = f.id AND h.status = 'alive') AS hens
        FROM farms f LEFT JOIN agents a ON a.farm_id = f.id LEFT JOIN players p ON p.id = f.player_id ORDER BY (f.bust_day IS NULL) DESC, f.cash_milli DESC LIMIT 12`,
     );
@@ -823,6 +853,7 @@ export class Game {
         hens: num(r.hens),
         cashMilli: num(r.cash_milli),
         bust: r.bust_day !== null,
+        busts: num(r.busts),
         badges: topBadges(marks.get(String(r.id)) ?? [], 3),
       })),
       explorer: await this.explorer(),
@@ -894,7 +925,12 @@ export class Game {
   /** The player's own profile (private: sent only to its player). */
   async getProfile(farmId: string): Promise<ProfileData> {
     const facts = (await loadFacts(this.db, [farmId], this.clock.day, ['daysNoBreakdown', 'bigTrades'])).get(farmId) ?? {};
-    return profileFor(this.db, farmId, this.clock.day, facts, await badgeViews(this.db, farmId));
+    return profileFor(this.db, farmId, this.clock.day, facts, await badgeViews(this.db, farmId), await bestRanks(this.db, farmId));
+  }
+
+  /** GET /api/leaderboard: a board's window (by id, else the open one), its entries, and the closed ones before it. Public. */
+  async getLeaderboard(board: LeagueBoard, id: string | null): Promise<LeaderboardView | null> {
+    return leaderboardView(this.db, board, id, this.league, this.now(), await this.explorer());
   }
 
   /** A farm's public profile (GET /api/profile/:farmId): a whitelist of public fields, or null. */
@@ -1049,6 +1085,9 @@ export class Game {
         emit(ctx, farm, { kind: 'landBought', plot: action.plot, costMilli: cost });
         return;
       }
+      case 'freshStart':
+        await freshStart(ctx, farm, (c, farmId, count) => this.insertHens(c, farmId, count));
+        return;
       case 'redeemTicket': {
         const r = await redeemTicket(ctx, farm.id, action.ticketId, this.collection ?? 'live');
         emit(ctx, farm, { kind: 'ticketRedeemed', ticketId: action.ticketId, grade: r.grade, score: r.score, feeMilli: r.feeMilli, number: r.number });
@@ -1451,6 +1490,8 @@ export class Game {
         const playerFarms = (await q.query<{ id: string }>(`SELECT id FROM farms WHERE owner_kind = 'player' ORDER BY id`)).map((r) => String(r.id));
         await rememberTraits(q, playerFarms);
         await evaluateBadges(ctx, playerFarms, { atClose: true });
+        // 4d. the league: each open entry's rank now, for tomorrow's arrows; players climbing into the week's top ten hear it
+        await leagueDayClose(ctx);
         // 5. the next day opens
         const newDay = day + 1;
         let start = this.clock.dayStartedAt + this.dayMs;
@@ -1535,6 +1576,83 @@ export class Game {
     this.kickMints();
   }
 
+  // ---- the league -----------------------------------------------------------------------------
+
+  /**
+   * Closes every league window that has ended (each once, in one transaction with its rewards) and
+   * opens the windows that hold now: at boot (windows that ended while the server was down), and from
+   * the tick when one is due. Then the closed seasons' standings go on chain, in the background.
+   */
+  async leagueCatchUp(): Promise<void> {
+    if (this.leagueClosing) return;
+    this.leagueClosing = true;
+    try {
+      const seasons = await this.serial(() =>
+        this.inTx(async (ctx) => {
+          const closed: number[] = [];
+          for (const w of await dueWindows(ctx.q, ctx.now)) {
+            const stored = await closeWindow(ctx, w.id, this.chain.featherMinted);
+            if (stored) closed.push(stored.seq);
+          }
+          await ensureWindows(ctx, this.league);
+          return closed;
+        }),
+      );
+      this.leagueDueAt = await nextWindowEnd(this.db);
+      if (seasons.length) this.log(`[league] ${seasons.length} season${seasons.length === 1 ? '' : 's'} closed: standings go on chain`);
+      // a season just closed, and any whose standings did not reach the chain before (at boot, a failed one is retried)
+      this.kickStandings();
+    } finally {
+      this.leagueClosing = false;
+    }
+  }
+
+  /** Starts storing closed seasons' standings hashes on chain (any not stored yet, or failed), or has a run in progress go round once more. */
+  private kickStandings(): void {
+    if (!this.chain.storeStandings) return;
+    if (this.standingsRun) {
+      this.standingsAgain = true;
+      return;
+    }
+    this.standingsRun = (async () => {
+      do {
+        this.standingsAgain = false;
+        await this.storeStandings();
+      } while (this.standingsAgain);
+    })()
+      .catch((err: unknown) => this.log(`[league] storing standings stopped: ${err instanceof Error ? err.message : String(err)}`))
+      .finally(() => {
+        this.standingsRun = null;
+      });
+  }
+
+  /**
+   * Every closed season whose standings hash is not on chain yet (never sent, or failed): one paced
+   * call each, oldest first. A failure stops the run, so a later season never lands before an earlier
+   * one (the contract takes a season's days in order).
+   */
+  private async storeStandings(): Promise<void> {
+    const store = this.chain.storeStandings?.bind(this.chain);
+    if (!store) return;
+    const rows = await this.db.query<{ id: string; seq: number; standings_sha256: string }>(
+      `SELECT id, seq, standings_sha256 FROM league_windows WHERE kind = 'season' AND status = 'closed' AND standings_sha256 IS NOT NULL
+       AND (chain_status IS NULL OR chain_status = 'failed') ORDER BY seq`,
+    );
+    for (const w of rows) {
+      const r = await store(num(w.seq), String(w.standings_sha256));
+      await this.db.query('UPDATE league_windows SET chain_status = $2, chain_tx = COALESCE($3, chain_tx) WHERE id = $1', [w.id, r.status, r.txHash]);
+      if (r.status === 'failed') {
+        this.log(`[league] season ${String(w.id)} standings did not reach the chain (${r.error ?? 'failed'}): they go again at the next boot or close`);
+        break;
+      }
+    }
+  }
+
+  /** Waits until storing standings on chain is idle (tests and scripts). */
+  async leagueIdle(): Promise<void> {
+    while (this.standingsRun) await this.standingsRun;
+  }
+
   // ---- instant mints --------------------------------------------------------------------------
 
   /** Starts the mint queue, or (if it is running) has it go round once more. */
@@ -1566,18 +1684,23 @@ export class Game {
 
   private async mintTicket(ticketId: string): Promise<void> {
     const [t] = await this.db.query(
-      `SELECT t.id, t.farm_id, t.grade, t.milestone, t.season, t.day, t.number, t.fee_milli, t.mint_state, t.mint_note, f.player_id, p.near_account_id AS account
-       FROM feather_tickets t JOIN farms f ON f.id = t.farm_id LEFT JOIN players p ON p.id = f.player_id WHERE t.id = $1 AND t.status = 'queued'`,
+      `SELECT t.id, t.farm_id, t.grade, t.milestone, t.season, t.day, t.number, t.fee_milli, t.mint_state, t.mint_note, f.player_id, p.retired_from,
+              COALESCE(p.near_account_id, r.near_account_id) AS account
+       FROM feather_tickets t JOIN farms f ON f.id = t.farm_id LEFT JOIN players p ON p.id = f.player_id LEFT JOIN players r ON r.id = p.retired_from
+       WHERE t.id = $1 AND t.status = 'queued'`,
       [ticketId],
     );
     if (!t) return;
     const farmId = String(t.farm_id);
-    const playerId = t.player_id ? String(t.player_id) : null;
+    // a retired holder's farm (one its player chose not to keep): its account's player hears, and its wallet gets the Feather
+    const retired = t.retired_from ? String(t.retired_from) : null;
+    const playerId = retired ?? (t.player_id ? String(t.player_id) : null);
     const grade = t.grade as FeatherGrade;
     let state = { s: (t.mint_state as string | null) ?? null, note: (t.mint_note as string | null) ?? null };
     const tell = async (event: GameEvent) => {
       if (!playerId) return;
-      this.emit(playerId, { t: 'farm', farm: await this.getFarmState(farmId) });
+      // the account plays another farm now: it hears the event, not the old farm's state
+      if (!retired) this.emit(playerId, { t: 'farm', farm: await this.getFarmState(farmId) });
       this.emit(playerId, { t: 'event', event });
     };
     const wait = async (note: string) => {
@@ -1604,7 +1727,7 @@ export class Game {
       await this.db.query(`UPDATE feather_tickets SET mint_state = 'sending', mint_note = NULL, mint_tries = mint_tries + 1 WHERE id = $1`, [ticketId]);
       state = { s: 'sending', note: null };
       await tell({ kind: 'mintSent', ticketId, number, grade });
-      const r = await this.chain.mintFeather({ owner: String(t.account), grade, milestone: t.milestone as MilestoneId, season: String(t.season), day: num(t.day), number });
+      const r = await this.chain.mintFeather({ owner: String(t.account), grade, milestone: t.milestone as TicketMilestone, season: String(t.season), day: num(t.day), number });
       if (r.status === 'sent') return this.mintConfirmed(ticketId, farmId, playerId, number, String(t.account), r);
       if (r.status === 'waiting') return wait(r.note ?? 'the chain is not ready: it goes again at the next day close');
       if (!r.taken) return this.mintFailed(ticketId, farmId, playerId, num(t.fee_milli), r.note ?? 'the mint did not go through');
@@ -1633,7 +1756,7 @@ export class Game {
     if (playerId && t) {
       this.emit(playerId, {
         t: 'event',
-        event: { kind: 'featherMinted', ticketId, number, grade: t.grade as FeatherGrade, milestone: t.milestone as MilestoneId, token: String(t.token_id), owner, txHash: r.txHash, day },
+        event: { kind: 'featherMinted', ticketId, number, grade: t.grade as FeatherGrade, milestone: t.milestone as TicketMilestone, token: String(t.token_id), owner, txHash: r.txHash, day },
       });
     }
   }

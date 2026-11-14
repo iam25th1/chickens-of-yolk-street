@@ -54,7 +54,7 @@ describe('the badge catalog', () => {
     expect(new Set(BADGES.map((b) => b.id)).size).toBe(BADGES.length);
     expect(new Set(BADGES.map((b) => b.name)).size).toBe(BADGES.length);
     const icons = new Set<string>(BADGE_ICONS);
-    expect(icons.size).toBe(40);
+    expect(icons.size).toBe(42);
     for (const b of BADGES) {
       expect(icons.has(b.icon), `${b.id} icon ${b.icon}`).toBe(true);
       expect(b.icon).not.toBe('mystery');

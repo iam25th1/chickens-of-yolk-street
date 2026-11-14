@@ -7,6 +7,7 @@ import { COOP_KINDS, ECONOMY, EGG_GRADES, FEED_TIERS, GOAL_IDS, LAND_IDS, UNLOCK
 import type { BodyColour, CoopKind, EggGrade, FeatherGrade, FeedTier, LandId, MilestoneId, Rarity, UnlockId } from './economy';
 import type { AgentKind, AgentRole, CardKind } from './market';
 import type { BadgeLevel } from './badges';
+import type { TicketMilestone } from './league';
 
 export const PROTOCOL_VERSION = 2;
 
@@ -92,6 +93,8 @@ export const clientMessageSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('keepFarmName'), rid }).strict(),
   /** Repair a machine to 100% (its price share for what is missing). */
   z.object({ t: z.literal('repairMachine'), rid, unlock: z.enum(UNLOCK_IDS) }).strict(),
+  /** Start again at a dead end (FarmState.freshStart): the starting coins, feed and hens; it counts as a bust on the leaderboard. */
+  z.object({ t: z.literal('freshStart'), rid }).strict(),
 ]);
 
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
@@ -129,7 +132,8 @@ export interface MilestoneView {
  */
 export interface FeatherTicketView {
   id: string;
-  milestone: MilestoneId;
+  /** The milestone it was won at, or 'league-week' for a week's top three. */
+  milestone: TicketMilestone;
   /** The day it was won. */
   day: number;
   status: 'held' | 'queued' | 'minted';
@@ -157,7 +161,7 @@ export interface ManagementScore {
 export interface FeatherSlot {
   number: number;
   grade: FeatherGrade;
-  milestone: MilestoneId;
+  milestone: TicketMilestone;
   day: number;
   owner: string;
   farm: string;
@@ -373,6 +377,8 @@ export interface FarmState {
   score: ManagementScore;
   /** Good standing (needed for milestone rolls) as of the last day close, and why not. */
   standing: { good: boolean; reasons: string[] };
+  /** The farm is at a dead end (no eggs, no way to get any, no goal to claim): a Fresh Start is offered. */
+  freshStart: boolean;
 }
 
 export interface GoalView {
@@ -430,6 +436,8 @@ export interface RivalRank {
   hens: number;
   cashMilli: number;
   bust: boolean;
+  /** Times the farm has gone bust (a Fresh Start counts as one). */
+  busts: number;
   /** The farm's best few badges, for a small row beside its name. */
   badges: BadgeMark[];
 }
@@ -591,6 +599,8 @@ export interface ProfileData {
   };
   mint: { ticketsWon: number; milestones: number; minted: Record<FeatherGrade, number> };
   badges: BadgeView[];
+  /** The farm's best final rank in a closed league week and season (warm-up weeks left out), or null. */
+  league: { bestWeek: number | null; bestSeason: number | null };
 }
 
 /**
@@ -605,6 +615,8 @@ export interface PublicProfile {
   /** A guest farm (no sign-in yet). */
   guest: boolean;
   bust: boolean;
+  /** Times the farm has gone bust (a Fresh Start counts as one). */
+  busts: number;
   rank: number | null;
   farms: number;
   daysOnStreet: number;
@@ -621,7 +633,7 @@ export type CardOutcome = 'accepted' | 'declined' | 'won' | 'failed' | 'expired'
 export type GameEvent =
   | { kind: 'hensBought'; count: number; fromAuction: number; costMilli: number; henIds?: string[] }
   /** One of the player's Feathers is minted on NEAR testnet and confirmed (the minting moment's last stage). txHash is null when an earlier send landed unseen. */
-  | { kind: 'featherMinted'; ticketId: string; number: number; grade: FeatherGrade; milestone: MilestoneId; token: string; owner: string; txHash: string | null; day: number }
+  | { kind: 'featherMinted'; ticketId: string; number: number; grade: FeatherGrade; milestone: TicketMilestone; token: string; owner: string; txHash: string | null; day: number }
   /** The player redeemed a ticket: its number is drawn and its mint goes out at once. */
   | { kind: 'ticketRedeemed'; ticketId: string; grade: FeatherGrade; score: number; feeMilli: number; number: number | null }
   /** A redeemed ticket's mint was sent to NEAR (the minting moment's first stage). */
@@ -655,7 +667,11 @@ export type GameEvent =
   | { kind: 'orderFilled'; orderId: string; side: 'buy' | 'sell'; qty: number; priceMilli: number; counterparty: string }
   | { kind: 'bigTrade'; trade: TradeView }
   /** A badge (or a higher level of one) is earned: the unlock moment. Cosmetic. */
-  | { kind: 'badgeEarned'; badge: string; level: BadgeLevel; day: number };
+  | { kind: 'badgeEarned'; badge: string; level: BadgeLevel; day: number }
+  /** The player took a Fresh Start: the farm starts again (busts: its bust count now, this one included). */
+  | { kind: 'freshStart'; busts: number }
+  /** At a day close the farm climbed into the week's top 10 on the leaderboard. */
+  | { kind: 'leagueRank'; board: 'week'; rank: number };
 
 export type ServerMessage =
   /** build: the server's commit, so a client open across a deploy can offer a reload. */

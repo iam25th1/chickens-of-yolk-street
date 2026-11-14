@@ -7,6 +7,7 @@
 import { randomBytes } from 'node:crypto';
 import { num, type Queryable } from '../db/db';
 import type { Ctx } from './ctx';
+import { freezeEntries } from './league';
 import { guardHit, setFarmName, uniqueFarmName } from './names';
 
 /** A guest farm idle this long (real time) goes bust at the next day close. */
@@ -35,13 +36,16 @@ export async function guestLimitHit(q: Queryable, ipHash: string, now: number, l
 }
 
 /**
- * Retires a player's farm through the bust flow (as an AI farm goes bust): its hens go to the
- * auction, its open orders, contracts and cards close, its unpaid credit is written off as
- * defaulted, and the farm is marked bust today. Its records (ledger, trades, badges, tickets) stay.
+ * Retires a player's farm through the bust flow (as an AI farm goes bust): its league scores freeze
+ * at what it holds, its hens go to the auction, its open orders, contracts and cards close, its unpaid
+ * credit is written off as defaulted, and the farm is marked bust today (one more bust on its
+ * record). Its records (ledger, trades, badges, tickets) stay.
  */
 export async function retireFarm(ctx: Ctx, farmId: string): Promise<number> {
+  const [open] = await ctx.q.query('SELECT 1 AS x FROM farms WHERE id = $1 AND bust_day IS NULL', [farmId]);
+  if (open) await freezeEntries(ctx, farmId);
   const hens = (await ctx.q.query(`UPDATE hens SET status = 'auction', farm_id = NULL WHERE farm_id = $1 AND status = 'alive' RETURNING id`, [farmId])).length;
-  await ctx.q.query('UPDATE farms SET bust_day = $2 WHERE id = $1 AND bust_day IS NULL', [farmId, ctx.day]);
+  await ctx.q.query('UPDATE farms SET bust_day = $2, busts = busts + 1 WHERE id = $1 AND bust_day IS NULL', [farmId, ctx.day]);
   await ctx.q.query(`UPDATE orders SET status = 'cancelled' WHERE farm_id = $1 AND status = 'open'`, [farmId]);
   await ctx.q.query(`UPDATE contracts SET status = 'cancelled' WHERE farm_id = $1 AND status = 'active'`, [farmId]);
   await ctx.q.query(`UPDATE cards SET status = 'expired' WHERE farm_id = $1 AND status = 'open'`, [farmId]);

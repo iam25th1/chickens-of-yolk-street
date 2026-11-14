@@ -54,7 +54,7 @@ export function announce(a: Omit<Announcement, 'key'>): void {
 
 const done = (key: number) => announcements.set((s) => ({ queue: s.queue.filter((a) => a.key !== key), since: Date.now() }));
 
-/** Badges earned and milestone rolls become announcements (the farm screen listens while it is open). */
+/** Badges earned, milestone rolls and a climb into the week's top 10 become announcements (the farm screen listens while it is open). */
 export function listenForAnnouncements(): () => void {
   return events.on((e) => {
     if (e.kind === 'badgeEarned') {
@@ -68,6 +68,9 @@ export function listenForAnnouncements(): () => void {
         line: e.won ? `FEATHER TICKET WON. ${e.left} OF ${ECONOMY.feathers.maxSupply} LEFT` : `NO TICKET THIS TIME (${Math.round(e.odds * 100)}% A ROLL)`,
         tab: 'mint',
       });
+    } else if (e.kind === 'leagueRank') {
+      // a day close moved the farm into the week's top 10 on the leaderboard (the season badge's icon)
+      announce({ kind: 'milestone', title: `LEADERBOARD: #${e.rank} THIS WEEK`, line: 'YOU MOVED INTO THE TOP 10', badge: { id: 'league', level: 'gold', icon: 'season' }, tab: 'overview' });
     }
   });
 }

@@ -8,6 +8,7 @@ import {
   BADGE_BY_ID,
   BADGE_RULES,
   ECONOMY,
+  SEASON_BADGE_ID,
   coopCapacity,
   levelAbove,
   levelFor,
@@ -24,7 +25,7 @@ import { daysNoBreakdown, rivalsOutlasted, traitsOf, worthOf } from './profile';
 
 export type Facts = Partial<Record<BadgeMetric, number>>;
 
-type Family = 'stats' | 'farm' | 'days' | 'climb' | 'profit' | 'machineDays' | 'trades' | 'sales' | 'memory' | 'contracts' | 'flock' | 'machines' | 'rivals' | 'feathers' | 'worth' | 'land';
+type Family = 'stats' | 'farm' | 'days' | 'climb' | 'profit' | 'machineDays' | 'trades' | 'sales' | 'memory' | 'contracts' | 'flock' | 'machines' | 'rivals' | 'feathers' | 'worth' | 'land' | 'league';
 
 /** Which query family reads each number. */
 const FAMILY: Record<BadgeMetric, Family> = {
@@ -97,6 +98,8 @@ const FAMILY: Record<BadgeMetric, Family> = {
   netWorth: 'worth',
   landPlots: 'land',
   landCoops: 'land',
+  comebacks: 'league',
+  seasonPlace: 'league',
 };
 
 const OWNS: Record<UnlockId, BadgeMetric> = { conveyor: 'ownsConveyor', grader: 'ownsGrader', cart: 'ownsCart', hopper: 'ownsHopper', clerk: 'ownsClerk' };
@@ -280,6 +283,15 @@ export async function loadFacts(q: Queryable, farmIds: string[], day: number, me
     for (const r of await q.query('SELECT farm_id, count(*) AS n FROM farm_land WHERE farm_id = ANY($1::text[]) GROUP BY farm_id', ids)) set(r.farm_id, 'landPlots', r.n);
     for (const r of await q.query('SELECT farm_id, count(*) AS n FROM coops WHERE farm_id = ANY($1::text[]) AND plot >= $2 GROUP BY farm_id', [farmIds, ECONOMY.coops.plots])) set(r.farm_id, 'landCoops', r.n);
   }
+  if (families.has('league')) {
+    // league weeks finished in the top ten after a bust (game/league.ts), and the best season badge held (1 bronze to 3 gold)
+    for (const r of await q.query(`SELECT farm_id, count(*) AS n FROM league_rewards WHERE farm_id = ANY($1::text[]) AND reward = 'comeback' GROUP BY farm_id`, ids)) set(r.farm_id, 'comebacks', r.n);
+    for (const r of await q.query(
+      `SELECT farm_id, MAX(CASE tier WHEN 'gold' THEN 3 WHEN 'silver' THEN 2 ELSE 1 END) AS n FROM badges WHERE farm_id = ANY($1::text[]) AND badge LIKE 'season-%' AND tier IS NOT NULL GROUP BY farm_id`,
+      ids,
+    ))
+      set(r.farm_id, 'seasonPlace', r.n);
+  }
   if (families.has('rivals')) {
     const n = await rivalsOutlasted(q, farmIds);
     for (const id of farmIds) set(id, 'rivalsOutlasted', n.get(id) ?? 0);
@@ -403,18 +415,20 @@ export async function evaluateBadges(ctx: Ctx, farmIds: string[], opts: Evaluate
   return earned;
 }
 
-/** Every catalog badge for a farm's profile: the level held (or null), the day, and the count. */
+/** Every catalog badge for a farm's profile: the level held (or null), the day, and the count; then any league season badges it holds. */
 export async function badgeViews(q: Queryable, farmId: string): Promise<BadgeView[]> {
   const rows = new Map((await q.query('SELECT badge, tier, earned_day, progress FROM badges WHERE farm_id = $1', [farmId])).map((r) => [String(r.badge), r]));
-  return BADGES.map((b) => {
-    const r = rows.get(b.id);
+  const view = (id: string): BadgeView => {
+    const r = rows.get(id);
     return {
-      id: b.id,
+      id,
       level: (r?.tier as BadgeLevel | null | undefined) ?? null,
       earnedDay: r?.earned_day === null || r?.earned_day === undefined ? null : num(r.earned_day),
       progress: num(r?.progress ?? 0),
     };
-  });
+  };
+  const seasons = [...rows.keys()].filter((id) => SEASON_BADGE_ID.test(id) && rows.get(id)?.tier).sort((a, b) => num(a.slice(7)) - num(b.slice(7)));
+  return [...BADGES.map((b) => view(b.id)), ...seasons.map(view)];
 }
 
 /** Test and admin hook: gives a farm a badge at a level now (the player hears it, as if earned). */

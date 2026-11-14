@@ -58,4 +58,13 @@ describe('configuration', () => {
     expect(() => readInferenceConfig({ SERV_REASONING_EFFORT: 'max' })).toThrow(/none, low, medium, high/);
     expect(() => readInferenceConfig({ NEARAI_MAIN_PRICE: 'cheap' })).toThrow(/input,output/);
   });
+
+  it('LEAGUE_START (an ISO date and time with its zone) and LEAGUE_SEASON_DAYS (1 to 90) set the league; unset, the defaults', () => {
+    expect(readConfig({}, '/repo').league).toEqual({ start: Date.UTC(2026, 10, 16), seasonDays: 14 });
+    expect(readConfig({ LEAGUE_START: '2026-12-07T00:00:00Z', LEAGUE_SEASON_DAYS: '28' }, '/repo').league).toEqual({ start: Date.UTC(2026, 11, 7), seasonDays: 28 });
+    expect(readConfig({ LEAGUE_START: '2026-12-07T01:00:00+01:00' }, '/repo').league.start).toBe(Date.UTC(2026, 11, 7));
+    expect(() => readConfig({ LEAGUE_START: '2026-12-07' }, '/repo')).toThrow(/LEAGUE_START must be an ISO date and time/);
+    expect(() => readConfig({ LEAGUE_START: 'next monday' }, '/repo')).toThrow(/LEAGUE_START/);
+    for (const bad of ['0', '91', '7.5', 'two weeks']) expect(() => readConfig({ LEAGUE_SEASON_DAYS: bad }, '/repo')).toThrow(/LEAGUE_SEASON_DAYS must be a whole number from 1 to 90/);
+  });
 });
