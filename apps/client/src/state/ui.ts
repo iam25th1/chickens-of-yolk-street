@@ -43,11 +43,46 @@ export const OPEN_MINT_KEY = 'coys.openMint';
 export type UiEvent = { kind: 'opened'; modal: ModalState } | { kind: 'tab'; modal: 'shop' | 'market' | 'profile'; tab: string } | { kind: 'tapped'; what: string };
 export const uiEvents = new Emitter<UiEvent>();
 
+/**
+ * Going into or out of the Market changes the whole picture (the farm's canvas becomes the town
+ * square): the farm screen registers how that change goes through the curtain (app/curtain.ts). While
+ * such a change is on its way, every later modal change waits its turn behind it, and each change is
+ * decided against the modal that is open when its turn comes (so nothing lands out of order).
+ */
+let pageSwap: ((apply: () => void) => Promise<void>) | null = null;
+export function setPageSwap(fn: ((apply: () => void) => Promise<void>) | null): void {
+  pageSwap = fn;
+}
+const isMarket = (m: ModalState | null) => m?.kind === 'market';
+let queue: Promise<void> = Promise.resolve();
+let waiting = 0;
+
+function change(next: ModalState | null, after?: () => void): void {
+  const run = (): Promise<void> | void => {
+    const apply = () => {
+      ui.set({ modal: next });
+      after?.();
+    };
+    if (pageSwap && isMarket(next) !== isMarket(ui.get().modal)) return pageSwap(apply);
+    apply();
+  };
+  if (!waiting && !(pageSwap && isMarket(next) !== isMarket(ui.get().modal))) {
+    run();
+    return;
+  }
+  waiting++;
+  queue = queue
+    .then(run)
+    .catch(() => undefined)
+    .finally(() => {
+      waiting--;
+    });
+}
+
 export function openModal(modal: ModalState): void {
-  ui.set({ modal });
-  uiEvents.emit({ kind: 'opened', modal });
+  change(modal, () => uiEvents.emit({ kind: 'opened', modal }));
 }
 
 export function closeModal(): void {
-  ui.set({ modal: null });
+  change(null);
 }

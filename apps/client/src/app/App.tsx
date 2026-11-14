@@ -7,7 +7,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AssetStore } from '../assets/store';
 import { BOOT_GROUPS, BOOT_SOUNDS, FARM_GROUPS, FARM_SOUNDS, LATER_GROUPS, TITLE_GROUPS } from '../assets/catalog';
 import { AudioEngine } from '../audio/audio';
-import { motion } from '../motion/ui';
 import { GUEST_SESSION, GuestLimitError, api, sessionStore, type ServerConfigView } from '../net/api';
 import { BackdropScene } from '../pixi/BackdropScene';
 import { PixiHost } from '../pixi/host';
@@ -22,6 +21,7 @@ import { Ticker } from '../ui/Hud';
 import { HowToPlay } from '../ui/HowToPlay';
 import { SettingsPanel } from '../ui/Panels';
 import { UpdatePrompt } from '../ui/UpdatePrompt';
+import { expectFarm, mountCurtain, swap } from './curtain';
 import { ServicesContext, type Services } from './services';
 import { Stage, useViewport } from './Stage';
 import { viewport } from './viewport';
@@ -37,7 +37,27 @@ const FONTS = ['16px "Pixelify Sans"', '8px Silkscreen', 'bold 8px Silkscreen'];
 export function App() {
   const vp = useViewport();
   const [services, setServices] = useState<Services | null>(null);
-  const [screen, setScreen] = useState<Screen>('boot');
+  const [screen, setScreenNow] = useState<Screen>('boot');
+  /** The farm's art is in (warmed while the title shows): PLAY goes straight to the farm. */
+  const farmWarm = useRef(false);
+  /**
+   * Every screen change goes through the curtain (app/curtain.ts): it covers, the change happens, the
+   * next screen draws, then it uncovers. The farm keeps the curtain closed until it has drawn, and a
+   * farm whose art is already in skips the loading screen.
+   */
+  const screenRef = useRef<Screen>('boot');
+  screenRef.current = screen;
+  const setScreen = useCallback((next: Screen | ((s: Screen) => Screen)) => {
+    const n = typeof next === 'function' ? next(screenRef.current) : next;
+    const to = n === 'loadingFarm' && farmWarm.current ? 'farm' : n;
+    if (to === screenRef.current) return;
+    void swap(() => {
+      const ready = to === 'farm' ? expectFarm() : undefined;
+      screenRef.current = to;
+      setScreenNow(to);
+      return ready;
+    });
+  }, []);
   const [progress, setProgress] = useState(0);
   const [config, setConfig] = useState<ServerConfigView | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -61,7 +81,8 @@ export function App() {
         audio.setLevels(settings.get().sound);
         const v0 = viewport.get();
         // stage 1: the loading screen's own art (a few KB), on screen at once
-        await assets.loadGroups([...BOOT_GROUPS], v0.p);
+        // fonts before any text shows, with the loading screen's own art
+        await Promise.all([assets.loadGroups([...BOOT_GROUPS], v0.p), ...FONTS.map((f) => document.fonts.load(f).catch(() => undefined))]);
         pixi.setScene(new BackdropScene(assets, 'loading'));
         // the page's own loading screen (index.html) hands over to the game's
         document.getElementById('boot')?.remove();
@@ -74,14 +95,19 @@ export function App() {
         // the mint's own address opens the mint (it needs the card art)
         if (location.pathname === MINT_PATH) await assets.loadGroups(['cards'], v0.p).catch(() => undefined);
         setScreen(location.pathname === MINT_PATH ? 'mint' : 'title');
+        // the farm's art warms while the title shows (PLAY then opens the farm at once)
+        void assets
+          .loadGroups([...FARM_GROUPS], viewport.get().farm.k, { quick: true })
+          .then(() => {
+            farmWarm.current = true;
+          })
+          .catch(() => undefined);
         void audio.load(BOOT_SOUNDS).catch(() => undefined);
-        // stage 3 starts now: the farm's art downloads while the player reads the title
-        void assets.loadGroups([...FARM_GROUPS], viewport.get().farm.k, { quick: true }).catch(() => undefined);
       } catch (e) {
         setFatal(e instanceof Error ? e.message : String(e));
       }
     })();
-  }, []);
+  }, [setScreen]);
 
   // a new window density brings the matching atlases for the groups already loaded (sprites keep
   // drawing meanwhile); it never starts a group early
@@ -111,9 +137,6 @@ export function App() {
     img.src = services.assets.url('34-cursor');
   }, [services, cursorPx]);
 
-  useEffect(() => {
-    if (screenEl.current) motion.slideIn(screenEl.current, 'up');
-  }, [screen]);
 
   const unlockAudio = () => {
     if (!services || audioReady) return;
@@ -141,7 +164,7 @@ export function App() {
     const onPop = () => setScreen((s) => (s === 'title' && location.pathname === MINT_PATH ? 'mint' : s === 'mint' && location.pathname !== MINT_PATH ? 'title' : s));
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, []);
+  }, [setScreen]);
 
   const play = () => {
     unlockAudio();
@@ -203,7 +226,7 @@ export function App() {
   const saveFarm = useCallback(() => {
     setFromGuest(true);
     setScreen('login');
-  }, []);
+  }, [setScreen]);
 
   // farm loading: the jingle plays while the farm's art and sound arrive
   useEffect(() => {
@@ -219,17 +242,26 @@ export function App() {
     void assets
       .loadGroups([...FARM_GROUPS], v.farm.k, { quick: true, onEach: tick })
       .then(() => {
-        setTimeout(() => setScreen('farm'), 250);
-        // the sharp farm first; sounds and the other screens' art a few seconds after it, so nothing
-        // shares the line with the farm while it opens
-        void assets
-          .loadGroups([...FARM_GROUPS], v.farm.k)
-          .catch(() => undefined)
-          .then(() => new Promise((r) => setTimeout(r, 3000)))
-          .then(() => audio.load(FARM_SOUNDS).catch(() => undefined))
-          .then(() => assets.loadGroups([...LATER_GROUPS], viewport.get().p).catch(() => undefined));
+        farmWarm.current = true;
+        setScreen('farm');
       })
       .catch((e: unknown) => setFatal(e instanceof Error ? e.message : String(e)));
+  }, [screen, services, setScreen]);
+
+  // once the farm is open (by the loading screen, or straight from PLAY when its art was warm): the
+  // sharp farm first; sounds and the other screens' art a few seconds after it, so nothing shares the
+  // line with the farm while it opens. Once a visit.
+  const followUp = useRef(false);
+  useEffect(() => {
+    if (screen !== 'farm' || !services || followUp.current) return;
+    followUp.current = true;
+    const { assets, audio } = services;
+    void assets
+      .loadGroups([...FARM_GROUPS], viewport.get().farm.k)
+      .catch(() => undefined)
+      .then(() => new Promise((r) => setTimeout(r, 3000)))
+      .then(() => audio.load(FARM_SOUNDS).catch(() => undefined))
+      .then(() => assets.loadGroups([...LATER_GROUPS], viewport.get().p).catch(() => undefined));
   }, [screen, services]);
 
   const onSignedIn = (s: SignedIn) => {
@@ -247,7 +279,7 @@ export function App() {
     sessionStore.set(null);
     setSignedIn(null);
     setScreen('login');
-  }, [signedIn]);
+  }, [signedIn, setScreen]);
 
   return (
     <Stage onMount={onMount} cursor={cursor} onPointerDown={unlockAudio}>
@@ -322,6 +354,8 @@ export function App() {
           </div>
         </div>
       )}
+      {/* the curtain every screen change fades through (app/curtain.ts) */}
+      <div ref={mountCurtain} className="curtain" aria-hidden="true" />
     </Stage>
   );
 }

@@ -197,13 +197,22 @@ export class FrameSprite extends Container {
     if (changed) this.apply();
   }
 
+  /** One anchor for every frame (a sheet whose frames carry stray anchors would jump between frames). */
+  private pinned: { x: number; y: number } | null = null;
+  pin(x: number, y: number): this {
+    this.pinned = { x, y };
+    this.apply();
+    return this;
+  }
+
   private apply(): void {
     this.frames.forEach((frames, layer) => {
       const f = frames[Math.min(this.i, frames.length - 1)];
       const s = this.layers[layer];
       if (!f || !s) return;
       s.texture = f.texture;
-      s.anchor.set(f.texture.defaultAnchor?.x ?? 0.5, f.texture.defaultAnchor?.y ?? 1);
+      if (this.pinned) s.anchor.set(this.pinned.x, this.pinned.y);
+      else s.anchor.set(f.texture.defaultAnchor?.x ?? 0.5, f.texture.defaultAnchor?.y ?? 1);
     });
   }
 }

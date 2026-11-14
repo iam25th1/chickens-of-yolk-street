@@ -1,9 +1,20 @@
-// Loading and title backdrops: a 640x360 plate with drifting clouds and little hens.
-import { Container } from 'pixi.js';
+// Loading and title backdrops: a 640x360 plate with drifting clouds and little hens. On the title the
+// hens march along a path on ground drawn by code in the plate's own colours: the plate's art ends at
+// y 300 and below it is one flat green, which a tall window shows as a bare band.
+import { Container, Graphics } from 'pixi.js';
 import type { AssetStore } from '../assets/store';
 import { FrameSprite } from './FrameSprite';
 import type { Scene } from './host';
-import { Plate, PLATE_W } from './plate';
+import { Plate, PLATE_H, PLATE_W } from './plate';
+
+/** Where the plate's art ends (below it the plate is one flat green), and the hens' path. */
+const GROUND_Y = 300;
+const PATH_Y = 342;
+/** The plate's own colours: its meadow, its lighter grass, its path and the path's edge. */
+const MEADOW = 0x82b425;
+const TUFT = 0xafcc22;
+const PATH = 0xcdd659;
+const PATH_EDGE = 0xbbc138;
 
 interface Drifter {
   s: FrameSprite;
@@ -19,6 +30,8 @@ export class BackdropScene implements Scene {
   private readonly sprites: FrameSprite[] = [];
   private logo: FrameSprite | null = null;
   private readonly plate: Plate;
+  /** The title's ground below the plate's art (redrawn to the window's width and height). */
+  private readonly ground: Graphics | null;
 
   constructor(
     private readonly assets: AssetStore,
@@ -28,6 +41,11 @@ export class BackdropScene implements Scene {
     const anim = kind === 'loading' ? '25-loading-anim' : '26-title-anim';
     this.plate = new Plate(assets, plate, this.root);
     const at = this.plate.content;
+    this.ground = kind === 'title' ? new Graphics() : null;
+    if (this.ground) {
+      at.addChild(this.ground);
+      this.drawGround({ x: 0, y: 0, w: PLATE_W, h: PLATE_H });
+    }
 
     const cloudRow = kind === 'loading' ? 'big-cloud' : 'clouds';
     const clouds: [string, number, number, number][] = [
@@ -57,12 +75,18 @@ export class BackdropScene implements Scene {
         this.sprites.push(s);
       }
     } else {
+      const hens: FrameSprite[] = [];
       for (let i = 0; i < 5; i++) {
-        const s = new FrameSprite(assets, [anim], 'hen-march').desync();
-        s.position.set(-40 - i * 34, 336);
+        // the march row's frames carry anchors that swap sides every frame (the hen would jump half
+        // its frame each step): one anchor, the frame's centre, for every frame
+        const s = new FrameSprite(assets, [anim], 'hen-march').desync().pin(0.5, 0.5);
+        s.position.set(-40 - i * 34, PATH_Y - 6);
         at.addChild(s);
         this.drifters.push({ s, speed: 0.022, min: -200, max: PLATE_W + 40 });
+        hens.push(s);
       }
+      // read only, for automated checks: where each marching hen is drawn (CSS pixels)
+      (window as unknown as { __coysTitle?: unknown }).__coysTitle = { hens: () => hens.map((h) => Math.round(h.getBounds().minX * 10) / 10) };
     }
   }
 
@@ -80,9 +104,33 @@ export class BackdropScene implements Scene {
     return logo;
   }
 
+  /**
+   * The title's ground from the plate's art line (y 300) to the window's foot, across the window: the
+   * plate's meadow green with tufts in its lighter green, and the plate's pale path where the hens walk.
+   */
+  private drawGround(view: { x: number; y: number; w: number; h: number }): void {
+    const g = this.ground;
+    if (!g) return;
+    const x0 = Math.floor(Math.min(0, view.x)) - 2;
+    const x1 = Math.ceil(Math.max(PLATE_W, view.x + view.w)) + 2;
+    const y1 = Math.ceil(Math.max(PLATE_H, view.y + view.h)) + 2;
+    g.clear();
+    g.rect(x0, GROUND_Y, x1 - x0, y1 - GROUND_Y).fill({ color: MEADOW });
+    // tufts: two-pixel marks on a fixed grid (the same at every window size), never on the path
+    for (let y = GROUND_Y + 4; y < y1; y += 9) {
+      if (y > PATH_Y - 13 && y < PATH_Y + 13) continue;
+      const shift = ((y - GROUND_Y) / 9) % 2 ? 6 : 0;
+      for (let x = Math.floor(x0 / 12) * 12 + shift; x < x1; x += 12) g.rect(x, y, 2, 1).fill({ color: TUFT }).rect(x + 1, y - 1, 1, 1).fill({ color: TUFT });
+    }
+    g.rect(x0, PATH_Y - 10, x1 - x0, 20).fill({ color: PATH });
+    g.rect(x0, PATH_Y - 11, x1 - x0, 1).fill({ color: PATH_EDGE });
+    g.rect(x0, PATH_Y + 10, x1 - x0, 1).fill({ color: PATH_EDGE });
+  }
+
   /** Clouds and marching hens cross the whole window, not only the plate. */
   resize(view: { x: number; y: number; w: number; h: number }): void {
     this.plate.resize(view);
+    this.drawGround(view);
     for (const d of this.drifters) {
       d.min = Math.min(d.min, view.x - 200);
       d.max = Math.max(PLATE_W + 40, view.x + view.w + 80);
