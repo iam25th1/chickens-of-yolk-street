@@ -2,8 +2,8 @@
   "version": 1,
   "source": {
     "repo": "iam25th1/coys-assets",
-    "commit": "7d871650deab40e455a86a8e1707d7284441570f",
-    "manifestSha256": "fdda7ea1836d20db48be8de8246736806b9c32ab27c5579b9096631670430417"
+    "commit": "a2a8ebbbf1bd414f55c14d3a3cb2a042f2cef0a9",
+    "manifestSha256": "fd9ca28e316ec1985e584f904a55b0c985cb247b7fc4072bec5822636c41796a"
   },
   "sprites": {
     "01-hen-base": {
@@ -181,7 +181,7 @@
     "04-upstart": {
       "json": "sprites/04-upstart.json",
       "png": "sprites/04-upstart.png",
-      "sha256": "47b9ce7c6e8086ded19dd857c36bda4d9f2f87ed8c80cc44a6a113440d2282a8",
+      "sha256": "6dd2c0dc0c9b8b6a98ac6c87b13706ba2d384d8beb37a3dd3a86cbab3b986579",
       "source": "art/04-upstart/04-upstart.png",
       "role": "canonical",
       "docTracker": "04",
@@ -405,7 +405,7 @@
     "09-market-trader": {
       "json": "sprites/09-market-trader.json",
       "png": "sprites/09-market-trader.png",
-      "sha256": "88d2541484db2992d7bef7ffc69dc14051dc8bd772e4ec2052a14151d438c1e3",
+      "sha256": "9ce7cf78d38bbe7e5fbd97aae25fd2bfac20378dcdf03deaf5535f80baa918b2",
       "source": "art/09-market-trader/09-market-trader.png",
       "role": "canonical",
       "docTracker": "09",
@@ -3149,7 +3149,7 @@
     "x-badge-frames": {
       "json": "sprites/x-badge-frames.json",
       "png": "sprites/x-badge-frames.png",
-      "sha256": "ed03e76e314984dc27df7cba4069ff330fccf9f3526d8b0fc085f9ab9abc32a0",
+      "sha256": "4091f5b5f57537c18d37bee1b067c7bebcfdabccf895fb795481246abb88895b",
       "source": "art/x-badge-frames/x-badge-frames.png",
       "role": "extra",
       "docTracker": null,
@@ -3195,7 +3195,7 @@
     "x-badge-icons": {
       "json": "sprites/x-badge-icons.json",
       "png": "sprites/x-badge-icons.png",
-      "sha256": "cb194ca476e947b6ec46374e4a585e74edd2b2e1858237f8bedbaf83a3503f5b",
+      "sha256": "dd64889535e8d9ad546ab24fb62657da45ca0ace30eaf7b5ce8afb55c83b2d0a",
       "source": "art/x-badge-icons/x-badge-icons.png",
       "role": "extra",
       "docTracker": null,
@@ -3451,7 +3451,7 @@
     "x-hatch-egg": {
       "json": "sprites/x-hatch-egg.json",
       "png": "sprites/x-hatch-egg.png",
-      "sha256": "b5a3919bed5ae9184092b79a3eff4c4bac200d949549b2f0b559004ff189cfdd",
+      "sha256": "895a848af260b11681bd9f6366ab60fbc35645a26943dde69997aeb1a573985f",
       "source": "art/x-hatch-egg/x-hatch-egg.png",
       "role": "extra",
       "docTracker": null,

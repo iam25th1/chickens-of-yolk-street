@@ -21,12 +21,12 @@ Factor 1 means no downscale passes: the art keeps its original resolution, and t
 | 02-eyes-sleepy | painted | 1024x1792 | 2: 15.13% | 1 | 0.00% | 8 | 37.71% |
 | 02-eyes-wild | painted | 1024x1792 | 2: 13.91% | 1 | 0.00% | 8 | 35.18% |
 | 03-chick | unused | 1024x1024 | 2: 11.43% | 1 | 0.00% | 1 | n/a |
-| 04-upstart | painted | 1024x1280 | 2: 21.07% | 1 | 0.00% | 4 | 31.99% |
+| 04-upstart | painted | 1024x1280 | 2: 21.10% | 1 | 0.00% | 4 | 32.06% |
 | 05-old-money | painted | 1024x1280 | 2: 16.30% | 1 | 0.00% | 4 | 26.89% |
 | 06-squeezer | painted | 1024x1280 | 2: 14.54% | 1 | 0.00% | 4 | 22.95% |
 | 07-loyalist | painted | 1024x1280 | 2: 15.72% | 1 | 0.00% | 4 | 24.82% |
 | 08-bakery-buyer | painted | 1024x1024 | 2: 13.82% | 1 | 0.00% | 4 | 21.72% |
-| 09-market-trader | painted | 1024x1024 | 2: 14.90% | 1 | 0.00% | 4 | 24.35% |
+| 09-market-trader | painted | 1024x1024 | 2: 14.93% | 1 | 0.00% | 4 | 24.40% |
 | 10-wholesaler | painted | 1024x1024 | 2: 12.36% | 1 | 0.00% | 4 | 20.56% |
 | 11-egg-brown | painted | 1024x1024 | 2: 6.54% | 1 | 0.00% | 12 | 24.28% |
 | 11-egg-cream | painted | 1024x1280 | 2: 9.84% | 1 | 0.00% | 12 | 31.06% |
@@ -120,8 +120,8 @@ Painted pages are WebP (quality 90, alpha lossless); exact pages are lossless PN
 | farm.wide@6 | 3938x719 | 787.3 KB |
 | market | 899x362 | 10.9 KB |
 | cards | 901x3275 | 40.3 KB |
-| cards.wide@2 | 4076x716 | 1084.2 KB |
-| cards.wide@3 | 4096x1430 | 1945.6 KB |
-| cards.wide@4 | 4082x1896 | 2553.1 KB |
+| cards.wide@2 | 4076x716 | 1084.0 KB |
+| cards.wide@3 | 4096x1430 | 1945.5 KB |
+| cards.wide@4 | 4082x1896 | 2553.0 KB |
 | ui | 510x642 | 8.7 KB |
 | fx | 355x130 | 5.0 KB |
