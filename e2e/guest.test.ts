@@ -138,13 +138,21 @@ describe('guest play', () => {
         await page.keyboard.press('Escape');
         await page.waitForTimeout(400);
 
-        // about ten minutes of play (a simulated clock): one offer to save the farm, and LATER is final for the session
-        expect(await page.locator('[data-ui="save-farm"]').count()).toBe(0);
-        await page.evaluate(() => (window as unknown as { __coysGuest: { play(ms: number): void } }).__coysGuest.play(9 * 60 * 1000));
-        await page.waitForTimeout(600);
-        expect(await page.locator('[data-ui="save-farm"]').count()).toBe(0);
-        await page.evaluate(() => (window as unknown as { __coysGuest: { play(ms: number): void } }).__coysGuest.play(60 * 1000));
+        // about ten minutes of play (a simulated clock): one offer to save the farm, and LATER is final for the session.
+        // The real time already played counts too, so the clock goes to a minute short of ten, then past it.
+        // (a real milestone roll at a day close may bring a ticket card meanwhile: only the offer is looked at)
         const nudge = page.locator('[data-ui="save-farm"][data-reason="nudge"]');
+        expect(await nudge.count()).toBe(0);
+        const played = await page.evaluate(() => (window as unknown as { __coysGuest: { played(): number } }).__coysGuest.played());
+        expect(played).toBeLessThan(9 * 60 * 1000);
+        await page.evaluate((ms) => (window as unknown as { __coysGuest: { play(ms: number): void } }).__coysGuest.play(ms), 9 * 60 * 1000 - played);
+        await page.waitForTimeout(600);
+        expect(await nudge.count()).toBe(0);
+        for (let i = 0; i < 4 && (await page.locator('[data-ui="save-farm"]').count()); i++) {
+          await page.keyboard.press('Escape');
+          await page.waitForTimeout(400);
+        }
+        await page.evaluate(() => (window as unknown as { __coysGuest: { play(ms: number): void } }).__coysGuest.play(2 * 60 * 1000));
         await nudge.waitFor({ timeout: 5000 });
         await page.waitForTimeout(700);
         await check('ten-minute offer');
@@ -153,7 +161,7 @@ describe('guest play', () => {
         await nudge.waitFor({ state: 'detached' });
         await page.evaluate(() => (window as unknown as { __coysGuest: { play(ms: number): void } }).__coysGuest.play(30 * 60 * 1000));
         await page.waitForTimeout(1500);
-        expect(await page.locator('[data-ui="save-farm"]').count()).toBe(0);
+        expect(await nudge.count()).toBe(0);
         // a reload in the same session: the same guest farm with PLAY, and no second offer
         await page.reload();
         await play.waitFor({ timeout: 60_000 });
