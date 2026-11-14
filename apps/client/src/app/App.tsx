@@ -244,17 +244,25 @@ export function App() {
       .then(() => {
         farmWarm.current = true;
         setScreen('farm');
-        // the sharp farm first; sounds and the other screens' art a few seconds after it, so nothing
-        // shares the line with the farm while it opens
-        void assets
-          .loadGroups([...FARM_GROUPS], v.farm.k)
-          .catch(() => undefined)
-          .then(() => new Promise((r) => setTimeout(r, 3000)))
-          .then(() => audio.load(FARM_SOUNDS).catch(() => undefined))
-          .then(() => assets.loadGroups([...LATER_GROUPS], viewport.get().p).catch(() => undefined));
       })
       .catch((e: unknown) => setFatal(e instanceof Error ? e.message : String(e)));
   }, [screen, services, setScreen]);
+
+  // once the farm is open (by the loading screen, or straight from PLAY when its art was warm): the
+  // sharp farm first; sounds and the other screens' art a few seconds after it, so nothing shares the
+  // line with the farm while it opens. Once a visit.
+  const followUp = useRef(false);
+  useEffect(() => {
+    if (screen !== 'farm' || !services || followUp.current) return;
+    followUp.current = true;
+    const { assets, audio } = services;
+    void assets
+      .loadGroups([...FARM_GROUPS], viewport.get().farm.k)
+      .catch(() => undefined)
+      .then(() => new Promise((r) => setTimeout(r, 3000)))
+      .then(() => audio.load(FARM_SOUNDS).catch(() => undefined))
+      .then(() => assets.loadGroups([...LATER_GROUPS], viewport.get().p).catch(() => undefined));
+  }, [screen, services]);
 
   const onSignedIn = (s: SignedIn) => {
     setSignedIn({ session: s.login.session, accountId: s.accountId });

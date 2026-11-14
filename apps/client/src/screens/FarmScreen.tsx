@@ -275,12 +275,12 @@ export function FarmScreen({ session, accountId, onSignedOut, onSave }: { sessio
   // into and out of the Market through the curtain: the town square's art is in, the page and the
   // town square are up and drawn, then the curtain opens (no half-drawn or previous frame)
   useEffect(() => {
-    setPageSwap((apply) => {
-      void swap(async () => {
+    setPageSwap((apply) =>
+      swap(async () => {
         if (!viewport.get().portrait) await assets.loadGroups(['market'], viewport.get().p, { quick: true }).catch(() => undefined);
         apply();
-      });
-    });
+      }),
+    );
     return () => setPageSwap(null);
   }, [assets]);
 
