@@ -53,6 +53,12 @@ Every step is the owner's.
 
 ## 4. Deploy
 
+- [ ] Any change to the service's environment follows the rule in
+  [deploy/pier/README.md](../deploy/pier/README.md#changing-a-variable-never-a-partial-environment):
+  read the full key list, merge the change, write it back, then confirm the key count and every key
+  name are unchanged except the one being set. Never send a partial environment.
+
+
 - [ ] Write a mainnet deploy script on purpose: today's `scripts/deploy-testnet-contract.ts` and
       the server's `assertTestnetConfig` **refuse** any non-testnet account or RPC, by design. Do
       not loosen those checks in place; add a separate mainnet path with its own explicit flag and

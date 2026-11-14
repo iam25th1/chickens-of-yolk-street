@@ -75,6 +75,21 @@ in [.env.example](../../.env.example).
 The boot log lists every variable as `set` or `unset` (never a value) and warns loudly about
 anything missing.
 
+### Changing a variable (never a partial environment)
+
+Pier's environment update replaces the whole set: a write that names one key drops every other key.
+On 14 November 2026 one such write left the live service with one variable of twelve; the others were
+read back from the running process before any restart. So every change, every time:
+
+1. Read the full current key list (`GET /projects/<id>/env` answers `{ keys: [{ key, length }] }`;
+   never print a value or its preview).
+2. Merge the change into it: every existing key as `__PIER_KEEP__`, only the key being set with its
+   new value. Stop without writing if the merged set is missing any current key.
+3. Write the merged set back in one update.
+4. Read the list again and confirm the key count and every key name are unchanged except the one being
+   set, and that key's length is the new value's length. Restart only after that check passes.
+
+
 ## Cloudflare tunnel
 
 The game has a Cloudflare tunnel of its own, `yolkstreet`, in the **25th.dev** account, registered in Pier as a
