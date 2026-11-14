@@ -63,7 +63,15 @@ async function luminance(page: Page): Promise<number> {
 async function holdsStill(page: Page, what: string, n: number, step: (i: number) => Promise<void>, opts: { luma?: boolean } = {}): Promise<string[]> {
   await page.locator('[data-ui="modal"]').first().waitFor();
   await page.waitForTimeout(900);
-  const settled = await pose(page);
+  // (a modal that waits its turn behind a screen change opens a little later: settled is when two
+  // looks 300 ms apart agree)
+  let settled = await pose(page);
+  for (let i = 0; i < 10; i++) {
+    await page.waitForTimeout(300);
+    const again = await pose(page);
+    if (JSON.stringify(again) === JSON.stringify(settled)) break;
+    settled = again;
+  }
   let last = await luminance(page);
   const problems: string[] = [];
   for (let i = 0; i < n; i++) {
